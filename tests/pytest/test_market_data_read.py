@@ -408,6 +408,12 @@ class TestFullLoop:
         body = r.get_json()
         assert body["error"] == "unknown_pair"
         assert body["supported_pairs"] == ["ETH/USD", "USDC/USD"]
+        # P1-1: the 400 must NOT burn the single-use token — the
+        # same token still delivers once the payload is valid.
+        r2 = _serve_paid(client, paid["access_token"],
+                         {"pair": "ETH/USD"})
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["round_id"] == 424242
 
     def test_unpaid_serve_rejected(
             self, client, x402_db, mock_onchain, feed):

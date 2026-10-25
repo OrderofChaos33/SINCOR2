@@ -12,33 +12,39 @@ never healthy):
 - Fresh snapshot (age <= 48h, the P20 ``LIST_FRESHNESS_FAIL_SECONDS``
   window): a listed address returns ``flagged`` with the real snapshot
   entry metadata; an unlisted address returns ``clean``.
-- Stale snapshot (age > 48h): EVERY address returns ``unknown`` with
-  ``stale: true`` — never ``clean``, never ``flagged``. A stale list
-  cannot prove either, and this module will not fake-fresh. This mirrors
-  the AML adapter, which returns Verdict.STALE before it ever looks at
-  the sanctions set.
+- Stale snapshot (age > 48h): the screening function reports EVERY
+  address as ``unknown`` with ``stale: true`` — never ``clean``, never
+  ``flagged``. A stale list cannot prove either, and this module will
+  not fake-fresh. This mirrors the AML adapter, which returns
+  Verdict.STALE before it ever looks at the sanctions set.
 - Every response carries the snapshot provenance (publication date,
   fetched_at, entry count) so the buyer can judge the evidence.
 
 Payment is NOT handled here: the serve path sits behind the standard
 x402 flow (bound challenge -> verify with require_bound_challenge=True
--> single-use access token consumed by ``access_granted`` in the billing
-blueprint). This module only does the screening work that is served
-after settlement.
+-> single-use access token). Since P1-3a the paid serve REFUSES a
+stale snapshot with ``503 snapshot_stale`` instead of charging $0.005
+for an unscreened ``unknown`` — and since P1-1 the billing blueprint
+consumes the token only on a 200, so the 503 never burns it. The
+snapshot is refreshed by ``python -m sincor2.refresh_ofac_sdn``
+(boot/daily): a refreshed copy under ``SINCOR_DATA_DIR`` wins over
+the vendored bundled file when present.
 """
 
 from __future__ import annotations
 
 import datetime
+import os
 import re
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from sincor2.defi.compliance_automation import (
     LIST_FRESHNESS_ALERT_SECONDS,
     LIST_FRESHNESS_FAIL_SECONDS,
 )
-from sincor2.defi.ofac_sdn import load_snapshot
+from sincor2.defi.ofac_sdn import SNAPSHOT_FILENAME, load_snapshot
 
 RESOURCE_ID = "wallet-sanctions-screen"
 
@@ -51,8 +57,18 @@ _INDEX_CACHE: Dict[int, Dict[str, Dict[str, Any]]] = {}
 
 
 def load_screen_snapshot() -> Dict[str, Any]:
-    """Load the vendored OFAC snapshot. Seam for tests to inject a
-    snapshot with a controlled ``fetched_at`` (freshness fixtures)."""
+    """Load the active OFAC snapshot. Seam for tests to inject a
+    snapshot with a controlled ``fetched_at`` (freshness fixtures).
+
+    Read order: a refreshed snapshot under ``SINCOR_DATA_DIR``
+    (written by ``python -m sincor2.refresh_ofac_sdn``) wins when
+    present; otherwise the vendored bundled file is the fallback.
+    """
+    data_dir = os.environ.get("SINCOR_DATA_DIR", "")
+    if data_dir:
+        candidate = Path(data_dir) / SNAPSHOT_FILENAME
+        if candidate.exists():
+            return load_snapshot(str(candidate))
     return load_snapshot()
 
 
@@ -179,11 +195,14 @@ def serve_sanctions_screen(
     payload: Optional[Dict[str, Any]],
 ) -> tuple[int, Dict[str, Any]]:
     """Serve-path handler for the paid resource (called by the billing
-    blueprint ONLY after the x402 access token has been consumed).
+    blueprint after the x402 access token has been PEEK-verified; the
+    token is consumed only when this returns a 200 — P1-1).
 
     The address to screen arrives in the request payload as ``address``
     (aliases: ``wallet_address``, ``wallet``). A missing/invalid address
-    is a 400 — the screening itself never guesses an address.
+    is a 400 — the screening itself never guesses an address. A stale
+    snapshot is a 503 ``snapshot_stale`` (P1-3a): the buyer is never
+    charged for an unscreened ``unknown``.
     """
     payload = payload or {}
     address = (
@@ -195,4 +214,8 @@ def serve_sanctions_screen(
     result = screen_wallet(address)
     if not result.get("ok"):
         return 400, result
+    if result.get("stale"):
+        # Fail closed BEFORE charging: a stale list proves nothing, so
+        # this is an availability refusal, not a screening verdict.
+        return 503, {**result, "ok": False, "error": "snapshot_stale"}
     return 200, result

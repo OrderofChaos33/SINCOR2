@@ -421,3 +421,8 @@ class TestFullLoop:
         r = _serve(client, paid["access_token"], {})
         assert r.status_code == 400
         assert r.get_json()["error"] == "agent_id_or_wallet_required"
+        # P1-1: the 400 must NOT burn the single-use token — the
+        # same token still delivers once the payload is valid.
+        r2 = _serve(client, paid["access_token"], {"agent_id": AGENT})
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["score"] == 70

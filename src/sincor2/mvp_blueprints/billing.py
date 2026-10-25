@@ -492,9 +492,14 @@ def x402_paid_resource(resource_id):
     """Serve paid API payloads after x402 access token presented."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
-    from sincor2.x402_payments import access_granted, execute_paid_resource
+    from sincor2.x402_payments import access_granted
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
-    if not access_granted(token, resource_id):
+    # P1-1: PEEK first (consume=False) — never burn the buyer's
+    # single-use token before a deliverable exists. A 400 bad payload
+    # or a 503/500 upstream failure previously consumed the token up
+    # front and charged the buyer for no service. The token is
+    # consumed atomically below, only when the dispatch returns a 200.
+    if not access_granted(token, resource_id, consume=False):
         from sincor2.x402_payments import challenge_bind_message, create_challenge
         # W-102 round 3: mint an unbound draft; the payer proves wallet
         # ownership by signing the bind message and POSTing it to
@@ -515,103 +520,125 @@ def x402_paid_resource(resource_id):
                 ch['challenge_id'], resource_id, wallet)
             ch['payer_wallet_hint'] = wallet
         return jsonify(ch), 402
+    status, body = _paid_skill_dispatch(resource_id)
+    if status == 200:
+        # Deliverable in hand: burn the token now. The consume
+        # re-checks expiry/consumption and stamps token_consumed_at
+        # via a conditional UPDATE, so the token still grants exactly
+        # one delivered 200 even under concurrency; a caller that
+        # loses the race is refused rather than served twice.
+        if not access_granted(token, resource_id, consume=True):
+            return jsonify({'ok': False,
+                            'error': 'access_token_already_consumed'}), 409
+    return jsonify(body), status
+
+
+def _paid_skill_dispatch(resource_id):
+    """Run the paid handler for ``resource_id`` -> (status, body).
+
+    Called only after the access token has been PEEK-verified
+    (x402_paid_resource); this function never touches token state.
+    Non-200 outcomes leave the token unconsumed so the buyer can fix
+    the payload (or wait out an upstream outage) and retry (P1-1).
+    """
+    from sincor2.x402_payments import execute_paid_resource
     if resource_id == 'web-search-read':
-        # Web search + page read (G5). The access token was
-        # consumed by access_granted above (settle-before-serve,
-        # single-use); the buyer's {mode, query|url} payload is
-        # validated after payment. Stateless: every call re-runs
-        # through the module's provider seam.
+        # Web search + page read (G5). The buyer's {mode, query|url}
+        # payload is validated by the handler; the caller consumes
+        # the token only when this returns a 200 (P1-1). Stateless:
+        # every call re-runs through the module's provider seam.
         from sincor2.web_search_read import serve_web_search_read
         wsr_payload = request.get_json(silent=True)
         if wsr_payload is None:
             wsr_payload = request.args.to_dict(flat=True)
             wsr_payload.pop('access_token', None)
         status, body = serve_web_search_read(wsr_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'local-business-site-check':
-        # Local-business site check (G8). The access token was
-        # consumed by access_granted above (settle-before-serve,
-        # single-use); the business URL/name arrive in the request
-        # payload, validated after payment. Stateless: every call
-        # re-fetches through the module's fetch seam.
+        # Local-business site check (G8). The business URL/name
+        # arrive in the request payload, validated by the handler;
+        # the caller consumes the token only on a 200 (P1-1).
+        # Stateless: every call re-fetches through the module's
+        # fetch seam.
         from sincor2.site_check import serve_site_check
         sc_payload = request.get_json(silent=True)
         if sc_payload is None:
             sc_payload = request.args.to_dict(flat=True)
             sc_payload.pop('access_token', None)
         status, body = serve_site_check(sc_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'market-data-read':
-        # Market-data single price read (G6). The access token was
-        # consumed by access_granted above (settle-before-serve,
-        # single-use); the pair/mode arrive in the request payload,
-        # validated after payment. Stateless: every call re-reads
-        # the Chainlink feed seam.
+        # Market-data single price read (G6). The pair/mode arrive
+        # in the request payload, validated by the handler; the
+        # caller consumes the token only on a 200 (P1-1). Stateless:
+        # every call re-reads the Chainlink feed seam.
         from sincor2.market_data_read import serve_market_data_read
         md_payload = request.get_json(silent=True)
         if md_payload is None:
             md_payload = request.args.to_dict(flat=True)
             md_payload.pop('access_token', None)
         status, body = serve_market_data_read(md_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'polymarket-whale-signal':
-        # Polymarket whale signal single read (G3). The access token
-        # was consumed by access_granted above (settle-before-serve,
-        # single-use); optional wallet/market filters come from the
-        # request payload.
+        # Polymarket whale signal single read (G3). Optional
+        # wallet/market filters come from the request payload; the
+        # caller consumes the token only on a 200 (P1-1) — an empty
+        # registry's 503 never consumes it (P1-3b).
         from sincor2.whale_signal import serve_whale_signal
         signal_payload = request.get_json(silent=True)
         if signal_payload is None:
             signal_payload = request.args.to_dict(flat=True)
             signal_payload.pop('access_token', None)
         status, body = serve_whale_signal(signal_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'kya-trust-score':
-        # KYA trust score deep read (G2). The access token was consumed
-        # by access_granted above (settle-before-serve, single-use);
-        # the agent to score comes from the request payload.
+        # KYA trust score deep read (G2). The agent to score comes
+        # from the request payload; the caller consumes the token
+        # only on a 200 (P1-1).
         from sincor2.kya_trust_score import serve_kya_trust_score
         score_payload = request.get_json(silent=True)
         if score_payload is None:
             score_payload = request.args.to_dict(flat=True)
             score_payload.pop('access_token', None)
         status, body = serve_kya_trust_score(score_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'wallet-sanctions-screen':
-        # Single-read OFAC screen (G1). The access token was consumed by
-        # access_granted above (settle-before-serve, single-use); the
-        # address to screen comes from the request payload.
+        # Single-read OFAC screen (G1). The address to screen comes
+        # from the request payload; the caller consumes the token
+        # only on a 200 (P1-1) — a stale snapshot's 503 never
+        # consumes it (P1-3a).
         from sincor2.sanctions_screen import serve_sanctions_screen
         screen_payload = request.get_json(silent=True)
         if screen_payload is None:
             screen_payload = request.args.to_dict(flat=True)
             screen_payload.pop('access_token', None)
         status, body = serve_sanctions_screen(screen_payload)
-        return jsonify(body), status
+        return status, body
     if resource_id == 'hook_status':
         try:
             from sincor2.hook_stats import fetch_hook_status
-            return jsonify({'ok': True, 'resource': resource_id, 'data': fetch_hook_status()}), 200
+            return 200, {'ok': True, 'resource': resource_id,
+                         'data': fetch_hook_status()}
         except Exception as e:
-            return jsonify({'ok': False, 'error': str(e)}), 500
+            return 500, {'ok': False, 'error': str(e)}
     if resource_id == 'toa-micro-decision':
-        # TOA micro-decision (G7). The access token was consumed by
-        # access_granted above (settle-before-serve, single-use); the
-        # decision question arrives as structured options+signals in
-        # the request payload, validated after payment.
+        # TOA micro-decision (G7). The decision question arrives as
+        # structured options+signals in the request payload,
+        # validated by the handler; the caller consumes the token
+        # only on a 200 (P1-1).
         from sincor2.toa_micro_decision import serve_toa_micro_decision
         toa_payload = request.get_json(silent=True)
         if toa_payload is None:
             toa_payload = request.args.to_dict(flat=True)
             toa_payload.pop('access_token', None)
         status, body = serve_toa_micro_decision(toa_payload)
-        return jsonify(body), status
+        return status, body
     payload = request.get_json(silent=True)
     if payload is None:
         payload = request.args.to_dict(flat=True)
         payload.pop('access_token', None)
     status, body = execute_paid_resource(resource_id, payload)
-    return jsonify(body), status
+    return status, body
 
 
 @bp.route('/api/payment/webhook', methods=['POST'])

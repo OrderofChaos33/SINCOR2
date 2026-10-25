@@ -448,6 +448,13 @@ class TestFullLoop:
         assert r.status_code == 503, r.get_json()
         assert r.get_json()["error"] == "provider_not_configured"
         assert "results" not in (r.get_json() or {})
+        # P1-1: the 503 must NOT burn the single-use token — with
+        # the provider configured, the SAME token delivers.
+        provider_stub["mode"] = "ok"
+        r2 = _serve_paid(client, paid["access_token"],
+                         {"mode": "search", "query": "q"})
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["count"] == 2
 
     def test_unpaid_serve_rejected(
             self, client, x402_db, mock_onchain, provider_stub):
