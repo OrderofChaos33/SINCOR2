@@ -221,8 +221,10 @@ def _guarded_resolution(host: str, validated_ips: frozenset):
     aborts BEFORE connecting — the classic DNS-rebinding flip
     (public at validation, private at connect) can no longer land
     the fetch on an internal peer. Resolutions of any other host
-    (e.g. a configured proxy) pass through unmodified, and the
-    original resolver is always restored on exit.
+    pass through unmodified, and the original resolver is always
+    restored on exit. (The fetch never delegates to a proxy — see
+    the ``proxies=`` note in :func:`fetch_site_page` — so the
+    guarded target is the only host the transport resolves.)
     """
     original = socket.getaddrinfo
     target = host.strip().lower().rstrip(".")
@@ -288,6 +290,12 @@ def fetch_site_page(url: str) -> Optional[SiteFetch]:
     resolved at validation time has no validated set to connect
     against, so it also fails closed (``None``) without any transport
     call.
+
+    W-108 caveat B: the transport call passes explicit ``proxies=``
+    entries disabling every scheme, so ambient proxy environment
+    variables can never divert the fetch to a proxy — target
+    resolution always happens here, under the guard, never at a
+    proxy outside it.
     """
     import requests
 
@@ -306,6 +314,19 @@ def fetch_site_page(url: str) -> Optional[SiteFetch]:
                     headers={"User-Agent": "SINCOR-SiteCheck/1.0 "
                                           "(+https://getsincor.com)"},
                     allow_redirects=False,
+                    # W-108 caveat B: never inherit ambient proxy env
+                    # (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY). Delegating
+                    # to a proxy would move target resolution to the
+                    # proxy, outside the guarded pinning above. The
+                    # explicit None entries are what disable the env:
+                    # requests fills env proxies only into ABSENT keys
+                    # (setdefault in merge_environment_settings) and
+                    # then strips None-valued keys, leaving no proxy;
+                    # a bare proxies={} is refilled from the env, and
+                    # "all" must be present or select_proxy falls
+                    # back to ALL_PROXY. (Verified with real
+                    # transport against requests 2.32.)
+                    proxies={"http": None, "https": None, "all": None},
                 )
         except Exception:
             return None

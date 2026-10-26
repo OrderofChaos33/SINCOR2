@@ -117,6 +117,58 @@ def _connecting_transport(routes, connected, requests_seen=None):
     return _fake_get
 
 
+def _proxy_aware_transport(routes, connected, proxy_seen):
+    """A requests.get stand-in that ALSO emulates requests' ambient
+    proxy handling (requests 2.32, trust_env=True), faithfully enough
+    to prove the W-108 caveat-B hardening with real semantics:
+
+    - the per-request ``proxies`` mapping defaults to ``{}``;
+    - environment proxies (``*_proxy`` vars) fill only keys ABSENT
+      from that mapping (``setdefault`` in merge_environment_settings);
+    - None-valued entries are then stripped (merge_setting);
+    - the effective proxy is selected scheme first, then ``all``
+      (requests.utils.select_proxy).
+
+    Verified against real transport: no kwarg and ``proxies={}``
+    both route via the env proxy; ``{"http": None, "https": None,
+    "all": None}`` goes direct. When a proxy is effective the fake
+    "proxy" serves the page itself (target DNS is resolved at the
+    proxy, never through the guarded getaddrinfo) and the hit is
+    recorded in ``proxy_seen``; otherwise it resolves at call time
+    and records the direct connection, like _connecting_transport.
+    """
+    import os
+
+    def _fake_get(url, **kwargs):
+        assert kwargs.get("allow_redirects") is False
+        scheme = urlparse(url).scheme
+        host = urlparse(url).hostname
+        proxies = dict(kwargs.get("proxies") or {})
+        for key, val in os.environ.items():
+            low = key.lower()
+            if low.endswith("_proxy") and low != "no_proxy":
+                proxies.setdefault(low[:-len("_proxy")], val)
+        proxies = {k: v for k, v in proxies.items() if v is not None}
+        proxy = None
+        for key in (f"{scheme}://{host}", scheme, f"all://{host}",
+                    "all"):
+            if key in proxies:
+                proxy = proxies[key]
+                break
+        if proxy is not None:
+            proxy_seen.append((proxy, url))
+            return _FakeResponse(200, url,
+                                 text="<html>served by proxy</html>")
+        port = urlparse(url).port or (
+            443 if scheme == "https" else 80)
+        infos = socket.getaddrinfo(host, port,
+                                   proto=socket.IPPROTO_TCP)
+        connected.append((url, infos[0][4][0]))
+        return routes(url)
+
+    return _fake_get
+
+
 class TestDNSRebindingDirectFetch:
     def test_rebind_flip_at_connect_fails_closed(self, monkeypatch):
         # Validation resolution (#1) sees the public IP; the
@@ -252,6 +304,44 @@ class TestLegitimateFetchStillWorks:
             ("https://shop.example.com/", PUBLIC_IP),
             ("https://shop.example.com/landing", PUBLIC_IP),
         ]
+
+
+class TestAmbientProxyEnvIgnored:
+    def test_proxy_env_does_not_divert_fetch_from_guarded_direct_path(
+            self, monkeypatch):
+        # Caveat B (Builder B): with HTTP_PROXY/HTTPS_PROXY (and
+        # ALL_PROXY) set, a default requests fetch delegates target
+        # resolution to the proxy — outside the guarded getaddrinfo
+        # pinning. The fetch must ignore the ambient proxy env and
+        # take the same guarded direct path as without it.
+        proxy_url = "http://proxy.example.test:8080"
+        for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                    "http_proxy", "https_proxy", "all_proxy"):
+            monkeypatch.setenv(var, proxy_url)
+        monkeypatch.delenv("NO_PROXY", raising=False)
+        monkeypatch.delenv("no_proxy", raising=False)
+        monkeypatch.setattr(
+            socket, "getaddrinfo",
+            _per_host_flip_dns({"shop.example.com": [PUBLIC_IP]}))
+        connected = []
+        proxy_seen = []
+        monkeypatch.setattr(
+            "requests.get",
+            _proxy_aware_transport(
+                lambda url: _FakeResponse(200, url, text=GOOD_HTML),
+                connected, proxy_seen))
+
+        page = sc.fetch_site_page("https://shop.example.com/")
+
+        # The recording fake proxy saw zero requests...
+        assert proxy_seen == []
+        # ...and the fetch followed the guarded direct path: the
+        # validated public address is the one connected to, and the
+        # direct content (not proxy-served content) came back.
+        assert page is not None
+        assert page.status_code == 200
+        assert "Acme Dental" in page.html
+        assert connected == [("https://shop.example.com/", PUBLIC_IP)]
 
 
 class TestUnresolvableFailsClosed:
