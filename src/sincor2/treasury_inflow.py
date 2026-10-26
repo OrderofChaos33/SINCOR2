@@ -157,6 +157,53 @@ def _ensure_ledger_dir() -> None:
         logger.warning("Could not create ledger directory: %s", exc)
 
 
+def _find_inflow_by_key(*, tx_hash: str, source: str, note: str,
+                        amount: float, asset: str,
+                        projected: bool) -> Optional[InflowEvent]:
+    """Existing ledger event for the same payment key, if one was
+    already appended (see the dedupe note in record_inflow)."""
+    try:
+        if not _LEDGER_PATH.is_file():
+            return None
+        lines = _LEDGER_PATH.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    tx = tx_hash.lower()
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (row.get("tx_hash") or "").lower() != tx:
+            continue
+        if row.get("source") != source or row.get("note") != note:
+            continue
+        if (row.get("asset") or "").upper() != asset:
+            continue
+        if bool(row.get("projected")) != projected:
+            continue
+        try:
+            if float(row.get("amount") or 0) != amount:
+                continue
+        except (TypeError, ValueError):
+            continue
+        return InflowEvent(
+            ts=row.get("ts") or _utc_now_iso(),
+            amount=float(row.get("amount") or 0),
+            asset=row.get("asset") or asset,
+            source=row.get("source") or source,
+            usd_estimate=float(row.get("usd_estimate") or 0),
+            tx_hash=row.get("tx_hash"),
+            note=row.get("note") or "",
+            projected=bool(row.get("projected")),
+            event_id=row.get("event_id") or _new_event_id(),
+            supersedes=row.get("supersedes"),
+        )
+    return None
+
+
 def record_inflow(
     amount: float,
     *,
@@ -200,6 +247,18 @@ def record_inflow(
     line = json.dumps(event.to_dict(), separators=(",", ":")) + "\n"
 
     with _lock:
+        if tx_hash:
+            # Crash-safe idempotency (hunt-29 R1): a caller can crash
+            # after this append but before its own commit lands, then
+            # retry. An identical (tx_hash, source, note, amount,
+            # asset, projected) row already in the ledger IS that
+            # payment — return it instead of appending a duplicate.
+            existing = _find_inflow_by_key(
+                tx_hash=tx_hash, source=source, note=note,
+                amount=float(amount), asset=asset.upper(),
+                projected=bool(projected))
+            if existing is not None:
+                return existing
         try:
             with _LEDGER_PATH.open("a", encoding="utf-8") as fh:
                 fh.write(line)

@@ -56,7 +56,16 @@ that finds the applied stamp repairs the flag and acks already_renewed.
 The payment finalize is likewise claimed under the same write lock
 (finalized flag flipped in the transaction that holds the lock across
 finalize_challenge_payment), so concurrent settles cannot append
-duplicate platform-payment / treasury-inflow records for one tx.
+duplicate platform-payment / treasury-inflow records for one tx; and
+the two external stores dedupe on the tx/payment key, so a crash
+after the appends but before the flag commit cannot duplicate them
+on retry either (R1). The platform mirror carries separate claim /
+done flags plus an OS sync lock, so a crash mid-sync is repairable
+by the next duplicate ack instead of silently stuck (R2), and a sync
+failure never flips an already-committed settle to failure (R5).
+Pre-W-105 ledger rows are repaired from the subscription row's
+last_challenge_id evidence (R3) and seeded as already-synced at
+migration when extended=1 (R4).
 
 Proration (pinned in tests; period math mirrors
 platform_payments.activate_subscription exactly so the rail record and
@@ -84,6 +93,7 @@ stripe_checkout.py.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -172,6 +182,7 @@ CREATE TABLE IF NOT EXISTS rail_sub_settles (
     applied_period_index INTEGER NOT NULL DEFAULT 0,
     applied_action       TEXT NOT NULL DEFAULT '',
     platform_synced      INTEGER NOT NULL DEFAULT 0,
+    platform_sync_done   INTEGER NOT NULL DEFAULT 0,
     note          TEXT NOT NULL DEFAULT '',
     created_at    TEXT NOT NULL
 );
@@ -184,6 +195,7 @@ _SETTLE_EXTRA_COLUMNS = {
     "applied_period_index": "INTEGER NOT NULL DEFAULT 0",
     "applied_action": "TEXT NOT NULL DEFAULT ''",
     "platform_synced": "INTEGER NOT NULL DEFAULT 0",
+    "platform_sync_done": "INTEGER NOT NULL DEFAULT 0",
 }
 
 
@@ -205,13 +217,84 @@ def _connect() -> sqlite3.Connection:
     conn.commit()
     existing = {r[1] for r in conn.execute(
         "PRAGMA table_info(rail_sub_settles)")}
+    newly_added = set()
     for col, decl in _SETTLE_EXTRA_COLUMNS.items():
         if col not in existing:
             conn.execute(
                 f"ALTER TABLE rail_sub_settles ADD COLUMN {col} {decl}")
+            newly_added.add(col)
+    conn.commit()
+    if newly_added:
+        _migrate_legacy_settles(conn, newly_added)
+    _repair_legacy_applied_stamps(conn)
     conn.commit()
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _migrate_legacy_settles(conn: sqlite3.Connection,
+                            newly_added: set) -> None:
+    """Seed sync state for settle rows written before the done marker.
+
+    Runs ONLY at the migration moment (a column was just added), never
+    on steady-state connects — a live row with extended=1 and a sync
+    still pending must not be marked done.
+
+    R4: code predating the platform_synced / platform_sync_done
+    columns synced the platform record inside _apply_period, so every
+    pre-existing row with extended=1 WAS already synced. Seed both
+    flags so the first post-upgrade duplicate ack does not re-run the
+    sync and double-extend the platform mirror.
+    """
+    if "platform_sync_done" not in newly_added:
+        return
+    conn.execute(
+        "UPDATE rail_sub_settles SET platform_synced=1, "
+        "platform_sync_done=1 WHERE extended=1")
+    conn.commit()
+
+
+def _repair_legacy_applied_stamps(conn: sqlite3.Connection) -> None:
+    """Seed the applied-period stamp for pre-W-105 crash victims (R3).
+
+    Old code committed the period application and only afterwards
+    wrote extended=1 in a separate transaction; a crash in between
+    left a settle indistinguishable from never-applied — except for
+    the evidence the old _apply_period DID commit: the subscription
+    row's last_challenge_id / last_tx_hash point at exactly the
+    challenge whose period was applied. A verified+finalized settle
+    whose challenge_id matches its subscription row's
+    last_challenge_id therefore already applied its period: stamp it
+    from the subscription row so _apply_period acks already_renewed
+    and never re-applies. The challenge-match makes this safe to run
+    on every connect: an in-flight new-code settle cannot match (its
+    challenge is not the subscription's last applied challenge until
+    the atomic apply itself stamps it).
+    """
+    candidate = conn.execute(
+        "SELECT s.settle_id FROM rail_sub_settles s "
+        "JOIN rail_subscriptions sub "
+        "  ON sub.wallet = s.wallet "
+        " AND sub.last_challenge_id = s.challenge_id "
+        "WHERE s.extended=0 AND s.verified=1 AND s.finalized=1 "
+        "  AND s.applied_period_end='' AND s.challenge_id<>'' "
+        "LIMIT 1").fetchone()
+    if candidate is None:
+        return
+    conn.execute(
+        "UPDATE rail_sub_settles SET "
+        "applied_period_end = (SELECT period_end FROM "
+        "  rail_subscriptions WHERE wallet = rail_sub_settles.wallet), "
+        "applied_period_index = (SELECT period_index FROM "
+        "  rail_subscriptions WHERE wallet = rail_sub_settles.wallet), "
+        "applied_action = CASE WHEN applied_action='' THEN 'renewed' "
+        "  ELSE applied_action END "
+        "WHERE extended=0 AND verified=1 AND finalized=1 "
+        "  AND applied_period_end='' AND challenge_id<>'' "
+        "  AND EXISTS (SELECT 1 FROM rail_subscriptions sub "
+        "    WHERE sub.wallet = rail_sub_settles.wallet "
+        "      AND sub.last_challenge_id = rail_sub_settles.challenge_id)")
+    conn.commit()
 
 
 def _resource_id_for(plan_id: str) -> str:
@@ -463,10 +546,13 @@ def _finalize_sub_settle_once(settle_id: str, build_result) -> bool:
 
     The write lock (BEGIN IMMEDIATE) is held across the finalized-flag
     re-check, finalize_challenge_payment(), and the flag write, so two
-    concurrent settles of one challenge cannot both run the finalize:
-    finalize appends to the platform-payment JSONL and the treasury
-    inflow ledger (both append-only, no dedupe), which would otherwise
-    double-record revenue for one tx. Returns True when THIS caller
+    concurrent settles of one challenge cannot both run the finalize.
+    Crash safety for the appends themselves lives in the stores (R1):
+    record_platform_payment dedupes on (tx_hash, payment_id) and
+    record_inflow on (tx_hash, source, note, amount), so if this
+    process dies after the appends but before the flag commit, the
+    retry's finalize re-call appends nothing twice — each external
+    record happens at most once per tx. Returns True when THIS caller
     performed the finalize. Neither append touches this DB, so holding
     its write lock across them cannot deadlock.
     """
@@ -718,26 +804,82 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
             "period_index": period_index}
 
 
+@contextlib.contextmanager
+def _platform_sync_lock():
+    """OS file lock serializing platform syncs for this ledger.
+
+    Held across the claim-check + sync + done-write in
+    _sync_platform_once. The OS releases it automatically when the
+    holder process dies, which is what makes a crashed sync claim
+    distinguishable from a live one: a claimed-but-not-done row whose
+    lock can be acquired has no live syncer and is safe to re-drive.
+    Degrades to a no-op where flock is unavailable (the DB claim flag
+    still guards the common path).
+    """
+    lock_path = str(_db_path()) + ".platform-sync.lock"
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:
+        yield
+        return
+    locked = False
+    try:
+        try:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            locked = True
+        except (ImportError, OSError):
+            locked = False
+        yield
+    finally:
+        if locked:
+            try:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except (ImportError, OSError):
+                pass
+        os.close(fd)
+
+
 def _sync_platform_once(*, settle_id: str, wallet: str, plan_id: str,
                         tx_hash: str, challenge_id: str,
                         plan_changed: bool) -> bool:
     """Mirror the applied period into platform_payments exactly once.
 
     The platform store lives in a different DB, so it cannot join the
-    atomic extension transaction; instead the platform_synced flag is
-    claimed atomically and only the claim winner syncs. A failed sync
-    releases the claim so a later re-settle can reconcile (see
-    _reconcile_platform_sync). Returns True when this caller synced.
+    atomic extension transaction. Claim/done are separate flags
+    (R2): platform_synced is the claim, platform_sync_done is written
+    only AFTER a successful sync. The sync lock is acquired BEFORE
+    the claim is inspected, so a claimed-but-not-done row observed
+    under the lock belongs to a caller that died mid-sync (a live
+    syncer would hold the lock) and is re-driven here — never
+    silently stuck. A failed sync releases the claim (done stays 0)
+    and re-raises so a later re-settle can reconcile. Returns True
+    when this caller synced.
     """
-    if not _claim_sub_settle_flag(settle_id, "platform_synced"):
-        return False
-    try:
-        _sync_platform(wallet=wallet, plan_id=plan_id, tx_hash=tx_hash,
-                       challenge_id=challenge_id, plan_changed=plan_changed)
-    except Exception:
-        _update_sub_settle(settle_id, platform_synced=0)
-        raise
-    return True
+    with _platform_sync_lock():
+        settle = _get_sub_settle(settle_id)
+        if settle is None or settle.get("platform_sync_done"):
+            return False
+        if not settle.get("platform_synced"):
+            if not _claim_sub_settle_flag(settle_id, "platform_synced"):
+                settle = _get_sub_settle(settle_id) or {}
+                if settle.get("platform_sync_done"):
+                    return False
+                if not settle.get("platform_synced"):
+                    return False
+                # Lost the claim race to a caller that has already
+                # died (we hold the sync lock): fall through and
+                # re-drive the claimed-but-not-done sync.
+        try:
+            _sync_platform(wallet=wallet, plan_id=plan_id,
+                           tx_hash=tx_hash, challenge_id=challenge_id,
+                           plan_changed=plan_changed)
+        except Exception:
+            _update_sub_settle(settle_id, platform_synced=0)
+            raise
+        _update_sub_settle(settle_id, platform_sync_done=1)
+        return True
 
 
 def _reconcile_platform_sync(settle: Dict[str, Any]) -> None:
@@ -750,7 +892,7 @@ def _reconcile_platform_sync(settle: Dict[str, Any]) -> None:
     must not fail because the mirror store hiccuped.
     """
     try:
-        if not settle or settle.get("platform_synced"):
+        if not settle or settle.get("platform_sync_done"):
             return
         if not (settle.get("extended") or settle.get("applied_period_end")):
             return
@@ -969,10 +1111,21 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
             return _already_renewed(settle)
         # Mirror into platform_payments exactly once (separate DB —
         # claimed via the platform_synced flag, not the extension txn).
-        _sync_platform_once(
-            settle_id=settle_id, wallet=w, plan_id=plan_id, tx_hash=tx,
-            challenge_id=cid,
-            plan_changed=bool(applied.get("plan_changed")))
+        # R5: the payment and the period are already irrevocably
+        # committed at this point, so a sync failure must NOT flip the
+        # settle result to failure. The claim is released inside
+        # _sync_platform_once (done stays 0), leaving the sync
+        # repairable via _reconcile_platform_sync on a duplicate ack.
+        try:
+            _sync_platform_once(
+                settle_id=settle_id, wallet=w, plan_id=plan_id, tx_hash=tx,
+                challenge_id=cid,
+                plan_changed=bool(applied.get("plan_changed")))
+        except Exception as sync_exc:
+            logger.error(
+                "[RAIL-SUB] platform sync failed for settle %s after "
+                "the period committed — settle stands, sync left "
+                "repairable via reconcile: %s", settle_id, sync_exc)
         return {"ok": True, "status": applied["action"], "plan_id": plan_id,
                 "settle_id": settle_id, "challenge_id": cid,
                 "subscription": subscription_status(w)}

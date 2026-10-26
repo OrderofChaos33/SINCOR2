@@ -5,11 +5,12 @@ deposit. No burn — burn counters below are historical-only."""
 from __future__ import annotations
 
 import json
+import threading
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from sincor2.platform_payments import SINC, TREASURY, _rpc_call, atomic_to_display
 
@@ -27,6 +28,40 @@ def _log_path() -> Path:
     return agent_burn_log_path()
 
 
+_log_lock = threading.Lock()
+
+
+def _find_platform_payment(log_file: Path, *, tx_hash: str,
+                           payment_id: str,
+                           product_name: str) -> Optional[dict[str, Any]]:
+    """Return the existing platform-payment row for this payment, if any.
+
+    Dedupe key: (tx_hash, payment_id) — payment_id is the challenge /
+    order id that uniquely names one payment for one tx. Rows written
+    without a payment_id fall back to (tx_hash, product_name).
+    """
+    if not log_file.is_file():
+        return None
+    tx = (tx_hash or "").lower()
+    for line in log_file.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("type") != "platform_payment":
+            continue
+        if (row.get("tx_hash") or "").lower() != tx:
+            continue
+        if payment_id:
+            if row.get("payment_id") == payment_id:
+                return row
+        elif row.get("product_name") == product_name:
+            return row
+    return None
+
+
 def record_platform_payment(
     *,
     tx_hash: str,
@@ -37,7 +72,15 @@ def record_platform_payment(
     plan_id: str = "",
     payment_id: str = "",
 ) -> dict[str, Any]:
-    """Append treasury payment to the platform payment log."""
+    """Append treasury payment to the platform payment log.
+
+    Crash-safe idempotency (hunt-29 R1): the log is append-only and a
+    caller can crash after this append but before its own commit /
+    flag write lands, then retry the whole payment record. Keyed on
+    (tx_hash, payment_id), a retry of the same payment returns the
+    existing row instead of appending a duplicate — each payment is
+    recorded at most once across any crash+retry sequence.
+    """
     entry = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "type": "platform_payment",
@@ -54,8 +97,16 @@ def record_platform_payment(
         "burn_tx": None,
     }
 
-    with _log_path().open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
+    log_file = _log_path()
+    with _log_lock:
+        if tx_hash:
+            existing = _find_platform_payment(
+                log_file, tx_hash=tx_hash, payment_id=payment_id,
+                product_name=product_name)
+            if existing is not None:
+                return existing
+        with log_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
 
     return entry
 
