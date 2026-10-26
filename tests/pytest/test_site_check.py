@@ -30,6 +30,7 @@ project is built for that business.
 """
 from __future__ import annotations
 
+import socket
 import sqlite3
 
 import pytest
@@ -211,6 +212,156 @@ class TestPayloadAndRegistration:
         assert res["amount_atomic"] == "10000"
         ids = [r["id"] for r in x402.list_resources()]
         assert RESOURCE in ids
+
+
+# ---------------------------------------------------------------------------
+# SSRF hardening (audit P1-2): the buyer-supplied URL is attacker
+# controlled. Forbidden targets are 400 invalid_target_host BEFORE any
+# fetch, and redirect hops are re-validated before connecting.
+# Hermetic: DNS is stubbed for the whole file (autouse fixture below);
+# a test that needs a specific resolution installs its own stub,
+# which overrides the fixture's.
+# ---------------------------------------------------------------------------
+
+_PUBLIC_IP = "93.184.216.34"
+
+
+def _dns_stub(mapping=None, default=_PUBLIC_IP):
+    """A socket.getaddrinfo replacement: hosts in ``mapping`` resolve
+    to the mapped address (or fail when mapped to None); every other
+    host resolves to ``default`` (one public address)."""
+    mapping = mapping or {}
+
+    def _resolve(host, port, *args, **kwargs):
+        ip = mapping.get(host, default)
+        if ip is None:
+            raise socket.gaierror(f"stub DNS: no such host {host}")
+        return [(socket.AF_INET, socket.SOCK_STREAM,
+                 socket.IPPROTO_TCP, "", (ip, port or 0))]
+
+    return _resolve
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_dns(monkeypatch):
+    monkeypatch.setattr(socket, "getaddrinfo", _dns_stub())
+
+
+class TestSSRFGuard:
+    @pytest.mark.parametrize("bad_url", [
+        "http://127.0.0.1",
+        "http://127.0.0.1:8080/health",
+        "http://localhost",
+        "http://localhost:8080/admin",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://10.0.0.1",
+        "http://192.168.1.1/router",
+        "http://service.railway.internal",
+        "https://example.com:8443",
+        "http://example.com:22/",
+    ])
+    def test_forbidden_targets_400_before_any_fetch(self, bad_url):
+        calls = []
+
+        def _fetch(url):
+            calls.append(url)
+            return GOOD_PAGE
+
+        status, body = sc.serve_site_check({"url": bad_url},
+                                           fetch=_fetch)
+        assert status == 400, body
+        assert body["ok"] is False
+        assert body["error"] == "invalid_target_host"
+        assert "verdict" not in body
+        # Rejected at validation: the fetch seam never ran.
+        assert calls == []
+
+    def test_hostname_resolving_to_private_ip_400(self, monkeypatch):
+        monkeypatch.setattr(
+            socket, "getaddrinfo",
+            _dns_stub({"sneaky.example.com": "192.168.1.20"}))
+        calls = []
+        status, body = sc.serve_site_check(
+            {"url": "https://sneaky.example.com/"},
+            fetch=lambda u: calls.append(u) or GOOD_PAGE)
+        assert status == 400, body
+        assert body["error"] == "invalid_target_host"
+        assert calls == []
+
+    def test_validate_payload_rejects_metadata_endpoint(self):
+        parsed, err = sc.validate_payload(
+            {"url": "http://169.254.169.254/latest/meta-data/"})
+        assert parsed is None
+        assert err is not None
+        assert err[0] == 400
+        assert err[1]["error"] == "invalid_target_host"
+
+
+class _FakeResponse:
+    def __init__(self, status_code, url, text="", headers=None):
+        self.status_code = status_code
+        self.url = url
+        self.text = text
+        self.headers = headers or {}
+
+
+class TestSSRFRedirects:
+    def test_fetcher_raises_on_forbidden_target_without_transport(
+            self, monkeypatch):
+        def _fake_get(url, **kwargs):
+            raise AssertionError("transport must not run for a "
+                                 "forbidden target")
+        monkeypatch.setattr("requests.get", _fake_get)
+        with pytest.raises(sc.InvalidTargetHostError):
+            sc.fetch_site_page("http://169.254.169.254/")
+
+    def test_redirect_to_loopback_rejected_before_connect(
+            self, monkeypatch):
+        calls = []
+
+        def _fake_get(url, **kwargs):
+            calls.append(url)
+            # Redirects must be handled manually, never auto-followed.
+            assert kwargs.get("allow_redirects") is False
+            return _FakeResponse(302, url, headers={
+                "Location": "http://127.0.0.1:8080/health"})
+
+        monkeypatch.setattr("requests.get", _fake_get)
+        status, body = sc.serve_site_check(
+            {"url": "https://shop.example.com/"})
+        assert status == 400, body
+        assert body["ok"] is False
+        assert body["error"] == "invalid_target_host"
+        assert "verdict" not in body
+        # The transport was invoked exactly once — with the public
+        # URL — and never with the forbidden redirect target.
+        assert calls == ["https://shop.example.com/"]
+
+    def test_redirect_to_public_target_is_followed(self, monkeypatch):
+        pages = {
+            "https://shop.example.com/": _FakeResponse(
+                302, "https://shop.example.com/",
+                headers={"Location": "/landing"}),
+            "https://shop.example.com/landing": _FakeResponse(
+                200, "https://shop.example.com/landing",
+                text=GOOD_HTML),
+        }
+        calls = []
+
+        def _fake_get(url, **kwargs):
+            calls.append(url)
+            assert kwargs.get("allow_redirects") is False
+            return pages[url]
+
+        monkeypatch.setattr("requests.get", _fake_get)
+        status, body = sc.serve_site_check(
+            {"url": "https://shop.example.com/"})
+        assert status == 200, body
+        assert body["verdict"] == "no_build_needed"
+        assert body["observations"]["final_url"] == \
+            "https://shop.example.com/landing"
+        assert calls == ["https://shop.example.com/",
+                         "https://shop.example.com/landing"]
 
 
 # ---------------------------------------------------------------------------
