@@ -46,6 +46,18 @@ the period is extended exactly once. A retry of a claimed-but-incomplete
 settle reuses the verified claim (tx_hash/wallet pinned) instead of
 re-verifying.
 
+Atomic extension (W-105): the period application and the settle row's
+extended flag commit in ONE transaction on the shared ledger DB (BEGIN
+IMMEDIATE), and the same transaction stamps the applied period_end /
+period_index / action onto the settle row. There is no window in which
+the extension is committed but the flag is not, so neither a crash nor
+a concurrent settle can apply a second period for one payment; a retry
+that finds the applied stamp repairs the flag and acks already_renewed.
+The payment finalize is likewise claimed under the same write lock
+(finalized flag flipped in the transaction that holds the lock across
+finalize_challenge_payment), so concurrent settles cannot append
+duplicate platform-payment / treasury-inflow records for one tx.
+
 Proration (pinned in tests; period math mirrors
 platform_payments.activate_subscription exactly so the rail record and
 the platform record can never diverge):
@@ -156,10 +168,23 @@ CREATE TABLE IF NOT EXISTS rail_sub_settles (
     verified      INTEGER NOT NULL DEFAULT 0,
     finalized     INTEGER NOT NULL DEFAULT 0,
     extended      INTEGER NOT NULL DEFAULT 0,
+    applied_period_end   TEXT NOT NULL DEFAULT '',
+    applied_period_index INTEGER NOT NULL DEFAULT 0,
+    applied_action       TEXT NOT NULL DEFAULT '',
+    platform_synced      INTEGER NOT NULL DEFAULT 0,
     note          TEXT NOT NULL DEFAULT '',
     created_at    TEXT NOT NULL
 );
 """
+
+# Columns added after the original schema shipped (W-105 atomic
+# extension). _connect() backfills them on pre-existing ledger files.
+_SETTLE_EXTRA_COLUMNS = {
+    "applied_period_end": "TEXT NOT NULL DEFAULT ''",
+    "applied_period_index": "INTEGER NOT NULL DEFAULT 0",
+    "applied_action": "TEXT NOT NULL DEFAULT ''",
+    "platform_synced": "INTEGER NOT NULL DEFAULT 0",
+}
 
 
 def _db_path() -> Path:
@@ -177,6 +202,13 @@ def _connect() -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), timeout=30.0)
     conn.executescript(_SUB_SCHEMA)
+    conn.commit()
+    existing = {r[1] for r in conn.execute(
+        "PRAGMA table_info(rail_sub_settles)")}
+    for col, decl in _SETTLE_EXTRA_COLUMNS.items():
+        if col not in existing:
+            conn.execute(
+                f"ALTER TABLE rail_sub_settles ADD COLUMN {col} {decl}")
     conn.commit()
     conn.row_factory = sqlite3.Row
     return conn
@@ -407,6 +439,65 @@ def _update_sub_settle(settle_id: str, **fields: Any) -> None:
         conn.close()
 
 
+def _claim_sub_settle_flag(settle_id: str, column: str) -> bool:
+    """Atomically flip a settle-row flag 0 -> 1; True for the one winner.
+
+    ``column`` is whitelisted — it names a flag, never caller data.
+    """
+    if column not in ("finalized", "platform_synced"):
+        raise ValueError(f"not a claimable flag: {column}")
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            f"UPDATE rail_sub_settles SET {column}=1 "
+            f"WHERE settle_id=? AND {column}=0",
+            (settle_id,))
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
+def _finalize_sub_settle_once(settle_id: str, build_result) -> bool:
+    """Finalize the payment for a settle exactly once (W-105 corollary).
+
+    The write lock (BEGIN IMMEDIATE) is held across the finalized-flag
+    re-check, finalize_challenge_payment(), and the flag write, so two
+    concurrent settles of one challenge cannot both run the finalize:
+    finalize appends to the platform-payment JSONL and the treasury
+    inflow ledger (both append-only, no dedupe), which would otherwise
+    double-record revenue for one tx. Returns True when THIS caller
+    performed the finalize. Neither append touches this DB, so holding
+    its write lock across them cannot deadlock.
+    """
+    from sincor2 import x402_payments as x402
+
+    conn = _connect()
+    conn.isolation_level = None  # explicit transaction control
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = conn.execute(
+                "SELECT * FROM rail_sub_settles WHERE settle_id=?",
+                (settle_id,)).fetchone()
+            if row is None or row["finalized"]:
+                conn.rollback()
+                return False
+            result = build_result(dict(row))
+            x402.finalize_challenge_payment(result)
+            conn.execute(
+                "UPDATE rail_sub_settles SET finalized=1, tx_hash=? "
+                "WHERE settle_id=?",
+                (str(result.get("tx_hash") or row["tx_hash"]), settle_id))
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            raise
+    finally:
+        conn.close()
+
+
 # --- Money gate -----------------------------------------------------------------
 def _sub_money_gate_allows(*, settle_id: str, challenge_id: str,
                            plan_id: str, amount_usdc: float,
@@ -462,98 +553,218 @@ def _record_gate_denial(settle_id: str, plan_id: str) -> None:
 
 
 # --- Period application ---------------------------------------------------------
-def _apply_period(*, wallet: str, plan_id: str, tx_hash: str,
-                  challenge_id: str) -> Dict[str, Any]:
-    """Apply one paid period per the proration rules.
+def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
+                  tx_hash: str, challenge_id: str) -> Dict[str, Any]:
+    """Apply one paid period per the proration rules — atomically (W-105).
 
-    Returns {"ok": True, "action": ...} or
-    {"ok": False, "error": "downgrade_at_renewal", ...} (nothing applied —
-    the caller must NOT mark the settle extended so a later re-settle can
-    complete it).
+    The subscription upsert and the settle row's extended flag (plus the
+    applied-period stamp: period_end / period_index / action) commit in
+    ONE BEGIN IMMEDIATE transaction on the shared ledger DB. A crash can
+    therefore never leave the extension committed with the flag unwritten
+    (the deterministic double-extend), and a concurrent settle blocks on
+    the write lock, then sees the applied stamp and acks instead of
+    re-applying. The conditional flag UPDATE (``extended=0 AND
+    applied_period_end=''``) is a second, independent guard: exactly one
+    caller can ever win it for a given settle row.
+
+    Returns {"ok": True, "action": ..., "plan_changed": ...}, or
+    {"ok": True, "already": True, ...} when this settle's period was
+    already applied, or
+    {"ok": False, "error": "downgrade_at_renewal", ...} (nothing applied
+    and nothing stamped — a later re-settle can still complete it).
     """
     now = _utc_now()
-    row = _get_row(wallet)
     new_rank = pg.rank(plan_id)
     period_delta = timedelta(days=PERIOD_DAYS)
 
-    if row is None:
-        period_start, period_end = now, now + period_delta
-        period_index = 1
-        action = "renewed"
-        plan_changed = False
-    else:
-        current = _derive_status(row, now)
-        old_rank = pg.rank(row["plan_id"])
-        try:
-            old_end = _parse_iso(row["period_end"])
-        except ValueError:
-            old_end = now
-        if new_rank > old_rank:
-            # upgrade: fresh period from payment, no credit for unused time
-            period_start, period_end = now, now + period_delta
-            action = "upgraded"
-        elif new_rank < old_rank:
-            in_window = (current != "active" or
-                         now >= old_end - timedelta(days=RENEWAL_WINDOW_DAYS))
-            if not in_window:
-                return {
-                    "ok": False,
-                    "error": "downgrade_at_renewal",
-                    "current_plan": row["plan_id"],
-                    "period_end": row["period_end"],
-                    "detail": (
-                        "downgrades take effect at renewal: re-settle this "
-                        "challenge within 7 days of period_end or after "
-                        "expiry; no second payment is needed"),
-                }
-            # downgrade at renewal: fresh period from payment (same rule as
-            # upgrades — no proration credit in either direction)
-            period_start, period_end = now, now + period_delta
-            action = "downgraded"
-        else:
-            # same-plan renewal: extend from max(period_end, now) — the
-            # exact rule platform_payments.activate_subscription uses, so
-            # the two stores can never diverge.
-            base = old_end if old_end > now else now
-            period_start = _parse_iso(row["period_start"]) \
-                if current == "active" else now
-            period_end = base + period_delta
-            action = "renewed"
-        period_index = int(row["period_index"]) + 1
-        plan_changed = row["plan_id"] != plan_id
-
-    grace_until = (period_end + timedelta(days=GRACE_DAYS)).isoformat()
     conn = _connect()
+    conn.isolation_level = None  # explicit transaction control
     try:
-        conn.execute(
-            "INSERT INTO rail_subscriptions "
-            "(wallet, plan_id, status, period_index, period_start, "
-            " period_end, grace_until, last_tx_hash, last_challenge_id, "
-            " reminder_count, last_reminder_at, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
-            "ON CONFLICT(wallet) DO UPDATE SET "
-            "plan_id=excluded.plan_id, status='active', "
-            "period_index=excluded.period_index, "
-            "period_start=excluded.period_start, "
-            "period_end=excluded.period_end, "
-            "grace_until=excluded.grace_until, "
-            "last_tx_hash=excluded.last_tx_hash, "
-            "last_challenge_id=excluded.last_challenge_id, "
-            "reminder_count=0, last_reminder_at='', "
-            "updated_at=excluded.updated_at",
-            (wallet, plan_id, "active", period_index,
-             period_start.isoformat(), period_end.isoformat(), grace_until,
-             tx_hash, challenge_id, 0, "",
-             _utc_now_iso(), _utc_now_iso()))
-        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            settle_row = conn.execute(
+                "SELECT * FROM rail_sub_settles WHERE settle_id=?",
+                (settle_id,)).fetchone()
+            if settle_row is not None and (
+                    settle_row["extended"]
+                    or settle_row["applied_period_end"]):
+                # This settle already applied its period in an earlier
+                # atomic commit. Repair the flag/stamp pair if one half
+                # was cleared (the crash-window simulation), then ack —
+                # NEVER re-apply.
+                sub_row = conn.execute(
+                    "SELECT * FROM rail_subscriptions WHERE wallet=?",
+                    (wallet,)).fetchone()
+                applied_end = settle_row["applied_period_end"] or (
+                    sub_row["period_end"] if sub_row else "")
+                applied_index = settle_row["applied_period_index"] or (
+                    int(sub_row["period_index"]) if sub_row else 0)
+                conn.execute(
+                    "UPDATE rail_sub_settles SET extended=1, "
+                    "applied_period_end=?, applied_period_index=? "
+                    "WHERE settle_id=?",
+                    (applied_end, applied_index, settle_id))
+                conn.commit()
+                return {"ok": True, "already": True,
+                        "action": "already_renewed",
+                        "period_end": applied_end,
+                        "period_index": applied_index}
+
+            row_raw = conn.execute(
+                "SELECT * FROM rail_subscriptions WHERE wallet=?",
+                (wallet,)).fetchone()
+            row = dict(row_raw) if row_raw is not None else None
+
+            if row is None:
+                period_start, period_end = now, now + period_delta
+                period_index = 1
+                action = "renewed"
+                plan_changed = False
+            else:
+                current = _derive_status(row, now)
+                old_rank = pg.rank(row["plan_id"])
+                try:
+                    old_end = _parse_iso(row["period_end"])
+                except ValueError:
+                    old_end = now
+                if new_rank > old_rank:
+                    # upgrade: fresh period from payment, no credit for
+                    # unused time
+                    period_start, period_end = now, now + period_delta
+                    action = "upgraded"
+                elif new_rank < old_rank:
+                    in_window = (
+                        current != "active" or
+                        now >= old_end - timedelta(
+                            days=RENEWAL_WINDOW_DAYS))
+                    if not in_window:
+                        conn.rollback()
+                        return {
+                            "ok": False,
+                            "error": "downgrade_at_renewal",
+                            "current_plan": row["plan_id"],
+                            "period_end": row["period_end"],
+                            "detail": (
+                                "downgrades take effect at renewal: "
+                                "re-settle this challenge within 7 days of "
+                                "period_end or after expiry; no second "
+                                "payment is needed"),
+                        }
+                    # downgrade at renewal: fresh period from payment
+                    # (same rule as upgrades — no proration credit in
+                    # either direction)
+                    period_start, period_end = now, now + period_delta
+                    action = "downgraded"
+                else:
+                    # same-plan renewal: extend from max(period_end, now)
+                    # — the exact rule
+                    # platform_payments.activate_subscription uses, so
+                    # the two stores can never diverge.
+                    base = old_end if old_end > now else now
+                    period_start = _parse_iso(row["period_start"]) \
+                        if current == "active" else now
+                    period_end = base + period_delta
+                    action = "renewed"
+                period_index = int(row["period_index"]) + 1
+                plan_changed = row["plan_id"] != plan_id
+
+            grace_until = (period_end
+                           + timedelta(days=GRACE_DAYS)).isoformat()
+            stamp = _utc_now_iso()
+            conn.execute(
+                "INSERT INTO rail_subscriptions "
+                "(wallet, plan_id, status, period_index, period_start, "
+                " period_end, grace_until, last_tx_hash, "
+                " last_challenge_id, reminder_count, last_reminder_at, "
+                " created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(wallet) DO UPDATE SET "
+                "plan_id=excluded.plan_id, status='active', "
+                "period_index=excluded.period_index, "
+                "period_start=excluded.period_start, "
+                "period_end=excluded.period_end, "
+                "grace_until=excluded.grace_until, "
+                "last_tx_hash=excluded.last_tx_hash, "
+                "last_challenge_id=excluded.last_challenge_id, "
+                "reminder_count=0, last_reminder_at='', "
+                "updated_at=excluded.updated_at",
+                (wallet, plan_id, "active", period_index,
+                 period_start.isoformat(), period_end.isoformat(),
+                 grace_until, tx_hash, challenge_id, 0, "", stamp, stamp))
+            cur = conn.execute(
+                "UPDATE rail_sub_settles SET extended=1, "
+                "applied_period_end=?, applied_period_index=?, "
+                "applied_action=?, note='' "
+                "WHERE settle_id=? AND extended=0 "
+                "AND applied_period_end=''",
+                (period_end.isoformat(), period_index, action, settle_id))
+            if cur.rowcount != 1:
+                # Lost the claim race inside the transaction — another
+                # settle applied this period. Roll EVERYTHING back.
+                conn.rollback()
+                return {"ok": True, "already": True,
+                        "action": "already_renewed"}
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
     finally:
         conn.close()
 
-    _sync_platform(wallet=wallet, plan_id=plan_id, tx_hash=tx_hash,
-                   challenge_id=challenge_id, plan_changed=plan_changed)
     logger.info("[RAIL-SUB] %s: wallet=%s plan=%s period_end=%s",
                 action, wallet, plan_id, period_end.isoformat())
-    return {"ok": True, "action": action}
+    return {"ok": True, "action": action, "plan_changed": plan_changed,
+            "period_end": period_end.isoformat(),
+            "period_index": period_index}
+
+
+def _sync_platform_once(*, settle_id: str, wallet: str, plan_id: str,
+                        tx_hash: str, challenge_id: str,
+                        plan_changed: bool) -> bool:
+    """Mirror the applied period into platform_payments exactly once.
+
+    The platform store lives in a different DB, so it cannot join the
+    atomic extension transaction; instead the platform_synced flag is
+    claimed atomically and only the claim winner syncs. A failed sync
+    releases the claim so a later re-settle can reconcile (see
+    _reconcile_platform_sync). Returns True when this caller synced.
+    """
+    if not _claim_sub_settle_flag(settle_id, "platform_synced"):
+        return False
+    try:
+        _sync_platform(wallet=wallet, plan_id=plan_id, tx_hash=tx_hash,
+                       challenge_id=challenge_id, plan_changed=plan_changed)
+    except Exception:
+        _update_sub_settle(settle_id, platform_synced=0)
+        raise
+    return True
+
+
+def _reconcile_platform_sync(settle: Dict[str, Any]) -> None:
+    """Best-effort completion of a platform sync lost to a crash.
+
+    If the rail period was applied (extended / applied stamp present)
+    but the platform mirror never ran — the crash window between the
+    atomic extension commit and the sync — a duplicate ack completes it
+    here, exactly once via the same claim. Never raises: the ack itself
+    must not fail because the mirror store hiccuped.
+    """
+    try:
+        if not settle or settle.get("platform_synced"):
+            return
+        if not (settle.get("extended") or settle.get("applied_period_end")):
+            return
+        _sync_platform_once(
+            settle_id=settle["settle_id"],
+            wallet=settle.get("wallet") or "",
+            plan_id=settle.get("plan_id") or "",
+            tx_hash=settle.get("tx_hash") or "",
+            challenge_id=settle.get("challenge_id") or "",
+            plan_changed=settle.get("applied_action")
+            in ("upgraded", "downgraded"))
+    except Exception as exc:
+        logger.error("[RAIL-SUB] platform sync reconcile failed for %s: %s",
+                     settle.get("settle_id") if settle else "?", exc)
 
 
 def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
@@ -647,6 +858,7 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         if settle.get("extended"):
             logger.info("[RAIL-SUB] duplicate settle for %s — acknowledged",
                         settle_id)
+            _reconcile_platform_sync(settle)
             return _already_renewed(settle)
         # Retry of a claimed-but-incomplete settle: pin tx_hash/wallet.
         if (settle.get("tx_hash") or "").lower() != tx.lower():
@@ -687,39 +899,41 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         if not is_new:
             settle = _get_sub_settle(settle_id) or settle
             if settle.get("extended"):
+                _reconcile_platform_sync(settle)
                 return _already_renewed(settle)
 
     amount_usdc = SUB_PLANS[plan_id]["price_cents"] / 100
 
     try:
-        # Record the platform payment + treasury inflow exactly once.
+        # Record the platform payment + treasury inflow exactly once:
+        # the finalized flag is claimed under the ledger write lock,
+        # held across finalize_challenge_payment, so concurrent settles
+        # cannot both append payment/inflow records for one tx.
         # NOTE: no automatic 5% fee split is booked (known gap; founder
         # decision owed) — payments are recorded faithfully.
         settle = _get_sub_settle(settle_id) or settle
         if not settle.get("finalized"):
-            if verify_result and verify_result.get("status") == "fulfilled":
-                result = verify_result
-            else:
+            def _build_finalize_result(row, _verify=verify_result):
+                if _verify and _verify.get("status") == "fulfilled":
+                    return _verify
                 resource = x402.get_resource(_resource_id_for(plan_id))
                 if not resource:
                     raise RuntimeError(
                         "subscription resource missing for finalize")
-                result = {
+                return {
                     "ok": True,
                     "status": "fulfilled",
                     "challenge_id": cid,
                     "resource_id": _resource_id_for(plan_id),
-                    "tx_hash": settle.get("tx_hash") or tx,
-                    "payer_wallet": settle.get("wallet") or w,
+                    "tx_hash": row.get("tx_hash") or tx,
+                    "payer_wallet": row.get("wallet") or w,
                     "amount_atomic": resource["amount_atomic"],
                     "amount_display": resource["amount_display"],
                 }
-            x402.finalize_challenge_payment(result)
-            _update_sub_settle(
-                settle_id, finalized=1,
-                tx_hash=str(result.get("tx_hash") or tx))
-            logger.info("[RAIL-SUB] finalized payment for settle %s",
-                        settle_id)
+
+            if _finalize_sub_settle_once(settle_id, _build_finalize_result):
+                logger.info("[RAIL-SUB] finalized payment for settle %s",
+                            settle_id)
 
         # Treasury kill-switch money gate (fail closed). A denial records
         # an alert and stops the extension; the claim stays non-extended
@@ -732,8 +946,12 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
             return {"ok": False, "error": "money_gate_denied",
                     "settle_id": settle_id}
 
-        # Extend exactly one period per the proration rules.
-        applied = _apply_period(wallet=w, plan_id=plan_id, tx_hash=tx,
+        # Extend exactly one period per the proration rules. The
+        # extension and the extended flag commit atomically inside
+        # _apply_period (W-105); there is deliberately no separate
+        # flag write after it returns.
+        applied = _apply_period(settle_id=settle_id, wallet=w,
+                                plan_id=plan_id, tx_hash=tx,
                                 challenge_id=cid)
         if not applied.get("ok"):
             # downgrade_at_renewal: payment recorded, nothing applied —
@@ -743,7 +961,18 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
                     "detail": applied.get("detail", ""),
                     "settle_id": settle_id,
                     "subscription": subscription_status(w)}
-        _update_sub_settle(settle_id, extended=1, note="")
+        if applied.get("already"):
+            # A concurrent settle (or an earlier crash-interrupted one)
+            # already applied this settle's one period.
+            settle = _get_sub_settle(settle_id) or settle
+            _reconcile_platform_sync(settle)
+            return _already_renewed(settle)
+        # Mirror into platform_payments exactly once (separate DB —
+        # claimed via the platform_synced flag, not the extension txn).
+        _sync_platform_once(
+            settle_id=settle_id, wallet=w, plan_id=plan_id, tx_hash=tx,
+            challenge_id=cid,
+            plan_changed=bool(applied.get("plan_changed")))
         return {"ok": True, "status": applied["action"], "plan_id": plan_id,
                 "settle_id": settle_id, "challenge_id": cid,
                 "subscription": subscription_status(w)}
