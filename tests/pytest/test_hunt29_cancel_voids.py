@@ -27,6 +27,8 @@ imports from red-team scratch.
 """
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 import sincor2.rail_subscriptions as rs
@@ -256,3 +258,158 @@ def test_module_level_settle_of_pre_cancel_challenge_refused(
     assert r2["ok"] is False
     assert r2["error"] == "challenge_voided_by_cancel"
     assert rs.subscription_status(PAYER)["status"] == "canceled"
+
+
+# ---------------------------------------------------------------------------
+# TOCTOU (Fix Round 2): cancel landing DURING an in-flight settle
+#
+# Builder B rejected abb71aed because settle_renewal ran the W-106
+# void/cancel check only once, at the top, before verify_challenge
+# (on-chain RPC), finalize, and the money gate — and never re-checked
+# before _apply_period. A cancel landing in that window voided the
+# challenge in the DB, yet the in-flight settle still applied the
+# period and overwrote the subscription to active (resurrection).
+# The fix re-validates the void/cancel state immediately before
+# _apply_period (after the money gate). These orchestrated tests pin
+# the two deterministic reproductions (R1 / R2).
+# ---------------------------------------------------------------------------
+
+def test_race_r1_cancel_during_verify_blocks_settle(
+        sub_app, sub_env, monkeypatch):
+    """R1: settle blocked inside verify_challenge while cancel lands."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    period_end_before = r["subscription"]["period_end"]
+
+    ch2 = rs.issue_renewal_challenge(PAYER, "starter")
+
+    orig_verify = x402.verify_challenge
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking_verify(cid, tx, **kwargs):
+        entered.set()
+        assert release.wait(timeout=10), "test orchestration timed out"
+        return orig_verify(cid, tx, **kwargs)
+
+    monkeypatch.setattr(x402, "verify_challenge", _blocking_verify)
+
+    holder = {}
+
+    def _run_settle():
+        holder["result"] = rs.settle_renewal(
+            ch2["challenge_id"], TX_STARTER2, PAYER)
+
+    thread = threading.Thread(target=_run_settle)
+    thread.start()
+    try:
+        assert entered.wait(timeout=10), "settle never reached verify"
+        # The cancel lands while the settle is in flight (post top-check,
+        # blocked at the on-chain verify seam).
+        out = rs.cancel_subscription(PAYER)
+        assert out["status"] == "canceled"
+        assert rs._get_issued(ch2["challenge_id"])["voided_at"]
+    finally:
+        release.set()
+    thread.join(timeout=10)
+    assert not thread.is_alive(), "settle thread did not finish"
+
+    result = holder["result"]
+    assert result["ok"] is False, result
+    assert result["error"] == "challenge_voided_by_cancel"
+
+    # no resurrection: still canceled, period NOT extended
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["effective_plan"] == "none"
+    assert status["period_end"] == period_end_before
+    assert status["period_index"] == 1
+
+
+def test_race_r2_cancel_at_money_gate_blocks_settle(
+        sub_app, sub_env, monkeypatch):
+    """R2: cancel lands at the money gate, immediately before apply."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    period_end_before = r["subscription"]["period_end"]
+
+    ch2 = rs.issue_renewal_challenge(PAYER, "starter")
+
+    def _cancel_at_gate(**kwargs):
+        # The last step before _apply_period: a cancel arriving here
+        # must still be honored by a re-check before the period applies.
+        out = rs.cancel_subscription(PAYER)
+        assert out["status"] == "canceled"
+        return True
+
+    monkeypatch.setattr(rs, "_sub_money_gate_allows", _cancel_at_gate)
+
+    result = rs.settle_renewal(ch2["challenge_id"], TX_STARTER2, PAYER)
+    assert result["ok"] is False, result
+    assert result["error"] == "challenge_voided_by_cancel"
+
+    # no resurrection: still canceled, period NOT extended
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["effective_plan"] == "none"
+    assert status["period_end"] == period_end_before
+    assert status["period_index"] == 1
+
+
+def test_already_renewed_ack_survives_cancel_no_resurrection(
+        sub_app, sub_env):
+    """P11 preserved: re-settling an already-extended challenge after a
+    cancel is an ack-only duplicate — ok/already_renewed, no period
+    applied, no resurrection."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    period_end_before = r["subscription"]["period_end"]
+
+    rs.cancel_subscription(PAYER)
+    assert rs.subscription_status(PAYER)["status"] == "canceled"
+
+    dup = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert dup["ok"] is True, dup
+    assert dup["status"] == "already_renewed"
+    assert dup["duplicate"] is True
+
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["period_index"] == 1
+    assert status["period_end"] == period_end_before
+
+
+def test_settle_refuses_when_stored_status_is_messy_canceled(
+        sub_app, sub_env):
+    """Hardening: the settle-side canceled check is case/whitespace
+    normalized — a stored ' Canceled ' must still refuse a pre-cancel
+    challenge."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    period_end_before = r["subscription"]["period_end"]
+
+    ch2 = rs.issue_renewal_challenge(PAYER, "starter")
+
+    # White-box messy cancel: non-canonical stored status spelling,
+    # stamped after ch2 was issued, and ch2 deliberately NOT voided
+    # (legacy-row belt-and-braces path).
+    conn = rs._connect()
+    try:
+        conn.execute(
+            "UPDATE rail_subscriptions SET status=' Canceled ', "
+            "canceled_at=? WHERE wallet=?",
+            (rs._utc_now_iso(), PAYER.lower()))
+        conn.commit()
+    finally:
+        conn.close()
+
+    result = rs.settle_renewal(ch2["challenge_id"], TX_STARTER2, PAYER)
+    assert result["ok"] is False, result
+    assert result["error"] == "challenge_voided_by_cancel"
+    row = rs._get_row(PAYER)
+    assert row["period_index"] == 1
+    assert row["period_end"] == period_end_before
