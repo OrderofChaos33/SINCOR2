@@ -312,23 +312,12 @@ class TestPaidSurface402Status:
 # ---------------------------------------------------------------------------
 
 class TestChecklistRules:
-    @pytest.mark.xfail(
-        strict=False,
-        reason="FINDING-1: 402s carry no Cache-Control header — "
-               "jsonify(ch), 402 in mvp_blueprints/billing.py sets none; "
-               "checklist requires `no-store`.",
-    )
     @pytest.mark.parametrize("case", CASES)
     def test_rule1_no_store_on_402(self, paid_client, x402_db, monkeypatch, case):
         resp = _fetch_402(case, paid_client, monkeypatch)
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule1_no_store(resp)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="FINDING-2: no PAYMENT-REQUIRED header is emitted on 402s, and "
-               "the body envelope lives under `payment`, not x402-v2 `accepts`.",
-    )
     @pytest.mark.parametrize("case", CASES)
     def test_rule2_header_body_consistency(self, paid_client, x402_db,
                                           monkeypatch, case):
@@ -336,12 +325,6 @@ class TestChecklistRules:
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule2_header_body_consistent(resp)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="FINDING-3: no CORS headers on the billing blueprint — 402s do "
-               "not expose PAYMENT-REQUIRED and OPTIONS preflight carries no "
-               "Access-Control-Allow-* headers.",
-    )
     @pytest.mark.parametrize("case", CASES)
     def test_rule3a_cors_exposes_header(self, paid_client, x402_db,
                                         monkeypatch, case):
@@ -349,21 +332,10 @@ class TestChecklistRules:
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule3a_cors_exposes_payment_required(resp)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="FINDING-3: OPTIONS preflight on paid routes carries no "
-               "Access-Control-Allow-Origin / Allow-Headers (no CORS middleware "
-               "on the billing blueprint).",
-    )
     @pytest.mark.parametrize("case", CASES)
     def test_rule3b_preflight_allows_payment_headers(self, paid_client, case):
         check_rule3b_preflight_allows_payment_headers(paid_client, CASE_PATHS[case])
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="FINDING-4: undeclared methods get Werkzeug's default HTML 405 "
-               "page — no 405 errorhandler returning JSON on the blueprint.",
-    )
     @pytest.mark.parametrize("method,path", UNDECLARED,
                              ids=[f"{m} {p}" for m, p in UNDECLARED])
     def test_rule4_undeclared_method_405_json(self, paid_client, method, path):

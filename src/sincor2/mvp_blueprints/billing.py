@@ -342,6 +342,140 @@ def api_sinc_burn_stats():
     }), 410
 
 
+# ---------------------------------------------------------------------------
+# x402 paid-surface checklist (docs/ops/X402_PAID_SURFACE_CHECKLIST.md).
+# R1: every 402 carries `Cache-Control: no-store`. R2: every challenge 402
+# emits a PAYMENT-REQUIRED header whose decoded envelope deep-equals the
+# body's `accepts`. R3: CORS exposes PAYMENT-REQUIRED and preflight allows
+# the payment headers. R4: undeclared methods get a JSON 405, never HTML.
+# Implemented as ONE blueprint after_request hook + ONE errorhandler so no
+# per-resource serve block's return flow is disturbed.
+# ---------------------------------------------------------------------------
+
+_PAID_SURFACE_VERIFY_402_ERRORS = ('tx_pending', 'insufficient_amount',
+                                   'no_treasury_transfer')
+
+
+def _merge_header_tokens(existing, *tokens):
+    """Merge comma-separated header tokens without duplicating any."""
+    merged = [t.strip() for t in (existing or '').split(',') if t.strip()]
+    lowered = {t.lower() for t in merged}
+    for token in tokens:
+        if token.lower() not in lowered:
+            merged.append(token)
+            lowered.add(token.lower())
+    return ', '.join(merged)
+
+
+def _paid_surface_envelope(body):
+    """Payment envelope for a 402 body, or None when not derivable.
+
+    Challenge 402s already carry the envelope under ``payment``. Verify
+    402s (tx_pending & friends) return the bare transfer-verification
+    error with no envelope, so theirs is rebuilt from the still-pending
+    challenge: build_payment_payload is deterministic in
+    (resource, challenge_id), so the rebuilt envelope is identical to
+    the one issued at challenge time. Read-only lookup; any failure
+    returns None and the caller simply skips R2 for that response.
+    """
+    payment = body.get('payment')
+    if isinstance(payment, dict) and body.get('challenge_id'):
+        return payment
+    if body.get('error') not in _PAID_SURFACE_VERIFY_402_ERRORS:
+        return None
+    try:
+        import sqlite3
+
+        from sincor2.data_paths import orders_db_path
+        from sincor2.x402_payments import build_payment_payload, get_resource
+
+        data = request.get_json(silent=True) or {}
+        challenge_id = sanitize_string(
+            data.get('challenge_id', ''), max_length=64)
+        if not challenge_id:
+            return None
+        conn = sqlite3.connect(orders_db_path())
+        try:
+            row = conn.execute(
+                'SELECT resource_id FROM x402_challenges '
+                'WHERE challenge_id=?', (challenge_id,)).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        resource = get_resource(row[0])
+        if not resource:
+            return None
+        return build_payment_payload(resource, row[0], challenge_id)
+    except Exception:
+        return None
+
+
+@bp.after_request
+def _paid_surface_headers(response):
+    # R3b: a CORS preflight against any billing route must succeed and
+    # allow the payment headers a browser buyer sends.
+    if request.method == 'OPTIONS':
+        if request.headers.get('Origin'):
+            response.headers['Access-Control-Allow-Origin'] = \
+                request.headers['Origin']
+            response.headers['Access-Control-Allow-Headers'] = \
+                _merge_header_tokens(
+                    response.headers.get('Access-Control-Allow-Headers'),
+                    'Content-Type', 'Authorization', 'X-Payment',
+                    'X-Payment-Token')
+            response.headers['Access-Control-Allow-Methods'] = \
+                _merge_header_tokens(
+                    response.headers.get('Access-Control-Allow-Methods'),
+                    'GET', 'POST', 'OPTIONS')
+        return response
+    if response.status_code != 402:
+        return response
+    # R1: a 402 is a per-challenge, per-payer, expiring offer — a cached
+    # copy replays a dead challenge. Never store it.
+    response.headers['Cache-Control'] = _merge_header_tokens(
+        response.headers.get('Cache-Control'), 'no-store')
+    # R2: mirror the envelope into the x402-v2 `accepts` body key and the
+    # PAYMENT-REQUIRED header (base64 JSON) so header readers and body
+    # readers authorize identical terms.
+    if response.is_json:
+        body = response.get_json(silent=True)
+        if isinstance(body, dict):
+            envelope = _paid_surface_envelope(body)
+            if envelope is not None:
+                import base64
+
+                accepts = [envelope]
+                if body.get('accepts') != accepts:
+                    new_body = dict(body)
+                    new_body['accepts'] = accepts
+                    raw = json.dumps(new_body).encode('utf-8')
+                    response.set_data(raw)
+                    response.headers['Content-Length'] = str(len(raw))
+                response.headers['PAYMENT-REQUIRED'] = base64.b64encode(
+                    json.dumps(accepts).encode('utf-8')).decode('ascii')
+                # R3a: browser buyers may only read the header cross-origin
+                # if it is explicitly exposed.
+                response.headers['Access-Control-Expose-Headers'] = \
+                    _merge_header_tokens(
+                        response.headers.get(
+                            'Access-Control-Expose-Headers'),
+                        'PAYMENT-REQUIRED')
+    return response
+
+
+@bp.app_errorhandler(405)
+def _paid_surface_method_not_allowed(_error):
+    """R4: undeclared methods return a JSON 405, never Werkzeug's HTML.
+
+    Registered app-wide (via the blueprint) on purpose: a routing-raised
+    405 is raised before any blueprint is active, so a blueprint-scoped
+    errorhandler never sees it — verified on Flask 3.0.3, where
+    ``bp.errorhandler(405)`` still serves the default HTML page.
+    """
+    return jsonify({'ok': False, 'error': 'method_not_allowed'}), 405
+
+
 @bp.route('/api/x402/resources', methods=['GET'])
 def x402_resources():
     if not X402_AVAILABLE:
