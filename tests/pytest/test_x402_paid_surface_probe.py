@@ -24,10 +24,12 @@ Rules probed:
   R3b CORS preflight (OPTIONS) MUST allow the payment headers
   R4  undeclared methods -> 405 with a JSON body (never 404, never HTML)
 
-Known-current deviations are xfail-marked with FINDING tags (strict=False):
-the assertions stay strict; when the surface is fixed, delete the markers.
-This commit's scope is the probe + checklist doc only (no route changes),
-so gaps are REPORTED here, not fixed here.
+The FINDING-1..4 deviations this probe originally reported (xfail-marked)
+are FIXED on branch xioix/x402-paid-surface — the markers are deleted and
+every assertion below runs strict against the live surface. A later
+adversarial-review round on that fix is pinned separately in
+tests/pytest/test_x402_paid_surface_fixes.py (Allow header on the JSON
+405, preflight reflection narrowed to paid routes, Allow-Origin on 402s).
 
 Negative controls: `misconfigured_402` deliberately violates every
 response rule and each check MUST raise on it; `wellformed_402` violates
@@ -306,9 +308,9 @@ class TestPaidSurface402Status:
 # ---------------------------------------------------------------------------
 # Checklist rules against the live surface.
 #
-# FINDING markers: the assertion is the checklist; the xfail records the
-# measured deviation. Scope here is probe + doc only — no route changes —
-# so deviations are reported, not fixed. Delete a marker when fixed.
+# The assertion is the checklist. The FINDING-1..4 deviations were fixed
+# on branch xioix/x402-paid-surface and the xfail markers deleted; these
+# tests now run strict — a failure here is a regression, not a finding.
 # ---------------------------------------------------------------------------
 
 class TestChecklistRules:

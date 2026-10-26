@@ -411,12 +411,26 @@ def _paid_surface_envelope(body):
         return None
 
 
+#: The paid surface proper (checklist "Our paid surface"): only these
+#: paths get CORS origin reflection. The billing blueprint also serves
+#: non-paid routes (payment/paypal webhooks, orders, platform checkout)
+#: that must never reflect a caller-supplied Origin.
+_PAID_SURFACE_PATH_PREFIXES = ('/x402/', '/api/x402/', '/api/paid/')
+
+
+def _is_paid_surface_path(path):
+    return bool(path) and path.startswith(_PAID_SURFACE_PATH_PREFIXES)
+
+
 @bp.after_request
 def _paid_surface_headers(response):
-    # R3b: a CORS preflight against any billing route must succeed and
-    # allow the payment headers a browser buyer sends.
+    # R3b: a CORS preflight against a PAID route must succeed and allow
+    # the payment headers a browser buyer sends. Reflection is narrowed
+    # to the paid surface only — non-paid billing routes (webhooks,
+    # orders, checkout) get no CORS reflection at all.
     if request.method == 'OPTIONS':
-        if request.headers.get('Origin'):
+        if _is_paid_surface_path(request.path) \
+                and request.headers.get('Origin'):
             response.headers['Access-Control-Allow-Origin'] = \
                 request.headers['Origin']
             response.headers['Access-Control-Allow-Headers'] = \
@@ -435,6 +449,14 @@ def _paid_surface_headers(response):
     # copy replays a dead challenge. Never store it.
     response.headers['Cache-Control'] = _merge_header_tokens(
         response.headers.get('Cache-Control'), 'no-store')
+    # R3c: a cross-origin browser buyer cannot even READ the 402 unless
+    # the origin is reflected on the response itself (Expose-Headers
+    # alone is not enough). Paid routes only; never Allow-Credentials.
+    _origin = request.headers.get('Origin')
+    if _origin and _is_paid_surface_path(request.path):
+        response.headers['Access-Control-Allow-Origin'] = _origin
+        response.headers['Vary'] = _merge_header_tokens(
+            response.headers.get('Vary'), 'Origin')
     # R2: mirror the envelope into the x402-v2 `accepts` body key and the
     # PAYMENT-REQUIRED header (base64 JSON) so header readers and body
     # readers authorize identical terms.
@@ -465,15 +487,24 @@ def _paid_surface_headers(response):
 
 
 @bp.app_errorhandler(405)
-def _paid_surface_method_not_allowed(_error):
+def _paid_surface_method_not_allowed(error):
     """R4: undeclared methods return a JSON 405, never Werkzeug's HTML.
 
     Registered app-wide (via the blueprint) on purpose: a routing-raised
     405 is raised before any blueprint is active, so a blueprint-scoped
     errorhandler never sees it — verified on Flask 3.0.3, where
     ``bp.errorhandler(405)`` still serves the default HTML page.
+
+    RFC 9110 §15.5.6: a 405 MUST carry an ``Allow`` header listing the
+    valid methods. Werkzeug's MethodNotAllowed carries them on
+    ``valid_methods``; restore the header the default HTML page would
+    have sent (the JSON body alone dropped it).
     """
-    return jsonify({'ok': False, 'error': 'method_not_allowed'}), 405
+    response = jsonify({'ok': False, 'error': 'method_not_allowed'})
+    valid_methods = getattr(error, 'valid_methods', None)
+    if valid_methods:
+        response.headers['Allow'] = ', '.join(valid_methods)
+    return response, 405
 
 
 @bp.route('/api/x402/resources', methods=['GET'])

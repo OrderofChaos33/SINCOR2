@@ -77,24 +77,39 @@ Route code: `src/sincor2/mvp_blueprints/billing.py`. Challenge logic:
 `tests/pytest/test_x402_paid_surface_probe.py` — runs every rule against
 every declared method above, plus negative controls.
 
-## Current findings (probe-reported, not yet fixed)
+## Current findings — all FIXED (branch `xioix/x402-paid-surface`)
 
-Scope of the probe commit is probe + this doc (no route changes), so these
-are recorded as `xfail` markers in the probe, not fixed:
+FINDING-1 through FINDING-4 were fixed in the R1–R4 fix commit on branch
+`xioix/x402-paid-surface` (one `after_request` hook + one app-wide 405
+handler in `billing.py`); the probe's `xfail` markers were deleted and the
+probe runs 39/39 green with its assertions unchanged:
 
-- **FINDING-1 (R1):** 402s carry no `Cache-Control` header —
-  `jsonify(ch), 402` in `billing.py` sets none.
-- **FINDING-2 (R2):** no `PAYMENT-REQUIRED` header is emitted on 402s, and
-  the body envelope lives under `payment`, not the x402-v2 `accepts` key.
-- **FINDING-3 (R3):** no CORS headers on the billing blueprint — 402s don't
-  expose `PAYMENT-REQUIRED` and `OPTIONS` preflight returns no
-  `Access-Control-Allow-*` headers.
-- **FINDING-4 (R4):** undeclared methods get Werkzeug's default HTML 405
-  page — there is no 405 errorhandler returning JSON on the blueprint.
+- **FINDING-1 (R1) — FIXED:** every 402 from the billing blueprint now
+  carries `Cache-Control: no-store`.
+- **FINDING-2 (R2) — FIXED:** challenge 402s mirror the payment envelope
+  into the body `accepts` key and emit a `PAYMENT-REQUIRED` header
+  (base64 JSON) that deep-equals it; verify 402s (no envelope of their
+  own) have theirs rebuilt read-only from the pending challenge.
+- **FINDING-3 (R3) — FIXED:** 402s expose `PAYMENT-REQUIRED` via
+  `Access-Control-Expose-Headers`, and `OPTIONS` preflight echoes the
+  caller's `Origin` and allows the payment headers. **Adversarial-review
+  follow-ups (same branch):** the origin reflection was initially added
+  blueprint-wide; review finding **F2** narrowed the preflight
+  reflection to the paid routes only (`/x402/`, `/api/x402/`,
+  `/api/paid/`) — non-paid billing routes (payment/paypal webhooks,
+  orders, platform checkout) now get NO CORS reflection — and review
+  finding **F4b** added `Access-Control-Allow-Origin` echo plus
+  `Vary: Origin` on paid-route 402 responses themselves, since
+  Expose-Headers alone still left a cross-origin browser buyer unable
+  to read the 402. No `Access-Control-Allow-Credentials` is ever set.
+- **FINDING-4 (R4) — FIXED:** undeclared methods return a JSON 405 from
+  an app-wide errorhandler. Review finding **F1** completed this fix:
+  the JSON handler initially dropped the `Allow` header that
+  RFC 9110 §15.5.6 requires on a 405 (stock Flask sends one); it now
+  restores `Allow` from the exception's `valid_methods`.
 
-Fixing any finding = a route/middleware change (out of scope here); when
-fixed, delete the corresponding `xfail` marker in the probe — the assertion
-itself must not be weakened.
+The review-round fixes are pinned by
+`tests/pytest/test_x402_paid_surface_fixes.py`.
 
 ## Adjacent notes
 
