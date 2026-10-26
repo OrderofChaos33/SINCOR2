@@ -324,6 +324,21 @@ def issue_renewal_challenge(wallet: str, plan_id: str) -> Dict[str, Any]:
     if not challenge_id:
         raise RuntimeError("challenge_mint_failed")
 
+    # Hunt-29: bind the x402 challenge row to the issued wallet at
+    # issuance, so subscription settle can require a bound challenge
+    # (require_bound_challenge=True) consistently with the pack rail.
+    # Server-issued binding is sound here — and only here — because the
+    # wallet is required at issuance, recorded in rail_sub_challenges
+    # below, and settle extends ONLY that wallet's subscription: no
+    # settler can redirect the benefit to themselves. (Pack challenges
+    # are never bound this way; their fulfillment goes to the settler,
+    # so they require the EIP-191 ownership bind instead.)
+    bound = x402.bind_server_issued_challenge(challenge_id, w)
+    if not bound.get("ok"):
+        logger.error("[RAIL-SUB] challenge bind failed for plan %s: %s",
+                     plan, bound.get("error"))
+        raise RuntimeError("challenge_bind_failed")
+
     # Wallet <-> challenge binding: only the issued wallet may settle it.
     conn = _connect()
     try:
@@ -659,6 +674,7 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         if not settle.get("verified"):
             verify = x402.verify_challenge(
                 cid, tx, payer_wallet=w,
+                require_bound_challenge=True,
                 replay_signature=replay_signature,
                 replay_ts_ms=replay_ts_ms)
             if not verify.get("ok"):
@@ -669,6 +685,7 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         verify = (_preverified if _preverified is not None
                   else x402.verify_challenge(
                       cid, tx, payer_wallet=w,
+                      require_bound_challenge=True,
                       replay_signature=replay_signature,
                       replay_ts_ms=replay_ts_ms))
         if not verify.get("ok"):

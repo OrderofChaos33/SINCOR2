@@ -41,7 +41,28 @@ from sincor2.revenue_orchestrator import RevenueOrchestrator
 # payer is a well-formed 0x address. Treasury / token address / decimals
 # are read from the repo's own modules, never invented here.
 TX_HASH = "0x" + "ab" * 32
-PAYER = "0x" + "11" * 20
+
+# Hunt-29: rail settle requires a BOUND challenge (require_bound_
+# challenge=True), so the test payer must be a real account that can
+# sign the EIP-191 bind message. This is the well-known PUBLIC Hardhat
+# dev account #0 — test-only, never funded, never used off-test.
+from eth_account import Account as _Account
+from eth_account.messages import encode_defunct as _encode_defunct
+
+_PAYER_ACCT = _Account.from_key(
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+PAYER = _PAYER_ACCT.address
+
+
+def _bind_challenge(challenge_id, resource_id, acct=_PAYER_ACCT):
+    """Complete the W-102r3 ownership bind for a minted challenge —
+    the same step the rail pay page performs before paying."""
+    sig = acct.sign_message(_encode_defunct(
+        text=x402.challenge_bind_message(
+            challenge_id, resource_id, acct.address))).signature.hex()
+    bound = x402.bind_challenge_payer(challenge_id, acct.address, sig)
+    assert bound.get("ownership_proven") is True, bound
+    return bound
 
 AMOUNT_ATOMIC_497 = 497_000_000  # $497.00 in 6-decimal USDC
 
@@ -156,7 +177,9 @@ def _checkout_challenge(client, **extra):
     body.update(extra)
     res = client.post("/rail/checkout", json=body)
     assert res.status_code == 402, res.get_json()
-    return res.get_json()["challenge_id"]
+    payload = res.get_json()
+    _bind_challenge(payload["challenge_id"], payload["resource_id"])
+    return payload["challenge_id"]
 
 
 def _settle(client, challenge_id, **extra):
