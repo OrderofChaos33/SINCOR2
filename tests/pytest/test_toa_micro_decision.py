@@ -428,6 +428,11 @@ class TestFullLoop:
         assert r.status_code == 400
         assert r.get_json()["ok"] is False
         assert "action" not in r.get_json()
+        # P1-1: the 400 must NOT burn the single-use token — the
+        # same token still delivers once the payload is valid.
+        r2 = _serve(client, paid["access_token"], WINNER)
+        assert r2.status_code == 200, r2.get_json()
+        assert "action" in r2.get_json()
 
     def test_unpaid_serve_rejected(
             self, client, x402_db, mock_onchain):

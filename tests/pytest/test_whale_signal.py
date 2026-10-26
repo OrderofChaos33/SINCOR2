@@ -12,7 +12,8 @@ Unit layer proves:
   via the real ``whale_flow.score_wallet`` (winning share pays 1,
   losing share pays 0 — the PR #515 invariant; a winning 100-share
   position bought at 0.40 realizes exactly +$60, never ~100x that);
-- empty registry -> honest empty (``registry_empty``);
+- empty registry -> paid serve refused 503 ``registry_unavailable``
+  BEFORE the token is consumed (P1-3b);
 - registry present, no fresh entries -> honest empty
   (``no_fresh_signals``) with the track record still served;
 - the claim-bearing fields carry no profitability claim (Mission 1A
@@ -142,10 +143,15 @@ class TestCollectWhaleSignals:
         assert record[WHALE_B]["realized_pnl_usd"] == 1234.5
         assert record[WHALE_B]["resolved_trades"] == 34
 
-    def test_empty_registry_honest_empty(self, fixture_feed):
+    def test_empty_registry_refused_503(self, fixture_feed):
+        # P1-3b (audit redefinition): an empty registry used to serve
+        # a paid 200 with an empty list; it now refuses 503
+        # registry_unavailable so the buyer is never charged for it.
         fixture_feed["registry"] = {}
         status, body = ws.serve_whale_signal({})
-        assert status == 200
+        assert status == 503
+        assert body["ok"] is False
+        assert body["error"] == "registry_unavailable"
         assert body["status"] == "registry_empty"
         assert body["signals"] == []
         assert body["track_record"] == []
@@ -365,15 +371,23 @@ class TestFullLoop:
         assert sig["whale_stats"]["resolved_trades"] == 87
         assert len(body["track_record"]) == 2
 
-    def test_paid_settle_empty_registry_honest_empty(
+    def test_paid_settle_empty_registry_503_token_not_consumed(
             self, client, x402_db, mock_onchain, fixture_feed):
+        # P1-3b (audit redefinition): empty registry -> 503, not a
+        # charged 200. P1-1: the 503 leaves the token unconsumed.
         fixture_feed["registry"] = {}
         paid = _pay(client, _tx("b2"))
         r = _serve(client, paid["access_token"])
-        assert r.status_code == 200, r.get_json()
+        assert r.status_code == 503, r.get_json()
         body = r.get_json()
+        assert body["error"] == "registry_unavailable"
         assert body["status"] == "registry_empty"
         assert body["signals"] == []
+        # Registry populated: the SAME token now delivers.
+        fixture_feed["registry"] = dict(REGISTRY)
+        r2 = _serve(client, paid["access_token"])
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["status"] == "signals_available"
 
     def test_paid_settle_no_fresh_signals_honest_empty(
             self, client, x402_db, mock_onchain, fixture_feed):

@@ -358,6 +358,18 @@ class TestFullLoop:
         assert r.status_code == 200, r.get_json()
         assert r.get_json()["verdict"] == "unknown"
 
+    def test_paid_bad_payload_400_token_not_consumed(
+            self, client, x402_db, mock_onchain, fetch_stub):
+        # P1-1: a 400 validation error must NOT burn the single-use
+        # token — the same token delivers once the payload is valid.
+        paid = _pay(client, _tx("d9"))
+        r = _serve_paid(client, paid["access_token"], {})
+        assert r.status_code == 400, r.get_json()
+        r2 = _serve_paid(client, paid["access_token"],
+                         {"url": DEFICIENT_URL})
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["verdict"] == "build_recommended"
+
     def test_unpaid_serve_rejected(
             self, client, x402_db, mock_onchain, fetch_stub):
         r = client.post(f"/api/paid/{RESOURCE}?wallet={BUYER}",

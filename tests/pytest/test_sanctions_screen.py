@@ -22,6 +22,7 @@ Freshness fixtures inject the real snapshot with a controlled
 from __future__ import annotations
 
 import datetime
+import json
 import time
 
 import pytest
@@ -281,17 +282,30 @@ class TestFullLoop:
         assert body["verdict"] == "clean"
         assert body["status"] == "screened"
 
-    def test_paid_settle_stale_snapshot_honest_unknown(
+    def test_paid_settle_stale_snapshot_503_token_not_consumed(
             self, client, x402_db, mock_onchain, monkeypatch):
+        # P1-3a (audit redefinition): a stale snapshot used to serve a
+        # paid 200 "unknown"; it now refuses 503 snapshot_stale
+        # BEFORE the token is consumed.
+        state = {"snap": _stale_real_snapshot()}
         monkeypatch.setattr(
-            ss, "load_screen_snapshot", lambda: _stale_real_snapshot())
+            ss, "load_screen_snapshot", lambda: state["snap"])
         paid = _pay(client, _tx("a3"))
         r = _serve(client, paid["access_token"], FLAGGED_ADDR)
-        assert r.status_code == 200, r.get_json()
+        assert r.status_code == 503, r.get_json()
         body = r.get_json()
-        # Paid, settled — and still honest: stale list proves nothing.
+        # Still honest: stale list proves nothing either way.
+        assert body["ok"] is False
+        assert body["error"] == "snapshot_stale"
         assert body["verdict"] == "unknown"
         assert body["stale"] is True
+        # P1-1: the 503 did NOT consume the token — with a fresh
+        # snapshot the SAME token delivers the real verdict.
+        state["snap"] = _fresh_real_snapshot()
+        r2 = _serve(client, paid["access_token"], FLAGGED_ADDR)
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["verdict"] == "flagged"
+        assert r2.get_json()["match"]["uid"] == "24003"
 
     def test_unpaid_serve_rejected(
             self, client, x402_db, mock_onchain, fresh_snapshot):
@@ -368,3 +382,86 @@ class TestFullLoop:
         r = _serve(client, paid["access_token"], "not-an-address")
         assert r.status_code == 400
         assert r.get_json()["error"] == "invalid_address"
+        # P1-1: the 400 must NOT burn the single-use token — the
+        # same token still delivers once the payload is valid.
+        r2 = _serve(client, paid["access_token"], CLEAN_ADDR)
+        assert r2.status_code == 200, r2.get_json()
+        assert r2.get_json()["verdict"] == "clean"
+
+
+# ---------------------------------------------------------------------------
+# P1-3a: serve-level stale gate + refresh CLI wiring
+# ---------------------------------------------------------------------------
+
+class TestServeStaleGate:
+    def test_serve_stale_snapshot_is_503(self, monkeypatch):
+        monkeypatch.setattr(
+            ss, "load_screen_snapshot", _stale_real_snapshot)
+        status, body = ss.serve_sanctions_screen(
+            {"address": CLEAN_ADDR})
+        assert status == 503
+        assert body["ok"] is False
+        assert body["error"] == "snapshot_stale"
+        assert body["stale"] is True
+
+    def test_serve_fresh_snapshot_is_200(self, monkeypatch):
+        monkeypatch.setattr(
+            ss, "load_screen_snapshot", _fresh_real_snapshot)
+        status, body = ss.serve_sanctions_screen(
+            {"address": CLEAN_ADDR})
+        assert status == 200
+        assert body["verdict"] == "clean"
+
+
+class TestRefreshOfacSdn:
+    """The refresh CLI wires the verified updater machinery to the
+    SINCOR_DATA_DIR-preferred snapshot path. Hermetic: the network
+    fetch and XML verification are stubbed; the atomic write, the
+    status semantics and the screen's read preference are real."""
+
+    def _stub_updater(self, monkeypatch, snap):
+        import sincor2.refresh_ofac_sdn as refresh_mod
+        monkeypatch.setattr(refresh_mod, "fetch_sdn_xml",
+                            lambda url: b"<sdn/>")
+        monkeypatch.setattr(
+            refresh_mod, "verify_and_parse",
+            lambda raw, fetched_at: {**snap,
+                                     "fetched_at": fetched_at})
+        return refresh_mod
+
+    def test_active_path_prefers_sincor_data_dir(
+            self, tmp_path, monkeypatch):
+        import sincor2.refresh_ofac_sdn as refresh_mod
+        from sincor2.defi.ofac_sdn import snapshot_path
+        monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
+        assert refresh_mod.active_snapshot_path() == str(
+            tmp_path / "p20_ofac_sdn.json")
+        monkeypatch.delenv("SINCOR_DATA_DIR")
+        assert refresh_mod.active_snapshot_path() == snapshot_path()
+
+    def test_refresh_writes_atomically_under_data_dir(
+            self, tmp_path, monkeypatch):
+        refresh_mod = self._stub_updater(
+            monkeypatch, _fresh_real_snapshot())
+        monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
+        result = refresh_mod.refresh()
+        assert result["status"] == "updated"
+        written = json.loads(
+            (tmp_path / "p20_ofac_sdn.json").read_text())
+        assert written["publication_date"] == "10/21/2026"
+        assert written["entry_count"] == 19471
+        assert written["fetched_at"] == result["fetched_at"]
+        # Same publication again: a verified re-download truthfully
+        # advances fetched_at -> "refreshed", never "updated".
+        result2 = refresh_mod.refresh()
+        assert result2["status"] == "refreshed"
+        assert result2["previous_publication_date"] == "10/21/2026"
+
+    def test_screen_prefers_refreshed_data_dir_snapshot(
+            self, tmp_path, monkeypatch):
+        snap = _fresh_real_snapshot()
+        snap["source"] = "REFRESHED-COPY-MARKER"
+        (tmp_path / "p20_ofac_sdn.json").write_text(json.dumps(snap))
+        monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
+        loaded = ss.load_screen_snapshot()
+        assert loaded["source"] == "REFRESHED-COPY-MARKER"

@@ -24,14 +24,18 @@ Honesty contract (Mission 1A, 2026-10-22 — mandatory):
   about that wallet; they are not a forecast, a rating of the signal,
   or a promise about any future trade. No derived "confidence" or
   expected-return figure is computed or served anywhere.
-- Empty registry or no fresh entries is reported honestly as an
-  empty signal list with a status — a signal is never fabricated.
+- A signal is never fabricated. Since P1-3b an EMPTY registry
+  refuses the paid serve with ``503 registry_unavailable`` instead of
+  charging $0.02 for an empty list — and since P1-1 the billing
+  blueprint consumes the token only on a 200, so the 503 never burns
+  it. A populated registry with no fresh entries still serves 200:
+  the tracked wallets' record is itself the deliverable.
 
 Payment is NOT handled here: the serve path sits behind the standard
 x402 flow (bound challenge -> verify with require_bound_challenge=True
--> single-use access token consumed by ``access_granted`` in the
-billing blueprint). This module only does the data work served after
-settlement.
+-> single-use access token, peek-verified by the billing blueprint
+and consumed only on a delivered 200). This module only does the
+data work served after settlement.
 """
 
 from __future__ import annotations
@@ -203,7 +207,12 @@ def collect_whale_signals(
         "notice": NOTICE,
     }
     if not registry:
-        return 200, {**base, "status": "registry_empty", "signals": []}
+        # P1-3b: nothing tracked = nothing to sell. Refuse BEFORE the
+        # paid token is consumed (the billing caller consumes only on
+        # a 200) rather than charging for an empty registry.
+        return 503, {**base, "ok": False,
+                     "error": "registry_unavailable",
+                     "status": "registry_empty", "signals": []}
     try:
         fresh = _fresh_entries(window_min)
     except Exception:
@@ -226,5 +235,6 @@ def serve_whale_signal(
     payload: Optional[Dict[str, Any]],
 ) -> tuple[int, Dict[str, Any]]:
     """Serve-path handler for the paid resource (called by the billing
-    blueprint ONLY after the x402 access token has been consumed)."""
+    blueprint after the x402 access token has been PEEK-verified; the
+    token is consumed only when this returns a 200 — P1-1)."""
     return collect_whale_signals(payload or {})
