@@ -122,6 +122,20 @@ def _load_loop() -> None:
         delay = min(delay * 1.5, 60.0)
 
 
+def _start_ofac_auto_refresh() -> None:
+    """Start the OFAC snapshot auto-refresh (boot + daily).
+
+    Fully isolated: any import/start failure is logged and swallowed
+    so it can never break app boot.
+    """
+    try:
+        from sincor2.ofac_auto_refresh import start_auto_refresh
+
+        start_auto_refresh()
+    except Exception as exc:
+        logger.warning("[boot] OFAC auto-refresh not started: %s", _safe_error(exc))
+
+
 def start_background_load() -> None:
     """Idempotent. Called from gunicorn post_worker_init and on first request."""
     global _thread_started
@@ -131,6 +145,7 @@ def start_background_load() -> None:
         _thread_started = True
         thread = threading.Thread(target=_load_loop, name="sincor2-boot", daemon=True)
         thread.start()
+    _start_ofac_auto_refresh()
 
 
 def boot_status() -> dict:
