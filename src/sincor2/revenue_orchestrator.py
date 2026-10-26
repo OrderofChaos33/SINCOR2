@@ -34,22 +34,48 @@ except ImportError as e:
 
 # Setup logging
 logger = logging.getLogger("revenue_orchestrator")
-# The file handler below is created at import time: make sure its directory
-# exists first so importing this module never crashes on a missing logs/
-# dir (e.g. the x402 rail imports it lazily during pack fulfillment).
-Path("logs").mkdir(parents=True, exist_ok=True)
+
+# Filesystem layout. When SINCOR_DATA_DIR is set (the Railway volume root,
+# e.g. /data) it roots BOTH the log directory and the revenue data
+# directory; when unset, preserve the historical cwd-relative layout
+# ("logs" and "data/revenue").
+_DATA_ROOT = os.environ.get("SINCOR_DATA_DIR", "").strip()
+if _DATA_ROOT:
+    LOG_DIR = Path(_DATA_ROOT) / "logs"
+    DATA_DIR = Path(_DATA_ROOT) / "revenue"
+else:
+    LOG_DIR = Path("logs")
+    DATA_DIR = Path("data") / "revenue"
+
+# The file handler below is created at import time. On hosts where the
+# working directory is read-only or owned by another user (Railway's /app
+# is root-owned while the process runs as appuser), creating the logs dir
+# raises PermissionError — and because rail_routes imports this module at
+# top level, that single failure silently unmounted the whole rail in
+# production. Degrade to stream-only logging instead: importing this
+# module must NEVER raise on filesystem setup.
+_log_handlers: List[logging.Handler] = []
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    _log_handlers.append(
+        logging.FileHandler(LOG_DIR / "revenue_orchestrator.log",
+                            encoding="utf-8"))
+except OSError:
+    pass
+_log_handlers.append(logging.StreamHandler())
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler("logs/revenue_orchestrator.log", encoding="utf-8"),
-        logging.StreamHandler()
-    ]
+    handlers=_log_handlers,
 )
 
 # Paths
-DATA_DIR = Path("data/revenue")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    # Same reasoning as the log setup above: consumers that actually write
+    # to the ledger surface their own error; the import must not crash.
+    pass
 REVENUE_DB = DATA_DIR / "revenue_ledger.db"
 
 
