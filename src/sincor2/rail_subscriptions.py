@@ -673,6 +673,12 @@ def _apply_period(*, wallet: str, plan_id: str, tx_hash: str,
     return {"ok": True, "action": action}
 
 
+def _rail_row_canceled(wallet: str) -> bool:
+    """Fresh read: is the rail subscription row stored canceled now?"""
+    row = _get_row(wallet)
+    return bool(row and _is_canceled_status(row.get("status")))
+
+
 def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
                    challenge_id: str, plan_changed: bool) -> None:
     """Mirror the period into platform_payments' subscription record.
@@ -681,9 +687,26 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
     max(period_end, now) rule (identical to _apply_period's); plan
     changes cancel-then-reactivate so both stores agree on a fresh
     period starting at payment time.
+
+    W-106 mirror reconciliation: _apply_period's rail upsert has
+    already committed when this runs, so a cancel can land before or
+    during the sync — it cancels the platform row, and an activation
+    afterwards would insert a NEW active platform row nothing else
+    reconciles (the rail row and the gate stay correct; only the
+    platform mirror diverges). Re-read the rail state immediately
+    before activating (skip when canceled) and again after the sync
+    completes (re-apply the platform cancel — the same mechanism
+    cancel_subscription uses — when now canceled). A cancel landing
+    after the post-sync read runs its own platform cancel after this
+    activation, so every interleave ends with the mirror canceled.
     """
     import sincor2.platform_payments as pp
 
+    if _rail_row_canceled(wallet):
+        logger.warning(
+            "[RAIL-SUB] platform sync skipped for %s: rail subscription "
+            "canceled before the sync ran", wallet)
+        return
     if plan_changed:
         pp.cancel_wallet_subscriptions(wallet)
     pp.activate_subscription(
@@ -696,6 +719,12 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
         email="",
         period_days=PERIOD_DAYS,
     )
+    if _rail_row_canceled(wallet):
+        logger.warning(
+            "[RAIL-SUB] platform mirror reconciled for %s: cancel "
+            "landed during the sync — re-applying platform cancel",
+            wallet)
+        pp.cancel_wallet_subscriptions(wallet)
 
 
 # --- Settle -----------------------------------------------------------------------

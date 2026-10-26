@@ -413,3 +413,136 @@ def test_settle_refuses_when_stored_status_is_messy_canceled(
     row = rs._get_row(PAYER)
     assert row["period_index"] == 1
     assert row["period_end"] == period_end_before
+
+
+# ---------------------------------------------------------------------------
+# Platform-mirror divergence (delta re-review probe N1): cancel landing
+# WHILE _sync_platform is in flight. The rail row (authoritative) and the
+# gate stay correct, but the released sync called activate_subscription
+# AFTER the cancel had cancelled the platform row, inserting a NEW
+# active platform row that nothing reconciled — the platform mirror
+# showed an active subscription for a canceled rail subscription.
+# Fix pinned here: _sync_platform re-reads the rail state immediately
+# before activating (skip when canceled) and again after the sync
+# completes (re-apply the platform cancel when now canceled).
+# ---------------------------------------------------------------------------
+
+def _platform_active_rows():
+    return [s for s in pp.list_subscriptions(PAYER)
+            if s["status"] == "active"]
+
+
+def test_race_n1_cancel_during_platform_sync_reconciles_mirror(
+        sub_app, sub_env, monkeypatch):
+    """N1: settle blocked inside the platform sync while cancel lands."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    assert len(_platform_active_rows()) == 1
+
+    ch2 = rs.issue_renewal_challenge(PAYER, "starter")
+
+    orig_activate = pp.activate_subscription
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking_activate(**kwargs):
+        entered.set()
+        assert release.wait(timeout=10), "test orchestration timed out"
+        return orig_activate(**kwargs)
+
+    monkeypatch.setattr(pp, "activate_subscription", _blocking_activate)
+
+    holder = {}
+
+    def _run_settle():
+        holder["result"] = rs.settle_renewal(
+            ch2["challenge_id"], TX_STARTER2, PAYER)
+
+    thread = threading.Thread(target=_run_settle)
+    thread.start()
+    try:
+        assert entered.wait(timeout=10), "settle never reached the sync"
+        # The cancel lands while the sync is in flight: rail row ->
+        # canceled, existing platform row -> cancelled.
+        out = rs.cancel_subscription(PAYER)
+        assert out["status"] == "canceled"
+        assert _platform_active_rows() == []
+    finally:
+        release.set()
+    thread.join(timeout=10)
+    assert not thread.is_alive(), "settle thread did not finish"
+    assert holder["result"]["ok"] is True, holder["result"]
+
+    # The released sync activated the platform row, but the mirror must
+    # be reconciled: NO active platform row for a canceled rail sub.
+    assert _platform_active_rows() == []
+    for row in pp.list_subscriptions(PAYER):
+        assert row["status"] == "cancelled"
+
+    # Authoritative store unchanged by the reconciliation.
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["effective_plan"] == "none"
+    assert rs.gate(PAYER, "starter_agents").allowed is False
+
+
+def test_cancel_before_platform_sync_skips_activation(
+        sub_app, sub_env, monkeypatch):
+    """Simpler ordering: cancel completes BEFORE the sync step begins —
+    the sync must not call activate_subscription at all."""
+    ch = rs.issue_renewal_challenge(PAYER, "starter")
+    r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
+    assert r["ok"] is True, r
+    assert len(_platform_active_rows()) == 1
+
+    ch2 = rs.issue_renewal_challenge(PAYER, "starter")
+
+    orig_sync = rs._sync_platform
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking_sync(**kwargs):
+        entered.set()
+        assert release.wait(timeout=10), "test orchestration timed out"
+        return orig_sync(**kwargs)
+
+    monkeypatch.setattr(rs, "_sync_platform", _blocking_sync)
+
+    activate_calls = []
+    orig_activate = pp.activate_subscription
+
+    def _spy_activate(**kwargs):
+        activate_calls.append(kwargs)
+        return orig_activate(**kwargs)
+
+    monkeypatch.setattr(pp, "activate_subscription", _spy_activate)
+
+    holder = {}
+
+    def _run_settle():
+        holder["result"] = rs.settle_renewal(
+            ch2["challenge_id"], TX_STARTER2, PAYER)
+
+    thread = threading.Thread(target=_run_settle)
+    thread.start()
+    try:
+        assert entered.wait(timeout=10), "settle never reached the sync"
+        # Cancel fully completes before the sync step runs.
+        out = rs.cancel_subscription(PAYER)
+        assert out["status"] == "canceled"
+        assert _platform_active_rows() == []
+    finally:
+        release.set()
+    thread.join(timeout=10)
+    assert not thread.is_alive(), "settle thread did not finish"
+    assert holder["result"]["ok"] is True, holder["result"]
+
+    # The sync step saw the canceled rail row and skipped activation.
+    assert activate_calls == []
+    assert _platform_active_rows() == []
+
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["effective_plan"] == "none"
+    assert rs.gate(PAYER, "starter_agents").allowed is False
