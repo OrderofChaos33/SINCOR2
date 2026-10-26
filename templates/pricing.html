@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pricing â€” SINCOR Competitive Intelligence</title>
+    <title>Pricing — SINCOR</title>
     <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -90,6 +90,18 @@
             max-width: 900px;
             margin: 0 auto;
             padding: 48px 24px 80px;
+        }
+
+        .section-title {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 8px 0 6px;
+        }
+        .section-sub {
+            color: var(--muted);
+            font-size: 15px;
+            margin-bottom: 24px;
+            line-height: 1.6;
         }
 
         .pricing-grid {
@@ -209,7 +221,7 @@
         }
         .btn-plan-outline:hover { border-color: var(--purple); color: #fff; }
 
-        /* What's included detail */
+        /* How checkout works */
         .report-detail {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -270,118 +282,189 @@
         .faq-item.open .faq-a { display: block; }
         .faq-icon { color: var(--purple-light); font-size: 20px; }
         .faq-item.open .faq-icon { transform: rotate(45deg); }
-
-        /* Guarantee */
-        .guarantee {
-            text-align: center;
-            background: rgba(16,185,129,0.08);
-            border: 1px solid rgba(16,185,129,0.2);
-            border-radius: 12px;
-            padding: 32px;
-            margin-top: 40px;
-        }
-        .guarantee h3 { font-size: 20px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
-        .guarantee p { color: var(--muted); font-size: 15px; }
     </style>
 </head>
 <body>
     <nav>
         <a href="/" class="nav-logo">SINC<span>OR</span></a>
-        <a href="/" class="nav-back">â† Back to Home</a>
+        <a href="/" class="nav-back">← Back to Home</a>
     </nav>
 
     <div class="hero">
         <div class="hero-eyebrow">Simple, Honest Pricing</div>
-        <h1>Regulated Vertical Packs That<br>Ship <span>Cash Inflow</span></h1>
-        <p>Healthcare credentialing + RCM and compliance/SBOM packs priced for immediate B2B deployment.</p>
-        <p class="hero-note">Secure checkout via wallet or card. Every plan includes the full agent marketplace.</p>
+        <h1>Skill Packs, Subscriptions,<br>and <span>Digital Downloads</span></h1>
+        <p>One-time B2B skill packs, downloadable template packs, and 30-day wallet subscriptions for the SINCOR agent marketplace.</p>
+        <p class="hero-note">Every price on this page is the live server price. Each button opens the payment page for that exact pack, download, or plan — pay in USDC on Base.</p>
     </div>
 
     <div class="pricing-section">
+        <h2 class="section-title">B2B Skill Packs</h2>
+        <p class="section-sub">One-time purchases. Fulfillment starts from your checkout details after payment settles.</p>
         <div class="pricing-grid">
             <div class="plan-card">
                 <div class="plan-name">Credentialing Launch</div>
                 <div class="plan-price"><sup>$</sup>297</div>
-                <div class="plan-cadence">one-time Â· KYA / Adapter</div>
-                <div class="plan-desc">Fast-start healthcare credentialing intake and adapter setup for first paid workflow.</div>
+                <div class="plan-cadence">one-time · KYA / Adapter</div>
+                <div class="plan-desc">Healthcare credentialing intake and adapter setup for your first regulated workflow.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">âœ“</span>Provider credentialing workflow kickoff</li>
-                    <li><span class="chk">âœ“</span>RCM intake checklist + scope lock</li>
-                    <li><span class="chk">âœ“</span>Pilot inquiry path in under 1 day</li>
+                    <li><span class="chk">✓</span>Provider credentialing workflow kickoff</li>
+                    <li><span class="chk">✓</span>RCM intake checklist + scope lock</li>
+                    <li><span class="chk">✓</span>Adapter setup for your first paid workflow</li>
                 </ul>
-                <a href="/buy#b2b-packs" class="btn-plan btn-plan-outline">Start KYA / Adapter</a>
+                <a href="/rail/pay/rail-pack-credentialing_launch" class="btn-plan btn-plan-outline">Start Credentialing Launch</a>
             </div>
 
             <div class="plan-card featured">
-                <div class="plan-badge">Best Value</div>
+                <div class="plan-badge">Most Complete</div>
                 <div class="plan-name">Compliance Operations</div>
                 <div class="plan-price"><sup>$</sup>997</div>
-                <div class="plan-cadence">one-time Â· CHROMA</div>
-                <div class="plan-desc">Compliance sequence buildout with SBOM-ready artifacts and outbound deliverable samples.</div>
+                <div class="plan-cadence">one-time · CHROMA</div>
+                <div class="plan-desc">Compliance operations buildout with SBOM-ready artifacts and deliverable samples.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">âœ“</span>Compliance SBOM skill activation</li>
-                    <li><span class="chk">âœ“</span>Outbound sequence templates included</li>
-                    <li><span class="chk">âœ“</span>Delivery artifacts for pilot sign-off</li>
+                    <li><span class="chk">✓</span>Compliance SBOM skill activation</li>
+                    <li><span class="chk">✓</span>Outbound sequence templates included</li>
+                    <li><span class="chk">✓</span>Delivery artifacts for pilot sign-off</li>
                 </ul>
-                <a href="/buy#b2b-packs" class="btn-plan btn-plan-primary">Start CHROMA Pack</a>
+                <a href="/rail/pay/rail-pack-chroma_compliance" class="btn-plan btn-plan-primary">Start CHROMA Pack</a>
             </div>
 
             <div class="plan-card">
                 <div class="plan-name">SADAS Execution</div>
                 <div class="plan-price"><sup>$</sup>2,997</div>
-                <div class="plan-cadence">one-time Â· strategic deployment</div>
-                <div class="plan-desc">Tailored deployment for regulated operations — dedicated infrastructure, custom integrations, white-glove onboarding.</div>
+                <div class="plan-cadence">one-time · strategic deployment</div>
+                <div class="plan-desc">Tailored deployment for regulated operations — dedicated setup, custom integrations, higher-touch onboarding.</div>
                 <ul class="plan-features">
-                    <li><span class="chk">âœ“</span>Higher-touch pilot onboarding</li>
-                    <li><span class="chk">âœ“</span>Compliance and fulfillment handoff</li>
-                    <li><span class="chk">âœ“</span>Clear paid inquiry path to close</li>
+                    <li><span class="chk">✓</span>Higher-touch pilot onboarding</li>
+                    <li><span class="chk">✓</span>Custom integration scoping</li>
+                    <li><span class="chk">✓</span>Compliance and fulfillment handoff</li>
                 </ul>
-                <a href="/buy#b2b-packs" class="btn-plan btn-plan-outline">Start SADAS Pack</a>
+                <a href="/rail/pay/rail-pack-sadas_execution" class="btn-plan btn-plan-outline">Start SADAS Execution</a>
+            </div>
+
+            <div class="plan-card">
+                <div class="plan-name">WebBuilder Site</div>
+                <div class="plan-price"><sup>$</sup>497</div>
+                <div class="plan-cadence">one-time · website build</div>
+                <div class="plan-desc">A business website designed and built through the SINCOR WebBuilder studio.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Website design and build</li>
+                    <li><span class="chk">✓</span>Intake collected at checkout</li>
+                    <li><span class="chk">✓</span>Built to hand over as a live site</li>
+                </ul>
+                <a href="/rail/pay/rail-pack-webbuilder_site" class="btn-plan btn-plan-outline">Start WebBuilder Site</a>
             </div>
         </div>
 
-        <!-- What's in the report -->
+        <h2 class="section-title">Digital Downloads</h2>
+        <p class="section-sub">One-time purchases delivered as token-gated downloads after checkout settles.</p>
+        <div class="pricing-grid">
+            <div class="plan-card">
+                <div class="plan-name">BI Template Pack</div>
+                <div class="plan-price"><sup>$</sup>97</div>
+                <div class="plan-cadence">one-time · download</div>
+                <div class="plan-desc">Templates for business reporting and dashboards, ready to put to work in your own stack.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Reporting and dashboard templates</li>
+                    <li><span class="chk">✓</span>Token-gated download after checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-pack-digital_bi_template_pack" class="btn-plan btn-plan-outline">Get the BI Template Pack</a>
+            </div>
+
+            <div class="plan-card">
+                <div class="plan-name">AI Agent Bundle</div>
+                <div class="plan-price"><sup>$</sup>297</div>
+                <div class="plan-cadence">one-time · download</div>
+                <div class="plan-desc">A downloadable bundle of agent workflow assets for builders working with autonomous agents.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Agent workflow assets</li>
+                    <li><span class="chk">✓</span>Token-gated download after checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-pack-digital_ai_agent_bundle" class="btn-plan btn-plan-outline">Get the AI Agent Bundle</a>
+            </div>
+
+            <div class="plan-card">
+                <div class="plan-name">Growth Forecast Template</div>
+                <div class="plan-price"><sup>$</sup>147</div>
+                <div class="plan-cadence">one-time · download</div>
+                <div class="plan-desc">A growth-forecast template you can put to work in your own planning.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Forecast template, ready to adapt</li>
+                    <li><span class="chk">✓</span>Token-gated download after checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-pack-digital_growth_forecast" class="btn-plan btn-plan-outline">Get the Growth Forecast Template</a>
+            </div>
+        </div>
+
+        <h2 class="section-title">Wallet Subscriptions</h2>
+        <p class="section-sub">30-day plan periods paid by wallet checkout. No card on file and no automatic charge — each period is a fresh checkout.</p>
+        <div class="pricing-grid">
+            <div class="plan-card">
+                <div class="plan-name">SINCOR Starter</div>
+                <div class="plan-price"><sup>$</sup>297</div>
+                <div class="plan-cadence">per 30 days · wallet subscription</div>
+                <div class="plan-desc">The entry plan for the SINCOR agent marketplace.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Agent roster up to 10 agents</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-sub-starter" class="btn-plan btn-plan-outline">Start Starter</a>
+            </div>
+
+            <div class="plan-card featured">
+                <div class="plan-badge">Most Popular</div>
+                <div class="plan-name">SINCOR Professional</div>
+                <div class="plan-price"><sup>$</sup>997</div>
+                <div class="plan-cadence">per 30 days · wallet subscription</div>
+                <div class="plan-desc">Room to run a larger agent roster on the marketplace.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Agent roster up to 25 agents</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-sub-professional" class="btn-plan btn-plan-primary">Start Professional</a>
+            </div>
+
+            <div class="plan-card">
+                <div class="plan-name">SINCOR Enterprise</div>
+                <div class="plan-price"><sup>$</sup>2,997</div>
+                <div class="plan-cadence">per 30 days · wallet subscription</div>
+                <div class="plan-desc">The highest subscription tier, for large agent operations.</div>
+                <ul class="plan-features">
+                    <li><span class="chk">✓</span>Highest roster tier</li>
+                    <li><span class="chk">✓</span>Marketplace access for your agents</li>
+                    <li><span class="chk">✓</span>Renew each period with a fresh wallet checkout</li>
+                </ul>
+                <a href="/rail/pay/rail-sub-enterprise" class="btn-plan btn-plan-outline">Start Enterprise</a>
+            </div>
+        </div>
+
+        <!-- How checkout works -->
         <div class="report-detail">
-            <h2>ðŸ“Š What's Inside Every Report</h2>
-            <p class="subtitle">A real competitive intelligence report â€” not a generic AI summary. Built from live data on your specific market.</p>
+            <h2>How checkout works</h2>
+            <p class="subtitle">Every purchase runs through the same wallet checkout — no card on file, no hidden steps.</p>
             <div class="report-sections">
                 <div class="report-item">
-                    <div class="report-item-icon">ðŸ’°</div>
-                    <h4>Pricing Intelligence</h4>
-                    <p>What your competitors charge, how they package their services, and where you're positioned.</p>
+                    <div class="report-item-icon">🧭</div>
+                    <h4>Pick a pack or plan</h4>
+                    <p>Choose a one-time pack, a digital download, or a 30-day subscription above.</p>
                 </div>
                 <div class="report-item">
-                    <div class="report-item-icon">â­</div>
-                    <h4>Reputation Analysis</h4>
-                    <p>Review scores, common complaints, what customers love â€” and what they hate about your rivals.</p>
+                    <div class="report-item-icon">🔗</div>
+                    <h4>Open the payment page</h4>
+                    <p>Your button opens the payment page for that exact item, at the exact server price shown here.</p>
                 </div>
                 <div class="report-item">
-                    <div class="report-item-icon">ðŸ”</div>
-                    <h4>Online Presence</h4>
-                    <p>Website quality, SEO keywords they're winning, Google rankings, and digital footprint.</p>
+                    <div class="report-item-icon">💵</div>
+                    <h4>Pay in USDC on Base</h4>
+                    <p>Connect a wallet and approve the USDC transfer. Settlement is verified onchain before anything is fulfilled.</p>
                 </div>
                 <div class="report-item">
-                    <div class="report-item-icon">ðŸ“£</div>
-                    <h4>Marketing Activity</h4>
-                    <p>How they advertise, what social content performs, and where they're investing attention.</p>
-                </div>
-                <div class="report-item">
-                    <div class="report-item-icon">ðŸŽ¯</div>
-                    <h4>Market Gaps</h4>
-                    <p>Specific opportunities your competitors are missing that you can move on immediately.</p>
-                </div>
-                <div class="report-item">
-                    <div class="report-item-icon">ðŸ“‹</div>
-                    <h4>Action Plan</h4>
-                    <p>3 concrete things you can do in the next 30 days to gain a competitive edge.</p>
+                    <div class="report-item-icon">📦</div>
+                    <h4>Fulfillment starts</h4>
+                    <p>Packs kick off from your checkout details, downloads unlock with a token-gated link, and subscription periods start at settle.</p>
                 </div>
             </div>
-        </div>
-
-        <!-- Guarantee -->
-        <div class="guarantee">
-            <h3>ðŸ›¡ï¸ Satisfaction Guarantee</h3>
-            <p>If the report doesn't give you at least one actionable insight you can use, we'll refund you. No questions asked.</p>
         </div>
 
         <!-- FAQ -->
@@ -390,42 +473,34 @@
 
             <div class="faq-item">
                 <div class="faq-q" onclick="this.closest('.faq-item').classList.toggle('open')">
-                    What industries do you cover?
+                    How do I pay?
                     <span class="faq-icon">+</span>
                 </div>
-                <div class="faq-a">We specialize in local service businesses: med spas, gyms, fitness studios, real estate agents, salons, dental practices, and similar businesses. If you're not sure if we cover your niche, email us at support@getsincor.com before buying.</div>
+                <div class="faq-a">All checkout is in USDC on Base through the payment pages linked above. Connect a wallet, approve the transfer, and the payment settles onchain. There is no card checkout, and nothing is stored for recurring billing.</div>
             </div>
 
             <div class="faq-item">
                 <div class="faq-q" onclick="this.closest('.faq-item').classList.toggle('open')">
-                    How long does it take to get my report?
+                    How do subscriptions renew?
                     <span class="faq-icon">+</span>
                 </div>
-                <div class="faq-a">Reports are delivered within 24 hours of your purchase. Most come back in under 12 hours. You'll receive the PDF by email as soon as it's ready.</div>
+                <div class="faq-a">They never auto-charge. Each 30-day period is a fresh wallet checkout, so you stay in control: renew from the payment page when a period ends, or let it lapse — access continues until the end of the period you already paid for.</div>
             </div>
 
             <div class="faq-item">
                 <div class="faq-q" onclick="this.closest('.faq-item').classList.toggle('open')">
-                    What do I need to provide?
+                    What do I get with a digital download?
                     <span class="faq-icon">+</span>
                 </div>
-                <div class="faq-a">Just your business name, location (city/zip), and industry. After checkout you'll fill out a short form and we take it from there. No technical setup required.</div>
+                <div class="faq-a">After checkout settles, you receive a token-gated download link for the pack you bought. The link is tied to your purchase — keep it somewhere safe.</div>
             </div>
 
             <div class="faq-item">
                 <div class="faq-q" onclick="this.closest('.faq-item').classList.toggle('open')">
-                    Can I cancel my monthly subscription?
+                    Which pack fits regulated work?
                     <span class="faq-icon">+</span>
                 </div>
-                <div class="faq-a">Yes. SINC subscriptions are wallet-based — stop renewing at <a href="/buy">/buy</a> or cancel from <a href="/billing">/billing</a>. Access continues until your paid period ends.</div>
-            </div>
-
-            <div class="faq-item">
-                <div class="faq-q" onclick="this.closest('.faq-item').classList.toggle('open')">
-                    What if I'm not satisfied with my report?
-                    <span class="faq-icon">+</span>
-                </div>
-                <div class="faq-a">We offer a Satisfaction Guarantee. If the report doesn't give you at least one actionable insight you can use, reply to your delivery email and we'll refund you in full.</div>
+                <div class="faq-a">Credentialing Launch covers healthcare credentialing intake, Compliance Operations covers compliance and SBOM work, and SADAS Execution is the higher-touch deployment tier. Not sure which fits? Email support@getsincor.com before buying.</div>
             </div>
         </div>
     </div>
