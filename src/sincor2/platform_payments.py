@@ -206,6 +206,16 @@ def init_platform_payments_db() -> None:
         )"""
     )
     conn.execute(
+        """CREATE TABLE IF NOT EXISTS platform_activation_journal (
+            payment_id TEXT PRIMARY KEY,
+            wallet TEXT NOT NULL,
+            plan_id TEXT NOT NULL,
+            subscription_id TEXT NOT NULL DEFAULT '',
+            period_end TEXT NOT NULL,
+            applied_at TEXT NOT NULL
+        )"""
+    )
+    conn.execute(
         """CREATE TABLE IF NOT EXISTS platform_checkouts (
             payment_id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
@@ -923,6 +933,171 @@ def activate_subscription(
                 ),
             )
         conn.commit()
+
+    return {
+        "subscription_id": sub_id,
+        "wallet": wallet,
+        "plan_id": plan_id,
+        "period_end": period_end,
+        "status": "active",
+    }
+
+
+def activate_subscription_idempotent(
+    *,
+    wallet: str,
+    plan_id: str,
+    product_name: str,
+    token: str,
+    tx_hash: str,
+    payment_id: str,
+    email: str = "",
+    period_days: int = 30,
+    cancel_plan_ids: tuple[str, ...] | list[str] = (),
+) -> dict[str, Any]:
+    """Idempotent subscription activation, journaled per payment (R3-2).
+
+    ``activate_subscription`` has no payment_id dedupe of its own, and
+    the subscription row's single ``last_payment_id`` slot cannot serve
+    as one: a later legitimate purchase overwrites the slot, so a
+    delayed re-drive of an earlier payment (crash post-activation,
+    pre-done) no longer matches it and would extend AGAIN.
+
+    This entry point instead records every activation it applies in
+    ``platform_activation_journal`` (payment_id PRIMARY KEY — a record
+    that cannot be overwritten), in the SAME transaction (BEGIN
+    IMMEDIATE) as the activation itself. A re-drive whose payment_id
+    is already journaled returns the journaled result without
+    extending, cancelling, or otherwise touching any row.
+
+    Optional plan replacement: when ``cancel_plan_ids`` is given, the
+    wallet's ACTIVE rows in those plans are cancelled inside the same
+    transaction, before the activation — so a plan change is
+    cancel-then-activate atomically, and only for the named plans
+    (callers scope this to their own plan family).
+
+    Legacy fallback: an activation that predates the journal carries
+    ``last_payment_id == payment_id`` on the still-active target row.
+    That state is detected, journaled (freezing the protection), and
+    returned without extending.
+
+    Existing callers of ``activate_subscription`` are unaffected: this
+    is a separate entry point with its own transaction.
+    """
+    import secrets
+    from datetime import timedelta
+
+    wallet = wallet.lower()
+    now = datetime.now(timezone.utc)
+    period_start = now.isoformat()
+    period_end = (now + timedelta(days=period_days)).isoformat()
+
+    conn = _conn()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            journaled = conn.execute(
+                "SELECT * FROM platform_activation_journal "
+                "WHERE payment_id=?",
+                (payment_id,),
+            ).fetchone()
+            if journaled is not None:
+                conn.commit()
+                return {
+                    "subscription_id": journaled["subscription_id"],
+                    "wallet": journaled["wallet"],
+                    "plan_id": journaled["plan_id"],
+                    "period_end": journaled["period_end"],
+                    "status": "active",
+                    "already_applied": True,
+                }
+
+            existing = conn.execute(
+                "SELECT id, period_end, last_payment_id FROM "
+                "platform_subscriptions WHERE wallet=? AND plan_id=? "
+                "AND status='active'",
+                (wallet, plan_id),
+            ).fetchone()
+            if (existing is not None
+                    and existing["last_payment_id"] == payment_id):
+                # Legacy pre-journal activation of this very payment:
+                # capture it in the journal and return it unchanged.
+                conn.execute(
+                    "INSERT OR IGNORE INTO platform_activation_journal "
+                    "(payment_id, wallet, plan_id, subscription_id, "
+                    " period_end, applied_at) VALUES (?,?,?,?,?,?)",
+                    (payment_id, wallet, plan_id, existing["id"],
+                     existing["period_end"], now.isoformat()))
+                conn.commit()
+                return {
+                    "subscription_id": existing["id"],
+                    "wallet": wallet,
+                    "plan_id": plan_id,
+                    "period_end": existing["period_end"],
+                    "status": "active",
+                    "already_applied": True,
+                }
+
+            cancel_ids = [p for p in cancel_plan_ids if p]
+            if cancel_ids:
+                placeholders = ",".join("?" * len(cancel_ids))
+                conn.execute(
+                    "UPDATE platform_subscriptions SET status='cancelled', "
+                    f"updated_at=? WHERE wallet=? AND status='active' "
+                    f"AND plan_id IN ({placeholders})",
+                    (now.isoformat(), wallet, *cancel_ids))
+
+            # Re-read after any cancellation: a cancelled target row
+            # must not be extended — activation starts fresh.
+            existing = conn.execute(
+                "SELECT id, period_end FROM platform_subscriptions "
+                "WHERE wallet=? AND plan_id=? AND status='active'",
+                (wallet, plan_id),
+            ).fetchone()
+            if existing:
+                sub_id = existing["id"]
+                try:
+                    prev_end = datetime.fromisoformat(
+                        existing["period_end"].replace("Z", "+00:00"))
+                    base = prev_end if prev_end > now else now
+                except ValueError:
+                    base = now
+                period_end = (base + timedelta(days=period_days)).isoformat()
+                conn.execute(
+                    """UPDATE platform_subscriptions SET period_end=?,
+                       last_tx_hash=?, last_payment_id=?,
+                       email=COALESCE(NULLIF(?, ''), email), updated_at=?,
+                       status='active'
+                       WHERE id=?""",
+                    (period_end, tx_hash, payment_id, email,
+                     now.isoformat(), sub_id),
+                )
+            else:
+                sub_id = f"sub_{secrets.token_hex(8)}"
+                conn.execute(
+                    """INSERT INTO platform_subscriptions
+                       (id, wallet, email, plan_id, product_name, token,
+                        status, period_start, period_end, last_tx_hash,
+                        last_payment_id, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)""",
+                    (
+                        sub_id, wallet, email, plan_id, product_name, token,
+                        period_start, period_end, tx_hash, payment_id,
+                        now.isoformat(), now.isoformat(),
+                    ),
+                )
+            conn.execute(
+                "INSERT INTO platform_activation_journal "
+                "(payment_id, wallet, plan_id, subscription_id, "
+                " period_end, applied_at) VALUES (?,?,?,?,?,?)",
+                (payment_id, wallet, plan_id, sub_id, period_end,
+                 now.isoformat()))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    finally:
+        conn.close()
 
     return {
         "subscription_id": sub_id,

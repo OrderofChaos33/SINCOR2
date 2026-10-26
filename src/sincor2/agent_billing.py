@@ -82,6 +82,17 @@ def _find_platform_payment(log_file: Path, *, tx_hash: str,
     equal amounts — a same-amount retry whose recovered payer differs
     (e.g. by case) still dedupes, which is the safe direction for an
     append-only revenue log.
+
+    Trade-off, stated both ways (R3-3): the amount-exact side cuts the
+    other direction. If one economic payment is re-presented under the
+    same tx + product with a RECOMPUTED different amount (e.g. a spot
+    re-price between a crash and its retry), it does not match the
+    first row and a second row IS appended — the log can double-count
+    that payment. That is accepted deliberately: the alternative
+    (amount-blind dedupe on tx + product) would swallow a genuinely
+    distinct second payment that happens to share one tx, silently
+    LOSING revenue records, which is worse for an append-only log
+    than an auditable duplicate.
     """
     if not log_file.is_file():
         return None

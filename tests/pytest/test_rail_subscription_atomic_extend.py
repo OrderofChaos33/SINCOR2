@@ -1054,3 +1054,218 @@ def test_new6_empty_payment_id_different_amount_is_not_deduped(
         amount_atomic=100, product_name="Probe", payment_id="")
     rows = [r for r in _jsonl_rows(log_file) if r.get("tx_hash") == TX]
     assert len(rows) == 2
+
+
+# ===========================================================================
+# Fix round 3 (delta re-review #3 residuals R3-1 / R3-2)
+#
+# R3-1: round 2 derived plan_changed from the WHOLE platform store, so a
+# rail settle cancelled unrelated non-rail platform subscriptions (the
+# store is shared and multi-plan by design — e.g. an `intel` row bought
+# via the human checkout). The derivation must be scoped to the rail
+# plan family (SUB_PLANS) and non-rail rows must never be cancelled.
+#
+# R3-2: the last_payment_id early-return reads ONE mutable slot on the
+# subscription row. CH-A crashes post-activation / pre-done, CH-B (a
+# legitimate next purchase) overwrites the slot, and CH-A's late
+# repairing ack then re-drives the sync and extends a THIRD period for
+# two payments. Idempotency needs a per-payment journal that cannot be
+# overwritten, written atomically with the activation.
+# ===========================================================================
+
+TX_B = "0x" + "ef" * 32
+
+
+def _seed_platform_plan(plan_id, payment_id, tx_hash="0x" + "cd" * 32):
+    plan = pp.PLATFORM_PLANS[plan_id]
+    return pp.activate_subscription(
+        wallet=WALLET, plan_id=plan_id,
+        product_name=plan["product_name"], token=plan["token"],
+        tx_hash=tx_hash, payment_id=payment_id, email="", period_days=30)
+
+
+def _platform_sub(plan_id, wallet=WALLET):
+    for s in pp.list_subscriptions(wallet):
+        if s["plan_id"] == plan_id:
+            return s
+    return None
+
+
+# ---------------------------------------------------------------------------
+# R3-1: non-rail platform rows survive rail settles
+# ---------------------------------------------------------------------------
+
+def test_r31_intel_survives_first_time_rail_starter_settle(
+        platform_sync_env):
+    seeded = _seed_platform_plan("intel", "intel-payment-1")
+    intel_end = seeded["period_end"]
+
+    cid = _issue()
+    res = rs.settle_renewal(cid, TX, WALLET)
+    assert res["ok"] is True, res
+    assert res["status"] == "renewed"
+
+    active = {s["plan_id"]: s for s in _active_platform_subs()}
+    assert set(active) == {"intel", "starter"}, active
+    assert active["intel"]["period_end"] == intel_end  # untouched
+    assert active["intel"]["last_payment_id"] == "intel-payment-1"
+    assert active["starter"]["last_payment_id"] == cid
+
+
+def test_r31_intel_survives_same_plan_rail_renewal(platform_sync_env):
+    seeded = _seed_platform_plan("intel", "intel-payment-1")
+    intel_end = seeded["period_end"]
+
+    cid1 = _issue()
+    first = rs.settle_renewal(cid1, TX, WALLET)
+    assert first["ok"] is True, first
+    starter_end_1 = _platform_sub("starter")["period_end"]
+
+    cid2 = _issue()
+    second = rs.settle_renewal(cid2, TX_B, WALLET)
+    assert second["ok"] is True, second
+    assert second["status"] == "renewed"
+
+    active = {s["plan_id"]: s for s in _active_platform_subs()}
+    assert set(active) == {"intel", "starter"}, active
+    assert active["intel"]["period_end"] == intel_end  # still untouched
+    # The renewal really extended the rail plan (not a no-op).
+    assert active["starter"]["period_end"] > starter_end_1
+    assert active["starter"]["last_payment_id"] == cid2
+
+
+def test_r31_genuine_rail_plan_switch_cancels_only_rail_rows(
+        platform_sync_env):
+    seeded = _seed_platform_plan("intel", "intel-payment-1")
+    intel_end = seeded["period_end"]
+
+    cid1 = _issue()
+    assert rs.settle_renewal(cid1, TX, WALLET)["ok"] is True
+
+    cid2 = rs.issue_renewal_challenge(WALLET, "professional")[
+        "challenge_id"]
+    res = rs.settle_renewal(cid2, TX_B, WALLET)
+    assert res["ok"] is True, res
+    assert res["status"] == "upgraded"
+
+    active = {s["plan_id"]: s for s in _active_platform_subs()}
+    # Rail family converged on professional; intel was NOT cancelled.
+    assert set(active) == {"intel", "professional"}, active
+    assert active["intel"]["period_end"] == intel_end
+    assert active["professional"]["last_payment_id"] == cid2
+    starter = _platform_sub("starter")
+    assert starter["status"] == "cancelled"
+
+
+# ---------------------------------------------------------------------------
+# R3-2: per-payment journal defeats the single-slot interleave
+# ---------------------------------------------------------------------------
+
+def _fail_first_done_write(monkeypatch):
+    real_update = rs._update_sub_settle
+    state = {"failed": False}
+
+    def _failing_update(settle_id, **fields):
+        if fields.get("platform_sync_done") == 1 and not state["failed"]:
+            state["failed"] = True
+            raise RuntimeError("done-write failed (simulated crash)")
+        return real_update(settle_id, **fields)
+
+    monkeypatch.setattr(rs, "_update_sub_settle", _failing_update)
+    return state
+
+
+def test_r32_interleaved_crash_repair_does_not_extend_third_period(
+        platform_sync_env, monkeypatch):
+    _fail_first_done_write(monkeypatch)
+
+    # CH-A: activation commits, the done-write dies -> claim held,
+    # platform_sync_done=0 (the crash state).
+    cid_a = _issue()
+    res_a = rs.settle_renewal(cid_a, TX, WALLET)
+    assert res_a["ok"] is True, res_a  # R5: committed settle stands
+    row_a = _settle_row(platform_sync_env["tmp"], f"railsub-{cid_a}")
+    assert row_a["platform_sync_done"] == 0
+    end_a = _platform_sub("starter")["period_end"]
+
+    # CH-B: a legitimate next purchase settles fully and overwrites
+    # the single last_payment_id slot.
+    cid_b = _issue()
+    res_b = rs.settle_renewal(cid_b, TX_B, WALLET)
+    assert res_b["ok"] is True, res_b
+    sub_b = _platform_sub("starter")
+    assert sub_b["last_payment_id"] == cid_b
+    end_b = sub_b["period_end"]
+    assert end_b > end_a  # B really bought a second period
+
+    # CH-A's late repairing ack: must NOT extend a third period.
+    dup = rs.settle_renewal(cid_a, TX, WALLET)
+    assert dup["ok"] is True, dup
+    assert dup["status"] == "already_renewed"
+    sub = _platform_sub("starter")
+    assert sub["period_end"] == end_b  # exactly 2 periods for 2 payments
+    assert sub["last_payment_id"] == cid_b
+    assert len(_active_platform_subs()) == 1
+    row_a = _settle_row(platform_sync_env["tmp"], f"railsub-{cid_a}")
+    assert row_a["platform_sync_done"] == 1  # repair completed the sync
+
+
+def test_r32_plan_change_redrive_after_interleave_does_not_reactivate(
+        platform_sync_env, monkeypatch):
+    cid0 = _issue()
+    assert rs.settle_renewal(cid0, TX, WALLET)["ok"] is True
+
+    _fail_first_done_write(monkeypatch)
+
+    # CH-A: a plan-change (upgrade) settle whose activation commits
+    # but whose done-write dies.
+    cid_a = rs.issue_renewal_challenge(WALLET, "professional")[
+        "challenge_id"]
+    res_a = rs.settle_renewal(cid_a, TX_B, WALLET)
+    assert res_a["ok"] is True, res_a
+    assert res_a["status"] == "upgraded"
+    row_a = _settle_row(platform_sync_env["tmp"], f"railsub-{cid_a}")
+    assert row_a["platform_sync_done"] == 0
+    assert _platform_sub("professional")["last_payment_id"] == cid_a
+
+    # CH-B: a legitimate professional renewal settles fully and
+    # overwrites last_payment_id.
+    cid_b = rs.issue_renewal_challenge(WALLET, "professional")[
+        "challenge_id"]
+    tx_c = "0x" + "98" * 32
+    res_b = rs.settle_renewal(cid_b, tx_c, WALLET)
+    assert res_b["ok"] is True, res_b
+    sub_b = _platform_sub("professional")
+    assert sub_b["last_payment_id"] == cid_b
+    end_b = sub_b["period_end"]
+
+    # CH-A's late ack re-drives a plan_changed sync: it must not
+    # cancel / re-activate / extend again.
+    dup = rs.settle_renewal(cid_a, TX_B, WALLET)
+    assert dup["ok"] is True, dup
+    assert dup["status"] == "already_renewed"
+    sub = _platform_sub("professional")
+    assert sub["status"] == "active"
+    assert sub["period_end"] == end_b
+    assert sub["last_payment_id"] == cid_b
+    active_plans = {s["plan_id"] for s in _active_platform_subs()}
+    assert active_plans == {"professional"}, active_plans
+
+
+def test_r32_idempotent_entry_point_journals_per_payment(
+        platform_sync_env):
+    fn = pp.activate_subscription_idempotent
+    kw = dict(wallet=WALLET, plan_id="starter",
+              product_name=rs.SUB_PLANS["starter"]["name"], token="USDC",
+              tx_hash=TX, email="", period_days=30)
+    first = fn(payment_id="pay-1", **kw)
+    again = fn(payment_id="pay-1", **kw)
+    assert again["period_end"] == first["period_end"]  # no re-extension
+    assert again["subscription_id"] == first["subscription_id"]
+
+    # A NEW payment_id is a legitimate repeat purchase: it extends.
+    second = fn(payment_id="pay-2", **kw)
+    assert second["period_end"] > first["period_end"]
+    # ...and is itself idempotent thereafter.
+    assert fn(payment_id="pay-2", **kw)["period_end"] == \
+        second["period_end"]

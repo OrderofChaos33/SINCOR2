@@ -940,11 +940,25 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
     old-code sync already ran carries last_payment_id == challenge on
     the platform row, so the repairing ack leaves the mirror alone.
 
+    That single-slot check is only a legacy fallback, not the primary
+    dedupe (R3-2): last_payment_id is overwritten by the NEXT
+    legitimate purchase, so an interleaved late ack for an earlier
+    payment no longer matches it. The primary dedupe is the
+    per-payment activation journal inside
+    platform_payments.activate_subscription_idempotent — written in
+    the same transaction as the activation, keyed by payment_id, and
+    never overwritten — which this sync now routes through.
+
     Plan changes are likewise derived from the platform store, not
     just the caller's stamp (NEW-3): a legacy applied stamp says
     'renewed' unconditionally, but if the platform store's active plan
     differs from the settle's plan, the mirror needs cancel-then-
-    activate semantics or both plans end up active at once.
+    activate semantics or both plans end up active at once. The
+    derivation is scoped to the RAIL plan family (R3-1): the platform
+    store is shared and multi-plan by design (e.g. an `intel` row
+    bought via the human checkout), so only active rows whose plan_id
+    is in SUB_PLANS count as a different plan here, and a rail settle
+    cancels ONLY rail-family rows — non-rail rows are never touched.
     """
     import sincor2.platform_payments as pp
 
@@ -953,15 +967,14 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
             and existing.get("last_payment_id") == challenge_id):
         return  # this payment already synced — never extend twice
     if not plan_changed:
-        active_others = [
+        active_rail_others = [
             s for s in pp.list_subscriptions(wallet)
             if s.get("status") == "active"
+            and s.get("plan_id") in SUB_PLANS
             and s.get("plan_id") != plan_id]
-        if active_others:
+        if active_rail_others:
             plan_changed = True
-    if plan_changed:
-        pp.cancel_wallet_subscriptions(wallet)
-    pp.activate_subscription(
+    pp.activate_subscription_idempotent(
         wallet=wallet,
         plan_id=plan_id,
         product_name=SUB_PLANS[plan_id]["name"],
@@ -970,6 +983,10 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
         payment_id=challenge_id,
         email="",
         period_days=PERIOD_DAYS,
+        # Plan change: cancel-then-activate, scoped to the rail plan
+        # family, inside the activation transaction (and skipped
+        # entirely when this payment is already journaled).
+        cancel_plan_ids=tuple(SUB_PLANS) if plan_changed else (),
     )
 
 
