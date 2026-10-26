@@ -4,7 +4,9 @@ deposit. No burn — burn counters below are historical-only."""
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import threading
 import urllib.error
 import urllib.request
@@ -31,14 +33,55 @@ def _log_path() -> Path:
 _log_lock = threading.Lock()
 
 
+@contextlib.contextmanager
+def _log_file_lock(log_file: Path):
+    """OS flock beside the JSONL log, held across dedupe-check + append.
+
+    _log_lock only serializes threads in THIS process (NEW-4): two
+    processes released together could both miss the dedupe check and
+    append duplicates. The OS releases the lock automatically when a
+    holder dies, so a crashed writer never wedges the log. Degrades to
+    the threading lock alone where flock is unavailable.
+    """
+    lock_path = str(log_file) + ".lock"
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:
+        yield
+        return
+    locked = False
+    try:
+        try:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            locked = True
+        except (ImportError, OSError):
+            locked = False
+        yield
+    finally:
+        if locked:
+            try:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except (ImportError, OSError):
+                pass
+        os.close(fd)
+
+
 def _find_platform_payment(log_file: Path, *, tx_hash: str,
-                           payment_id: str,
+                           payment_id: str, amount_atomic: int,
                            product_name: str) -> Optional[dict[str, Any]]:
     """Return the existing platform-payment row for this payment, if any.
 
     Dedupe key: (tx_hash, payment_id) — payment_id is the challenge /
     order id that uniquely names one payment for one tx. Rows written
-    without a payment_id fall back to (tx_hash, product_name).
+    without a payment_id fall back to (tx_hash, product_name,
+    amount_atomic): a different amount under the same tx + product is
+    a DIFFERENT payment and must not dedupe into the first row
+    (NEW-6). Known limitation: the fallback key stays payer-blind for
+    equal amounts — a same-amount retry whose recovered payer differs
+    (e.g. by case) still dedupes, which is the safe direction for an
+    append-only revenue log.
     """
     if not log_file.is_file():
         return None
@@ -58,6 +101,11 @@ def _find_platform_payment(log_file: Path, *, tx_hash: str,
             if row.get("payment_id") == payment_id:
                 return row
         elif row.get("product_name") == product_name:
+            try:
+                if int(row.get("amount_atomic") or 0) != amount_atomic:
+                    continue
+            except (TypeError, ValueError):
+                continue
             return row
     return None
 
@@ -99,14 +147,16 @@ def record_platform_payment(
 
     log_file = _log_path()
     with _log_lock:
-        if tx_hash:
-            existing = _find_platform_payment(
-                log_file, tx_hash=tx_hash, payment_id=payment_id,
-                product_name=product_name)
-            if existing is not None:
-                return existing
-        with log_file.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
+        with _log_file_lock(log_file):
+            if tx_hash:
+                existing = _find_platform_payment(
+                    log_file, tx_hash=tx_hash, payment_id=payment_id,
+                    amount_atomic=amount_atomic,
+                    product_name=product_name)
+                if existing is not None:
+                    return existing
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
 
     return entry
 

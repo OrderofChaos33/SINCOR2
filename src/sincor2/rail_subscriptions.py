@@ -245,8 +245,17 @@ def _migrate_legacy_settles(conn: sqlite3.Connection,
     pre-existing row with extended=1 WAS already synced. Seed both
     flags so the first post-upgrade duplicate ack does not re-run the
     sync and double-extend the platform mirror.
+
+    NEW-5: seed ONLY for that genuinely pre-W-105 ledger — one where
+    platform_synced was ALSO just added. A c2de0901-era ledger already
+    carries platform_synced (and the applied stamps) but no
+    platform_sync_done column; there, an extended=1 row with
+    platform_synced=0 is a legitimately pending sync that reconcile
+    must still drive, not an already-synced row.
     """
     if "platform_sync_done" not in newly_added:
+        return
+    if "platform_synced" not in newly_added:
         return
     conn.execute(
         "UPDATE rail_sub_settles SET platform_synced=1, "
@@ -917,9 +926,39 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
     max(period_end, now) rule (identical to _apply_period's); plan
     changes cancel-then-reactivate so both stores agree on a fresh
     period starting at payment time.
+
+    The sync itself is idempotent per challenge (NEW-1/NEW-2): the
+    platform store records which payment last activated a subscription
+    (last_payment_id), and activate_subscription has no payment_id
+    dedupe of its own — a second activation for the same challenge
+    would stack another period. The claim/done flags alone cannot
+    distinguish "claimed, sync never ran" from "claimed, sync already
+    committed" (a crash — or a failed done-write — after the platform
+    commit lands in exactly that state), so before activating we skip
+    when this challenge already activated the target plan's row. The
+    same check closes the legacy hole: a pre-W-105 victim whose
+    old-code sync already ran carries last_payment_id == challenge on
+    the platform row, so the repairing ack leaves the mirror alone.
+
+    Plan changes are likewise derived from the platform store, not
+    just the caller's stamp (NEW-3): a legacy applied stamp says
+    'renewed' unconditionally, but if the platform store's active plan
+    differs from the settle's plan, the mirror needs cancel-then-
+    activate semantics or both plans end up active at once.
     """
     import sincor2.platform_payments as pp
 
+    existing = pp.get_subscription(wallet, plan_id)
+    if (existing is not None
+            and existing.get("last_payment_id") == challenge_id):
+        return  # this payment already synced — never extend twice
+    if not plan_changed:
+        active_others = [
+            s for s in pp.list_subscriptions(wallet)
+            if s.get("status") == "active"
+            and s.get("plan_id") != plan_id]
+        if active_others:
+            plan_changed = True
     if plan_changed:
         pp.cancel_wallet_subscriptions(wallet)
     pp.activate_subscription(
