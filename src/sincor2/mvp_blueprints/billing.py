@@ -651,6 +651,76 @@ def x402_verify():
     return jsonify(result), 200
 
 
+# ---------------------------------------------------------------------------
+# W-107 single-flight guard for the paid-token pipeline.
+#
+# The P1-1 peek -> dispatch -> consume split (PR #533) deliberately
+# runs the provider dispatch BEFORE the atomic token consume, so a
+# failed dispatch (400/503) never burns the buyer's token. That left
+# a race: concurrent requests carrying the SAME single-use token all
+# passed the peek, all dispatched (spending provider money / egress),
+# and only the consume winner was served — the losers' provider
+# results were discarded (W-107, verified 8/8 synchronised trials:
+# provider_calls == N for N concurrent duplicates).
+#
+# This guard makes the pipeline single-flight PER TOKEN: the first
+# in-flight request (the leader) proceeds; a concurrent duplicate is
+# refused with the existing 409 access_token_already_consumed
+# semantics WITHOUT dispatching. It is NOT consume-before-dispatch:
+# the leader still consumes only on a 200, and the flight entry is
+# released on EVERY exit path (success, 400, 503, exception) via
+# try/finally, so a failed leader leaves no stale flight and the
+# legitimate retry dispatches fresh (P1-1 preservation intact).
+# Different tokens hold different flights and dispatch concurrently.
+# ---------------------------------------------------------------------------
+import hashlib as _hashlib
+import threading as _threading
+
+_PAID_FLIGHT_GUARD = _threading.Lock()
+# flight key -> [lock, refcount]; entries are dropped at refcount 0.
+_PAID_TOKEN_FLIGHTS: dict = {}
+
+
+def _paid_flight_key(token, resource_id):
+    # Hash the bearer token so the registry never stores it raw.
+    digest = _hashlib.sha256(
+        (resource_id + '\x00' + token).encode('utf-8')).hexdigest()
+    return digest
+
+
+def _drop_paid_flight_ref(key, entry):
+    with _PAID_FLIGHT_GUARD:
+        entry[1] -= 1
+        if entry[1] <= 0 and _PAID_TOKEN_FLIGHTS.get(key) is entry:
+            _PAID_TOKEN_FLIGHTS.pop(key, None)
+
+
+def _acquire_paid_token_flight(token, resource_id):
+    """Try to become the flight leader for (token, resource_id).
+
+    Returns the flight handle for the leader, or None when another
+    request already leads this token's flight (caller must refuse
+    without dispatching).
+    """
+    key = _paid_flight_key(token, resource_id)
+    with _PAID_FLIGHT_GUARD:
+        entry = _PAID_TOKEN_FLIGHTS.get(key)
+        if entry is None:
+            entry = [_threading.Lock(), 0]
+            _PAID_TOKEN_FLIGHTS[key] = entry
+        entry[1] += 1
+    if entry[0].acquire(blocking=False):
+        return (key, entry)
+    _drop_paid_flight_ref(key, entry)
+    return None
+
+
+def _release_paid_token_flight(flight):
+    key, entry = flight
+    _drop_paid_flight_ref(key, entry)
+    entry[0].release()
+
+
 @bp.route('/api/paid/<resource_id>', methods=['GET', 'POST'])
 @limiter.limit("120 per hour")
 def x402_paid_resource(resource_id):
@@ -659,6 +729,30 @@ def x402_paid_resource(resource_id):
         return jsonify({'error': 'x402_unavailable'}), 503
     from sincor2.x402_payments import access_granted
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
+    # W-107: claim this token's flight BEFORE the peek, so a duplicate
+    # that arrives at any point during the leader's peek -> dispatch ->
+    # consume pipeline is refused without dispatching. Token-less
+    # requests skip the guard entirely (they can only fail the peek
+    # and receive a challenge; there is no token to single-flight).
+    flight = None
+    if token:
+        flight = _acquire_paid_token_flight(token, resource_id)
+        if flight is None:
+            return jsonify({'ok': False,
+                            'error': 'access_token_already_consumed'}), 409
+    try:
+        return _x402_paid_resource_leader(resource_id, token, access_granted)
+    finally:
+        if flight is not None:
+            _release_paid_token_flight(flight)
+
+
+def _x402_paid_resource_leader(resource_id, token, access_granted):
+    """The peek -> dispatch -> consume pipeline (flight leader only).
+
+    Sequential behavior is exactly the pre-W-107 flow; the caller
+    (x402_paid_resource) owns the single-flight guard + release.
+    """
     # P1-1: PEEK first (consume=False) — never burn the buyer's
     # single-use token before a deliverable exists. A 400 bad payload
     # or a 503/500 upstream failure previously consumed the token up
