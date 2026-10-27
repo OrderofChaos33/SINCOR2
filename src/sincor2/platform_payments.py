@@ -265,6 +265,8 @@ def init_platform_payments_db() -> None:
         """CREATE INDEX IF NOT EXISTS idx_platform_payment_audits_payment
            ON platform_payment_audits(payment_id)"""
     )
+    # D2: shared consumed-tx registry (see claim_consumed_onchain_tx).
+    conn.execute(CONSUMED_TX_DDL)
     conn.commit()
     conn.close()
 
@@ -307,6 +309,157 @@ def _conn() -> sqlite3.Connection:
     c = sqlite3.connect(_db_path())
     c.row_factory = sqlite3.Row
     return c
+
+
+# --- D2: shared consumed_onchain_txs registry (cross-ledger double-spend) --
+# Before D2, each ledger enforced UNIQUE(tx_hash) only inside itself:
+# platform_checkouts had a partial unique index, x402_challenges a unique
+# index on its own table, and the rail tables (rail_events /
+# rail_sub_settles, in the separate revenue DB) carried tx_hash as plain
+# TEXT with no index at all. One on-chain transfer could therefore fulfill
+# TWO entitlements in two different systems (reproduced 2026-10-26: one
+# 297 USDC transfer settled both a rail pack and a platform 'starter'
+# checkout).
+#
+# The registry below is the single system-wide claim book. It lives in
+# the orders DB (shared by platform_payments and x402_payments); the rail
+# modules, whose own ledgers live in the revenue DB, claim here too, via
+# claim_consumed_onchain_tx(). A tx_hash may be claimed by exactly ONE
+# entitlement, identified by ``claim_ref``:
+#   * platform checkout  -> claim_ref = payment_id,  claim_system="platform"
+#   * x402 challenge     -> claim_ref = challenge_id, claim_system="x402"
+#   * rail pack settle   -> claim_ref = challenge_id, claim_system="rail_pack"
+#   * rail subscription  -> claim_ref = challenge_id, claim_system="rail_sub"
+# Rail settles ride on an x402 challenge, so for a rail settle the x402
+# claim and the rail claim name the SAME claim_ref (the challenge_id) and
+# are the same entitlement, not two: re-claiming with the same claim_ref
+# is an idempotent success (settle retries must keep working), while any
+# claim for a tx_hash already held under a DIFFERENT claim_ref is refused
+# with tx_hash_already_used and must not fulfill.
+CONSUMED_TX_DDL = """CREATE TABLE IF NOT EXISTS consumed_onchain_txs (
+    tx_hash TEXT PRIMARY KEY,
+    claim_system TEXT NOT NULL,
+    claim_ref TEXT NOT NULL,
+    payer_wallet TEXT NOT NULL DEFAULT '',
+    claimed_at TEXT NOT NULL
+)"""
+
+
+def _ensure_consumed_registry(conn: sqlite3.Connection) -> None:
+    conn.execute(CONSUMED_TX_DDL)
+
+
+def _registry_conn() -> sqlite3.Connection:
+    """Lightweight connection for registry-only work.
+
+    Deliberately NOT _conn(): that runs the full platform init on every
+    call, whose conditional ALTER TABLE migrations race under
+    concurrent settles. The registry helpers need only their own table;
+    CREATE TABLE IF NOT EXISTS is safe under concurrency with a
+    generous busy timeout.
+    """
+    c = sqlite3.connect(_db_path(), timeout=30.0)
+    c.row_factory = sqlite3.Row
+    c.execute(CONSUMED_TX_DDL)
+    c.commit()
+    return c
+
+
+def normalize_tx_hash(tx_hash: Any) -> str:
+    return str(tx_hash or "").strip().lower()
+
+
+def get_consumed_onchain_tx(tx_hash: str) -> dict[str, Any] | None:
+    """Return the registry row for a tx_hash, or None if unclaimed."""
+    tx = normalize_tx_hash(tx_hash)
+    if not tx:
+        return None
+    with _registry_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM consumed_onchain_txs WHERE tx_hash=?", (tx,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def claim_consumed_onchain_tx(
+    tx_hash: str,
+    *,
+    claim_system: str,
+    claim_ref: str,
+    payer_wallet: str = "",
+) -> dict[str, Any]:
+    """Atomically claim an on-chain tx for exactly one entitlement.
+
+    BEGIN IMMEDIATE + INSERT on the PRIMARY KEY(tx_hash): the first
+    claimant wins. Re-claiming with the same ``claim_ref`` returns
+    ``{"ok": True, "already_claimed": True}`` (idempotent retries of the
+    same entitlement). A claim under any other ``claim_ref`` returns
+    ``{"ok": False, "error": "tx_hash_already_used", ...}`` naming the
+    holding system/ref, and the caller MUST NOT fulfill.
+    """
+    tx = normalize_tx_hash(tx_hash)
+    ref = str(claim_ref or "").strip()
+    if not tx.startswith("0x") or len(tx) != 66:
+        return {"ok": False, "error": "invalid_tx_hash"}
+    if not ref:
+        return {"ok": False, "error": "claim_ref_required"}
+    conn = _registry_conn()
+    try:
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError:
+            return {"ok": False, "error": "store_busy"}
+        try:
+            conn.execute(
+                "INSERT INTO consumed_onchain_txs "
+                "(tx_hash, claim_system, claim_ref, payer_wallet, claimed_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (tx, str(claim_system), ref,
+                 str(payer_wallet or "").strip().lower(),
+                 datetime.now(timezone.utc).isoformat()),
+            )
+            conn.commit()
+            return {"ok": True, "already_claimed": False,
+                    "tx_hash": tx, "claim_system": str(claim_system),
+                    "claim_ref": ref}
+        except sqlite3.IntegrityError:
+            existing = conn.execute(
+                "SELECT * FROM consumed_onchain_txs WHERE tx_hash=?",
+                (tx,),
+            ).fetchone()
+            conn.rollback()
+            if existing is not None and existing["claim_ref"] == ref:
+                return {"ok": True, "already_claimed": True,
+                        "tx_hash": tx,
+                        "claim_system": existing["claim_system"],
+                        "claim_ref": existing["claim_ref"]}
+            return {
+                "ok": False, "error": "tx_hash_already_used",
+                "tx_hash": tx,
+                "consumed_by_system": (
+                    existing["claim_system"] if existing else ""),
+                "consumed_by_ref": (
+                    existing["claim_ref"] if existing else ""),
+            }
+    finally:
+        conn.close()
+
+
+def release_consumed_onchain_tx(tx_hash: str, *, claim_ref: str) -> bool:
+    """Release a claim (only by its owning claim_ref). Used when the
+    checkout that claimed a tx is reverted pre-fulfillment (reorg/drop):
+    no entitlement was granted, so the claim must not linger. Returns
+    True when a row was deleted."""
+    tx = normalize_tx_hash(tx_hash)
+    if not tx:
+        return False
+    with _registry_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM consumed_onchain_txs WHERE tx_hash=? AND claim_ref=?",
+            (tx, str(claim_ref or "").strip()),
+        )
+        conn.commit()
+        return cur.rowcount == 1
 
 
 def token_address(symbol: str) -> str:
@@ -1267,6 +1420,28 @@ def _maybe_finalize(
         confirmations=conf,
         required_confirmations=depth,
     )
+    # D2: claim the tx in the shared consumed_onchain_txs registry BEFORE
+    # any finality/fulfillment transition, so the same on-chain transfer
+    # cannot also fulfill an x402 challenge or a rail settle under a
+    # different entitlement. The claim is taken even while below depth
+    # (awaiting_finality): the tx is reserved to THIS checkout until it
+    # finalizes or is reverted (revert releases the claim, see
+    # _advance_finality). Same-payment re-polls re-claim idempotently.
+    claim = claim_consumed_onchain_tx(
+        tx_hash, claim_system="platform", claim_ref=payment_id,
+        payer_wallet=str(vr.get("payer_wallet") or ""))
+    if not claim.get("ok"):
+        _set_checkout_status(
+            payment_id, "pending",
+            only_from=("verifying", "awaiting_finality"),
+        )
+        _audit_payment_event(
+            payment_id, "consumed_tx_conflict", tx_hash,
+            f"held by {claim.get('consumed_by_system')}:"
+            f"{claim.get('consumed_by_ref')}")
+        return {"ok": False, "error": "tx_already_used",
+                "consumed_by_system": claim.get("consumed_by_system"),
+                "consumed_by_ref": claim.get("consumed_by_ref"), **base}
     if conf < depth:
         _set_checkout_status(
             payment_id,
@@ -1386,6 +1561,9 @@ def _advance_finality(payment_id: str) -> dict[str, Any]:
                 payment_id, "reverted",
                 only_from=("awaiting_finality", "finalized"),
             )
+            # D2: no entitlement was granted — release the registry
+            # claim so the reverted claim does not linger.
+            release_consumed_onchain_tx(tx_hash, claim_ref=payment_id)
             _audit_payment_event(
                 payment_id, "reorg_tx_missing", tx_hash,
                 "receipt no longer present on chain (reorg or drop)",
@@ -1397,6 +1575,7 @@ def _advance_finality(payment_id: str) -> dict[str, Any]:
                 payment_id, "reverted",
                 only_from=("awaiting_finality", "finalized"),
             )
+            release_consumed_onchain_tx(tx_hash, claim_ref=payment_id)
             _audit_payment_event(
                 payment_id, "tx_failed_on_recheck", tx_hash,
                 "receipt now reports failure",

@@ -566,6 +566,27 @@ def _update_sub_settle(settle_id: str, **fields: Any) -> None:
         conn.close()
 
 
+def _claim_consumed_tx_for_settle(*, tx_hash: str, challenge_id: str,
+                                  wallet: str = "") -> Dict[str, Any]:
+    """D2 item 1: claim the settle tx in the shared consumed_onchain_txs
+    registry (platform_payments, orders DB).
+
+    rail_sub_settles itself carries tx_hash as plain TEXT with no
+    uniqueness, so the registry is this ledger's cross-system guard.
+    The claim_ref is the challenge_id: a subscription settle rides on
+    exactly one x402 challenge, and verify_challenge claims the same tx
+    under that same challenge_id — the two claims are ONE entitlement,
+    so the registry treats them as idempotent. A tx held under any
+    other claim_ref (a platform payment_id or a different challenge)
+    is refused here and the period MUST NOT be extended.
+    """
+    from sincor2 import platform_payments as pp
+
+    return pp.claim_consumed_onchain_tx(
+        tx_hash, claim_system="rail_sub", claim_ref=challenge_id,
+        payer_wallet=wallet)
+
+
 def _claim_sub_settle_flag(settle_id: str, column: str) -> bool:
     """Atomically flip a settle-row flag 0 -> 1; True for the one winner.
 
@@ -1160,6 +1181,12 @@ def _verify_fail(result: Dict[str, Any]) -> Dict[str, Any]:
         "error": result.get("error", "verify_failed"),
         "detail": result.get("detail", ""),
     }
+    # D2 item 3: pass the finality/OFAC context through (see
+    # rail_routes._verify_fail).
+    for _k in ("confirmations", "required_confirmations",
+               "ofac_verdict", "ofac_detail"):
+        if result.get(_k) is not None:
+            out[_k] = result[_k]
     if result.get("error") == "replay_auth_failed":
         out["replay_hint"] = (
             "challenge already fulfilled: re-settle with replay_signature + "
@@ -1285,6 +1312,26 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
                 return _already_renewed(settle)
 
     amount_usdc = SUB_PLANS[plan_id]["price_cents"] / 100
+
+    # D2 item 1 (defense in depth, localized to the subscription settle
+    # claim path): claim the tx in the shared registry before finalizing
+    # or extending. verify_challenge already claimed it under this same
+    # challenge_id on the first-attempt path, so this is idempotent
+    # there; on retry paths that reuse the verified settle row without
+    # re-verifying, this is the guard that stops a tx consumed by a
+    # DIFFERENT entitlement (e.g. a platform checkout) from extending
+    # this subscription.
+    _consumed = _claim_consumed_tx_for_settle(
+        tx_hash=tx, challenge_id=cid, wallet=w)
+    if not _consumed.get("ok"):
+        logger.warning(
+            "[RAIL-SUB] settle refused for %s: tx already consumed by "
+            "%s:%s", settle_id, _consumed.get("consumed_by_system"),
+            _consumed.get("consumed_by_ref"))
+        return {"ok": False, "error": "tx_hash_already_used",
+                "settle_id": settle_id,
+                "consumed_by_system": _consumed.get("consumed_by_system"),
+                "consumed_by_ref": _consumed.get("consumed_by_ref")}
 
     try:
         # Record the platform payment + treasury inflow exactly once:
