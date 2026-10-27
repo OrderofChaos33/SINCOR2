@@ -603,7 +603,12 @@ from sincor2 import payment_ledger as pl
 from sincor2.governance.money_gate import reset_money_boundary
 
 RAIL_TX_HASH = "0x" + "ab" * 32
-RAIL_PAYER = "0x" + "11" * 20
+# Hunt-29: rail settle requires a BOUND challenge, so the rail payer
+# must be a real account that can sign the EIP-191 bind message.
+# Well-known PUBLIC Hardhat dev account #0 — test-only, never funded.
+RAIL_PAYER_ACCT = Account.from_key(
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+RAIL_PAYER = RAIL_PAYER_ACCT.address
 AMOUNT_ATOMIC_497 = 497_000_000  # $497.00 in 6-decimal USDC
 
 
@@ -720,6 +725,14 @@ def test_flagged_lead_completes_rail_webbuilder_purchase(
     assert checkout["resource_id"] == step["resource"]
     assert checkout["amount_usdc"] == step["price_usdc"]
     cid = checkout["challenge_id"]
+
+    # Hunt-29: bind the challenge to the payer (EIP-191 ownership
+    # proof) before settling — the step the rail pay page performs.
+    bind_sig = RAIL_PAYER_ACCT.sign_message(encode_defunct(
+        text=x402.challenge_bind_message(
+            cid, checkout["resource_id"], RAIL_PAYER))).signature.hex()
+    bound = x402.bind_challenge_payer(cid, RAIL_PAYER, bind_sig)
+    assert bound.get("ownership_proven") is True, bound
 
     res = rail.post("/rail/settle", json={
         "challenge_id": cid,

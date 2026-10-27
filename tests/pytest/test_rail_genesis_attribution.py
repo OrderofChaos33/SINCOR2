@@ -32,8 +32,35 @@ from sincor2.governance.money_gate import reset_money_boundary
 
 TX_HASH = "0x" + "ab" * 32
 WRONG_TX_HASH = "0x" + "cd" * 32
-PAYER = "0x" + "11" * 20
-STRANGER = "0x" + "33" * 20
+
+# Hunt-29: rail settle requires a BOUND challenge (require_bound_
+# challenge=True), so the test payers must be real accounts that can
+# sign the EIP-191 bind message. These are the well-known PUBLIC
+# Hardhat dev accounts #0/#1 — test-only, never funded, never used
+# off-test.
+from eth_account import Account as _Account
+from eth_account.messages import encode_defunct as _encode_defunct
+
+_PAYER_ACCT = _Account.from_key(
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+_STRANGER_ACCT = _Account.from_key(
+    "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+PAYER = _PAYER_ACCT.address
+STRANGER = _STRANGER_ACCT.address
+_ACCT_BY_WALLET = {PAYER.lower(): _PAYER_ACCT,
+                   STRANGER.lower(): _STRANGER_ACCT}
+
+
+def _bind_challenge(challenge_id, resource_id, wallet):
+    """Complete the W-102r3 ownership bind for a minted challenge —
+    the same step the rail pay page performs before paying."""
+    acct = _ACCT_BY_WALLET[wallet.lower()]
+    sig = acct.sign_message(_encode_defunct(
+        text=x402.challenge_bind_message(
+            challenge_id, resource_id, acct.address))).signature.hex()
+    bound = x402.bind_challenge_payer(challenge_id, acct.address, sig)
+    assert bound.get("ownership_proven") is True, bound
+    return bound
 GENESIS_EMAIL = "genesis.early@getsincor.com"
 STRANGER_EMAIL = "stranger@example.com"
 
@@ -146,7 +173,10 @@ def _checkout(client, sku="credentialing_launch", **kw):
     body.update(kw)
     res = client.post("/rail/checkout", json=body)
     assert res.status_code == 402, res.get_data(as_text=True)
-    return res.get_json()["challenge_id"]
+    payload = res.get_json()
+    _bind_challenge(payload["challenge_id"], payload["resource_id"],
+                    body["payer_wallet"])
+    return payload["challenge_id"]
 
 
 def _settle(client, cid, **kw):
