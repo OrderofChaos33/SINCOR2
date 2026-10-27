@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS rail_subscriptions (
     last_challenge_id TEXT NOT NULL DEFAULT '',
     reminder_count    INTEGER NOT NULL DEFAULT 0,
     last_reminder_at  TEXT NOT NULL DEFAULT '',
+    canceled_at       TEXT NOT NULL DEFAULT '',
     created_at        TEXT NOT NULL,
     updated_at        TEXT NOT NULL
 );
@@ -166,7 +167,8 @@ CREATE TABLE IF NOT EXISTS rail_sub_challenges (
     challenge_id TEXT PRIMARY KEY,
     wallet       TEXT NOT NULL,
     plan_id      TEXT NOT NULL,
-    issued_at    TEXT NOT NULL
+    issued_at    TEXT NOT NULL,
+    voided_at    TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS rail_sub_settles (
     settle_id     TEXT PRIMARY KEY,
@@ -214,6 +216,19 @@ def _connect() -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), timeout=30.0)
     conn.executescript(_SUB_SCHEMA)
+    # Migrations for ledgers created before the W-106 columns existed.
+    sub_cols = {r[1] for r in
+                conn.execute("PRAGMA table_info(rail_subscriptions)")}
+    if "canceled_at" not in sub_cols:
+        conn.execute(
+            "ALTER TABLE rail_subscriptions "
+            "ADD COLUMN canceled_at TEXT NOT NULL DEFAULT ''")
+    ch_cols = {r[1] for r in
+               conn.execute("PRAGMA table_info(rail_sub_challenges)")}
+    if "voided_at" not in ch_cols:
+        conn.execute(
+            "ALTER TABLE rail_sub_challenges "
+            "ADD COLUMN voided_at TEXT NOT NULL DEFAULT ''")
     conn.commit()
     existing = {r[1] for r in conn.execute(
         "PRAGMA table_info(rail_sub_settles)")}
@@ -383,7 +398,12 @@ def subscription_status(wallet: str) -> Dict[str, Any]:
         }
     derived = _derive_status(row, now)
     if derived != row["status"]:
-        _update_row(w, status=derived)
+        updates: Dict[str, Any] = {"status": derived}
+        if derived == "canceled":
+            # W-106: stamp when the cancel took effect so settle can
+            # distinguish pre-cancel challenges from fresh purchases.
+            updates["canceled_at"] = _utc_now_iso()
+        _update_row(w, **updates)
         row = _get_row(w) or row
     return {
         "wallet": w,
@@ -447,6 +467,21 @@ def issue_renewal_challenge(wallet: str, plan_id: str) -> Dict[str, Any]:
     challenge_id = challenge.get("challenge_id")
     if not challenge_id:
         raise RuntimeError("challenge_mint_failed")
+
+    # Hunt-29: bind the x402 challenge row to the issued wallet at
+    # issuance, so subscription settle can require a bound challenge
+    # (require_bound_challenge=True) consistently with the pack rail.
+    # Server-issued binding is sound here — and only here — because the
+    # wallet is required at issuance, recorded in rail_sub_challenges
+    # below, and settle extends ONLY that wallet's subscription: no
+    # settler can redirect the benefit to themselves. (Pack challenges
+    # are never bound this way; their fulfillment goes to the settler,
+    # so they require the EIP-191 ownership bind instead.)
+    bound = x402.bind_server_issued_challenge(challenge_id, w)
+    if not bound.get("ok"):
+        logger.error("[RAIL-SUB] challenge bind failed for plan %s: %s",
+                     plan, bound.get("error"))
+        raise RuntimeError("challenge_bind_failed")
 
     # Wallet <-> challenge binding: only the issued wallet may settle it.
     conn = _connect()
@@ -647,6 +682,53 @@ def _record_gate_denial(settle_id: str, plan_id: str) -> None:
                      exc)
 
 
+# --- W-106 void/cancel check (fresh read, shared by settle + apply) ------------
+def _is_canceled_status(stored: Any) -> bool:
+    """Normalized canceled comparison: case/whitespace-insensitive."""
+    return (stored or "").strip().lower() == "canceled"
+
+
+def _challenge_voided_by_cancel(challenge_id: str, wallet: str, *,
+                                already_extended: bool = False) -> bool:
+    """Fresh-read W-106 check: is this challenge dead because of a cancel?
+
+    Re-reads the challenge row and the subscription row at call time —
+    never values loaded earlier in a settle. True when the challenge
+    was voided by cancel_subscription(), or when the subscription is
+    stored canceled and this challenge predates that cancel (a
+    challenge issued AFTER the cancel is a genuinely fresh purchase
+    and is not voided by it). The already-extended carve-out is
+    ack-only: a settle that already applied its period keeps its
+    duplicate ack and applies nothing new, so it is never refused.
+    """
+    if already_extended:
+        return False
+    issued = _get_issued(challenge_id)
+    if issued is None:
+        return False
+    if (issued.get("voided_at") or "").strip():
+        logger.warning(
+            "[RAIL-SUB] settle refused: challenge %s voided by cancel",
+            challenge_id)
+        return True
+    sub_row = _get_row(wallet)
+    if sub_row and _is_canceled_status(sub_row.get("status")):
+        canceled_raw = (sub_row.get("canceled_at")
+                        or sub_row.get("updated_at") or "")
+        try:
+            fresh_purchase = (
+                _parse_iso(issued.get("issued_at") or "")
+                > _parse_iso(canceled_raw))
+        except ValueError:
+            fresh_purchase = False  # unparseable clock — fail closed
+        if not fresh_purchase:
+            logger.warning(
+                "[RAIL-SUB] settle refused: challenge %s predates the "
+                "cancel of wallet %s", challenge_id, wallet)
+            return True
+    return False
+
+
 # --- Period application ---------------------------------------------------------
 def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
                   tx_hash: str, challenge_id: str) -> Dict[str, Any]:
@@ -668,6 +750,18 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
     {"ok": False, "error": "downgrade_at_renewal", ...} (nothing applied
     and nothing stamped — a later re-settle can still complete it).
     """
+    # W-106 defense-in-depth: last-moment fresh re-validation inside the
+    # apply step itself, so a cancel that landed after settle_renewal's
+    # pre-apply re-check (below) still cannot be overwritten to active.
+    # Nothing external (no RPC, no gate, no finalize) runs between this
+    # read and the upsert below — only local period math on SQLite rows.
+    if _challenge_voided_by_cancel(challenge_id, wallet):
+        return {
+            "ok": False,
+            "error": "challenge_voided_by_cancel",
+            "detail": ("challenge voided by a cancel that landed before "
+                       "the period was applied"),
+        }
     now = _utc_now()
     new_rank = pg.rank(plan_id)
     period_delta = timedelta(days=PERIOD_DAYS)
@@ -705,6 +799,46 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
                         "period_end": applied_end,
                         "period_index": applied_index}
 
+            # W-106 atomic final check: BEGIN IMMEDIATE holds the DB
+            # write lock, so a concurrent cancel either committed fully
+            # before this transaction (its void/cancel is seen on THIS
+            # connection here — abort) or waits for the upsert to
+            # commit and then re-cancels the row (final state canceled
+            # either way). Re-reads use THIS connection only — opening
+            # another _connect() while holding the write lock would
+            # self-block on its schema script. This runs after the
+            # already-applied ack above: a settle that already applied
+            # its period applies nothing new, so a later cancel never
+            # refuses its ack (the W-106 already-extended carve-out).
+            ch_row = conn.execute(
+                "SELECT voided_at, issued_at FROM rail_sub_challenges "
+                "WHERE challenge_id=?", (challenge_id,)).fetchone()
+            atomic_voided = bool(
+                ch_row is not None and (ch_row["voided_at"] or "").strip())
+            if not atomic_voided and ch_row is not None:
+                sub_now = conn.execute(
+                    "SELECT status, canceled_at, updated_at FROM "
+                    "rail_subscriptions WHERE wallet=?",
+                    (wallet.lower(),)).fetchone()
+                if sub_now is not None and _is_canceled_status(
+                        sub_now["status"]):
+                    canceled_raw = (sub_now["canceled_at"]
+                                    or sub_now["updated_at"] or "")
+                    try:
+                        atomic_fresh = (
+                            _parse_iso(ch_row["issued_at"] or "")
+                            > _parse_iso(canceled_raw))
+                    except ValueError:
+                        atomic_fresh = False  # unparseable — fail closed
+                    atomic_voided = not atomic_fresh
+            if atomic_voided:
+                conn.rollback()
+                return {
+                    "ok": False,
+                    "error": "challenge_voided_by_cancel",
+                    "detail": ("challenge voided by a cancel that landed "
+                               "before the period was applied"),
+                }
             row_raw = conn.execute(
                 "SELECT * FROM rail_subscriptions WHERE wallet=?",
                 (wallet,)).fetchone()
@@ -771,8 +905,8 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
                 "(wallet, plan_id, status, period_index, period_start, "
                 " period_end, grace_until, last_tx_hash, "
                 " last_challenge_id, reminder_count, last_reminder_at, "
-                " created_at, updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                " canceled_at, created_at, updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(wallet) DO UPDATE SET "
                 "plan_id=excluded.plan_id, status='active', "
                 "period_index=excluded.period_index, "
@@ -781,11 +915,11 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
                 "grace_until=excluded.grace_until, "
                 "last_tx_hash=excluded.last_tx_hash, "
                 "last_challenge_id=excluded.last_challenge_id, "
-                "reminder_count=0, last_reminder_at='', "
+                "reminder_count=0, last_reminder_at='', canceled_at='', "
                 "updated_at=excluded.updated_at",
                 (wallet, plan_id, "active", period_index,
                  period_start.isoformat(), period_end.isoformat(),
-                 grace_until, tx_hash, challenge_id, 0, "", stamp, stamp))
+                 grace_until, tx_hash, challenge_id, 0, "", "", stamp, stamp))
             cur = conn.execute(
                 "UPDATE rail_sub_settles SET extended=1, "
                 "applied_period_end=?, applied_period_index=?, "
@@ -918,6 +1052,12 @@ def _reconcile_platform_sync(settle: Dict[str, Any]) -> None:
                      settle.get("settle_id") if settle else "?", exc)
 
 
+def _rail_row_canceled(wallet: str) -> bool:
+    """Fresh read: is the rail subscription row stored canceled now?"""
+    row = _get_row(wallet)
+    return bool(row and _is_canceled_status(row.get("status")))
+
+
 def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
                    challenge_id: str, plan_changed: bool) -> None:
     """Mirror the period into platform_payments' subscription record.
@@ -959,9 +1099,26 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
     bought via the human checkout), so only active rows whose plan_id
     is in SUB_PLANS count as a different plan here, and a rail settle
     cancels ONLY rail-family rows — non-rail rows are never touched.
+
+    W-106 mirror reconciliation: _apply_period's rail upsert has
+    already committed when this runs, so a cancel can land before or
+    during the sync — it cancels the platform row, and an activation
+    afterwards would insert a NEW active platform row nothing else
+    reconciles (the rail row and the gate stay correct; only the
+    platform mirror diverges). Re-read the rail state immediately
+    before activating (skip when canceled) and again after the sync
+    completes (re-apply the platform cancel — the same mechanism
+    cancel_subscription uses — when now canceled). A cancel landing
+    after the post-sync read runs its own platform cancel after this
+    activation, so every interleave ends with the mirror canceled.
     """
     import sincor2.platform_payments as pp
 
+    if _rail_row_canceled(wallet):
+        logger.warning(
+            "[RAIL-SUB] platform sync skipped for %s: rail subscription "
+            "canceled before the sync ran", wallet)
+        return
     existing = pp.get_subscription(wallet, plan_id)
     if (existing is not None
             and existing.get("last_payment_id") == challenge_id):
@@ -988,6 +1145,12 @@ def _sync_platform(*, wallet: str, plan_id: str, tx_hash: str,
         # entirely when this payment is already journaled).
         cancel_plan_ids=tuple(SUB_PLANS) if plan_changed else (),
     )
+    if _rail_row_canceled(wallet):
+        logger.warning(
+            "[RAIL-SUB] platform mirror reconciled for %s: cancel "
+            "landed during the sync — re-applying platform cancel",
+            wallet)
+        pp.cancel_wallet_subscriptions(wallet)
 
 
 # --- Settle -----------------------------------------------------------------------
@@ -1052,6 +1215,25 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
     settle = _get_sub_settle(settle_id)
     verify_result: Optional[Dict[str, Any]] = None
 
+    # W-106: a canceled subscription's outstanding challenges are dead.
+    # (a) cancel_subscription() voids them — a voided challenge can no
+    # longer settle or resurrect the subscription. (b) Belt-and-braces:
+    # even without a recorded void (legacy rows), a challenge issued
+    # before the stored cancel took effect is refused; only a challenge
+    # issued AFTER the cancel — a genuinely fresh purchase — may settle.
+    # A challenge that already extended a period keeps its duplicate ack
+    # (it applies nothing new), so the carve-out below is ack-only.
+    # NOTE: this top check alone is NOT sufficient — a cancel can land
+    # after it, while the settle is in flight (verify / finalize / money
+    # gate). The same fresh check therefore runs again immediately
+    # before _apply_period (see below) and inside _apply_period itself.
+    already_extended = bool(settle and settle.get("extended"))
+    if _challenge_voided_by_cancel(cid, w,
+                                   already_extended=already_extended):
+        return {"ok": False, "error": "challenge_voided_by_cancel",
+                "settle_id": settle_id,
+                "subscription": subscription_status(w)}
+
     if settle is not None:
         if settle.get("extended"):
             logger.info("[RAIL-SUB] duplicate settle for %s — acknowledged",
@@ -1069,6 +1251,7 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         if not settle.get("verified"):
             verify = x402.verify_challenge(
                 cid, tx, payer_wallet=w,
+                require_bound_challenge=True,
                 replay_signature=replay_signature,
                 replay_ts_ms=replay_ts_ms)
             if not verify.get("ok"):
@@ -1079,6 +1262,7 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
         verify = (_preverified if _preverified is not None
                   else x402.verify_challenge(
                       cid, tx, payer_wallet=w,
+                      require_bound_challenge=True,
                       replay_signature=replay_signature,
                       replay_ts_ms=replay_ts_ms))
         if not verify.get("ok"):
@@ -1144,6 +1328,25 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
             return {"ok": False, "error": "money_gate_denied",
                     "settle_id": settle_id}
 
+        # W-106 TOCTOU re-check — the fix for the Builder-B rejection of
+        # abb71aed: re-validate the void/cancel state IMMEDIATELY BEFORE
+        # applying the period, after the money gate, as the last step
+        # before _apply_period. The top-of-settle check runs before
+        # verify_challenge (on-chain RPC), finalize, and the gate; a
+        # cancel landing anywhere in that window has since recorded
+        # voided_at / canceled in the DB, and this fresh re-read catches
+        # it. Same error semantics as the top check. The
+        # already-extended ack path is preserved: a settle that already
+        # applied its period is acknowledged, never refused, and
+        # applies nothing new.
+        settle_fresh = _get_sub_settle(settle_id) or settle
+        if settle_fresh and settle_fresh.get("extended"):
+            return _already_renewed(settle_fresh)
+        if _challenge_voided_by_cancel(cid, w):
+            return {"ok": False, "error": "challenge_voided_by_cancel",
+                    "settle_id": settle_id,
+                    "subscription": subscription_status(w)}
+
         # Extend exactly one period per the proration rules. The
         # extension and the extended flag commit atomically inside
         # _apply_period (W-105); there is deliberately no separate
@@ -1195,12 +1398,30 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
 
 # --- Cancellation -------------------------------------------------------------------
 def cancel_subscription(wallet: str) -> Dict[str, Any]:
-    """Cancel immediately: access revoked, platform record cancelled."""
+    """Cancel immediately: access revoked, platform record cancelled.
+
+    W-106: cancelling also VOIDS every outstanding renewal challenge for
+    the wallet, so a challenge issued before the cancel can no longer
+    settle afterwards and resurrect the subscription (settle_renewal
+    refuses voided challenges, and refuses any pre-cancel challenge
+    against a stored canceled row). A genuinely fresh purchase — a new
+    challenge issued after the cancel — is unaffected and still settles.
+    """
     import sincor2.platform_payments as pp
 
     w = (wallet or "").strip().lower()
+    now_iso = _utc_now_iso()
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE rail_sub_challenges SET voided_at=? "
+            "WHERE wallet=? AND voided_at=''",
+            (now_iso, w))
+        conn.commit()
+    finally:
+        conn.close()
     if _get_row(w):
-        _update_row(w, status="canceled")
+        _update_row(w, status="canceled", canceled_at=now_iso)
         try:
             pp.cancel_wallet_subscriptions(w)
         except Exception as exc:

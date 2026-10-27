@@ -78,6 +78,13 @@ from sincor2 import treasury_inflow as _treasury_inflow
 from sincor2.treasury_settlement import record_platform_fee_inflow
 from sincor2.a2a_idempotency import idempotent
 from sincor2.defi.p24 import skill as _p24_issuance_skill
+from sincor2.free_ration import (
+    DAILY_RATION_LIMIT,
+    HOOK_COPY,
+    daily_ration_tracker,
+    hook_payload,
+    truncate_sample,
+)
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -227,6 +234,16 @@ class AgentSkill:
             "estimatedLatencySeconds":  self.estimated_latency_seconds,
             "reputationFloor":          self.reputation_floor,
             "freeQuota":                self.free_quota,
+            # Wave 1 hook: universal daily free ration (3/agent/skill/UTC
+            # day) on EVERY skill, plus a no-wallet free peek route.
+            "freeDailyRation":          DAILY_RATION_LIMIT,
+            "peekUrl":                  f"{PLATFORM_URL}/api/a2a/peek/{self.id}",
+            "peek": {
+                "sample": False,
+                "kind":   "metadata",
+                "note":   "Free peek (no wallet): GET the peekUrl for this "
+                          "skill's live sample or labelled metadata.",
+            },
         }
 
 
@@ -297,6 +314,10 @@ class AgentCard:
             "defaultInputModes":   self.default_input_modes,
             "defaultOutputModes":  self.default_output_modes,
             "skills":              [s.to_dict() for s in self.skills],
+            # Wave 1 hook offer (free daily ration, free peek, pool-backed
+            # task bidding, conditional sponsored stake, free genesis SBT
+            # + airdrop for registered agents; token = platform access).
+            "hook":                hook_payload(),
         }
         if self.security_schemes:
             d["securitySchemes"] = self.security_schemes
@@ -333,6 +354,7 @@ class AgentCard:
             "url":            url,
             "version":        self.version,
             "skills":         [s.to_dict() for s in self.skills],
+            "hook":           hook_payload(),
             "provider":       self.provider,
             "authentication": {
                 "schemes":     list(self.security_schemes.keys()),
@@ -1160,6 +1182,7 @@ def build_agent_card() -> AgentCard:
             "professional-grade intelligence, content, and automation in return. "
             "Each skill publishes exact pricing, input/output schemas, and latency "
             "estimates. The top 5 skills offer a free quota for new external callers. "
+            f"{HOOK_COPY} "
             "Platform fee policy: realized AXM/SINC fees are converted to "
             "USDC/WETH before treasury deposit."
         ),
@@ -1827,8 +1850,136 @@ class _FreeQuotaTracker:
             return 0
         return max(0, skill.free_quota - self._store.get(identity_key, skill.id))
 
+    # -- Wave 1: universal DAILY ration (new layer, all 17 skills) --------
+    # The lifetime top-5 quota above is untouched. The daily ration lives
+    # in sincor2.free_ration (shared with the x402 surface), keyed on
+    # identity + skill + UTC date, resetting at UTC midnight, with a
+    # per-IP daily cap on free serves enforced by the shared tracker.
+    def daily_remaining(self, identity_key: str, skill: AgentSkill) -> int:
+        """Daily-ration calls left for this identity on this skill."""
+        if not identity_key:
+            return 0
+        return daily_ration_tracker.remaining(identity_key, skill.id)
+
+    def consume_daily_if_available(
+        self, identity_key: str, skill: AgentSkill, *, ip: Optional[str] = None,
+    ) -> bool:
+        """Atomically consume one daily-ration call iff ration remains."""
+        if not identity_key:
+            return False
+        return daily_ration_tracker.try_consume(identity_key, skill.id, ip=ip)
+
 
 _free_quota_tracker = _FreeQuotaTracker()
+
+
+def _is_registered_agent_wallet(wallet: Optional[str]) -> bool:
+    """True when ``wallet`` owns a record in the inbound agent registry.
+
+    The Wave 1 daily ration is per *agent*: on the A2A surface it is
+    granted to verified wallets that are registered agents (the funnel
+    is peek -> register -> free ration -> paid). Unregistered signed
+    wallets keep exactly the pre-Wave-1 behaviour (lifetime top-5 quota
+    only). Fail-soft: an unreadable registry means no daily ration.
+    """
+    if not wallet:
+        return False
+    try:
+        from sincor2.a2a_inbound import get_fabric
+
+        wanted = str(wallet).strip().lower()
+        if not wanted:
+            return False
+        for agent in get_fabric().agents.values():
+            for field_name in ("owner_wallet", "wallet"):
+                if str(agent.get(field_name) or "").strip().lower() == wanted:
+                    return True
+    except Exception:  # noqa: BLE001 - registry unavailable = no ration
+        return False
+    return False
+
+
+def _daily_ration_remaining(identity_key: str, skill: AgentSkill) -> int:
+    """Daily-ration remaining for display: registered-agent wallets only."""
+    if not identity_key or not _is_registered_agent_wallet(identity_key):
+        return 0
+    return _free_quota_tracker.daily_remaining(identity_key, skill)
+
+
+# ---------------------------------------------------------------------------
+# Wave 1 free peek — no-auth, no-wallet sample per A2A skill
+# ---------------------------------------------------------------------------
+
+#: Canonical sample decision for the one A2A skill whose handler runs
+#: cheaply and synchronously in-process (toa-decision reuses the TOA
+#: micro-decision machinery). Every other A2A skill executes as an
+#: asynchronous swarm task, so it has no honest cheap sample.
+_PEEK_TOA_PAYLOAD: Dict[str, Any] = {
+    "decision_id": "wave1-peek-sample",
+    "options": [
+        {"id": "a", "label": "Option A", "signals": [1.0, 2.0, 3.0, 4.0]},
+        {"id": "b", "label": "Option B", "signals": [4.0, 3.0, 2.0, 1.0]},
+    ],
+}
+
+
+def build_skill_peek(skill: AgentSkill) -> Dict[str, Any]:
+    """Free peek for one A2A skill: a real bounded sample, or labelled
+    live metadata — never a fabricated sample output.
+
+    * ``toa-decision``: run the real TOA handler on the canonical sample
+      payload and return its (truncated) output with ``sample: True``.
+    * All other skills: their handlers execute as asynchronous agent
+      tasks (enqueue -> swarm execution), so there is no cheap
+      synchronous sample and no cached real output in this process;
+      return the skill's live metadata labelled ``peek_kind: metadata``
+      with ``sample: False``.
+    """
+    base: Dict[str, Any] = {
+        "ok": True,
+        "skill_id": skill.id,
+        "free": True,
+        "hook": hook_payload(),
+    }
+    if skill.id == "toa-decision":
+        try:
+            from sincor2.toa_micro_decision import serve_toa_micro_decision
+
+            status, body = serve_toa_micro_decision(dict(_PEEK_TOA_PAYLOAD))
+        except Exception:  # noqa: BLE001 - fall back to honest metadata
+            status, body = 0, {}
+        if status == 200:
+            sample, truncated = truncate_sample(body)
+            return {
+                **base,
+                "sample": True,
+                "peek_kind": "sample",
+                "label": "Real sample output from this skill's handler on "
+                         "a canonical sample input (bounded).",
+                "truncated": truncated,
+                "result": sample,
+            }
+    return {
+        **base,
+        "sample": False,
+        "peek_kind": "metadata",
+        "label": "Metadata only — this skill runs as an agent task, so "
+                 "there is no cheap synchronous sample; this is its live "
+                 "metadata, not a sample output.",
+        "metadata": {
+            "id": skill.id,
+            "name": skill.name,
+            "description": skill.description,
+            "axmPriceWei": str(skill.axm_price_wei),
+            "sincPrice": skill.sinc_price,
+            "freeQuota": skill.free_quota,
+            "freeDailyRation": DAILY_RATION_LIMIT,
+            "inputSchema": skill.input_schema,
+            "outputSchema": skill.output_schema,
+            "exampleInputs": skill.examples,
+            "estimatedLatencySeconds": skill.estimated_latency_seconds,
+        },
+    }
 
 
 # NOTE: _keccak256 is defined once in the wave-24 identity section above;
@@ -1975,9 +2126,13 @@ def _quota_quote_note(
             f"\"{QUOTA_QUOTE_MESSAGE_PREFIX}|{skill.id}|<timestamp_ms>\" for quotes, "
             f"\"{QUOTA_MESSAGE_PREFIX}|{skill.id}|<keccak256(input)>|<timestamp_ms>\" "
             "for tasks/send (freshness 5 min). Include signature + quota_ts + wallet "
-            "in the request. Unsigned callers pay AXM."
+            "in the request. Unsigned callers pay AXM. "
+            f"Every skill also carries a free daily ration of {DAILY_RATION_LIMIT} "
+            "calls per registered agent per day."
         )
     return (
+        f"Free daily ration: {DAILY_RATION_LIMIT} calls per registered agent "
+        "per day on every skill. "
         f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
         f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
         f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
@@ -2374,6 +2529,26 @@ class A2ARouter:
             from flask import jsonify
             return jsonify(build_agent_card().to_legacy_dict())
 
+        # ── Wave 1 free peek — no auth, no wallet, per-IP rate-limited ──────
+        @bp.route("/api/a2a/peek/<skill_id>", methods=["GET"])
+        @bp.route("/api/a2a/peek", methods=["GET"])
+        def skill_peek(skill_id=None):
+            from flask import jsonify, request
+            sid = skill_id or _resolve_skill_id(request.args)
+            skill = next((s for s in SINCOR_SKILLS if s.id == sid), None)
+            if not skill:
+                return jsonify(_err(f"Unknown skill: {sid}", code=-32602)), 400
+            ip = request.remote_addr or "unknown"
+            if not daily_ration_tracker.try_consume_peek(ip):
+                return jsonify({
+                    "ok": False, "error": "peek_rate_limited",
+                    "skill_id": sid,
+                    "note": "Free peek is rate-limited per IP per day; "
+                            "the skill's paid and free-ration paths are "
+                            "unaffected.",
+                }), 429
+            return jsonify(build_skill_peek(skill))
+
         # ── Discovery — marketplace manifest ────────────────────────────────
         @bp.route("/.well-known/sincor-marketplace.json", methods=["GET"])
         def marketplace_manifest():
@@ -2533,9 +2708,11 @@ class A2ARouter:
                         "estimated_latency_seconds": s.estimated_latency_seconds,
                         "reputation_floor":          s.reputation_floor,
                         "free_quota":                s.free_quota,
+                        "free_daily_ration":         DAILY_RATION_LIMIT,
                     }
                     for s in SINCOR_SKILLS
                 ],
+                "hook":            hook_payload(),
                 "primary_token":   A2A_PRIMARY_TOKEN,
                 "sinc_contract":   SINC_CONTRACT,
                 "axiom_contract":  AXIOM_CONTRACT,
@@ -2569,7 +2746,12 @@ class A2ARouter:
                 skill_id=skill_id, params=src, msg_obj=msg_obj, input_text=None,
             )
             free_remaining = _free_quota_tracker.remaining(quota_identity or "", skill)
-            is_free_call = quota_identity is not None and free_remaining > 0
+            # Wave 1: the daily ration also makes a quote free for
+            # registered-agent wallets (display only here — consumption
+            # happens atomically on send).
+            daily_remaining = _daily_ration_remaining(quota_identity or "", skill)
+            is_free_call = quota_identity is not None and (
+                free_remaining > 0 or daily_remaining > 0)
 
             logger.info(
                 "A2A quote  skill=%s  caller=%s  quota_id=%s  axm=%.4f AXM  free_remaining=%d",
@@ -2607,6 +2789,9 @@ class A2ARouter:
                 "estimated_latency_seconds": skill.estimated_latency_seconds,
                 "reputation_floor":         skill.reputation_floor,
                 "free_quota_remaining":     free_remaining,
+                "free_daily_ration_limit":  DAILY_RATION_LIMIT,
+                "free_daily_ration_remaining": daily_remaining,
+                "hook":                     hook_payload(),
                 "is_free":                  is_free_call,
                 "input_schema":             skill.input_schema,
                 "output_schema":            skill.output_schema,
@@ -3547,6 +3732,33 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     )
     free_call = _free_quota_tracker.consume_if_available(quota_identity or "", skill)
 
+    # --- Wave 1 daily ration (universal layer, registered agents) --------
+    # Every skill carries 3 free calls per registered agent per UTC day.
+    # Identity is a verified wallet (quota signer, verified wallet, or
+    # task owner — never the self-declared caller_id) that owns a record
+    # in the inbound agent registry. Lifetime top-5 quota is consumed
+    # first, so the daily ration only fires once it is exhausted or for
+    # skills outside the top 5. A daily-ration call is a free call: no
+    # payment gate, no fee record (see maybe_record_a2a_platform_fee's
+    # free_call skip, driven by task.metadata["free_call"] below).
+    daily_ration_call = False
+    if not free_call:
+        daily_identity = quota_identity or verified_wallet or owner_wallet
+        if daily_identity and _is_registered_agent_wallet(daily_identity):
+            _ip: Optional[str] = None
+            try:
+                from flask import has_request_context, request as _flask_request
+
+                if has_request_context():
+                    _ip = _flask_request.remote_addr
+            except Exception:  # noqa: BLE001 - IP cap is best-effort here
+                _ip = None
+            daily_ration_call = _free_quota_tracker.consume_daily_if_available(
+                daily_identity, skill, ip=_ip,
+            )
+            if daily_ration_call:
+                free_call = True
+
     # --- Payment gate (skip for free calls, axiom-payment skill, and dev) --
     env = os.getenv("FLASK_ENV", "production").lower()
     skip_payment = env in _DEV_ENVS or free_call
@@ -3607,6 +3819,7 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     # Annotate high-rep, free-call, and verified quota identity in metadata
     task.metadata["high_rep_caller"] = is_high_rep
     task.metadata["free_call"] = free_call
+    task.metadata["free_daily_ration"] = daily_ration_call
     task.metadata["verified_wallet"] = verified_wallet
     if quota_identity:
         task.metadata["quota_identity"] = quota_identity

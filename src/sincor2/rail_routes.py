@@ -1076,6 +1076,7 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
             verify = x402.verify_challenge(
                 challenge_id, event.get("tx_hash") or tx_hash,
                 payer_wallet=payer_wallet,
+                require_bound_challenge=True,
                 replay_signature=replay_signature, replay_ts_ms=replay_ts_ms)
             if not verify.get("ok"):
                 return _verify_fail(verify)
@@ -1098,8 +1099,16 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
             return {"ok": False, "error": "wallet_mismatch",
                     "settle_id": sub_settle_id}
         # First attempt: verify the on-chain transfer, then claim.
+        # Hunt-29: require_bound_challenge=True — an unbound challenge is
+        # a bearer instrument; without this, an attacker could mint their
+        # own unbound challenge and claim the victim's public tx_hash
+        # under it first (first-claim-wins), leaving the victim's own
+        # settle to fail tx_hash_already_used. The legitimate buyer binds
+        # their wallet during checkout via the existing EIP-191 bind flow
+        # (bind_challenge_payer / POST /api/x402/challenge-bind).
         verify = x402.verify_challenge(
             challenge_id, tx_hash, payer_wallet=payer_wallet,
+            require_bound_challenge=True,
             replay_signature=replay_signature, replay_ts_ms=replay_ts_ms)
         if not verify.get("ok"):
             return _verify_fail(verify)
@@ -1299,6 +1308,17 @@ def rail_checkout():
     }
     if payer_wallet:
         body["payer_wallet"] = payer_wallet
+        # Hunt-29 / W-102r3 pattern (mirrors billing.py's challenge
+        # route): the challenge is minted UNBOUND; when the buyer names
+        # a wallet at checkout, hand back the exact EIP-191 bind message
+        # for that wallet so the buyer can bind the challenge via
+        # bind_challenge_payer (POST /api/x402/challenge-bind) BEFORE
+        # paying. Settle requires a bound challenge
+        # (require_bound_challenge=True), so an unbound challenge can
+        # never claim a payment — a bare address string is not a
+        # binding, which is why checkout itself does not bind here.
+        body["sign_message"] = x402.challenge_bind_message(
+            challenge.get("challenge_id") or "", resource_id, payer_wallet)
     if buyer_email:
         body["buyer_email"] = buyer_email
     return jsonify(body), http_status

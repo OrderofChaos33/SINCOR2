@@ -46,7 +46,28 @@ from sincor2.governance.money_gate import reset_money_boundary
 # are read from the repo's own modules, never invented here.
 TX_HASH = "0x" + "ab" * 32
 TX_HASH_2 = "0x" + "cd" * 32
-PAYER = "0x" + "11" * 20
+
+# Hunt-29: rail settle requires a BOUND challenge (require_bound_
+# challenge=True), so the test payer must be a real account that can
+# sign the EIP-191 bind message. This is the well-known PUBLIC Hardhat
+# dev account #0 — test-only, never funded, never used off-test.
+from eth_account import Account as _Account
+from eth_account.messages import encode_defunct as _encode_defunct
+
+_PAYER_ACCT = _Account.from_key(
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+PAYER = _PAYER_ACCT.address
+
+
+def _bind_challenge(challenge_id, resource_id, acct=_PAYER_ACCT):
+    """Complete the W-102r3 ownership bind for a minted challenge —
+    the same step the rail pay page performs before paying."""
+    sig = acct.sign_message(_encode_defunct(
+        text=x402.challenge_bind_message(
+            challenge_id, resource_id, acct.address))).signature.hex()
+    bound = x402.bind_challenge_payer(challenge_id, acct.address, sig)
+    assert bound.get("ownership_proven") is True, bound
+    return bound
 
 DIGITAL_CASES = [
     # (pack_sku, price_cents, asset file)
@@ -198,6 +219,7 @@ def _checkout_digital(client, pack_sku, price_cents):
     assert body["amount_usdc"] == price_cents / 100, (
         "server-side digital pack price must win")
     assert body["resource_id"] == f"rail-pack-{pack_sku}"
+    _bind_challenge(body["challenge_id"], body["resource_id"])
     return body["challenge_id"]
 
 
@@ -375,6 +397,7 @@ def test_wallet_only_digital_buyer_gets_download_url_in_settle_response(
     res = client.post("/rail/checkout", json={
         "pack_sku": "digital_bi_template_pack", "payer_wallet": PAYER})
     cid = res.get_json()["challenge_id"]
+    _bind_challenge(cid, res.get_json()["resource_id"])
 
     res = client.post("/rail/settle", json={
         "challenge_id": cid, "tx_hash": TX_HASH, "payer_wallet": PAYER})
