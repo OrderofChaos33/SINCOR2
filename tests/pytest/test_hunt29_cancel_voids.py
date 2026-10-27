@@ -442,7 +442,11 @@ def test_race_n1_cancel_during_platform_sync_reconciles_mirror(
 
     ch2 = rs.issue_renewal_challenge(PAYER, "starter")
 
-    orig_activate = pp.activate_subscription
+    # Hook re-pointed 2026-10-26 (founder-approved): _sync_platform now
+    # routes through activate_subscription_idempotent (B3's per-payment
+    # journal entry point) and never calls activate_subscription, so the
+    # race is orchestrated at the idempotent entry. Assertions unchanged.
+    orig_activate = pp.activate_subscription_idempotent
     entered = threading.Event()
     release = threading.Event()
 
@@ -451,7 +455,8 @@ def test_race_n1_cancel_during_platform_sync_reconciles_mirror(
         assert release.wait(timeout=10), "test orchestration timed out"
         return orig_activate(**kwargs)
 
-    monkeypatch.setattr(pp, "activate_subscription", _blocking_activate)
+    monkeypatch.setattr(pp, "activate_subscription_idempotent",
+                        _blocking_activate)
 
     holder = {}
 
