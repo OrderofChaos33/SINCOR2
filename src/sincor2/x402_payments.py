@@ -544,6 +544,61 @@ def bind_challenge_payer(
     }
 
 
+def bind_server_issued_challenge(
+    challenge_id: str, payer_wallet: str
+) -> dict[str, Any]:
+    """Bind a SERVER-ISSUED challenge to the wallet it was issued for.
+
+    Restricted counterpart to bind_challenge_payer() for flows where the
+    server itself mints the challenge for a specific wallet it has
+    already recorded in its own issuance table, and where fulfillment
+    accrues EXCLUSIVELY to that wallet — currently only rail
+    subscription renewals (rail_subscriptions.issue_renewal_challenge):
+    the wallet is required at issuance, recorded in
+    rail_sub_challenges, and settle_renewal extends only that wallet's
+    subscription, so a settler can never redirect the benefit to
+    themselves. This is what lets subscription settle pass
+    require_bound_challenge=True consistently with the pack rail.
+
+    This must NEVER be used for pack challenges: pack fulfillment
+    (download URL / intake) is delivered to whoever settles, so a
+    server-side string binding would let an attacker bind the victim's
+    wallet to their own challenge and front-run the victim's payment
+    (the W-102 round-3 attack). Pack challenges are bound only via
+    bind_challenge_payer() with an EIP-191 ownership signature.
+
+    Same atomic claim semantics as bind_challenge_payer(): the
+    conditional UPDATE is the claim; an already-bound or non-pending
+    challenge is refused (challenge_already_bound).
+    """
+    cid = (challenge_id or "").strip()
+    if not cid:
+        return {"ok": False, "error": "challenge_id_required"}
+    wallet = (payer_wallet or "").strip().lower()
+    if not _valid_wallet_format(wallet):
+        return {"ok": False, "error": "payer_wallet_required"}
+
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM x402_challenges WHERE challenge_id=?", (cid,)
+        ).fetchone()
+        if not row:
+            return {"ok": False, "error": "challenge_not_found"}
+        if row["status"] != "pending" or (row["payer_wallet"] or "").strip():
+            return {"ok": False, "error": "challenge_already_bound"}
+        cur = conn.execute(
+            "UPDATE x402_challenges SET payer_wallet=? WHERE challenge_id=? "
+            "AND status='pending' AND (payer_wallet='' OR payer_wallet IS NULL)",
+            (wallet, cid),
+        )
+        if cur.rowcount != 1:
+            conn.rollback()
+            return {"ok": False, "error": "challenge_already_bound"}
+        conn.commit()
+    return {"ok": True, "challenge_id": cid, "payer_wallet": wallet,
+            "ownership_proven": False, "server_issued": True}
+
+
 def _parse_iso(ts: str) -> datetime:
     """Parse the ISO timestamps this module stores (tolerates a Z suffix)."""
     return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))

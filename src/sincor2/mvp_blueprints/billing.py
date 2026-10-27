@@ -67,6 +67,156 @@ _bind_mvp()
 _VAULT_PAID_STATUSES = frozenset(s.lower() for s in _PAID_STATUSES)
 
 
+# ---------------------------------------------------------------------------
+# Wave 1 agent hook — daily free ration + free peek for the 7 x402 skills
+# ---------------------------------------------------------------------------
+#: The 7 skill resources (config/x402_pricing.yaml) that carry the Wave 1
+#: daily free ration and free peek. Other x402 resources are untouched.
+X402_FREE_RATION_RESOURCES = frozenset({
+    'web-search-read',
+    'local-business-site-check',
+    'market-data-read',
+    'toa-micro-decision',
+    'polymarket-whale-signal',
+    'kya-trust-score',
+    'wallet-sanctions-screen',
+})
+
+#: Canonical sample payloads for the x402 handlers that run cheaply and
+#: synchronously in-process. toa-micro-decision is deterministic local
+#: compute; kya-trust-score is a local registry read (an unknown agent is
+#: an honest real result). The other five handlers need a live external
+#: read (web fetch, Chainlink round, OFAC snapshot freshness, whale
+#: feed), so their peeks return labelled metadata — never a fake sample.
+_X402_PEEK_SAMPLE_PAYLOADS = {
+    'toa-micro-decision': {
+        'decision_id': 'wave1-peek-sample',
+        'options': [
+            {'id': 'a', 'label': 'Option A', 'signals': [1.0, 2.0, 3.0, 4.0]},
+            {'id': 'b', 'label': 'Option B', 'signals': [4.0, 3.0, 2.0, 1.0]},
+        ],
+    },
+    'kya-trust-score': {'agent_id': 'wave1-peek-unknown-agent'},
+}
+
+
+def _x402_token_payer_wallet(token, resource_id):
+    """Bound payer wallet for an access token, or None (read-only).
+
+    A presented payment token is bound at challenge-bind time to the
+    payer wallet that proved ownership by EIP-191 signature, so that
+    wallet — not the source IP — is the token bearer's ration identity.
+    Read-only SELECT through the x402 store's own connection helper;
+    any failure (unknown token, store unavailable) yields None.
+    """
+    if not token:
+        return None
+    try:
+        import sincor2.x402_payments as _x402
+
+        with _x402._conn() as conn:
+            row = conn.execute(
+                "SELECT payer_wallet FROM x402_challenges "
+                "WHERE access_token = :tok AND resource_id = :rid",
+                {"tok": token, "rid": resource_id},
+            ).fetchone()
+        if row:
+            wallet = validate_wallet(str(row[0] or ''))
+            if wallet:
+                return wallet.lower()
+    except Exception:  # noqa: BLE001 - identity falls back gracefully
+        return None
+    return None
+
+
+def _x402_free_identity(body, token=''):
+    """Free-ration identity for this request (see sincor2.free_ration).
+
+    Precedence: the bound payer wallet of a presented access token;
+    else the wallet param (query ``wallet`` or body
+    ``payer_wallet``/``wallet``) when present and well-formed; else
+    ``agent:<agent_id>`` from query, body, or the ``X-Agent-Id``
+    header; else ``ip:<remote_addr>``.
+    """
+    from sincor2.free_ration import resolve_caller_identity
+
+    body = body or {}
+    wallet = validate_wallet(
+        request.args.get('wallet', '')
+        or body.get('payer_wallet', '')
+        or body.get('wallet', '')
+        or request.headers.get('X-Agent-Wallet', ''))
+    agent_id = (
+        request.args.get('agent_id', '')
+        or body.get('agent_id', '')
+        or request.headers.get('X-Agent-Id', ''))
+    return resolve_caller_identity(
+        wallet=wallet, agent_id=agent_id,
+        ip=request.remote_addr or 'unknown')
+
+
+def _x402_peek_body(resource_id):
+    """Free-peek body: real bounded sample where honestly possible, else
+    the resource's live pricing metadata labelled as metadata."""
+    from sincor2.free_ration import hook_payload, truncate_sample
+
+    base = {'ok': True, 'resource': resource_id, 'free': True,
+            'hook': hook_payload()}
+    payload = _X402_PEEK_SAMPLE_PAYLOADS.get(resource_id)
+    if payload is not None:
+        status, body = 0, {}
+        try:
+            if resource_id == 'toa-micro-decision':
+                from sincor2.toa_micro_decision import serve_toa_micro_decision
+                status, body = serve_toa_micro_decision(dict(payload))
+            elif resource_id == 'kya-trust-score':
+                from sincor2.kya_trust_score import serve_kya_trust_score
+                status, body = serve_kya_trust_score(dict(payload))
+        except Exception:  # noqa: BLE001 - fall back to honest metadata
+            status, body = 0, {}
+        if status == 200:
+            sample, truncated = truncate_sample(body)
+            return {**base, 'sample': True, 'peek_kind': 'sample',
+                    'label': 'Real sample output from this resource\'s '
+                             'handler on a canonical sample input '
+                             '(bounded).',
+                    'truncated': truncated, 'result': sample}
+    metadata = None
+    try:
+        from sincor2.x402_payments import get_resource
+        metadata = get_resource(resource_id)
+    except Exception:  # noqa: BLE001 - metadata is best-effort
+        metadata = None
+    return {**base, 'sample': False, 'peek_kind': 'metadata',
+            'label': 'Metadata only — this resource\'s handler needs a '
+                     'live external read, so there is no cheap '
+                     'synchronous sample; this is its live metadata, '
+                     'not a sample output.',
+            'metadata': metadata or {'id': resource_id}}
+
+
+def _x402_peek_response(resource_id):
+    """No-auth, no-wallet free peek, rate-limited per IP per day."""
+    if not X402_AVAILABLE:
+        return jsonify({'error': 'x402_unavailable'}), 503
+    from sincor2.free_ration import daily_ration_tracker
+    from sincor2.x402_payments import get_resource
+
+    if resource_id not in X402_FREE_RATION_RESOURCES \
+            and get_resource(resource_id) is None:
+        return jsonify({'ok': False, 'error': 'unknown_resource'}), 404
+    ip = request.remote_addr or 'unknown'
+    if not daily_ration_tracker.try_consume_peek(ip):
+        return jsonify({'ok': False, 'error': 'peek_rate_limited',
+                        'resource': resource_id,
+                        'note': 'Free peek is rate-limited per IP per '
+                                'day; paid and free-ration paths are '
+                                'unaffected.'}), 429
+    resp = jsonify(_x402_peek_body(resource_id))
+    resp.headers['X-Free-Peek'] = 'true'
+    return resp, 200
+
+
 @bp.route('/buy', methods=['GET'])
 def buy_page():
     """Platform checkout — SINC + AXM on Base (default). Legacy Stripe if explicitly enabled."""
@@ -511,8 +661,21 @@ def _paid_surface_method_not_allowed(error):
 def x402_resources():
     if not X402_AVAILABLE:
         return jsonify({'ok': False, 'error': 'x402_unavailable'}), 503
+    from sincor2.free_ration import DAILY_RATION_LIMIT, hook_payload
     from sincor2.x402_payments import list_resources
-    return jsonify({'ok': True, 'resources': list_resources()})
+    resources = list_resources()
+    for res in resources:
+        if res.get('id') in X402_FREE_RATION_RESOURCES:
+            res['free_daily_ration'] = DAILY_RATION_LIMIT
+            res['peek_url'] = f"/api/x402/peek/{res['id']}"
+    return jsonify({'ok': True, 'resources': resources,
+                    'hook': hook_payload()})
+
+
+@bp.route('/api/x402/peek/<resource_id>', methods=['GET'])
+def x402_peek(resource_id):
+    """Wave 1 free peek — no auth, no wallet, no token (per-IP capped)."""
+    return _x402_peek_response(resource_id)
 
 
 @bp.route('/api/kya/verify', methods=['GET'])
@@ -727,6 +890,10 @@ def x402_paid_resource(resource_id):
     """Serve paid API payloads after x402 access token presented."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
+    # Wave 1 free peek via param: /api/paid/<resource>?peek=1 — no auth,
+    # no wallet, no token; rate-limited per IP (see _x402_peek_response).
+    if request.args.get('peek', '').strip().lower() in ('1', 'true', 'yes'):
+        return _x402_peek_response(resource_id)
     from sincor2.x402_payments import access_granted
     token = request.headers.get('X-Payment-Token') or request.args.get('access_token', '')
     # W-107: claim this token's flight BEFORE the peek, so a duplicate
@@ -750,9 +917,40 @@ def x402_paid_resource(resource_id):
 def _x402_paid_resource_leader(resource_id, token, access_granted):
     """The peek -> dispatch -> consume pipeline (flight leader only).
 
-    Sequential behavior is exactly the pre-W-107 flow; the caller
-    (x402_paid_resource) owns the single-flight guard + release.
+    Sequential behavior is exactly the pre-W-107 flow plus the Wave 1
+    daily free ration check at its head; the caller
+    (x402_paid_resource) owns the single-flight guard + release, so
+    the flight is claimed before the ration dispatch and the peek.
     """
+    # Wave 1 daily free ration (the 7 skill resources only): BEFORE the
+    # paid-token flow, serve free while the caller's daily ration
+    # remains. Identity = wallet param, else agent id, else source IP
+    # (sincor2.free_ration). The ration is consumed ONLY when the
+    # dispatch returns a 200 — a 400/503 free attempt consumes nothing
+    # and falls through to the exact existing paid path below, and a
+    # free serve never consumes a payment token and never writes fee,
+    # pool, or settlement records (the dispatch handlers are read-only).
+    if resource_id in X402_FREE_RATION_RESOURCES:
+        from sincor2.free_ration import daily_ration_tracker
+
+        _ration_body = request.get_json(silent=True) or {}
+        _identity = _x402_token_payer_wallet(token, resource_id) \
+            or _x402_free_identity(_ration_body)
+        _ip = request.remote_addr or 'unknown'
+        if daily_ration_tracker.remaining(_identity, resource_id) > 0 \
+                and daily_ration_tracker.ip_remaining(_ip) > 0:
+            _status, _body = _paid_skill_dispatch(resource_id)
+            if _status == 200 and daily_ration_tracker.try_consume(
+                    _identity, resource_id, ip=_ip):
+                _body = dict(_body)
+                _body['x402_free_ration'] = True
+                _body['free_ration_remaining'] = \
+                    daily_ration_tracker.remaining(_identity, resource_id)
+                _resp = jsonify(_body)
+                _resp.headers['X-Free-Ration'] = 'true'
+                return _resp, 200
+            # Non-200 dispatch (or a lost consume race): fall through to
+            # the unchanged paid flow below.
     # P1-1: PEEK first (consume=False) — never burn the buyer's
     # single-use token before a deliverable exists. A 400 bad payload
     # or a 503/500 upstream failure previously consumed the token up

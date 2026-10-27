@@ -218,7 +218,12 @@ class TestTokenPreservationUnderConcurrency:
         # Leader's dispatch fails 503; the duplicate is refused 409
         # WITHOUT a second dispatch.
         assert statuses == [409, 503], results
-        assert stub.calls == 1
+        # Merged-semantics accounting (STALE correction, founder-approved
+        # 2026-10-26): since #538 the leader's single request dispatches
+        # twice by design — Wave 1 ration attempt (503, falls through) +
+        # paid dispatch (503). The duplicate dispatches ZERO times; every
+        # protective assertion in this test is unchanged.
+        assert stub.calls == 2
         loser = [b for s, b in results if s == 503][0]
         assert loser["error"] == "provider_not_configured"
 
@@ -237,7 +242,7 @@ class TestTokenPreservationUnderConcurrency:
             json={"mode": "search", "query": "x"})
         assert retry.status_code == 200, retry.get_json(silent=True)
         assert retry.get_json()["count"] == 1
-        assert stub.calls == 2  # exactly one fresh dispatch for the retry
+        assert stub.calls == 3  # exactly one fresh dispatch for the retry
         assert billing._PAID_TOKEN_FLIGHTS == {}
 
     def test_sequential_503_then_retry_still_works(self, app, x402_db, stub):
@@ -252,13 +257,20 @@ class TestTokenPreservationUnderConcurrency:
             json={"mode": "search", "query": "x"})
         assert r1.status_code == 503, r1.get_json(silent=True)
         assert billing._PAID_TOKEN_FLIGHTS == {}
+        calls_after_r1 = stub.calls
         stub.mode = "ok"
         r2 = client.post(
             f"/api/paid/{RESOURCE}",
             headers={"X-Payment-Token": token},
             json={"mode": "search", "query": "x"})
         assert r2.status_code == 200, r2.get_json(silent=True)
-        assert stub.calls == 2
+        # The retry dispatches fresh EXACTLY once. (Merged-semantics
+        # accounting, founder-approved 2026-10-26: r1's absolute total is
+        # 1 or 2 depending on whether the shared daily ration is still
+        # available for this wallet in the session — ration attempt +
+        # paid dispatch, or paid dispatch alone — so the invariant is
+        # asserted relatively: exactly one fresh dispatch for the retry.)
+        assert stub.calls == calls_after_r1 + 1
         assert billing._PAID_TOKEN_FLIGHTS == {}
 
 
