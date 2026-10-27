@@ -138,7 +138,7 @@ def _x402_free_identity(body, token=''):
     ``agent:<agent_id>`` from query, body, or the ``X-Agent-Id``
     header; else ``ip:<remote_addr>``.
     """
-    from sincor2.free_ration import resolve_caller_identity
+    from sincor2.free_ration import abuse_client_ip, resolve_caller_identity
 
     body = body or {}
     wallet = validate_wallet(
@@ -152,7 +152,7 @@ def _x402_free_identity(body, token=''):
         or request.headers.get('X-Agent-Id', ''))
     return resolve_caller_identity(
         wallet=wallet, agent_id=agent_id,
-        ip=request.remote_addr or 'unknown')
+        ip=abuse_client_ip(request.remote_addr, environ=request.environ))
 
 
 def _x402_peek_body(resource_id):
@@ -199,13 +199,13 @@ def _x402_peek_response(resource_id):
     """No-auth, no-wallet free peek, rate-limited per IP per day."""
     if not X402_AVAILABLE:
         return jsonify({'error': 'x402_unavailable'}), 503
-    from sincor2.free_ration import daily_ration_tracker
+    from sincor2.free_ration import abuse_client_ip, daily_ration_tracker
     from sincor2.x402_payments import get_resource
 
     if resource_id not in X402_FREE_RATION_RESOURCES \
             and get_resource(resource_id) is None:
         return jsonify({'ok': False, 'error': 'unknown_resource'}), 404
-    ip = request.remote_addr or 'unknown'
+    ip = abuse_client_ip(request.remote_addr, environ=request.environ)
     if not daily_ration_tracker.try_consume_peek(ip):
         return jsonify({'ok': False, 'error': 'peek_rate_limited',
                         'resource': resource_id,
@@ -931,12 +931,12 @@ def _x402_paid_resource_leader(resource_id, token, access_granted):
     # free serve never consumes a payment token and never writes fee,
     # pool, or settlement records (the dispatch handlers are read-only).
     if resource_id in X402_FREE_RATION_RESOURCES:
-        from sincor2.free_ration import daily_ration_tracker
+        from sincor2.free_ration import abuse_client_ip, daily_ration_tracker
 
         _ration_body = request.get_json(silent=True) or {}
         _identity = _x402_token_payer_wallet(token, resource_id) \
             or _x402_free_identity(_ration_body)
-        _ip = request.remote_addr or 'unknown'
+        _ip = abuse_client_ip(request.remote_addr, environ=request.environ)
         if daily_ration_tracker.remaining(_identity, resource_id) > 0 \
                 and daily_ration_tracker.ip_remaining(_ip) > 0:
             _status, _body = _paid_skill_dispatch(resource_id)

@@ -81,6 +81,7 @@ from sincor2.defi.p24 import skill as _p24_issuance_skill
 from sincor2.free_ration import (
     DAILY_RATION_LIMIT,
     HOOK_COPY,
+    abuse_client_ip,
     daily_ration_tracker,
     hook_payload,
     truncate_sample,
@@ -2538,7 +2539,7 @@ class A2ARouter:
             skill = next((s for s in SINCOR_SKILLS if s.id == sid), None)
             if not skill:
                 return jsonify(_err(f"Unknown skill: {sid}", code=-32602)), 400
-            ip = request.remote_addr or "unknown"
+            ip = abuse_client_ip(request.remote_addr, environ=request.environ)
             if not daily_ration_tracker.try_consume_peek(ip):
                 return jsonify({
                     "ok": False, "error": "peek_rate_limited",
@@ -3750,7 +3751,10 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
                 from flask import has_request_context, request as _flask_request
 
                 if has_request_context():
-                    _ip = _flask_request.remote_addr
+                    _ip = abuse_client_ip(
+                        _flask_request.remote_addr,
+                        environ=_flask_request.environ,
+                    )
             except Exception:  # noqa: BLE001 - IP cap is best-effort here
                 _ip = None
             daily_ration_call = _free_quota_tracker.consume_daily_if_available(

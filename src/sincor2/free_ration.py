@@ -18,7 +18,17 @@ Rules (the abuse guards ARE these caps — there is no other free gate):
   a new day is simply a new key; yesterday's rows are never read again.
 * Per-IP cap: at most ``PER_IP_DAILY_CAP`` (default 30) free *serves*
   per source IP per UTC day across all skills/resources. This bounds
-  identity rotation from one host.
+  identity rotation from one host. The source IP for this cap (and for
+  the peek cap below) is derived by :func:`abuse_client_ip`, NOT from
+  the raw ``X-Forwarded-For``-derived ``request.remote_addr``:
+  ``X-Forwarded-For`` is never trusted for abuse caps unless the
+  immediate TCP peer is an operator-pinned trusted proxy listed in
+  ``SINCOR_TRUSTED_PROXY_IPS``. By default (fail-closed) the cap keys
+  on the original TCP peer recorded by Werkzeug's ``ProxyFix`` in
+  ``environ["werkzeug.proxy_fix.orig"]["REMOTE_ADDR"]``, so rotating
+  ``X-Forwarded-For`` cannot mint fresh cap buckets; when no trusted
+  proxy is pinned, all clients behind one edge peer deliberately
+  share one cap bucket (an availability trade-off, chosen secure).
 * Peek cap: at most ``PEEK_PER_IP_DAILY_CAP`` (default 60) free-peek
   responses per source IP per UTC day. Peeks are no-auth and no-wallet,
   so the IP is the only identity they have.
@@ -109,6 +119,65 @@ def utc_day(on: Union[None, datetime, date, str] = None) -> str:
             on = on.astimezone(timezone.utc)
         return on.date().isoformat()
     return on.isoformat()
+
+
+def trusted_proxy_ips() -> set[str]:
+    """Operator-pinned trusted proxy IPs from the environment.
+
+    Parses ``SINCOR_TRUSTED_PROXY_IPS`` (comma-separated) AT CALL TIME
+    so tests/ops can change it without an interpreter/import restart.
+    Entries are stripped and lowercased; empty entries are dropped.
+    """
+    raw = os.environ.get("SINCOR_TRUSTED_PROXY_IPS", "") or ""
+    return {
+        part.strip().lower()
+        for part in raw.split(",")
+        if part.strip()
+    }
+
+
+def abuse_client_ip(remote_addr=None, environ=None) -> str:
+    """Source IP to key abuse caps (free-ration per-IP / peek) on.
+
+    Default fail-closed: ``X-Forwarded-For`` is never trusted for
+    abuse caps unless the immediate TCP peer is an operator-pinned
+    trusted proxy. Werkzeug's ``ProxyFix`` stores the original TCP
+    peer in ``environ["werkzeug.proxy_fix.orig"]["REMOTE_ADDR"]``
+    before overwriting ``REMOTE_ADDR`` from ``X-Forwarded-For``, so:
+
+    * peer = that original ``REMOTE_ADDR`` when present and
+      non-empty, else ``remote_addr``.
+    * If peer is in :func:`trusted_proxy_ips` and ``remote_addr``
+      is non-empty, return ``remote_addr`` — the pinned edge is
+      trusted to attest the (ProxyFix-derived) client address.
+    * Otherwise return peer if non-empty, else ``remote_addr`` or
+      ``"unknown"``. When untrusted, all clients behind one edge
+      peer share one cap bucket — an availability trade-off,
+      deliberately secure.
+
+    With no ProxyFix orig in ``environ`` (tests, direct requests),
+    this returns ``remote_addr`` unchanged.
+    """
+    remote = ""
+    if remote_addr is not None:
+        remote = str(remote_addr).strip()
+    peer = ""
+    if environ is not None:
+        try:
+            orig = environ.get("werkzeug.proxy_fix.orig")
+        except AttributeError:
+            orig = None
+        if isinstance(orig, dict):
+            candidate = orig.get("REMOTE_ADDR")
+            if candidate is not None and str(candidate).strip():
+                peer = str(candidate).strip()
+    if not peer:
+        peer = remote
+    if peer and remote and peer.lower() in trusted_proxy_ips():
+        return remote
+    if peer:
+        return peer
+    return remote or "unknown"
 
 
 def resolve_caller_identity(
