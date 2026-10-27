@@ -132,9 +132,30 @@ class InvalidTargetHostError(Exception):
     """A fetch target failed the SSRF check (see _target_error)."""
 
 
+#: RFC 6598 shared address space (CGNAT): 100.64.0.0/10.
+#: ``ipaddress`` reports addresses in this range as NOT private,
+#: NOT reserved, and NOT global, so none of the standard flags in
+#: :func:`_ip_is_forbidden` catch them — yet on container/cloud
+#: networks this range commonly carries internal services, making
+#: it a live SSRF target class. It must be forbidden explicitly.
+_CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
+
+
 def _ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
-    return (ip.is_private or ip.is_loopback or ip.is_link_local
-            or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
+    if (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+        return True
+    # RFC 6598 CGNAT / shared address space (100.64.0.0/10) — see
+    # the _CGNAT_NETWORK note above. An IPv4-mapped IPv6 address is
+    # judged by its embedded IPv4 address as well.
+    addr = ip
+    if isinstance(ip, ipaddress.IPv6Address) \
+            and ip.ipv4_mapped is not None:
+        addr = ip.ipv4_mapped
+    if isinstance(addr, ipaddress.IPv4Address) \
+            and addr in _CGNAT_NETWORK:
+        return True
+    return False
 
 
 def _resolve_target(
