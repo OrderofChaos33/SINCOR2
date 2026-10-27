@@ -851,6 +851,18 @@ def _paid_flight_key(token, resource_id):
     return digest
 
 
+def _free_flight_key(identity, resource_id):
+    # W-111: hash the free-ration identity so the registry never
+    # stores it raw (identities can be wallet addresses). The
+    # "free\x00" namespace prefix guarantees this key can never
+    # collide with a token flight key, which is hashed from
+    # resource_id + "\x00" + token without the prefix.
+    digest = _hashlib.sha256(
+        ('free\x00' + resource_id + '\x00' + identity).encode('utf-8')
+    ).hexdigest()
+    return digest
+
+
 def _drop_paid_flight_ref(key, entry):
     with _PAID_FLIGHT_GUARD:
         entry[1] -= 1
@@ -879,6 +891,35 @@ def _acquire_paid_token_flight(token, resource_id):
 
 
 def _release_paid_token_flight(flight):
+    key, entry = flight
+    _drop_paid_flight_ref(key, entry)
+    entry[0].release()
+
+
+def _acquire_free_ration_flight(identity, resource_id):
+    """Try to become the flight leader for (identity, resource_id).
+
+    W-111 counterpart of _acquire_paid_token_flight, reusing the
+    same registry (_PAID_TOKEN_FLIGHTS / _PAID_FLIGHT_GUARD) with a
+    namespaced hashed key. Returns the flight handle for the leader,
+    or None when another request already leads this identity's free
+    flight (caller must NOT dispatch; it falls through to the paid
+    flow instead).
+    """
+    key = _free_flight_key(identity, resource_id)
+    with _PAID_FLIGHT_GUARD:
+        entry = _PAID_TOKEN_FLIGHTS.get(key)
+        if entry is None:
+            entry = [_threading.Lock(), 0]
+            _PAID_TOKEN_FLIGHTS[key] = entry
+        entry[1] += 1
+    if entry[0].acquire(blocking=False):
+        return (key, entry)
+    _drop_paid_flight_ref(key, entry)
+    return None
+
+
+def _release_free_ration_flight(flight):
     key, entry = flight
     _drop_paid_flight_ref(key, entry)
     entry[0].release()
@@ -939,18 +980,36 @@ def _x402_paid_resource_leader(resource_id, token, access_granted):
         _ip = request.remote_addr or 'unknown'
         if daily_ration_tracker.remaining(_identity, resource_id) > 0 \
                 and daily_ration_tracker.ip_remaining(_ip) > 0:
-            _status, _body = _paid_skill_dispatch(resource_id)
-            if _status == 200 and daily_ration_tracker.try_consume(
-                    _identity, resource_id, ip=_ip):
-                _body = dict(_body)
-                _body['x402_free_ration'] = True
-                _body['free_ration_remaining'] = \
-                    daily_ration_tracker.remaining(_identity, resource_id)
-                _resp = jsonify(_body)
-                _resp.headers['X-Free-Ration'] = 'true'
-                return _resp, 200
-            # Non-200 dispatch (or a lost consume race): fall through to
-            # the unchanged paid flow below.
+            # W-111: single-flight the free dispatch per
+            # (identity, resource_id). The token flight guard above
+            # only covers token-bearing requests, so concurrent
+            # token-less requests for the same identity+resource
+            # could all dispatch before any of them consumed the
+            # ration, paying the provider cost repeatedly for one
+            # logical free serve. Acquire the free flight BEFORE
+            # dispatch; if another request already leads it, do NOT
+            # dispatch — fall through to the unchanged paid flow
+            # below. Consume-on-200 semantics are unchanged, so a
+            # failed leader burns no ration (P1-1 property).
+            _free_flight = _acquire_free_ration_flight(
+                _identity, resource_id)
+            if _free_flight is not None:
+                try:
+                    _status, _body = _paid_skill_dispatch(resource_id)
+                    if _status == 200 and daily_ration_tracker.try_consume(
+                            _identity, resource_id, ip=_ip):
+                        _body = dict(_body)
+                        _body['x402_free_ration'] = True
+                        _body['free_ration_remaining'] = \
+                            daily_ration_tracker.remaining(
+                                _identity, resource_id)
+                        _resp = jsonify(_body)
+                        _resp.headers['X-Free-Ration'] = 'true'
+                        return _resp, 200
+                finally:
+                    _release_free_ration_flight(_free_flight)
+            # Non-200 dispatch, a lost consume race, or a lost free
+            # flight: fall through to the unchanged paid flow below.
     # P1-1: PEEK first (consume=False) — never burn the buyer's
     # single-use token before a deliverable exists. A 400 bad payload
     # or a 503/500 upstream failure previously consumed the token up
