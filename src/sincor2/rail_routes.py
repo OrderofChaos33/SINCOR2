@@ -667,15 +667,82 @@ def _send_pack_email(*, to_email: str, customer_name: str,
     return result
 
 
+# task_queue kind carrying a pack-agent job when the Celery broker is
+# unavailable (Directive #2 item 5a fallback).
+PACK_AGENT_QUEUE_KIND = "rail.fulfill_pack_agent"
+
+
+def _broker_unavailable_exceptions() -> tuple:
+    """Exception types that mean 'the Celery broker is unreachable'.
+
+    Deliberately narrow: a broker connection failure (builtin
+    ConnectionError / ConnectionRefusedError, redis-py's ConnectionError,
+    kombu's OperationalError, or a connect TimeoutError) triggers the
+    task_queue fallback. Any other apply_async failure (e.g. a plain
+    RuntimeError) is a REAL fulfillment failure — it propagates so the
+    settle fails retryably instead of being papered over.
+    """
+    excs: list = [ConnectionError, TimeoutError]
+    try:
+        from redis.exceptions import ConnectionError as _RedisConnectionError
+        excs.append(_RedisConnectionError)
+    except Exception:
+        pass
+    try:
+        from kombu.exceptions import OperationalError as _KombuOperationalError
+        excs.append(_KombuOperationalError)
+    except Exception:
+        pass
+    return tuple(dict.fromkeys(excs))
+
+
+def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
+    """task_queue handler for the broker-down fallback: run the same
+    pack-agent kickoff the Celery worker would have run."""
+    payload = payload or {}
+    return fulfill_pack_agent(
+        intake_id=str(payload.get("intake_id") or ""),
+        pack_sku=str(payload.get("pack_sku") or ""),
+        customer_email=str(payload.get("customer_email") or ""),
+    )
+
+
 def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
                           customer_email: str) -> str:
-    """Queue the vertical-agent deployment job on the sincor.long queue."""
+    """Queue the vertical-agent deployment job on the sincor.long queue.
+
+    Graceful half (Directive #2 item 5a): when the Celery broker is
+    unavailable (connection error against the broker URL), fall back to
+    the existing task_queue.enqueue path so the job still lands and the
+    settle succeeds. Non-connection queue failures propagate as real
+    fulfillment failures.
+    """
     if _celery_app is None:
         raise RuntimeError("celery unavailable — cannot queue pack agent job")
-    result = fulfill_pack_agent.apply_async(
-        args=[intake_id, pack_sku, customer_email],
-        queue=PACK_AGENT_QUEUE,
-    )
+    try:
+        result = fulfill_pack_agent.apply_async(
+            args=[intake_id, pack_sku, customer_email],
+            queue=PACK_AGENT_QUEUE,
+        )
+    except _broker_unavailable_exceptions() as exc:
+        logger.warning(
+            "[FULFILLMENT] Celery broker unavailable (%s) — falling back "
+            "to task_queue.enqueue for pack agent job intake=%s pack=%s",
+            exc, intake_id, pack_sku)
+        from sincor2 import task_queue
+
+        if task_queue.get_handler(PACK_AGENT_QUEUE_KIND) is None:
+            task_queue.register_handler(
+                PACK_AGENT_QUEUE_KIND, _pack_agent_queue_handler)
+        job = task_queue.enqueue(
+            PACK_AGENT_QUEUE_KIND,
+            {"intake_id": intake_id, "pack_sku": pack_sku,
+             "customer_email": customer_email},
+        )
+        logger.info(
+            "[FULFILLMENT] Queued pack agent job %s via task_queue "
+            "fallback", job.id)
+        return str(job.id)
     logger.info(
         "[FULFILLMENT] Queued pack agent job %s on %s", result.id, PACK_AGENT_QUEUE)
     return result.id
@@ -704,7 +771,11 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
          pack queues the vertical-agent job on the ``sincor.long`` Celery
          queue,      4. mark the rail event ``delivered`` — only when every step above
          succeeded. Any failure marks the event ``failed`` and records an
-         alert.
+         alert. Two graceful halves (Directive #2 item 5): a pack-email
+         failure never fails the settle (it is logged and persisted as a
+         retryable ``pack_email_failed`` state on the event), and a
+         Celery-broker connection failure falls back to
+         ``task_queue.enqueue`` so the agent job still lands.
     """
     from sincor2.payment_ledger import record_pack_intake
 
@@ -789,17 +860,59 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
         #    email.
         if customer_email:
             if not _rail_event_details(event_id).get("thank_you_email_sent"):
-                _send_pack_email(
-                    to_email=customer_email,
-                    customer_name=customer_name,
-                    pack_name=pack_name,
-                    intake_url=access_url,
-                    order_id=intake.intake_id,
-                    digital=is_digital,
-                    download_url=access_url if is_digital else "",
-                )
-                _rail_event_merge_details(
-                    event_id, {"thank_you_email_sent": True})
+                try:
+                    _send_pack_email(
+                        to_email=customer_email,
+                        customer_name=customer_name,
+                        pack_name=pack_name,
+                        intake_url=access_url,
+                        order_id=intake.intake_id,
+                        digital=is_digital,
+                        download_url=access_url if is_digital else "",
+                    )
+                except Exception as email_exc:
+                    # Graceful half (Directive #2 item 5b): a pack-email
+                    # failure must NOT fail the settle — the buyer paid
+                    # and the entitlement below still provisions. Log
+                    # the failure and persist a retryable failed state
+                    # on the rail event; thank_you_email_sent stays
+                    # unset, so a re-settle after a later REAL failure
+                    # (or an operator sweep of pack_email_failed events)
+                    # re-attempts the send.
+                    logger.exception(
+                        "[FULFILLMENT] Pack email failed for %s "
+                        "(intake %s) — settle continues; email state "
+                        "persisted as retryable", event_id, intake.intake_id)
+                    _rail_event_merge_details(event_id, {
+                        "pack_email_status": "failed",
+                        "pack_email_failed": True,
+                        "pack_email_retryable": True,
+                        "pack_email_error": str(email_exc),
+                    })
+                    try:
+                        from sincor2.payment_ledger import record_alert
+
+                        record_alert(
+                            _rail_db_path(),
+                            event_id or "unknown",
+                            "pack_email_failed",
+                            "Pack email failed for %s: %s"
+                            % (customer_email, email_exc),
+                            details={"pack_sku": pack_sku,
+                                     "retryable": True, "rail": True},
+                        )
+                    except Exception as alert_exc:
+                        logger.error(
+                            "[FULFILLMENT] Could not record pack-email "
+                            "failure alert: %s", alert_exc)
+                else:
+                    _rail_event_merge_details(event_id, {
+                        "thank_you_email_sent": True,
+                        "pack_email_status": "sent",
+                        "pack_email_failed": False,
+                        "pack_email_retryable": False,
+                        "pack_email_error": "",
+                    })
         else:
             logger.info(
                 "[FULFILLMENT] no buyer email for %s — intake link returned "

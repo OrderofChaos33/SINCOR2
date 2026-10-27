@@ -10,12 +10,17 @@ Routes (registered by :func:`init_rail_delivery_routes`):
   GET /download/<intake_id>?token=<delivery_token>
     -> the purchased digital pack's asset file (token-gated, fail closed)
 
-Token-gated: no auth beyond the token, no network calls. Fail closed —
-unknown intake, missing/blank/wrong token, or an unresolvable asset all
-yield 404. Serves ONLY what ``verify_digital_delivery`` resolves to: no
-fallback, no path joining with user input. The asset read is additionally
-confined under money_assets/ (defense in depth against any future
-allowlist change).
+Token-gated: no auth beyond the token, no network calls. The token may
+arrive as the ``token`` query parameter (the emailed link) or as the
+``X-Delivery-Token`` header; both go through the exact same
+``verify_digital_delivery`` check — same lookup, same semantics, no
+parallel weaker path. Fail closed — unknown intake, missing/blank/wrong
+token, or an unresolvable asset all yield 404. Serves ONLY what
+``verify_digital_delivery`` resolves to: no fallback, no path joining
+with user input. The asset read is additionally confined under
+money_assets/ (defense in depth against any future allowlist change).
+Successful downloads carry ``Cache-Control: no-store`` and a
+``Content-Disposition: attachment`` header naming the delivered file.
 """
 
 from __future__ import annotations
@@ -51,7 +56,11 @@ def download_digital_pack(intake_id):
     # level here (keeps this module import-light like the rail routes).
     from sincor2.revenue_orchestrator import verify_digital_delivery
 
-    token = request.args.get("token", "")
+    # The query parameter is the original credential (emailed links);
+    # X-Delivery-Token is an alternative carrier for the SAME credential,
+    # validated by the same verify_digital_delivery call below.
+    token = request.args.get("token", "") or request.headers.get(
+        "X-Delivery-Token", "")
     if not token:
         abort(404)  # fail closed: no token, no download
     try:
@@ -69,7 +78,11 @@ def download_digital_pack(intake_id):
         data = asset_path.read_bytes()
     except OSError:
         abort(404)  # asset unresolvable — no fallback file served
-    return Response(data, content_type="text/markdown; charset=utf-8")
+    response = Response(data, content_type="text/markdown; charset=utf-8")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="{asset_path.name}"')
+    return response
 
 
 def init_rail_delivery_routes(app) -> None:
