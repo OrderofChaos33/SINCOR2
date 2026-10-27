@@ -386,6 +386,27 @@ def _get_rail_event(event_id: str) -> Optional[Dict[str, Any]]:
         conn.close()
 
 
+def _claim_consumed_tx_for_pack(*, tx_hash: str, challenge_id: str,
+                                payer_wallet: str = "") -> Dict[str, Any]:
+    """D2 item 1: claim the settle tx in the shared consumed_onchain_txs
+    registry (platform_payments, orders DB).
+
+    rail_events itself carries tx_hash as plain TEXT with no uniqueness,
+    so the registry is this ledger's cross-system guard. The claim_ref is
+    the challenge_id: a rail pack settle rides on exactly one x402
+    challenge, and verify_challenge claims the same tx under that same
+    challenge_id — the two claims are ONE entitlement, so the registry
+    treats them as idempotent. A tx held under any other claim_ref (a
+    platform payment_id or a different challenge) is refused here and
+    the pack MUST NOT be fulfilled.
+    """
+    from sincor2 import platform_payments as pp
+
+    return pp.claim_consumed_onchain_tx(
+        tx_hash, claim_system="rail_pack", claim_ref=challenge_id,
+        payer_wallet=payer_wallet)
+
+
 def get_rail_revenue_summary(days: int = 30) -> Dict[str, Any]:
     """Read-only rail revenue summary with genesis-cohort attribution.
 
@@ -991,6 +1012,13 @@ def _verify_fail(result: Dict[str, Any]) -> Dict[str, Any]:
         "error": result.get("error", "verify_failed"),
         "detail": result.get("detail", ""),
     }
+    # D2 item 3: pass the finality/OFAC context through so a settle
+    # client can tell a below-depth refusal (re-poll after 12
+    # confirmations) from a terminal one.
+    for _k in ("confirmations", "required_confirmations",
+               "ofac_verdict", "ofac_detail"):
+        if result.get(_k) is not None:
+            out[_k] = result[_k]
     if result.get("error") == "replay_auth_failed":
         out["replay_hint"] = (
             "challenge already fulfilled: re-settle with replay_signature + "
@@ -1143,6 +1171,28 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
                     "resource_id": resource_id}
 
     amount_usdc = pack["price_cents"] / 100
+
+    # D2 item 1 (defense in depth, localized to the pack settle claim
+    # path): claim the tx in the shared registry before finalizing or
+    # fulfilling. verify_challenge already claimed it under this same
+    # challenge_id on the first-attempt path, so this is idempotent
+    # there; on retry paths that reuse the verified rail event without
+    # re-verifying, this is the guard that stops a tx consumed by a
+    # DIFFERENT entitlement (e.g. a platform checkout) from fulfilling
+    # this pack.
+    _consumed = _claim_consumed_tx_for_pack(
+        tx_hash=tx_hash, challenge_id=challenge_id,
+        payer_wallet=str((verify_result or {}).get("payer_wallet")
+                         or payer_wallet or ""))
+    if not _consumed.get("ok"):
+        logger.warning(
+            "[RAIL] settle refused for %s: tx already consumed by %s:%s",
+            event_id, _consumed.get("consumed_by_system"),
+            _consumed.get("consumed_by_ref"))
+        return {"ok": False, "error": "tx_hash_already_used",
+                "event_id": event_id,
+                "consumed_by_system": _consumed.get("consumed_by_system"),
+                "consumed_by_ref": _consumed.get("consumed_by_ref")}
 
     try:
         # Record the platform payment + treasury inflow exactly once.

@@ -54,6 +54,7 @@ import yaml
 from sincor2.agent_billing import record_platform_payment
 from sincor2.platform_payments import (
     CHAIN_ID,
+    CONSUMED_TX_DDL,
     atomic_to_display,
     display_to_atomic,
     token_address,
@@ -116,6 +117,11 @@ def init_x402_db() -> None:
         # continue: the atomic-claim UPDATE below still performs a
         # same-transaction pre-check as a best-effort defense.
         logger.warning("x402: tx_hash UNIQUE index not created: %s", err)
+    # D2: shared consumed_onchain_txs registry (canonical DDL lives in
+    # platform_payments). Created here too so the x402 atomic claim in
+    # verify_challenge can INSERT into it on the same connection /
+    # transaction as the challenge fulfill.
+    conn.execute(CONSUMED_TX_DDL)
     conn.commit()
     conn.close()
 
@@ -662,6 +668,97 @@ def _replay_auth_ok(
     return signer.lower() == wallet.lower()
 
 
+# ---------------------------------------------------------------------------
+# D2 item 3 — high-value rail settlements: finality + OFAC gate.
+#
+# Threshold encoding: the gate is keyed on the RESOURCE CLASS, using the
+# existing pack/subscription resource distinction in
+# config/x402_pricing.yaml, not on a raw amount (amounts are denominated
+# per-resource and the class already encodes the value tier):
+#   * "rail-pack-*" — B2B / digital skill packs, $97–$2,997 one-off
+#     entitlements (intake/download/subscription-grade fulfillment).
+#   * "rail-sub-*"  — rail subscriptions, $297–$2,997 per 30-day period.
+# These are HIGH-VALUE rail settlements: verify_challenge refuses to
+# fulfill them below finality_confirmations() (12 on Base, the platform
+# checkout depth) and screens the recovered payer against the vendored
+# OFAC SDN snapshot via platform_payments.screen_payer_sanctions, with
+# the platform path's fail behavior mirrored exactly: a sanctions HIT
+# always refuses; a screening outage / stale (>48h) snapshot refuses in
+# strict mode (PLATFORM_OFAC_STRICT, default true) and proceeds with a
+# warning otherwise. Platform checkouts themselves are already gated
+# inside platform_payments (verify_checkout/_maybe_finalize).
+#   * Every other resource (per-call skill serves: agent_task,
+#     web-search-read, wallet-sanctions-screen, ... — $0.005–$5 reads)
+#     is NOT high-value: no 12-confirmation wait and no OFAC gate is
+#     imposed here, so a small serve is never delayed for finality.
+# Both high-value entry routes funnel through verify_challenge —
+# POST /rail/settle (rail_routes.settle_rail_order) and
+# POST /api/x402/verify (mvp_blueprints.billing) — so this one gate
+# covers both surfaces.
+HIGH_VALUE_RESOURCE_PREFIXES: Final = ("rail-pack-", "rail-sub-")
+
+
+def is_high_value_rail_resource(resource_id: str) -> bool:
+    """True for pack/subscription resources (the D2 high-value class)."""
+    rid = str(resource_id or "")
+    return rid.startswith(HIGH_VALUE_RESOURCE_PREFIXES)
+
+
+def _high_value_gate(vr: dict[str, Any], resource_id: str) -> dict[str, Any] | None:
+    """Finality + OFAC gate for high-value rail settlements.
+
+    ``vr`` is a successful verify_treasury_transfer result (it already
+    carries confirmations / required_confirmations). Returns None when
+    the settle may proceed, or the refusal dict verify_challenge should
+    return (nothing is fulfilled and no registry claim is made).
+    """
+    conf = int(vr.get("confirmations") or 0)
+    required = int(vr.get("required_confirmations") or 12)
+    if conf < required:
+        return {
+            "ok": False,
+            "error": "awaiting_finality",
+            "status": "awaiting_finality",
+            "confirmations": conf,
+            "required_confirmations": required,
+            "resource_id": resource_id,
+            "detail": (
+                f"high-value rail settlement requires {required} "
+                f"confirmations, tx has {conf}"),
+        }
+    # OFAC: reuse the platform path's screening entry point and strict
+    # mode verbatim (resolved through the module so operator/test
+    # patching of platform_payments applies here too).
+    from sincor2 import platform_payments as _pp
+
+    payer = str(vr.get("payer_wallet") or "")
+    screen = _pp.screen_payer_sanctions(payer)
+    verdict = screen.get("verdict")
+    if verdict == "hit":
+        logger.warning(
+            "x402: high-value settle refused: OFAC hit for payer %s "
+            "resource %s", payer, resource_id)
+        return {"ok": False, "error": "sanctions_hit",
+                "ofac_verdict": verdict,
+                "ofac_detail": screen.get("detail", ""),
+                "resource_id": resource_id}
+    if verdict == "unavailable" and _pp.ofac_strict_mode():
+        logger.warning(
+            "x402: high-value settle refused: OFAC screening unavailable "
+            "(strict) for resource %s: %s", resource_id,
+            screen.get("detail", ""))
+        return {"ok": False, "error": "ofac_screening_unavailable",
+                "ofac_verdict": verdict,
+                "ofac_detail": screen.get("detail", ""),
+                "resource_id": resource_id}
+    if verdict == "unavailable":
+        logger.warning(
+            "x402: high-value settle proceeding with OFAC screening "
+            "unavailable (PLATFORM_OFAC_STRICT=false) for resource %s: %s",
+            resource_id, screen.get("detail", ""))
+    return None
+
+
 def verify_challenge(
     challenge_id: str,
     tx_hash: str,
@@ -747,6 +844,14 @@ def verify_challenge(
     if not vr.get("ok"):
         return vr
 
+    # D2 item 3: high-value rail settlements (rail-pack-* / rail-sub-*)
+    # must clear finality (12 confirmations) + OFAC screening before any
+    # fulfillment. Small per-call skill serves skip this gate entirely.
+    if is_high_value_rail_resource(str(row["resource_id"])):
+        gate_refusal = _high_value_gate(vr, str(row["resource_id"]))
+        if gate_refusal is not None:
+            return gate_refusal
+
     access_token = secrets.token_urlsafe(32)
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
@@ -810,6 +915,37 @@ def verify_challenge(
                     "rejecting double-fulfillment of %s",
                     tx_hash, claimed["challenge_id"], challenge_id)
                 return {"ok": False, "error": "tx_hash_already_used"}
+            # D2 item 1: claim the tx in the shared consumed_onchain_txs
+            # registry, inside THIS atomic transaction, so the fulfill
+            # and the cross-ledger claim commit or roll back together.
+            # A tx already held under a DIFFERENT claim_ref (a platform
+            # payment_id, or another challenge) refuses the fulfill; a
+            # claim under THIS challenge_id (a rail settle for this
+            # same challenge claimed first) is the same entitlement and
+            # proceeds idempotently.
+            try:
+                conn.execute(
+                    "INSERT INTO consumed_onchain_txs "
+                    "(tx_hash, claim_system, claim_ref, payer_wallet, "
+                    " claimed_at) VALUES (?, 'x402', ?, ?, ?)",
+                    (tx_hash, challenge_id, vr["payer_wallet"], now_iso),
+                )
+            except sqlite3.IntegrityError:
+                existing = conn.execute(
+                    "SELECT claim_ref, claim_system FROM "
+                    "consumed_onchain_txs WHERE tx_hash=?",
+                    (tx_hash,),
+                ).fetchone()
+                if existing is None or existing["claim_ref"] != challenge_id:
+                    conn.rollback()
+                    logger.warning(
+                        "x402: tx_hash %s already consumed system-wide "
+                        "by %s:%s; rejecting fulfillment of %s",
+                        tx_hash,
+                        existing["claim_system"] if existing else "?",
+                        existing["claim_ref"] if existing else "?",
+                        challenge_id)
+                    return {"ok": False, "error": "tx_hash_already_used"}
             cur = conn.execute(
                 """UPDATE x402_challenges
                    SET status='fulfilled', tx_hash=?, payer_wallet=?,
