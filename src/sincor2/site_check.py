@@ -61,8 +61,10 @@ sibling paid resources).
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import socket
+import threading
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -104,6 +106,21 @@ class SiteFetch:
 # fetcher re-runs this check immediately before connecting, which is
 # the enforcement point; validate_payload runs it early so a bad
 # target is a 400 before any fetch is attempted.
+#
+# W-108 (DNS-rebinding TOCTOU): validating a resolution is not enough
+# on its own — the transport resolves the hostname AGAIN at connect
+# time, and attacker-controlled DNS (TTL 0) can answer public for the
+# check and loopback for the connect. The fetcher therefore guards
+# the transport call: while a hop is being fetched, any
+# socket.getaddrinfo for that hop's hostname is checked against the
+# exact address set that was just validated, and a mismatched or
+# forbidden answer fails the resolution (and hence the fetch) closed
+# BEFORE any connection is opened. The addresses urllib3 actually
+# connects to are precisely the ones this guard returns, so the
+# checked set and the connected set cannot diverge. The request URL
+# is never rewritten, so Host header, TLS SNI and certificate
+# verification against the original hostname are all preserved
+# (verification is never disabled).
 # ---------------------------------------------------------------------------
 
 _ALLOWED_PORTS = {80, 443}
@@ -115,24 +132,40 @@ class InvalidTargetHostError(Exception):
     """A fetch target failed the SSRF check (see _target_error)."""
 
 
-def _target_error(url: str) -> Optional[str]:
-    """Return ``"invalid_target_host"`` if ``url`` must not be fetched,
-    else ``None``. Pure check — never opens a connection."""
+def _ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
+    return (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
+
+
+def _resolve_target(
+    url: str,
+) -> Tuple[Optional[str], frozenset, str]:
+    """Resolve and validate ``url``'s target in ONE resolution.
+
+    Returns ``(error, validated_ips, host)``: ``error`` is
+    ``"invalid_target_host"`` if the target must not be fetched, else
+    ``None``; ``validated_ips`` is the exact set of addresses that
+    resolution produced and that passed the forbidden-address check
+    (empty when the name does not resolve at all — see the SSRF guard
+    note above: there is then nothing to judge here, but also nothing
+    safe to connect to, so the fetcher fails closed on an empty set).
+    Pure check — never opens a connection.
+    """
     parts = urlparse(url)
     if parts.scheme not in ("http", "https"):
-        return "invalid_target_host"
+        return "invalid_target_host", frozenset(), ""
     host = (parts.hostname or "").strip().lower().rstrip(".")
     if not host:
-        return "invalid_target_host"
+        return "invalid_target_host", frozenset(), ""
     if (host == "localhost" or host.endswith(".localhost")
             or host.endswith(".local") or host.endswith(".internal")):
-        return "invalid_target_host"
+        return "invalid_target_host", frozenset(), host
     try:
         port = parts.port
     except ValueError:
-        return "invalid_target_host"
+        return "invalid_target_host", frozenset(), host
     if port is not None and port not in _ALLOWED_PORTS:
-        return "invalid_target_host"
+        return "invalid_target_host", frozenset(), host
 
     try:
         ips: List[ipaddress._BaseAddress] = [ipaddress.ip_address(host)]
@@ -146,22 +179,89 @@ def _target_error(url: str) -> Optional[str]:
             # Unresolvable: no address exists to connect to, so there
             # is nothing to judge — the fetch itself will fail and the
             # serve layer reports an honest "unknown".
-            return None
+            return None, frozenset(), host
         for info in infos:
             try:
                 ips.append(ipaddress.ip_address(info[4][0]))
             except ValueError:
                 continue
     for ip in ips:
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_multicast or ip.is_reserved
-                or ip.is_unspecified):
-            return "invalid_target_host"
-    return None
+        if _ip_is_forbidden(ip):
+            return "invalid_target_host", frozenset(), host
+    return None, frozenset(ips), host
+
+
+def _target_error(url: str) -> Optional[str]:
+    """Return ``"invalid_target_host"`` if ``url`` must not be fetched,
+    else ``None``. Pure check — never opens a connection."""
+    error, _ips, _host = _resolve_target(url)
+    return error
 
 
 def _target_allowed(url: str) -> bool:
     return _target_error(url) is None
+
+
+#: Serializes production fetches: the connect-time resolution guard
+#: below is installed on the process-wide ``socket.getaddrinfo`` for
+#: the duration of one transport call, so two fetches must never
+#: interleave their guard windows.
+_FETCH_LOCK = threading.RLock()
+
+
+@contextlib.contextmanager
+def _guarded_resolution(host: str, validated_ips: frozenset):
+    """Guard ``socket.getaddrinfo`` for one transport call (W-108).
+
+    While active, resolutions of ``host`` are delegated to the
+    resolver that was in place on entry, and every returned address
+    must belong to ``validated_ips`` (the set the pre-connect check
+    just approved) and must not be a forbidden address; otherwise
+    the resolution fails with ``socket.gaierror`` and the transport
+    aborts BEFORE connecting — the classic DNS-rebinding flip
+    (public at validation, private at connect) can no longer land
+    the fetch on an internal peer. Resolutions of any other host
+    pass through unmodified, and the original resolver is always
+    restored on exit. (The fetch never delegates to a proxy — see
+    the ``proxies=`` note in :func:`fetch_site_page` — so the
+    guarded target is the only host the transport resolves.)
+    """
+    original = socket.getaddrinfo
+    target = host.strip().lower().rstrip(".")
+
+    def _guarded(host_arg, port, family=0, type=0, proto=0, flags=0):
+        if isinstance(host_arg, bytes):
+            try:
+                name = host_arg.decode("utf-8", "strict")
+            except UnicodeDecodeError:
+                return original(host_arg, port, family, type, proto,
+                                flags)
+        else:
+            name = host_arg
+        if not isinstance(name, str) \
+                or name.strip().lower().rstrip(".") != target:
+            return original(host_arg, port, family, type, proto, flags)
+        infos = original(host_arg, port, family, type, proto, flags)
+        for info in infos:
+            try:
+                ip = ipaddress.ip_address(info[4][0])
+            except (ValueError, IndexError, TypeError):
+                raise socket.gaierror(
+                    socket.EAI_NONAME,
+                    "connect-time resolution returned an unparseable "
+                    "address for a guarded target")
+            if _ip_is_forbidden(ip) or ip not in validated_ips:
+                raise socket.gaierror(
+                    socket.EAI_NONAME,
+                    "connect-time resolution does not match the "
+                    "validated address set for this target")
+        return infos
+
+    socket.getaddrinfo = _guarded  # type: ignore[misc]
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = original  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
@@ -178,24 +278,56 @@ def fetch_site_page(url: str) -> Optional[SiteFetch]:
 
     SSRF: automatic redirects are DISABLED; hops are followed
     manually (max ``_MAX_REDIRECTS``) and every hop's target must
-    pass :func:`_target_error` before connecting. A forbidden target
+    pass :func:`_resolve_target` before connecting. A forbidden target
     raises :class:`InvalidTargetHostError` — the serve layer turns
     that into a 400, never an ``unknown``.
+
+    W-108: each hop's transport call runs under
+    :func:`_guarded_resolution` with the exact address set that hop's
+    validation resolved, so a DNS answer that changes between the
+    check and the connect (rebinding) fails the fetch closed instead
+    of landing on the flipped address. A hop whose name cannot be
+    resolved at validation time has no validated set to connect
+    against, so it also fails closed (``None``) without any transport
+    call.
+
+    W-108 caveat B: the transport call passes explicit ``proxies=``
+    entries disabling every scheme, so ambient proxy environment
+    variables can never divert the fetch to a proxy — target
+    resolution always happens here, under the guard, never at a
+    proxy outside it.
     """
     import requests
 
     current = url
     for _hop in range(_MAX_REDIRECTS + 1):
-        if not _target_allowed(current):
+        error, validated_ips, host = _resolve_target(current)
+        if error is not None:
             raise InvalidTargetHostError(current)
+        if not validated_ips:
+            return None
         try:
-            resp = requests.get(
-                current,
-                timeout=12,
-                headers={"User-Agent": "SINCOR-SiteCheck/1.0 "
-                                      "(+https://getsincor.com)"},
-                allow_redirects=False,
-            )
+            with _FETCH_LOCK, _guarded_resolution(host, validated_ips):
+                resp = requests.get(
+                    current,
+                    timeout=12,
+                    headers={"User-Agent": "SINCOR-SiteCheck/1.0 "
+                                          "(+https://getsincor.com)"},
+                    allow_redirects=False,
+                    # W-108 caveat B: never inherit ambient proxy env
+                    # (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY). Delegating
+                    # to a proxy would move target resolution to the
+                    # proxy, outside the guarded pinning above. The
+                    # explicit None entries are what disable the env:
+                    # requests fills env proxies only into ABSENT keys
+                    # (setdefault in merge_environment_settings) and
+                    # then strips None-valued keys, leaving no proxy;
+                    # a bare proxies={} is refilled from the env, and
+                    # "all" must be present or select_proxy falls
+                    # back to ALL_PROXY. (Verified with real
+                    # transport against requests 2.32.)
+                    proxies={"http": None, "https": None, "all": None},
+                )
         except Exception:
             return None
         if resp.status_code in _REDIRECT_STATUSES:
