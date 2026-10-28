@@ -190,10 +190,30 @@ async function sendPayment() {
 
 async function verifyPayment() {
   if (!checkout) return;
+  if (!account) {
+    showErr('Connect the wallet that paid first — verification requires a signature from the paying wallet.');
+    return;
+  }
   const tx = checkout._tx || prompt('Paste your transaction hash (0x…)');
   if (!tx) return;
   showErr('');
   $('btn-verify').disabled = true;
+  // W-113: prove ownership of the paying wallet by signing the
+  // platform bind message (EIP-191 personal_sign). The server rebuilds
+  // this exact string from its own payment_id + wallet and recovers
+  // the signer; a bare tx hash no longer verifies.
+  let signature;
+  try {
+    const bindMessage = `SINCOR-PLATFORM-CHECKOUT-BIND|${checkout.payment_id}|${account.toLowerCase()}`;
+    signature = await window.ethereum.request({
+      method: 'personal_sign',
+      params: [bindMessage, account],
+    });
+  } catch (e) {
+    showErr(e.message || 'Signature rejected — wallet ownership not proven.');
+    $('btn-verify').disabled = false;
+    return;
+  }
   const res = await fetch('/api/platform/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -202,6 +222,7 @@ async function verifyPayment() {
       tx_hash: tx,
       customer_email: $('email').value.trim(),
       payer_wallet: account,
+      payer_signature: signature,
     }),
   });
   const data = await res.json();

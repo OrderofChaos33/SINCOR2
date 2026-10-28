@@ -284,12 +284,21 @@ def platform_verify():
     tx_hash = sanitize_string(data.get('tx_hash', ''), max_length=66)
     email = validate_email(data.get('customer_email', '')) or ''
     wallet = validate_wallet(data.get('payer_wallet', '')) or ''
+    # W-113: payer proof — the caller must sign the platform bind
+    # message with the payer wallet (EIP-191 personal_sign); a bare
+    # tx_hash no longer verifies anything.
+    signature = sanitize_string(data.get('payer_signature', ''), max_length=256)
     result = platform_verify_checkout(
-        payment_id, tx_hash, customer_email=email, payer_wallet=wallet or ''
+        payment_id, tx_hash, customer_email=email, payer_wallet=wallet or '',
+        payer_signature=signature,
     )
     if not result.get('ok'):
         error = result.get('error')
         if error == 'sanctions_hit':
+            status = 403
+        elif error in ('payer_wallet_required', 'payer_wallet_mismatch',
+                       'ownership_signature_required',
+                       'ownership_proof_failed'):
             status = 403
         elif error == 'ofac_screening_unavailable':
             status = 503
