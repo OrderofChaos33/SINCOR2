@@ -519,6 +519,35 @@ def treasury_metrics():
         return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
 
 
+@app.route('/api/metrics/treasury/public')
+def treasury_metrics_public():
+    """Public ledger-only treasury view (observability build #1).
+
+    Answers the P2-A2 founder-decision note above: the intentionally
+    public homepage subset is THIS surface — inflow-ledger 24h aggregates
+    plus the bounty-pool figures /v1/a2a/pool already publishes. No
+    on-chain snapshot, no balances, no address. The route above stays
+    JWT-gated. Mirrors sincor2.blueprints.monitoring.treasury_metrics_public.
+    """
+    try:
+        from sincor2.treasury_inflow import (
+            ledger_summary_24h,
+            public_treasury_public_dto,
+        )
+        from sincor2.a2a_bounty_pool import bounty_pool
+    except ImportError as exc:
+        logger.error("treasury_inflow import failed: %s", exc)
+        return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    try:
+        summary = ledger_summary_24h()
+        pool_status = bounty_pool().status()
+        return jsonify(public_treasury_public_dto(summary, pool_status)), 200
+    except Exception:
+        logger.exception("treasury public metrics failed")
+        return jsonify({"status": "error", "detail": "treasury_public_unavailable"}), 500
+
+
 # ==================== PROTECTED ADMIN ROUTES ====================
 
 @app.route('/api/waitlist/analytics')

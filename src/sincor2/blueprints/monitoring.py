@@ -146,6 +146,44 @@ def treasury_metrics():
         return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
 
 
+@monitoring_bp.get("/api/metrics/treasury/public")
+def treasury_metrics_public():
+    """
+    PUBLIC (unauthenticated) ledger-only treasury view for the homepage
+    stats strip — observability build #1 (site audit 2026-10-28 §5.1).
+
+    The authenticated route above keeps its JWT gate: on-chain balances
+    stay behind auth. This variant never builds an on-chain snapshot; it
+    serves only the local inflow-ledger 24h aggregates plus the bounty
+    pool figures that ``GET /v1/a2a/pool`` already publishes anonymously
+    (see ``sincor2.treasury_inflow.public_treasury_public_dto``).
+    """
+    try:
+        from sincor2.treasury_inflow import (
+            ledger_summary_24h,
+            public_treasury_public_dto,
+        )
+        from sincor2.a2a_bounty_pool import bounty_pool
+    except ImportError:
+        try:
+            from src.sincor2.treasury_inflow import (  # type: ignore
+                ledger_summary_24h,
+                public_treasury_public_dto,
+            )
+            from src.sincor2.a2a_bounty_pool import bounty_pool  # type: ignore
+        except ImportError as exc:
+            logger.error("treasury public import failed: %s", exc)
+            return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    try:
+        summary = ledger_summary_24h()
+        pool_status = bounty_pool().status()
+        return jsonify(public_treasury_public_dto(summary, pool_status)), 200
+    except Exception:
+        logger.exception("treasury public metrics failed")
+        return jsonify({"status": "error", "detail": "treasury_public_unavailable"}), 500
+
+
 @monitoring_bp.get("/api/polyclaw/bankroll")
 def polyclaw_bankroll():
     """Current Polyclaw bankroll + risk gate snapshot."""
