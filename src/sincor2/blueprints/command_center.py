@@ -230,7 +230,9 @@ def _build_agent_roster() -> List[Dict[str, Any]]:
             # Merit & career
             "merit_points": merit_points,
             "tasks_completed": tasks_completed,
-            "success_rate": round(float(rep.get("success_rate", 1.0)) * 100, 1),
+            # No reputation data means no measured success: default 0.0,
+            # never 1.0 — a fabricated 100% next to 0 completed tasks.
+            "success_rate": round(float(rep.get("success_rate", 0.0)) * 100, 1),
             "average_quality": round(float(rep.get("average_quality", 0.0)) * 100, 1),
             "career": _career_trajectory(merit_points, tasks_completed),
             # Budget
