@@ -178,6 +178,20 @@ class PaymentRefusedError(AmbiguousPayment):
         self.reason = reason
 
 
+class SigningValidationError(X402BuyerError):
+    """Typed data about to be signed does not match the checked requirements.
+
+    Dev-watch item 301 (Cyfrin 1inch clear-signing audit): descriptors are
+    untrusted display metadata. Before any signature is produced, the exact
+    typed-data payload handed to the signer is validated field-by-field
+    against the checked :class:`PaymentRequirements`, and any summary shown
+    to a human/agent must be generated from that exact payload. A mismatch
+    (recipient, expiry/validBefore, spend value, nonce, domain), an
+    unexpected/extra field, or a summary that differs from the payload is
+    refused here — no signature is produced.
+    """
+
+
 class InsufficientFundsError(PaymentRefusedError):
     """Paid-leg 402 with body error ``insufficient_funds`` (unfunded wallet)."""
 
@@ -328,6 +342,202 @@ class SignedPayment:
 # Type: takes EIP-712 typed data dict, returns 0x-prefixed signature hex.
 # The caller owns the key; this module never sees it.
 SignerFn = Callable[[dict[str, Any]], str]
+
+
+# ---------------------------------------------------------------------------
+# Validate-before-signing (dev-watch item 301)
+# ---------------------------------------------------------------------------
+
+#: The exact TransferWithAuthorization message fields that may be signed.
+#: Anything else in the message is a hidden field and is refused.
+_EXPECTED_MESSAGE_FIELDS = frozenset(
+    {"from", "to", "value", "validAfter", "validBefore", "nonce"}
+)
+_EXPECTED_TYPED_DATA_FIELDS = frozenset(
+    {"types", "domain", "primaryType", "message"}
+)
+
+
+def signing_summary(typed_data: dict[str, Any]) -> dict[str, Any]:
+    """Canonical summary generated FROM the exact typed_data being signed.
+
+    This is the only summary that may be shown to a signer/human/agent for
+    a TransferWithAuthorization. It is copied field-by-field from
+    ``typed_data`` itself — never from a separate descriptor, challenge
+    body, or third-party attestation (item 301: descriptors are untrusted
+    display metadata, never verification).
+    """
+    if not isinstance(typed_data, dict):
+        raise SigningValidationError("typed_data must be a dict")
+    message = typed_data.get("message")
+    domain = typed_data.get("domain")
+    if not isinstance(message, dict) or not isinstance(domain, dict):
+        raise SigningValidationError(
+            "typed_data must carry dict 'message' and 'domain'"
+        )
+    return {
+        "primaryType": typed_data.get("primaryType"),
+        "domain": dict(domain),
+        "message": dict(message),
+    }
+
+
+def validate_typed_data_before_signing(
+    typed_data: dict[str, Any],
+    req: "PaymentRequirements",
+    *,
+    wallet_address: str,
+    expected_valid_before: int | None = None,
+    summary: dict[str, Any] | None = None,
+    descriptor: Any = None,
+) -> dict[str, Any]:
+    """Validate the exact typed_data about to be signed against ``req``.
+
+    Checks, fail-closed (raises :class:`SigningValidationError`):
+
+    - top-level shape is exactly {types, domain, primaryType, message};
+    - primaryType is TransferWithAuthorization and ``types``/``domain``
+      are exactly the expected USDC-on-Base EIP-712 definitions (no
+      hidden domain field, no substituted verifying contract/chain);
+    - the message carries exactly the six expected fields — any extra
+      (hidden) field or any missing field is refused;
+    - ``from`` == the buyer wallet, ``to`` == ``req.pay_to`` (recipient),
+      ``value`` == ``req.amount_atomic`` (spend authorization),
+      ``validAfter`` == the requirement/default actually used,
+      ``validBefore`` == ``expected_valid_before`` when given (else
+      ``req.valid_before`` when the challenge set one) (expiry), and
+      ``nonce`` == ``req.nonce``;
+    - ``validAfter``/``validBefore`` are ints by type (bool/float/str
+      refused, including equal-valued floats), and when no
+      ``expected_valid_before`` is supplied the validator still checks
+      expiry sanity itself: validBefore positive, greater than
+      validAfter, and in the future (round-2 hardening, finding B3);
+    - when ``summary`` is supplied (the summary shown to the signer), it
+      must equal the canonical summary generated from this exact
+      typed_data — a summary whose expiry or recipient differs from the
+      payload is refused, not signed.
+
+    ``descriptor`` is accepted only to make the trust rule explicit: it is
+    third-party display metadata and is NEVER consulted for verification;
+    mutating it cannot change what is validated or signed.
+
+    Returns the canonical summary (from :func:`signing_summary`).
+    """
+    del descriptor  # untrusted display metadata: never verification input
+    if not isinstance(typed_data, dict):
+        raise SigningValidationError("typed_data must be a dict")
+    extra_top = set(typed_data) - _EXPECTED_TYPED_DATA_FIELDS
+    missing_top = _EXPECTED_TYPED_DATA_FIELDS - set(typed_data)
+    if extra_top or missing_top:
+        raise SigningValidationError(
+            "typed_data shape mismatch: "
+            f"extra={sorted(extra_top)} missing={sorted(missing_top)}"
+        )
+    if typed_data.get("primaryType") != "TransferWithAuthorization":
+        raise SigningValidationError(
+            f"unexpected primaryType: {typed_data.get('primaryType')!r}"
+        )
+    if typed_data.get("domain") != _USDC_DOMAIN:
+        raise SigningValidationError(
+            "typed_data domain does not match the expected USDC-on-Base "
+            f"domain: {typed_data.get('domain')!r}"
+        )
+    if typed_data.get("types") != _TRANSFER_WITH_AUTH_TYPES:
+        raise SigningValidationError(
+            "typed_data types do not match the expected "
+            "TransferWithAuthorization type definition"
+        )
+    message = typed_data.get("message")
+    if not isinstance(message, dict):
+        raise SigningValidationError("typed_data message must be a dict")
+    extra = set(message) - _EXPECTED_MESSAGE_FIELDS
+    missing = _EXPECTED_MESSAGE_FIELDS - set(message)
+    if extra or missing:
+        raise SigningValidationError(
+            "typed_data message field mismatch (hidden/missing fields "
+            f"refused): extra={sorted(extra)} missing={sorted(missing)}"
+        )
+
+    def _addr(value: Any) -> str:
+        return str(value).lower()
+
+    if _addr(message["from"]) != _addr(wallet_address):
+        raise SigningValidationError(
+            f"message 'from' {message['from']!r} != wallet {wallet_address!r}"
+        )
+    if _addr(message["to"]) != _addr(req.pay_to):
+        raise SigningValidationError(
+            f"message 'to' (recipient) {message['to']!r} != checked "
+            f"pay_to {req.pay_to!r}"
+        )
+    value = message["value"]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SigningValidationError(
+            f"message 'value' must be an int, got {value!r}"
+        )
+    if value != req.amount_atomic:
+        raise SigningValidationError(
+            f"message 'value' (spend) {value!r} != checked "
+            f"amount_atomic {req.amount_atomic!r}"
+        )
+    # Round-2 hardening (item 301, finding B3): the expiry window fields
+    # must be ints by TYPE, not just by equality — in Python ``False == 0``,
+    # ``0.0 == 0`` and ``float(validBefore) == validBefore``, so an
+    # equality-only check lets equal-valued bools/floats (and strings are
+    # refused here too) through the exported validator.
+    for _field in ("validAfter", "validBefore"):
+        _value = message[_field]
+        if isinstance(_value, bool) or not isinstance(_value, int):
+            raise SigningValidationError(
+                f"message '{_field}' must be an int, got {_value!r}"
+            )
+    expected_valid_after = req.valid_after or 0
+    if message["validAfter"] != expected_valid_after:
+        raise SigningValidationError(
+            f"message 'validAfter' {message['validAfter']!r} != checked "
+            f"{expected_valid_after!r}"
+        )
+    if expected_valid_before is not None:
+        expected_expiry: int | None = expected_valid_before
+    elif req.valid_before:
+        expected_expiry = req.valid_before
+    else:
+        expected_expiry = None
+    if expected_expiry is not None and message["validBefore"] != expected_expiry:
+        raise SigningValidationError(
+            f"message 'validBefore' (expiry) {message['validBefore']!r} "
+            f"!= checked {expected_expiry!r}"
+        )
+    if expected_valid_before is None:
+        # B3: with no caller-supplied expectation the validator must still
+        # check expiry sanity itself instead of skipping the check:
+        # validBefore is a positive int (type-checked above), strictly
+        # after validAfter, and in the future.
+        valid_before = message["validBefore"]
+        valid_after = message["validAfter"]
+        if (
+            valid_before <= 0
+            or valid_before <= valid_after
+            or valid_before <= int(time.time())
+        ):
+            raise SigningValidationError(
+                f"message 'validBefore' (expiry) {valid_before!r} fails "
+                "expiry sanity with no expected_valid_before supplied: "
+                "must be positive, greater than validAfter "
+                f"({valid_after!r}), and in the future"
+            )
+    if message["nonce"] != req.nonce:
+        raise SigningValidationError(
+            f"message 'nonce' {message['nonce']!r} != checked {req.nonce!r}"
+        )
+    canonical = signing_summary(typed_data)
+    if summary is not None and summary != canonical:
+        raise SigningValidationError(
+            "summary shown to the signer differs from the exact typed_data "
+            "being signed (recipient/expiry/spend mismatch refused): "
+            f"summary={summary!r} payload_summary={canonical!r}"
+        )
+    return canonical
 
 
 # ---------------------------------------------------------------------------
@@ -482,8 +692,51 @@ class X402Buyer:
 
     # -- EIP-712 signing ------------------------------------------------
 
-    def sign_authorization(self, req: PaymentRequirements) -> SignedPayment:
-        """Build and sign EIP-712 transferWithAuthorization via injected signer."""
+    # -- validate-before-signing helpers (item 301) ----------------------
+
+    @staticmethod
+    def signing_summary(typed_data: dict[str, Any]) -> dict[str, Any]:
+        """Canonical summary from the exact typed_data (see module fn)."""
+        return signing_summary(typed_data)
+
+    def validate_before_signing(
+        self,
+        typed_data: dict[str, Any],
+        req: PaymentRequirements,
+        *,
+        expected_valid_before: int | None = None,
+        summary: dict[str, Any] | None = None,
+        descriptor: Any = None,
+    ) -> dict[str, Any]:
+        """Validate typed_data against the checked req (see module fn)."""
+        return validate_typed_data_before_signing(
+            typed_data,
+            req,
+            wallet_address=self.wallet_address,
+            expected_valid_before=expected_valid_before,
+            summary=summary,
+            descriptor=descriptor,
+        )
+
+    def sign_authorization(
+        self,
+        req: PaymentRequirements,
+        *,
+        summary: dict[str, Any] | None = None,
+        descriptor: Any = None,
+    ) -> SignedPayment:
+        """Build and sign EIP-712 transferWithAuthorization via injected signer.
+
+        Item 301 gate: the constructed typed_data is validated
+        field-by-field against the checked requirements (recipient,
+        spend value, expiry, nonce, domain; no hidden/extra fields)
+        BEFORE the signer is called. When ``summary`` — the summary
+        shown to the signer — is supplied, it must equal the canonical
+        summary generated from this exact typed_data or signing is
+        refused. ``descriptor`` is untrusted display metadata and is
+        never used as verification. The honest-path typed_data (fields
+        and values) is unchanged by this gate.
+        """
         self._check_requirements(req)
 
         now = int(time.time())
@@ -503,6 +756,14 @@ class X402Buyer:
             "primaryType": "TransferWithAuthorization",
             "message": message,
         }
+        validate_typed_data_before_signing(
+            typed_data,
+            req,
+            wallet_address=self.wallet_address,
+            expected_valid_before=valid_before,
+            summary=summary,
+            descriptor=descriptor,
+        )
         signature = self._signer_fn(typed_data)
         if not signature or not str(signature).startswith("0x"):
             raise X402BuyerError("signer_fn did not return 0x signature")

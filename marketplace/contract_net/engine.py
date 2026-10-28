@@ -21,6 +21,7 @@ from .eip712 import (
     to_hex,
     typed_data_digest,
     typed_data_payload,
+    validate_bid_before_signing,
     verify_digest,
 )
 from .compliance_filter import ComplianceAttestationFilter
@@ -129,6 +130,40 @@ class ContractNetEngine:
         nonce = self.next_nonce(agent.agent_id)
         deadline = now + self.config.bid_ttl_seconds
         bid_price = int(price if price is not None else agent.true_min_price)
+        # Item 301 gate, wired (round 2, finding B1): build the typed-data
+        # payload FIRST and validate it against this engine's OWN intent —
+        # the exact field values about to be signed for and the exact
+        # domain from self.config — BEFORE sign_digest is called. Any
+        # difference raises BidSummaryMismatchError and NO signature is
+        # produced. Honest inputs validate cleanly, so the digest,
+        # signature and SealedBid contents are unchanged.
+        payload = typed_data_payload(
+            self.config,
+            auction_id=auction_id,
+            task_id=task.task_id,
+            agent=agent.wallet,
+            price=bid_price,
+            estimated_tokens=agent.estimated_tokens,
+            nonce=nonce,
+            deadline=deadline,
+            epoch_id=epoch_id,
+            epoch_root=epoch_merkle_root,
+        )
+        validate_bid_before_signing(
+            payload,
+            config=self.config,
+            expected_message={
+                "auctionId": auction_id,
+                "taskId": task.task_id,
+                "agent": agent.wallet,
+                "price": bid_price,
+                "estimatedTokens": agent.estimated_tokens,
+                "nonce": nonce,
+                "deadline": deadline,
+                "epochId": epoch_id,
+                "epochRoot": epoch_merkle_root,
+            },
+        )
         digest = typed_data_digest(
             self.config,
             auction_id=auction_id,
@@ -157,18 +192,7 @@ class ContractNetEngine:
             digest=to_hex(digest),
             signature=signature,
             sig_type=sig_type,
-            typed_data=typed_data_payload(
-                self.config,
-                auction_id=auction_id,
-                task_id=task.task_id,
-                agent=agent.wallet,
-                price=bid_price,
-                estimated_tokens=agent.estimated_tokens,
-                nonce=nonce,
-                deadline=deadline,
-                epoch_id=epoch_id,
-                epoch_root=epoch_merkle_root,
-            ),
+            typed_data=payload,
             submitted_at=now,
             epoch_id=epoch_id,
             epoch_merkle_root=epoch_merkle_root,
