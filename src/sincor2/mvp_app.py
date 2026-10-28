@@ -134,6 +134,26 @@ try:
 except Exception as _q_exc:
     logger.warning('[QUEUE] poll routes not registered: %s', _q_exc)
 
+# Liveness disclosure (observability build #7): the cohort disclosure at
+# /.well-known/liveness-agents.json was previously attached only in the
+# legacy sincor2.app module, so the production app 404'd it. Attach it
+# here, on the app production actually runs, exactly as legacy did.
+try:
+    from sincor2.liveness import attach_liveness
+    attach_liveness(app)
+    logger.info('[LIVENESS] disclosure route registered')
+except Exception as _liveness_exc:
+    logger.warning('[LIVENESS] disclosure not registered: %s', _liveness_exc)
+
+# OFAC freshness badge (observability build #6): provenance-only readout
+# of the active sanctions snapshot at /api/compliance/ofac-status.
+try:
+    from sincor2.ofac_status import attach_ofac_status
+    attach_ofac_status(app)
+    logger.info('[OFAC] freshness badge route registered')
+except Exception as _ofac_exc:
+    logger.warning('[OFAC] freshness badge not registered: %s', _ofac_exc)
+
 # C2 (P2 audit): boot-time queue readiness gate. A configured-but-unreachable
 # broker or a celery backend without shared job storage fails boot fast with
 # a clear error instead of booting a half-working queue. Degraded (no-broker)
