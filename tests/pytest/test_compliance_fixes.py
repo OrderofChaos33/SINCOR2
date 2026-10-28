@@ -149,6 +149,62 @@ class TestUnlimited:
         assert "nlimited" not in pe
 
 
+class TestLeftoverClaims:
+    """Finisher pass: claims the first builder flagged with no DRAFT."""
+
+    def test_p10_lede_no_zero_principal_risk(self):
+        p10 = prose("templates/products/p10-flash-arbitrage.html")
+        assert "zero principal risk" not in p10.lower()
+
+    def test_p10_lede_matches_faq_tone(self):
+        lede = next(line for line in read(
+            "templates/products/p10-flash-arbitrage.html").splitlines()
+            if "sp-lede" in line)
+        # Same mechanics + qualification language as the corrected FAQ.
+        assert "does not settle at a loss" in lede
+        assert "not a promise of safety" in lede
+        assert "smart-contract, venue, and market risks remain" in lede
+        assert "principal is at risk" in lede
+        assert ("not live until it clears the platform's published "
+                "go-live bar") in lede
+
+    def test_p10_no_free_money_claim(self):
+        p10 = prose("templates/products/p10-flash-arbitrage.html")
+        assert "free money" not in p10.lower()
+
+    def test_earn_streams_not_claimed_live(self):
+        earn = prose("templates/earn.html")
+        assert "Five revenue streams are live" not in earn
+        assert "are live on-chain" not in earn
+        assert "5 Live Revenue Streams" not in earn
+
+    def test_earn_streams_described_as_designed_paths(self):
+        earn = prose("templates/earn.html")
+        assert "Five earning paths are designed" in earn
+        assert "5 Designed Revenue Streams" in earn
+        assert ("not a claim that any of them is currently paying out"
+                in earn)
+        # The five designed paths keep the page's structure.
+        for name in ("referral", "curve buys", "hook USDC sales",
+                     "platform access", "canonical token list"):
+            assert name.lower() in earn.lower()
+
+    def test_earn_no_unverifiable_sinc_quantity(self):
+        earn = prose("templates/earn.html")
+        assert "~20M SINC" not in earn
+        assert "20M SINC on walls" not in earn
+        assert not re.search(r"~?\d[\d,]*\s*(?:M|million)\s+SINC", earn)
+        assert "3 — Hook USDC sales (SINC on walls)" in earn
+
+    def test_no_risk_elimination_siblings(self):
+        for rel in ("templates/earn.html",
+                    "templates/products/p10-flash-arbitrage.html"):
+            text = prose(rel).lower()
+            for phrase in ("zero risk", "no risk", "risk-free",
+                           "risk free", "guaranteed"):
+                assert phrase not in text, (rel, phrase)
+
+
 class TestDefiPages:
     def test_p10_faq_corrected(self):
         p10 = prose("templates/products/p10-flash-arbitrage.html")
