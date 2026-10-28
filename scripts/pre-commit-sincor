@@ -23,6 +23,657 @@ if [ -n "$STAGED" ]; then
 fi
 echo "Secret scan clean."
 
+echo "=== SINCOR pre-commit: shell-injection guard (dev-watch 300) ==="
+# CVE-2026-117567/-117569/-117573: prompt-injection-reachable OS command
+# injection in MCP servers. Every external binary under src/sincor2 must be
+# invoked via argv arrays only — shell=True, create_subprocess_shell,
+# os.system/os.popen, subprocess.getoutput/getstatusoutput, or a string
+# command to subprocess.* anywhere in src/sincor2 is a hard failure.
+# Round 2: also any shell= that is not the constant False, ** unpacking on
+# subprocess.* calls, the os.exec*/os.spawn* families, getattr() dynamic
+# dispatch to those primitives, '<literal>'.format() commands, and names
+# bound to a string command in the same scope.
+# Round 3: also assign-then-call through a name bound to a getattr()
+# run-family result, ** unpacking on the asyncio spawn calls, .format_map()
+# and unbound str.format() command strings, and tuple / multi-target /
+# walrus / conditional name bindings.
+# Round 4: also same-line (';'-joined) binding -> call resolution by
+# statement order, getattr() results bound through tuple unpacking or
+# multi-target chains, and .format()/.format_map() templates that are
+# names bound to a string.
+# AST-based (mirrors tests/pytest/test_devwatch300_argv_only.py): docstrings,
+# comments and string literals that merely mention shell=True do not trip it.
+python3 - <<'PYEOF'
+import ast, sys
+from pathlib import Path
+
+_SUBPROCESS_FUNCS = {
+    "run",
+    "Popen",
+    "call",
+    "check_call",
+    "check_output",
+    "getoutput",
+    "getstatusoutput",
+}
+# getoutput / getstatusoutput always go through a shell by design.
+_ALWAYS_SHELL_FUNCS = {"getoutput", "getstatusoutput"}
+# os primitives that execute through a shell or replace / spawn a process
+# image directly — none of them take an argv-only contract we can verify.
+_OS_BANNED_FUNCS = {
+    "system",
+    "popen",
+    "execl",
+    "execle",
+    "execlp",
+    "execlpe",
+    "execv",
+    "execve",
+    "execvp",
+    "execvpe",
+    "spawnl",
+    "spawnle",
+    "spawnlp",
+    "spawnlpe",
+    "spawnv",
+    "spawnve",
+    "spawnvp",
+    "spawnvpe",
+}
+# Dynamic dispatch: getattr(<one of these modules>, "<name>") where the
+# name resolves to a shell / process-replacing primitive.
+_GETATTR_MODULES = {"subprocess", "os", "asyncio"}
+_GETATTR_BANNED_EXACT = {
+    "system",
+    "popen",
+    "getoutput",
+    "getstatusoutput",
+    "create_subprocess_shell",
+}
+
+
+def _getattr_banned(name: str) -> bool:
+    return (
+        name in _GETATTR_BANNED_EXACT
+        or name.startswith("exec")
+        or name.startswith("spawn")
+    )
+
+
+# ---------------------------------------------------------------------------
+# AST guard (shared by the tree test and the synthetic-source tests)
+# ---------------------------------------------------------------------------
+
+
+
+def _dotted(node: ast.AST) -> str:
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _resolve(tree: ast.AST) -> tuple[dict[str, str], dict[str, str]]:
+    """Map local names to the stdlib module / function they refer to."""
+    modules: dict[str, str] = {}
+    funcs: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules[alias.asname or alias.name.split(".")[0]] = alias.name
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                funcs[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    return modules, funcs
+
+
+def _canonical(dotted: str, modules: dict[str, str], funcs: dict[str, str]) -> str:
+    if dotted in funcs:
+        return funcs[dotted]
+    head, _, rest = dotted.partition(".")
+    if head in modules:
+        return modules[head] + (f".{rest}" if rest else "")
+    return dotted
+
+
+def _is_string_command(node: ast.AST) -> bool:
+    """True when an argv argument is provably a *string* command."""
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, (str, bytes))
+    if isinstance(node, ast.JoinedStr):  # f-string
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+        return True
+    if isinstance(node, ast.NamedExpr):
+        return _is_string_command(node.value)
+    if isinstance(node, ast.IfExp):
+        # A conditional is a string command only when both branches are.
+        return _is_string_command(node.body) and _is_string_command(node.orelse)
+    if isinstance(node, ast.Call):
+        # '<literal>'.format(...) / .format_map(...) builds a string
+        # command, and so does unbound str.format('<literal>', ...) —
+        # there the template is the first argument, not the receiver.
+        func = node.func
+        if isinstance(func, ast.Attribute) and func.attr in (
+            "format",
+            "format_map",
+        ):
+            if _is_string_command(func.value):
+                return True
+            if (
+                isinstance(func.value, ast.Name)
+                and func.value.id == "str"
+                and node.args
+            ):
+                return _is_string_command(node.args[0])
+    return False
+
+
+def _is_string_expr(node: ast.AST) -> bool:
+    """Stricter string-shape test for name bindings: at least one operand
+    must be provably a string, so ``['a'] + args`` (list concat) is not
+    misclassified as a string command."""
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, (str, bytes))
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+        return _is_string_expr(node.left) or _is_string_expr(node.right)
+    if isinstance(node, ast.NamedExpr):
+        return _is_string_expr(node.value)
+    if isinstance(node, ast.IfExp):
+        return _is_string_expr(node.body) and _is_string_expr(node.orelse)
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Attribute) and func.attr in (
+            "format",
+            "format_map",
+        ):
+            if _is_string_expr(func.value):
+                return True
+            if (
+                isinstance(func.value, ast.Name)
+                and func.value.id == "str"
+                and node.args
+            ):
+                return _is_string_expr(node.args[0])
+    return False
+
+
+def _classify_binding(value: ast.AST) -> str:
+    if isinstance(value, (ast.List, ast.Tuple)):
+        return "list"
+    if _is_string_expr(value):
+        return "string"
+    return "other"
+
+
+def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int, int]]:
+    """Name -> (kind, lineno, col_offset) for assignments made directly
+    in ``scope`` (module or one function), in source order — a later
+    assignment wins. Plain, tuple-unpacking, multi-target and walrus
+    targets are tracked per name; a name whose value shape is not
+    provable is "other". Nested scopes are not descended into. The
+    position is the binding statement's (line, column) so a binding and
+    a call joined on one line by ``;`` still order correctly."""
+    bindings: dict[str, tuple[str, int, int]] = {}
+
+    def target_names(target: ast.AST) -> list[str]:
+        if isinstance(target, ast.Name):
+            return [target.id]
+        if isinstance(target, ast.Starred):
+            return target_names(target.value)
+        if isinstance(target, (ast.Tuple, ast.List)):
+            names: list[str] = []
+            for elt in target.elts:
+                names.extend(target_names(elt))
+            return names
+        return []
+
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
+        if isinstance(target, ast.Name):
+            bindings[target.id] = (_classify_binding(value), pos[0], pos[1])
+        elif isinstance(target, ast.Starred):
+            for name in target_names(target):
+                bindings[name] = ("other", pos[0], pos[1])
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            if (
+                isinstance(value, (ast.Tuple, ast.List))
+                and len(value.elts) == len(target.elts)
+            ):
+                for elt_target, elt_value in zip(target.elts, value.elts):
+                    bind_target(elt_target, elt_value, pos)
+            else:
+                for name in target_names(target):
+                    bindings[name] = ("other", pos[0], pos[1])
+
+    def collect(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(
+                child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+            ):
+                continue
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
+            elif (
+                isinstance(child, ast.AnnAssign)
+                and isinstance(child.target, ast.Name)
+                and child.value is not None
+            ):
+                bindings[child.target.id] = (
+                    _classify_binding(child.value),
+                    child.lineno,
+                    child.col_offset,
+                )
+            elif (
+                isinstance(child, ast.AugAssign)
+                and isinstance(child.target, ast.Name)
+                and _is_string_expr(child.value)
+            ):
+                bindings[child.target.id] = (
+                    "string",
+                    child.lineno,
+                    child.col_offset,
+                )
+            elif isinstance(child, ast.NamedExpr) and isinstance(
+                child.target, ast.Name
+            ):
+                bindings[child.target.id] = (
+                    _classify_binding(child.value),
+                    child.lineno,
+                    child.col_offset,
+                )
+            collect(child)
+
+    collect(scope)
+    return bindings
+
+
+def _scope_getattr_bindings(
+    scope: ast.AST, modules: dict[str, str], funcs: dict[str, str]
+) -> dict[str, tuple[str, int, int]]:
+    """Name -> (canonical target, lineno, col_offset) for names bound
+    directly in ``scope`` to a ``getattr(<process module>, '<spawn
+    name>')`` result — the assign-then-call spelling of dynamic
+    dispatch. A later binding of the same name to anything else shadows
+    it with an empty target, the same later-assignment-wins rule as
+    ``_scope_bindings``. Target forms mirror ``_scope_bindings``:
+    plain, tuple-unpacking and multi-target targets are tracked per
+    name, so ``r, s = getattr(subprocess, 'run'), len`` and
+    ``r = q = getattr(subprocess, 'run')`` resolve like the plain
+    spelling."""
+    bindings: dict[str, tuple[str, int, int]] = {}
+
+    def target_names(target: ast.AST) -> list[str]:
+        if isinstance(target, ast.Name):
+            return [target.id]
+        if isinstance(target, ast.Starred):
+            return target_names(target.value)
+        if isinstance(target, (ast.Tuple, ast.List)):
+            names: list[str] = []
+            for elt in target.elts:
+                names.extend(target_names(elt))
+            return names
+        return []
+
+    def record(name: str, value: ast.AST, pos: tuple[int, int]) -> None:
+        resolved = _getattr_target(value, modules, funcs)
+        if resolved is not None and _is_spawn_canon(resolved):
+            bindings[name] = (resolved, pos[0], pos[1])
+        else:
+            bindings[name] = ("", pos[0], pos[1])
+
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
+        if isinstance(target, ast.Name):
+            record(target.id, value, pos)
+        elif isinstance(target, ast.Starred):
+            for name in target_names(target):
+                bindings[name] = ("", pos[0], pos[1])
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            if (
+                isinstance(value, (ast.Tuple, ast.List))
+                and len(value.elts) == len(target.elts)
+            ):
+                for elt_target, elt_value in zip(target.elts, value.elts):
+                    bind_target(elt_target, elt_value, pos)
+            else:
+                for name in target_names(target):
+                    bindings[name] = ("", pos[0], pos[1])
+
+    def collect(node: ast.AST) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(
+                child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+            ):
+                continue
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
+            elif (
+                isinstance(child, ast.AnnAssign)
+                and isinstance(child.target, ast.Name)
+                and child.value is not None
+            ):
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
+            elif isinstance(child, ast.AugAssign) and isinstance(
+                child.target, ast.Name
+            ):
+                bindings[child.target.id] = (
+                    "",
+                    child.lineno,
+                    child.col_offset,
+                )
+            elif isinstance(child, ast.NamedExpr) and isinstance(
+                child.target, ast.Name
+            ):
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
+            collect(child)
+
+    collect(scope)
+    return bindings
+
+
+def _getattr_target(
+    node: ast.AST, modules: dict[str, str], funcs: dict[str, str]
+) -> str | None:
+    """If ``node`` is a ``getattr(module, 'name')`` call on a stdlib
+    process module, return the canonical ``module.name`` it resolves to."""
+    if not isinstance(node, ast.Call) or _dotted(node.func) != "getattr":
+        return None
+    if len(node.args) < 2:
+        return None
+    mod = _canonical(_dotted(node.args[0]), modules, funcs)
+    name_node = node.args[1]
+    if (
+        mod in _GETATTR_MODULES
+        and isinstance(name_node, ast.Constant)
+        and isinstance(name_node.value, str)
+    ):
+        return f"{mod}.{name_node.value}"
+    return None
+
+
+def _command_arg(node: ast.Call) -> ast.AST | None:
+    if node.args:
+        return node.args[0]
+    for kw in node.keywords:
+        if kw.arg == "args":
+            return kw.value
+    return None
+
+
+def _is_spawn_canon(canon: str) -> bool:
+    return canon.startswith("subprocess.") or canon in (
+        "asyncio.create_subprocess_exec",
+        "asyncio.create_subprocess_shell",
+    )
+
+
+def violations_from_ast(tree: ast.AST, filename: str = "<synthetic>") -> list[str]:
+    modules, funcs = _resolve(tree)
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        where = f"{filename}:{node.lineno}"
+        # Dynamic dispatch spelling: flag the getattr() itself when it
+        # resolves to a banned primitive, even if it is only assigned.
+        target = _getattr_target(node, modules, funcs)
+        if target is not None and _getattr_banned(target.rsplit(".", 1)[-1]):
+            found.append(
+                f"{where}: getattr() dynamic dispatch to {target} "
+                "(shell / process-replacing primitive)"
+            )
+        dotted = _dotted(node.func)
+        canon = _canonical(dotted, modules, funcs) if dotted else ""
+        via_getattr = False
+        if not dotted:
+            # Call of a getattr(...) result: resolve it so the ordinary
+            # shell= / ** / string-command checks apply to the real target
+            # (this is what makes getattr(subprocess, 'run') safe to leave
+            # unflagged at the getattr site itself).
+            resolved = _getattr_target(node.func, modules, funcs)
+            if resolved is not None:
+                canon = resolved
+                via_getattr = True
+        if _is_spawn_canon(canon):
+            for kw in node.keywords:
+                if kw.arg is None:
+                    found.append(
+                        f"{where}: ** unpacking in call to {canon} hides its "
+                        "keywords from the argv-only guard"
+                    )
+                    break
+            for kw in node.keywords:
+                if kw.arg == "shell" and not (
+                    isinstance(kw.value, ast.Constant) and kw.value.value is False
+                ):
+                    found.append(
+                        f"{where}: shell= in call to {canon} is not the "
+                        "constant False"
+                    )
+        if canon.startswith("os."):
+            leaf = canon.rsplit(".", 1)[-1]
+            if leaf in _OS_BANNED_FUNCS and not via_getattr:
+                found.append(
+                    f"{where}: {canon}() is a banned shell / "
+                    "process-replacing primitive"
+                )
+        if "create_subprocess_shell" in canon and not via_getattr:
+            found.append(f"{where}: create_subprocess_shell executes through a shell")
+        if canon.startswith("subprocess."):
+            leaf = canon.rsplit(".", 1)[-1]
+            if leaf in _ALWAYS_SHELL_FUNCS:
+                if not via_getattr:
+                    found.append(
+                        f"{where}: subprocess.{leaf}() executes through a shell"
+                    )
+            elif leaf in _SUBPROCESS_FUNCS:
+                cmd = _command_arg(node)
+                if cmd is not None and _is_string_command(cmd):
+                    found.append(
+                        f"{where}: subprocess.{leaf}() called with a string "
+                        "command instead of an argv list"
+                    )
+    found.extend(_name_binding_violations(tree, filename, modules, funcs))
+    return found
+
+
+def _name_binding_violations(
+    tree: ast.AST,
+    filename: str,
+    modules: dict[str, str],
+    funcs: dict[str, str],
+) -> list[str]:
+    """Flag ``subprocess.*(name)`` where ``name`` was bound, earlier in an
+    enclosing scope, to a string-shaped command. Conservative: only
+    bindings whose shape is provable are tracked, and a later list
+    assignment wins (no flag). "Earlier" is statement order — (line,
+    column) — so a binding and a call joined on one line by ``;``
+    resolve the same way as the multi-line spelling.
+
+    Also resolves names bound to ``getattr(<module>, '<spawn name>')``
+    results in an enclosing scope: the ordinary ``shell=`` / ``**`` /
+    string-command checks apply at their call sites, exactly as for a
+    direct ``getattr(...)`` call. A ``.format()`` / ``.format_map()``
+    command whose template is a name bound to a string is resolved
+    through the same bindings."""
+    found: list[str] = []
+
+    def lookup(
+        name: str, scopes: list[dict[str, tuple[str, int, int]]]
+    ) -> tuple[str, int, int] | None:
+        for scope in reversed(scopes):
+            if name in scope:
+                return scope[name]
+        return None
+
+    def format_template_name(node: ast.AST) -> str | None:
+        """For a ``<tpl>.format(...)`` / ``.format_map(...)`` call, the
+        template's name when the template is a bare name — the receiver,
+        or the first argument of the unbound ``str.format`` spelling.
+        Otherwise None."""
+        if not isinstance(node, ast.Call):
+            return None
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr in ("format", "format_map")
+        ):
+            return None
+        if isinstance(func.value, ast.Name):
+            if func.value.id == "str":
+                if node.args and isinstance(node.args[0], ast.Name):
+                    return node.args[0].id
+                return None
+            return func.value.id
+        return None
+
+    def visit(
+        node: ast.AST,
+        scopes: list[dict[str, tuple[str, int, int]]],
+        gscopes: list[dict[str, tuple[str, int, int]]],
+    ) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            inner = _scope_bindings(node)
+            ginner = _scope_getattr_bindings(node, modules, funcs)
+            for deco in node.decorator_list:
+                visit(deco, scopes, gscopes)
+            for default in list(node.args.defaults) + [
+                d for d in node.args.kw_defaults if d is not None
+            ]:
+                visit(default, scopes, gscopes)
+            for child in node.body:
+                visit(child, scopes + [inner], gscopes + [ginner])
+            return
+        if isinstance(node, ast.Call):
+            dotted = _dotted(node.func)
+            canon = _canonical(dotted, modules, funcs) if dotted else ""
+            via_getattr_name = False
+            if not dotted:
+                resolved = _getattr_target(node.func, modules, funcs)
+                if resolved is not None:
+                    canon = resolved
+            elif isinstance(node.func, ast.Name):
+                gbinding = lookup(node.func.id, gscopes)
+                if (
+                    gbinding is not None
+                    and gbinding[0]
+                    and (gbinding[1], gbinding[2])
+                    < (node.lineno, node.col_offset)
+                ):
+                    canon = gbinding[0]
+                    via_getattr_name = True
+            if via_getattr_name and _is_spawn_canon(canon):
+                for kw in node.keywords:
+                    if kw.arg is None:
+                        found.append(
+                            f"{filename}:{node.lineno}: ** unpacking in call "
+                            f"to {canon} hides its keywords from the "
+                            "argv-only guard"
+                        )
+                        break
+                for kw in node.keywords:
+                    if kw.arg == "shell" and not (
+                        isinstance(kw.value, ast.Constant)
+                        and kw.value.value is False
+                    ):
+                        found.append(
+                            f"{filename}:{node.lineno}: shell= in call to "
+                            f"{canon} is not the constant False"
+                        )
+            if canon.startswith("subprocess."):
+                leaf = canon.rsplit(".", 1)[-1]
+                if leaf in _SUBPROCESS_FUNCS and leaf not in _ALWAYS_SHELL_FUNCS:
+                    cmd = _command_arg(node)
+                    if isinstance(cmd, ast.Name):
+                        binding = lookup(cmd.id, scopes)
+                        if (
+                            binding is not None
+                            and binding[0] == "string"
+                            and (binding[1], binding[2])
+                            < (node.lineno, node.col_offset)
+                        ):
+                            found.append(
+                                f"{filename}:{node.lineno}: subprocess.{leaf}() "
+                                f"called with '{cmd.id}', bound to a string "
+                                "command instead of an argv list"
+                            )
+                    elif (
+                        via_getattr_name
+                        and cmd is not None
+                        and _is_string_command(cmd)
+                    ):
+                        found.append(
+                            f"{filename}:{node.lineno}: subprocess.{leaf}() "
+                            "called with a string command instead of an "
+                            "argv list"
+                        )
+                    elif cmd is not None:
+                        template = format_template_name(cmd)
+                        if template is not None:
+                            binding = lookup(template, scopes)
+                            if (
+                                binding is not None
+                                and binding[0] == "string"
+                                and (binding[1], binding[2])
+                                < (node.lineno, node.col_offset)
+                            ):
+                                found.append(
+                                    f"{filename}:{node.lineno}: "
+                                    f"subprocess.{leaf}() called with a "
+                                    "string command built by .format() "
+                                    f"from '{template}', bound to a "
+                                    "string instead of an argv list"
+                                )
+        for child in ast.iter_child_nodes(node):
+            visit(child, scopes, gscopes)
+
+    visit(
+        tree,
+        [_scope_bindings(tree)],
+        [_scope_getattr_bindings(tree, modules, funcs)],
+    )
+    return found
+
+root = Path("src/sincor2")
+violations = []
+for path in sorted(root.rglob("*.py")):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    violations.extend(violations_from_ast(tree, str(path)))
+
+if violations:
+    print("BLOCKED: shell-injection guard (dev-watch 300) violations:")
+    for v in violations:
+        print(" ", v)
+    print("Use argv arrays only: subprocess.run([binary, arg, ...]).")
+    sys.exit(1)
+print("Shell-injection guard clean.")
+PYEOF
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
 echo "=== SINCOR pre-commit: claim-blocklist scan ==="
 # Block unproven marketing claims in staged public copy (README.md, templates/).
 # See scripts/claim-blocklist.txt for the list and rationale.
