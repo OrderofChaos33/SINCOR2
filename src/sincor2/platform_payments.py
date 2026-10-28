@@ -1434,6 +1434,18 @@ def _maybe_finalize(
             payment_id, "payer_proof_refused", tx_hash,
             "registry claim refused: no proven payer")
         return {"ok": False, "error": "payer_wallet_required", **base}
+    # W-113 (defense in depth): when the checkout carries a bound payer,
+    # the verified payer must BE that payer. A verification result naming
+    # anyone else (e.g. a merely chain-recovered payer for a row bound to
+    # a different wallet) never finalizes and never claims.
+    bound_payer = str(row.get("payer_wallet") or "").strip().lower()
+    if bound_payer and \
+            str(vr.get("payer_wallet") or "").strip().lower() != bound_payer:
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            "registry claim refused: verified payer contradicts the "
+            "checkout's bound payer")
+        return {"ok": False, "error": "payer_wallet_mismatch", **base}
     # D2: claim the tx in the shared consumed_onchain_txs registry BEFORE
     # any finality/fulfillment transition, so the same on-chain transfer
     # cannot also fulfill an x402 challenge or a rail settle under a
@@ -1559,6 +1571,19 @@ def _advance_finality(payment_id: str) -> dict[str, Any]:
     tx_hash = row["tx_hash"] or ""
     if not tx_hash:
         return {"ok": False, "error": "tx_hash_missing", "payment_id": payment_id}
+    if not str(row["payer_wallet"] or "").strip():
+        # W-113: a legacy row can sit in 'awaiting_finality' with NO
+        # bound payer (first verify predates the payer-proof gate).
+        # Re-verifying it would hand back the chain-recovered payer and
+        # finalize on a payer nobody ever proved — the squat through
+        # the recheck door. Refuse and leave the row exactly as found;
+        # it can only advance once a payer is bound by a proven verify.
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            "finality recheck refused: checkout has no bound payer")
+        return {"ok": False, "error": "payer_wallet_required",
+                "status": row["status"], "payment_id": payment_id,
+                "tx_hash": tx_hash}
     vr = verify_treasury_transfer(
         tx_hash,
         token=row["token"],

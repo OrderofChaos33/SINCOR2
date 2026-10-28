@@ -20,12 +20,20 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from eth_account import Account as _Account
+from eth_account.messages import encode_defunct as _encode_defunct
 
 from sincor2 import platform_payments as pp
 
 # Entries verified present in the vendored OFAC SDN snapshot.
 SANCTIONED_EVM_ADDR = "0x252a8bd2319d8a555b872990601221b3a2053bce"  # MESRI, Behzad
-CLEAN_ADDR = "0x000000000000000000000000000000000000dEaD"
+# W-113: the clean payer is a signable test account (well-known PUBLIC
+# Hardhat dev account #0 — test-only, never funded, not on the SDN
+# list): the bound verify flow requires an EIP-191 ownership signature
+# from the payer, which an arbitrary address cannot produce.
+CLEAN_ACCT = _Account.from_key(
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+CLEAN_ADDR = CLEAN_ACCT.address
 
 TX_A = "0x" + "aa" * 32
 TX_B = "0x" + "bb" * 32
@@ -84,7 +92,7 @@ def _make_rpc(payer: str, block_num: int, latest_num: int,
 
 
 def _insert_checkout(payment_id: str, tx_hash: str = "", status: str = "pending",
-                     token: str = "AXM") -> None:
+                     token: str = "AXM", payer_wallet: str = "") -> None:
     now = datetime.now(timezone.utc)
     exp = (now + timedelta(hours=1)).isoformat()
     with pp._conn() as conn:
@@ -95,11 +103,26 @@ def _insert_checkout(payment_id: str, tx_hash: str = "", status: str = "pending"
                 status, tx_hash, created_at, expires_at, metadata)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (payment_id, "intel", "Professional", token, str(10**18), 1.0,
-             149.0, "", "buyer@test.com", status, tx_hash or None,
+             149.0, payer_wallet, "buyer@test.com", status, tx_hash or None,
              now.isoformat(), exp,
              '{"order_type": "subscription", "billing": "month"}'),
         )
         conn.commit()
+
+
+def _platform_sign(payment_id: str, acct=CLEAN_ACCT) -> str:
+    """W-113: EIP-191 payer signature over the platform bind message."""
+    return acct.sign_message(_encode_defunct(
+        text=pp.platform_bind_message(
+            payment_id, acct.address))).signature.hex()
+
+
+def _verify_bound(payment_id: str, tx_hash: str, acct=CLEAN_ACCT):
+    """verify_checkout under the W-113 bound flow: the checkout's bound
+    payer plus its EIP-191 ownership proof."""
+    return pp.verify_checkout(
+        payment_id, tx_hash, payer_wallet=acct.address,
+        payer_signature=_platform_sign(payment_id, acct))
 
 
 def _pass_ofac(monkeypatch):
@@ -127,9 +150,9 @@ def _fresh_ofac_oracle(monkeypatch):
 class TestReceiptFinality:
     def test_below_depth_stays_pending(self, pp_db, monkeypatch):
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-1")
+        _insert_checkout("PLAT-B1-1", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 100))
-        r = pp.verify_checkout("PLAT-B1-1", TX_A)
+        r = _verify_bound("PLAT-B1-1", TX_A)
         assert r["ok"] is True
         assert r["status"] == "awaiting_finality"
         assert r["confirmations"] == 1
@@ -139,18 +162,18 @@ class TestReceiptFinality:
     def test_zero_confirmations_stays_pending(self, pp_db, monkeypatch):
         # Degenerate head-behind-receipt case: 0 confirmations -> pending.
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-0")
+        _insert_checkout("PLAT-B1-0", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 99))
-        r = pp.verify_checkout("PLAT-B1-0", TX_A)
+        r = _verify_bound("PLAT-B1-0", TX_A)
         assert r["ok"] is True
         assert r["status"] == "awaiting_finality"
         assert r["confirmations"] == 0
 
     def test_at_depth_finalizes(self, pp_db, monkeypatch):
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-2")
+        _insert_checkout("PLAT-B1-2", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 111))
-        r = pp.verify_checkout("PLAT-B1-2", TX_B)
+        r = _verify_bound("PLAT-B1-2", TX_B)
         assert r["ok"] is True
         assert r["status"] == "finalized"
         assert r["confirmations"] == 12
@@ -165,9 +188,9 @@ class TestReceiptFinality:
         assert pp.finality_confirmations(8453) == 2
         # Unknown chain falls back to the named fallback constant.
         assert pp.finality_confirmations(1) == pp.FINALITY_CONFIRMATIONS_FALLBACK
-        _insert_checkout("PLAT-B1-3")
+        _insert_checkout("PLAT-B1-3", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 101))
-        r = pp.verify_checkout("PLAT-B1-3", TX_C)
+        r = _verify_bound("PLAT-B1-3", TX_C)
         assert r["ok"] is True and r["status"] == "finalized"
         assert r["required_confirmations"] == 2
 
@@ -188,14 +211,14 @@ class TestReceiptFinality:
     def test_reorg_before_fulfillment_reverts_with_audit(
             self, pp_db, monkeypatch):
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-4")
+        _insert_checkout("PLAT-B1-4", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 100))
-        r1 = pp.verify_checkout("PLAT-B1-4", TX_D)
+        r1 = _verify_bound("PLAT-B1-4", TX_D)
         assert r1["status"] == "awaiting_finality"
         # The tx vanishes from chain: reorged out / dropped.
         monkeypatch.setattr(
             pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 110, no_receipt=True))
-        r2 = pp.verify_checkout("PLAT-B1-4", TX_D)
+        r2 = _verify_bound("PLAT-B1-4", TX_D)
         assert r2["ok"] is False
         assert r2["error"] == "reorg_detected"
         assert r2["status"] == "reverted"
@@ -205,9 +228,9 @@ class TestReceiptFinality:
 
     def test_deep_reorg_after_fulfillment_disputes(self, pp_db, monkeypatch):
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-5")
+        _insert_checkout("PLAT-B1-5", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 111))
-        r = pp.verify_checkout("PLAT-B1-5", TX_E)
+        r = _verify_bound("PLAT-B1-5", TX_E)
         assert r["status"] == "finalized"
         assert pp.mark_checkout_fulfilled("PLAT-B1-5") is True
         # Deep reorg AFTER fulfillment: must never silently stay fulfilled.
@@ -222,9 +245,9 @@ class TestReceiptFinality:
 
     def test_healthy_recheck_keeps_fulfilled(self, pp_db, monkeypatch):
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-6")
+        _insert_checkout("PLAT-B1-6", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 111))
-        assert pp.verify_checkout("PLAT-B1-6", TX_A)["status"] == "finalized"
+        assert _verify_bound("PLAT-B1-6", TX_A)["status"] == "finalized"
         assert pp.mark_checkout_fulfilled("PLAT-B1-6") is True
         r = pp.recheck_finality("PLAT-B1-6")
         assert r["status"] == "fulfilled" and r["reorg"] is False
@@ -233,12 +256,12 @@ class TestReceiptFinality:
         # Adversarial: two checkouts claim the same tx. The second must be
         # rejected at finalization — never double-provisioned.
         _pass_ofac(monkeypatch)
-        _insert_checkout("PLAT-B1-8A")
-        _insert_checkout("PLAT-B1-8B")
+        _insert_checkout("PLAT-B1-8A", payer_wallet=CLEAN_ADDR)
+        _insert_checkout("PLAT-B1-8B", payer_wallet=CLEAN_ADDR)
         monkeypatch.setattr(pp, "_rpc_call", _make_rpc(CLEAN_ADDR, 100, 111))
-        r1 = pp.verify_checkout("PLAT-B1-8A", TX_A)
+        r1 = _verify_bound("PLAT-B1-8A", TX_A)
         assert r1["status"] == "finalized"
-        r2 = pp.verify_checkout("PLAT-B1-8B", TX_A)
+        r2 = _verify_bound("PLAT-B1-8B", TX_A)
         assert r2["ok"] is False
         assert r2["error"] == "tx_already_used"
         # Loser goes back to pending and can retry with a different tx.
@@ -262,9 +285,16 @@ class TestOfacScreening:
 
     def test_sanctioned_sender_blocked(self, pp_db, monkeypatch):
         _fresh_ofac_oracle(monkeypatch)
-        _insert_checkout("PLAT-B2-1")
+        # W-113: no private key exists for a sanctioned address, so no
+        # verify-time ownership signature can ever be produced for it;
+        # the screen is exercised on the bound recheck leg (the same
+        # _maybe_finalize OFAC screen) with the sanctioned wallet bound
+        # to an awaiting_finality checkout.
+        _insert_checkout("PLAT-B2-1", tx_hash=TX_A,
+                         status="awaiting_finality",
+                         payer_wallet=SANCTIONED_EVM_ADDR)
         self._finalize_rpc(monkeypatch, SANCTIONED_EVM_ADDR)
-        r = pp.verify_checkout("PLAT-B2-1", TX_A)
+        r = pp.recheck_finality("PLAT-B2-1")
         assert r["ok"] is False
         assert r["error"] == "sanctions_hit"
         assert r["status"] == "blocked"
@@ -276,16 +306,18 @@ class TestOfacScreening:
             self, pp_db, monkeypatch):
         # Uppercase sender address must still hit the (lowercased) list.
         _fresh_ofac_oracle(monkeypatch)
-        _insert_checkout("PLAT-B2-1B")
+        _insert_checkout("PLAT-B2-1B", tx_hash=TX_B,
+                         status="awaiting_finality",
+                         payer_wallet=SANCTIONED_EVM_ADDR)
         self._finalize_rpc(monkeypatch, SANCTIONED_EVM_ADDR.upper())
-        r = pp.verify_checkout("PLAT-B2-1B", TX_B)
+        r = pp.recheck_finality("PLAT-B2-1B")
         assert r["ok"] is False and r["error"] == "sanctions_hit"
 
     def test_clean_sender_passes(self, pp_db, monkeypatch):
         _fresh_ofac_oracle(monkeypatch)
-        _insert_checkout("PLAT-B2-2")
+        _insert_checkout("PLAT-B2-2", payer_wallet=CLEAN_ADDR)
         self._finalize_rpc(monkeypatch, CLEAN_ADDR)
-        r = pp.verify_checkout("PLAT-B2-2", TX_C)
+        r = _verify_bound("PLAT-B2-2", TX_C)
         assert r["ok"] is True
         assert r["status"] == "finalized"
         assert r["ofac_verdict"] == "pass"
@@ -295,9 +327,9 @@ class TestOfacScreening:
             pp, "_get_ofac_oracle",
             lambda: (_ for _ in ()).throw(RuntimeError("simulated outage")),
         )
-        _insert_checkout("PLAT-B2-3")
+        _insert_checkout("PLAT-B2-3", payer_wallet=CLEAN_ADDR)
         self._finalize_rpc(monkeypatch, CLEAN_ADDR)
-        r = pp.verify_checkout("PLAT-B2-3", TX_D)
+        r = _verify_bound("PLAT-B2-3", TX_D)
         assert r["ok"] is False
         assert r["error"] == "ofac_screening_unavailable"
         assert r["status"] == "blocked"
@@ -313,9 +345,9 @@ class TestOfacScreening:
             pp, "_get_ofac_oracle",
             lambda: (_ for _ in ()).throw(RuntimeError("simulated outage")),
         )
-        _insert_checkout("PLAT-B2-4")
+        _insert_checkout("PLAT-B2-4", payer_wallet=CLEAN_ADDR)
         self._finalize_rpc(monkeypatch, CLEAN_ADDR)
-        r = pp.verify_checkout("PLAT-B2-4", TX_E)
+        r = _verify_bound("PLAT-B2-4", TX_E)
         assert r["ok"] is True
         assert r["status"] == "finalized"
         events = [a["event"] for a in pp.list_payment_audits("PLAT-B2-4")]
@@ -335,9 +367,9 @@ class TestOfacScreening:
             return oracle
 
         monkeypatch.setattr(pp, "_get_ofac_oracle", _stale_oracle)
-        _insert_checkout("PLAT-B2-5")
+        _insert_checkout("PLAT-B2-5", payer_wallet=CLEAN_ADDR)
         self._finalize_rpc(monkeypatch, CLEAN_ADDR)
-        r = pp.verify_checkout("PLAT-B2-5", TX_A)
+        r = _verify_bound("PLAT-B2-5", TX_A)
         assert r["ok"] is False
         assert r["error"] == "ofac_screening_unavailable"
 

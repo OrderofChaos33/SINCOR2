@@ -345,6 +345,77 @@ def test_high_s_signature_twin_refused(env):
 
 
 # ---------------------------------------------------------------------------
+# Recheck hardening (Builder B residual): a legacy row sitting in
+# 'awaiting_finality' with payer_wallet='' must NOT be finalized by the
+# recheck sweeper — verify_treasury_transfer would otherwise hand back
+# the chain-recovered payer and satisfy the finalize guard with a payer
+# nobody ever proved. And _maybe_finalize must refuse a verified payer
+# that contradicts the row's bound payer.
+# ---------------------------------------------------------------------------
+
+def _insert_awaiting_checkout(payment_id, tx_hash, payer_wallet):
+    """Checkout already in 'awaiting_finality' (first verify happened
+    in the past), with its tx_hash set — the legacy-row shape B used."""
+    now = datetime.now(timezone.utc)
+    with pp._conn() as conn:
+        conn.execute(
+            """INSERT INTO platform_checkouts
+               (payment_id, plan_id, product_name, token, amount_atomic,
+                amount_display, usd_reference, payer_wallet, customer_email,
+                status, tx_hash, created_at, expires_at, metadata)
+               VALUES (?, 'starter', 'Starter', 'USDC', ?, 297.0, 297.0,
+                       ?, 'buyer@example.com', 'awaiting_finality', ?, ?, ?, ?)""",
+            (payment_id, str(USDC_297), payer_wallet, tx_hash,
+             now.isoformat(), (now + timedelta(hours=1)).isoformat(),
+             '{"order_type": "subscription", "billing": "month"}'))
+        conn.commit()
+
+
+def test_recheck_refuses_legacy_unbound_awaiting_row(env):
+    env["chain"].register(TX_V, VICTIM, USDC_297)
+    _insert_awaiting_checkout("PLAT-W113-LEGACY", TX_V, "")
+    r = pp.recheck_finality("PLAT-W113-LEGACY")
+    assert r["ok"] is False and r["error"] == "payer_wallet_required", r
+    # Row untouched: still awaiting finality, still unbound, no claim.
+    row = pp._load_checkout("PLAT-W113-LEGACY")
+    assert row["status"] == "awaiting_finality"
+    assert (row["payer_wallet"] or "") == ""
+    assert pp.get_consumed_onchain_tx(TX_V) is None
+    assert pp.mark_checkout_fulfilled("PLAT-W113-LEGACY") is False
+    events = [a["event"] for a in pp.list_payment_audits("PLAT-W113-LEGACY")]
+    assert "payer_proof_refused" in events
+
+
+def test_recheck_finalizes_honest_bound_awaiting_row(env):
+    env["chain"].register(TX_P, VICTIM, USDC_297)
+    _insert_awaiting_checkout("PLAT-W113-RECHECK", TX_P, VICTIM)
+    r = pp.recheck_finality("PLAT-W113-RECHECK")
+    assert r["ok"] is True and r["status"] == "finalized", r
+    claim = pp.get_consumed_onchain_tx(TX_P)
+    assert claim is not None
+    assert claim["claim_ref"] == "PLAT-W113-RECHECK"
+    assert claim["payer_wallet"] == VICTIM.lower()
+
+
+def test_maybe_finalize_refuses_payer_contradicting_bound(env):
+    env["chain"].register(TX_Q, VICTIM, USDC_297)
+    _insert_awaiting_checkout("PLAT-W113-BOUNDMISMATCH", TX_Q, ATTACKER)
+    row = pp._load_checkout("PLAT-W113-BOUNDMISMATCH")
+    # Forged verification result: chain payer is the victim, but the row
+    # is bound to the attacker — finalize must refuse, never claim.
+    vr = {"payer_wallet": VICTIM, "confirmations": 13,
+          "required_confirmations": 12, "amount_display": 297.0}
+    r = pp._maybe_finalize("PLAT-W113-BOUNDMISMATCH", row, vr, TX_Q)
+    assert r["ok"] is False and r["error"] == "payer_wallet_mismatch", r
+    assert pp.get_consumed_onchain_tx(TX_Q) is None
+    row = pp._load_checkout("PLAT-W113-BOUNDMISMATCH")
+    assert row["status"] == "awaiting_finality"
+    events = [a["event"] for a in
+              pp.list_payment_audits("PLAT-W113-BOUNDMISMATCH")]
+    assert "payer_proof_refused" in events
+
+
+# ---------------------------------------------------------------------------
 # Full loop, platform first: a proven platform verify claims the tx and
 # the same tx cannot then settle a rail pack.
 # ---------------------------------------------------------------------------
