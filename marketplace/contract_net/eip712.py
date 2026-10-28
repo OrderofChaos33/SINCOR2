@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from .keccak import keccak256
@@ -306,6 +307,94 @@ _BID_MESSAGE_FIELDS = frozenset(
     }
 )
 
+# Round-2 hardening (item 301, Builder B findings B1/B2): the validator
+# pins the WHOLE payload shape, not just the message field-set.
+_BID_TOP_LEVEL_FIELDS = frozenset({"types", "domain", "primaryType", "message"})
+_BID_DOMAIN_FIELDS = frozenset(
+    {"name", "version", "chainId", "verifyingContract"}
+)
+#: The canonical type definition this module signs with — exactly what
+#: :func:`typed_data_payload` emits. Any extra/altered entry is refused.
+_EXPECTED_BID_TYPES: Dict[str, Any] = {
+    "EIP712Domain": [
+        {"name": "name", "type": "string"},
+        {"name": "version", "type": "string"},
+        {"name": "chainId", "type": "uint256"},
+        {"name": "verifyingContract", "type": "address"},
+    ],
+    "Bid": [
+        {"name": "auctionId", "type": "bytes32"},
+        {"name": "taskId", "type": "string"},
+        {"name": "agent", "type": "address"},
+        {"name": "price", "type": "uint256"},
+        {"name": "estimatedTokens", "type": "uint256"},
+        {"name": "nonce", "type": "uint256"},
+        {"name": "deadline", "type": "uint256"},
+        {"name": "epochId", "type": "string"},
+        {"name": "epochRoot", "type": "bytes32"},
+    ],
+}
+_BID_NUMERIC_FIELDS = ("price", "estimatedTokens", "nonce", "deadline")
+_ADDRESS_RE = re.compile(r"0[xX][0-9a-fA-F]{40}")
+_BYTES32_RE = re.compile(r"0[xX][0-9a-fA-F]{64}")
+_DECIMAL_UINT_RE = re.compile(r"0|[1-9][0-9]*")
+
+
+def _is_address(value: Any) -> bool:
+    return isinstance(value, str) and _ADDRESS_RE.fullmatch(value) is not None
+
+
+def _is_bytes32_hex(value: Any) -> bool:
+    return isinstance(value, str) and _BYTES32_RE.fullmatch(value) is not None
+
+
+def _decode_bid_uint256(field: str, value: Any) -> int:
+    """Decode a Bid message numeric field to its exact uint256 value.
+
+    The field must encode an integer exactly: an ``int`` is accepted, and
+    so is the canonical decimal-string encoding that
+    :func:`typed_data_payload` emits for uint256 fields (that encoding is
+    part of the signed payload's honest form and must stay valid).
+    ``bool`` (an int subclass), ``float`` (including equal-valued floats
+    such as ``120.0``), and any non-canonical string (hex, signed,
+    whitespace-padded, leading zeros, non-numeric) are refused.
+    """
+    if isinstance(value, bool):
+        raise BidSummaryMismatchError(
+            f"bid message field {field!r} must be an int, got bool {value!r}"
+        )
+    if isinstance(value, int):
+        decoded = value
+    elif isinstance(value, str) and _DECIMAL_UINT_RE.fullmatch(value):
+        decoded = int(value)
+    else:
+        raise BidSummaryMismatchError(
+            f"bid message field {field!r} must be an int (or its canonical "
+            f"decimal-string encoding), got {value!r}"
+        )
+    if decoded < 0 or decoded >= 1 << 256:
+        raise BidSummaryMismatchError(
+            f"bid message field {field!r} out of uint256 range: {value!r}"
+        )
+    return decoded
+
+
+def _domain_dict_from(source: Any) -> Dict[str, Any]:
+    """Normalize an expected-domain source to a plain domain dict."""
+    if isinstance(source, ContractNetConfig):
+        return {
+            "name": source.domain_name,
+            "version": source.domain_version,
+            "chainId": source.chain_id,
+            "verifyingContract": source.verifying_contract,
+        }
+    if isinstance(source, dict):
+        return dict(source)
+    raise BidSummaryMismatchError(
+        "expected domain must be a dict or ContractNetConfig, got "
+        f"{type(source).__name__}"
+    )
+
 
 def bid_signing_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Canonical summary generated FROM the exact Bid payload being signed.
@@ -334,16 +423,49 @@ def validate_bid_summary(
     summary: Optional[Dict[str, Any]] = None,
     *,
     descriptor: Any = None,
+    expected_domain: Any = None,
+    config: Optional[ContractNetConfig] = None,
+    expected_message: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Refuse a Bid payload whose summary differs from the exact payload.
+    """Refuse a Bid payload that is not exactly the payload to be signed.
 
-    - The payload message must carry exactly the nine Bid fields — any
-      extra (hidden) or missing field is refused.
+    Round-2 hardening (item 301, Builder B findings B1/B2) — the whole
+    payload is pinned, not just the message field-set:
+
+    - The top level must be exactly ``{types, domain, primaryType,
+      message}`` — any extra (hidden) or missing key is refused.
+    - ``types`` must exactly equal the canonical EIP712Domain + Bid type
+      definition this module signs with — extra/altered entries refused.
+    - ``domain`` must be exactly ``{name, version, chainId,
+      verifyingContract}`` with a well-formed verifying contract and an
+      int chainId. When ``expected_domain`` (a dict or a
+      :class:`ContractNetConfig`) and/or ``config`` is supplied, the
+      payload domain must equal the config-derived domain EXACTLY — a
+      mutated chainId (or name/version/contract) is refused.
+    - The message must carry exactly the nine Bid fields. The numeric
+      fields (price, estimatedTokens, nonce, deadline) must encode
+      uint256 integers exactly (see :func:`_decode_bid_uint256`):
+      bool/float/non-canonical-string values are refused. ``agent`` must
+      be a well-formed address; ``auctionId``/``epochRoot`` well-formed
+      bytes32 hex; ``taskId``/``epochId`` strings.
+    - When ``expected_message`` (the signer's OWN intent, as raw values)
+      is supplied, every message field must match it — numerics by
+      decoded integer value, hex fields case-insensitively, strings
+      exactly. Any difference is refused.
     - When ``summary`` (the summary shown to the signer) is supplied, it
       must equal :func:`bid_signing_summary` for this exact payload; a
       differing deadline (expiry), agent (executor identity), price, or
       any other field is refused, not signed.
     - ``descriptor`` is untrusted display metadata and is never consulted.
+
+    NOTE on ``summary=None`` / no intent supplied: at the library level a
+    well-formed payload with arbitrary-but-valid field values is accepted
+    when neither a summary nor an intent is supplied — the library cannot
+    know the signer's intent on its own. That acceptance is safe ONLY
+    because the wired call site, ``ContractNetEngine.draft_bid`` (B1),
+    always supplies the intent check (``config`` + ``expected_message``
+    built from the exact values it is about to sign for) before calling
+    ``sign_digest``. Library callers that sign MUST do the same.
 
     Returns the canonical summary. Additive gate only: honest payloads
     and their digests are unchanged.
@@ -351,10 +473,60 @@ def validate_bid_summary(
     del descriptor  # untrusted display metadata: never verification input
     if not isinstance(payload, dict):
         raise BidSummaryMismatchError("bid payload must be a dict")
+    extra_top = set(payload) - _BID_TOP_LEVEL_FIELDS
+    missing_top = _BID_TOP_LEVEL_FIELDS - set(payload)
+    if extra_top or missing_top:
+        raise BidSummaryMismatchError(
+            "bid payload top-level field mismatch (hidden/missing fields "
+            f"refused): extra={sorted(extra_top)} missing={sorted(missing_top)}"
+        )
     if payload.get("primaryType") != "Bid":
         raise BidSummaryMismatchError(
             f"unexpected primaryType: {payload.get('primaryType')!r}"
         )
+    if payload.get("types") != _EXPECTED_BID_TYPES:
+        raise BidSummaryMismatchError(
+            "bid payload types do not match the canonical EIP712Domain + "
+            f"Bid type definition: {payload.get('types')!r}"
+        )
+    domain = payload.get("domain")
+    if not isinstance(domain, dict):
+        raise BidSummaryMismatchError("bid payload domain must be a dict")
+    extra_dom = set(domain) - _BID_DOMAIN_FIELDS
+    missing_dom = _BID_DOMAIN_FIELDS - set(domain)
+    if extra_dom or missing_dom:
+        raise BidSummaryMismatchError(
+            "bid domain field mismatch (hidden/missing fields refused): "
+            f"extra={sorted(extra_dom)} missing={sorted(missing_dom)}"
+        )
+    if not isinstance(domain["name"], str) or not isinstance(
+        domain["version"], str
+    ):
+        raise BidSummaryMismatchError(
+            f"bid domain name/version must be strings: {domain!r}"
+        )
+    chain_id = domain["chainId"]
+    if isinstance(chain_id, bool) or not isinstance(chain_id, int) or chain_id <= 0:
+        raise BidSummaryMismatchError(
+            f"bid domain chainId must be a positive int, got {chain_id!r}"
+        )
+    if not _is_address(domain["verifyingContract"]):
+        raise BidSummaryMismatchError(
+            "bid domain verifyingContract is not a well-formed address: "
+            f"{domain['verifyingContract']!r}"
+        )
+    expected_domains = []
+    if config is not None:
+        expected_domains.append(_domain_dict_from(config))
+    if expected_domain is not None:
+        expected_domains.append(_domain_dict_from(expected_domain))
+    for expected in expected_domains:
+        if domain != expected:
+            raise BidSummaryMismatchError(
+                "bid domain differs from the expected signing domain "
+                f"(chainId/name/version/contract mismatch refused): "
+                f"domain={domain!r} expected={expected!r}"
+            )
     message = payload.get("message")
     if not isinstance(message, dict):
         raise BidSummaryMismatchError("bid payload message must be a dict")
@@ -365,6 +537,65 @@ def validate_bid_summary(
             "bid message field mismatch (hidden/missing fields refused): "
             f"extra={sorted(extra)} missing={sorted(missing)}"
         )
+    decoded = {
+        field: _decode_bid_uint256(field, message[field])
+        for field in _BID_NUMERIC_FIELDS
+    }
+    if not _is_address(message["agent"]):
+        raise BidSummaryMismatchError(
+            f"bid message agent is not a well-formed address: "
+            f"{message['agent']!r}"
+        )
+    for field in ("auctionId", "epochRoot"):
+        if not _is_bytes32_hex(message[field]):
+            raise BidSummaryMismatchError(
+                f"bid message {field} is not well-formed bytes32 hex: "
+                f"{message[field]!r}"
+            )
+    for field in ("taskId", "epochId"):
+        if not isinstance(message[field], str):
+            raise BidSummaryMismatchError(
+                f"bid message {field} must be a string: {message[field]!r}"
+            )
+    if expected_message is not None:
+        if not isinstance(expected_message, dict) or set(
+            expected_message
+        ) != set(_BID_MESSAGE_FIELDS):
+            raise BidSummaryMismatchError(
+                "expected_message (signer intent) must carry exactly the "
+                f"nine Bid fields, got {expected_message!r}"
+            )
+        for field in _BID_NUMERIC_FIELDS:
+            expected_value = _decode_bid_uint256(
+                field, expected_message[field]
+            )
+            if decoded[field] != expected_value:
+                raise BidSummaryMismatchError(
+                    f"bid message {field} differs from the signer's intent "
+                    f"(refused, not signed): payload={message[field]!r} "
+                    f"intent={expected_message[field]!r}"
+                )
+        for field in ("agent", "auctionId", "epochRoot"):
+            expected_hex = expected_message[field]
+            if field == "auctionId" and isinstance(expected_hex, str) and (
+                not expected_hex.startswith(("0x", "0X"))
+            ):
+                expected_hex = "0x" + expected_hex
+            if not isinstance(expected_hex, str) or (
+                message[field].lower() != expected_hex.lower()
+            ):
+                raise BidSummaryMismatchError(
+                    f"bid message {field} differs from the signer's intent "
+                    f"(refused, not signed): payload={message[field]!r} "
+                    f"intent={expected_message[field]!r}"
+                )
+        for field in ("taskId", "epochId"):
+            if message[field] != expected_message[field]:
+                raise BidSummaryMismatchError(
+                    f"bid message {field} differs from the signer's intent "
+                    f"(refused, not signed): payload={message[field]!r} "
+                    f"intent={expected_message[field]!r}"
+                )
     canonical = bid_signing_summary(payload)
     if summary is not None and summary != canonical:
         raise BidSummaryMismatchError(

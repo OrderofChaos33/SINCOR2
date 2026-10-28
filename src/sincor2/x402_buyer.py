@@ -407,6 +407,11 @@ def validate_typed_data_before_signing(
       ``validBefore`` == ``expected_valid_before`` when given (else
       ``req.valid_before`` when the challenge set one) (expiry), and
       ``nonce`` == ``req.nonce``;
+    - ``validAfter``/``validBefore`` are ints by type (bool/float/str
+      refused, including equal-valued floats), and when no
+      ``expected_valid_before`` is supplied the validator still checks
+      expiry sanity itself: validBefore positive, greater than
+      validAfter, and in the future (round-2 hardening, finding B3);
     - when ``summary`` is supplied (the summary shown to the signer), it
       must equal the canonical summary generated from this exact
       typed_data — a summary whose expiry or recipient differs from the
@@ -475,6 +480,17 @@ def validate_typed_data_before_signing(
             f"message 'value' (spend) {value!r} != checked "
             f"amount_atomic {req.amount_atomic!r}"
         )
+    # Round-2 hardening (item 301, finding B3): the expiry window fields
+    # must be ints by TYPE, not just by equality — in Python ``False == 0``,
+    # ``0.0 == 0`` and ``float(validBefore) == validBefore``, so an
+    # equality-only check lets equal-valued bools/floats (and strings are
+    # refused here too) through the exported validator.
+    for _field in ("validAfter", "validBefore"):
+        _value = message[_field]
+        if isinstance(_value, bool) or not isinstance(_value, int):
+            raise SigningValidationError(
+                f"message '{_field}' must be an int, got {_value!r}"
+            )
     expected_valid_after = req.valid_after or 0
     if message["validAfter"] != expected_valid_after:
         raise SigningValidationError(
@@ -492,6 +508,24 @@ def validate_typed_data_before_signing(
             f"message 'validBefore' (expiry) {message['validBefore']!r} "
             f"!= checked {expected_expiry!r}"
         )
+    if expected_valid_before is None:
+        # B3: with no caller-supplied expectation the validator must still
+        # check expiry sanity itself instead of skipping the check:
+        # validBefore is a positive int (type-checked above), strictly
+        # after validAfter, and in the future.
+        valid_before = message["validBefore"]
+        valid_after = message["validAfter"]
+        if (
+            valid_before <= 0
+            or valid_before <= valid_after
+            or valid_before <= int(time.time())
+        ):
+            raise SigningValidationError(
+                f"message 'validBefore' (expiry) {valid_before!r} fails "
+                "expiry sanity with no expected_valid_before supplied: "
+                "must be positive, greater than validAfter "
+                f"({valid_after!r}), and in the future"
+            )
     if message["nonce"] != req.nonce:
         raise SigningValidationError(
             f"message 'nonce' {message['nonce']!r} != checked {req.nonce!r}"
