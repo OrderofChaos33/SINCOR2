@@ -24,6 +24,12 @@ The hedge, turned into a permanent CI gate:
   unpacking on the asyncio spawn calls, ``.format_map()`` and unbound
   ``str.format()`` command strings, and tuple / multi-target / walrus /
   conditional-expression name bindings are failures too;
+* round 4 (Builder-B final re-review closure): a binding and its call on
+  the *same* source line (``;``-joined statements) resolve by statement
+  order, ``getattr()`` results bound through tuple unpacking or
+  multi-target chains are tracked like string bindings are, and a
+  ``.format()`` / ``.format_map()`` template that is a name bound to a
+  string is resolved through the scope bindings — all failures too;
 * prompt-injection-shaped values (plausible hostnames / paths / project
   names carrying metacharacters, not just raw ``;``/``|`` probes) fed into
   the MCP tool-arg handling and the MetaMask adapter command builder must
@@ -211,13 +217,15 @@ def _classify_binding(value: ast.AST) -> str:
     return "other"
 
 
-def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
-    """Name -> (kind, lineno) for assignments made directly in ``scope``
-    (module or one function), in source order — a later assignment wins.
-    Plain, tuple-unpacking, multi-target and walrus targets are tracked
-    per name; a name whose value shape is not provable is "other".
-    Nested scopes are not descended into."""
-    bindings: dict[str, tuple[str, int]] = {}
+def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int, int]]:
+    """Name -> (kind, lineno, col_offset) for assignments made directly
+    in ``scope`` (module or one function), in source order — a later
+    assignment wins. Plain, tuple-unpacking, multi-target and walrus
+    targets are tracked per name; a name whose value shape is not
+    provable is "other". Nested scopes are not descended into. The
+    position is the binding statement's (line, column) so a binding and
+    a call joined on one line by ``;`` still order correctly."""
+    bindings: dict[str, tuple[str, int, int]] = {}
 
     def target_names(target: ast.AST) -> list[str]:
         if isinstance(target, ast.Name):
@@ -231,22 +239,24 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
             return names
         return []
 
-    def bind_target(target: ast.AST, value: ast.AST, lineno: int) -> None:
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
         if isinstance(target, ast.Name):
-            bindings[target.id] = (_classify_binding(value), lineno)
+            bindings[target.id] = (_classify_binding(value), pos[0], pos[1])
         elif isinstance(target, ast.Starred):
             for name in target_names(target):
-                bindings[name] = ("other", lineno)
+                bindings[name] = ("other", pos[0], pos[1])
         elif isinstance(target, (ast.Tuple, ast.List)):
             if (
                 isinstance(value, (ast.Tuple, ast.List))
                 and len(value.elts) == len(target.elts)
             ):
                 for elt_target, elt_value in zip(target.elts, value.elts):
-                    bind_target(elt_target, elt_value, lineno)
+                    bind_target(elt_target, elt_value, pos)
             else:
                 for name in target_names(target):
-                    bindings[name] = ("other", lineno)
+                    bindings[name] = ("other", pos[0], pos[1])
 
     def collect(node: ast.AST) -> None:
         for child in ast.iter_child_nodes(node):
@@ -256,7 +266,9 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
                 continue
             if isinstance(child, ast.Assign):
                 for target in child.targets:
-                    bind_target(target, child.value, child.lineno)
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
             elif (
                 isinstance(child, ast.AnnAssign)
                 and isinstance(child.target, ast.Name)
@@ -265,19 +277,25 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
                 bindings[child.target.id] = (
                     _classify_binding(child.value),
                     child.lineno,
+                    child.col_offset,
                 )
             elif (
                 isinstance(child, ast.AugAssign)
                 and isinstance(child.target, ast.Name)
                 and _is_string_expr(child.value)
             ):
-                bindings[child.target.id] = ("string", child.lineno)
+                bindings[child.target.id] = (
+                    "string",
+                    child.lineno,
+                    child.col_offset,
+                )
             elif isinstance(child, ast.NamedExpr) and isinstance(
                 child.target, ast.Name
             ):
                 bindings[child.target.id] = (
                     _classify_binding(child.value),
                     child.lineno,
+                    child.col_offset,
                 )
             collect(child)
 
@@ -287,13 +305,18 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
 
 def _scope_getattr_bindings(
     scope: ast.AST, modules: dict[str, str], funcs: dict[str, str]
-) -> dict[str, tuple[str, int]]:
-    """Name -> (canonical target, lineno) for names bound directly in
-    ``scope`` to a ``getattr(<process module>, '<spawn name>')`` result —
-    the assign-then-call spelling of dynamic dispatch. A later binding
-    of the same name to anything else shadows it with an empty target,
-    the same later-assignment-wins rule as ``_scope_bindings``."""
-    bindings: dict[str, tuple[str, int]] = {}
+) -> dict[str, tuple[str, int, int]]:
+    """Name -> (canonical target, lineno, col_offset) for names bound
+    directly in ``scope`` to a ``getattr(<process module>, '<spawn
+    name>')`` result — the assign-then-call spelling of dynamic
+    dispatch. A later binding of the same name to anything else shadows
+    it with an empty target, the same later-assignment-wins rule as
+    ``_scope_bindings``. Target forms mirror ``_scope_bindings``:
+    plain, tuple-unpacking and multi-target targets are tracked per
+    name, so ``r, s = getattr(subprocess, 'run'), len`` and
+    ``r = q = getattr(subprocess, 'run')`` resolve like the plain
+    spelling."""
+    bindings: dict[str, tuple[str, int, int]] = {}
 
     def target_names(target: ast.AST) -> list[str]:
         if isinstance(target, ast.Name):
@@ -307,12 +330,31 @@ def _scope_getattr_bindings(
             return names
         return []
 
-    def record(name: str, value: ast.AST, lineno: int) -> None:
+    def record(name: str, value: ast.AST, pos: tuple[int, int]) -> None:
         resolved = _getattr_target(value, modules, funcs)
         if resolved is not None and _is_spawn_canon(resolved):
-            bindings[name] = (resolved, lineno)
+            bindings[name] = (resolved, pos[0], pos[1])
         else:
-            bindings[name] = ("", lineno)
+            bindings[name] = ("", pos[0], pos[1])
+
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
+        if isinstance(target, ast.Name):
+            record(target.id, value, pos)
+        elif isinstance(target, ast.Starred):
+            for name in target_names(target):
+                bindings[name] = ("", pos[0], pos[1])
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            if (
+                isinstance(value, (ast.Tuple, ast.List))
+                and len(value.elts) == len(target.elts)
+            ):
+                for elt_target, elt_value in zip(target.elts, value.elts):
+                    bind_target(elt_target, elt_value, pos)
+            else:
+                for name in target_names(target):
+                    bindings[name] = ("", pos[0], pos[1])
 
     def collect(node: ast.AST) -> None:
         for child in ast.iter_child_nodes(node):
@@ -321,28 +363,36 @@ def _scope_getattr_bindings(
             ):
                 continue
             if isinstance(child, ast.Assign):
-                if len(child.targets) == 1 and isinstance(
-                    child.targets[0], ast.Name
-                ):
-                    record(child.targets[0].id, child.value, child.lineno)
-                else:
-                    for target in child.targets:
-                        for name in target_names(target):
-                            bindings[name] = ("", child.lineno)
+                for target in child.targets:
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
             elif (
                 isinstance(child, ast.AnnAssign)
                 and isinstance(child.target, ast.Name)
                 and child.value is not None
             ):
-                record(child.target.id, child.value, child.lineno)
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
             elif isinstance(child, ast.AugAssign) and isinstance(
                 child.target, ast.Name
             ):
-                bindings[child.target.id] = ("", child.lineno)
+                bindings[child.target.id] = (
+                    "",
+                    child.lineno,
+                    child.col_offset,
+                )
             elif isinstance(child, ast.NamedExpr) and isinstance(
                 child.target, ast.Name
             ):
-                record(child.target.id, child.value, child.lineno)
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
             collect(child)
 
     collect(scope)
@@ -464,26 +514,51 @@ def _name_binding_violations(
     """Flag ``subprocess.*(name)`` where ``name`` was bound, earlier in an
     enclosing scope, to a string-shaped command. Conservative: only
     bindings whose shape is provable are tracked, and a later list
-    assignment wins (no flag).
+    assignment wins (no flag). "Earlier" is statement order — (line,
+    column) — so a binding and a call joined on one line by ``;``
+    resolve the same way as the multi-line spelling.
 
     Also resolves names bound to ``getattr(<module>, '<spawn name>')``
     results in an enclosing scope: the ordinary ``shell=`` / ``**`` /
     string-command checks apply at their call sites, exactly as for a
-    direct ``getattr(...)`` call."""
+    direct ``getattr(...)`` call. A ``.format()`` / ``.format_map()``
+    command whose template is a name bound to a string is resolved
+    through the same bindings."""
     found: list[str] = []
 
     def lookup(
-        name: str, scopes: list[dict[str, tuple[str, int]]]
-    ) -> tuple[str, int] | None:
+        name: str, scopes: list[dict[str, tuple[str, int, int]]]
+    ) -> tuple[str, int, int] | None:
         for scope in reversed(scopes):
             if name in scope:
                 return scope[name]
         return None
 
+    def format_template_name(node: ast.AST) -> str | None:
+        """For a ``<tpl>.format(...)`` / ``.format_map(...)`` call, the
+        template's name when the template is a bare name — the receiver,
+        or the first argument of the unbound ``str.format`` spelling.
+        Otherwise None."""
+        if not isinstance(node, ast.Call):
+            return None
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr in ("format", "format_map")
+        ):
+            return None
+        if isinstance(func.value, ast.Name):
+            if func.value.id == "str":
+                if node.args and isinstance(node.args[0], ast.Name):
+                    return node.args[0].id
+                return None
+            return func.value.id
+        return None
+
     def visit(
         node: ast.AST,
-        scopes: list[dict[str, tuple[str, int]]],
-        gscopes: list[dict[str, tuple[str, int]]],
+        scopes: list[dict[str, tuple[str, int, int]]],
+        gscopes: list[dict[str, tuple[str, int, int]]],
     ) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             inner = _scope_bindings(node)
@@ -510,7 +585,8 @@ def _name_binding_violations(
                 if (
                     gbinding is not None
                     and gbinding[0]
-                    and gbinding[1] < node.lineno
+                    and (gbinding[1], gbinding[2])
+                    < (node.lineno, node.col_offset)
                 ):
                     canon = gbinding[0]
                     via_getattr_name = True
@@ -541,7 +617,8 @@ def _name_binding_violations(
                         if (
                             binding is not None
                             and binding[0] == "string"
-                            and binding[1] < node.lineno
+                            and (binding[1], binding[2])
+                            < (node.lineno, node.col_offset)
                         ):
                             found.append(
                                 f"{filename}:{node.lineno}: subprocess.{leaf}() "
@@ -558,6 +635,23 @@ def _name_binding_violations(
                             "called with a string command instead of an "
                             "argv list"
                         )
+                    elif cmd is not None:
+                        template = format_template_name(cmd)
+                        if template is not None:
+                            binding = lookup(template, scopes)
+                            if (
+                                binding is not None
+                                and binding[0] == "string"
+                                and (binding[1], binding[2])
+                                < (node.lineno, node.col_offset)
+                            ):
+                                found.append(
+                                    f"{filename}:{node.lineno}: "
+                                    f"subprocess.{leaf}() called with a "
+                                    "string command built by .format() "
+                                    f"from '{template}', bound to a "
+                                    "string instead of an argv list"
+                                )
         for child in ast.iter_child_nodes(node):
             visit(child, scopes, gscopes)
 
@@ -1001,6 +1095,147 @@ class TestGuardRound3Evasions:
         ],
     )
     def test_extended_binding_conservative_cases_are_clean(self, source):
+        assert violations_from_source(source) == []
+
+
+class TestGuardRound4Evasions:
+    """Builder-B final re-review spellings, closed in round 4. Each
+    synthetic bad pattern below passed the round-3 guard silently —
+    including the first one, which is Builder B's round-2 reproducer A in
+    its exact semicolon form and which the shipped hook printed "guard
+    clean" over end-to-end."""
+
+    # 1. Same-line binding -> call: bindings resolve by statement order
+    # (line, column), not by strict line comparison, in both the
+    # getattr-binding pass and the string-binding pass.
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Builder B's round-2 reproducer A, verbatim, semicolon
+            # included.
+            "import subprocess\n"
+            "r = getattr(subprocess, 'run'); r(cmd, shell=True)\n",
+            # The string-binding pass had the same defect.
+            "import subprocess\ncmd = 'ls ' + name; subprocess.run(cmd)\n",
+            # Same line, string command through the bound getattr name.
+            "import subprocess\n"
+            "r = getattr(subprocess, 'run'); r('ls -la')\n",
+            # Same line inside a function scope.
+            "import subprocess\n"
+            "def f():\n"
+            "    r = getattr(subprocess, 'run'); r(cmd, shell=True)\n",
+            # Same-line walrus string binding.
+            "import subprocess\n(cmd := 'ls ' + name); subprocess.run(cmd)\n",
+            # Same-line rebind where the later (string) binding wins.
+            "import subprocess\n"
+            "cmd = ['ls']; cmd = 'ls ' + name; subprocess.run(cmd)\n",
+        ],
+    )
+    def test_same_line_binding_then_call_is_flagged(self, source):
+        assert violations_from_source(source), f"guard missed: {source!r}"
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Same-line binding to a list, then an argv call.
+            "import subprocess\ncmd = ['ls', name]; subprocess.run(cmd)\n",
+            # Same-line rebind-shadowing: the later list binding wins.
+            "import subprocess\n"
+            "cmd = 'ls ' + name; cmd = ['ls']; subprocess.run(cmd)\n",
+            # Same-line getattr rebind: the later non-getattr binding
+            # shadows the dispatch.
+            "import subprocess\n"
+            "r = getattr(subprocess, 'run'); r = len; r(cmd, shell=True)\n",
+            # A call that precedes its binding on the same line is not
+            # fed by that binding.
+            "import subprocess\nsubprocess.run(cmd); cmd = 'ls ' + name\n",
+        ],
+    )
+    def test_same_line_conservative_cases_are_clean(self, source):
+        assert violations_from_source(source) == []
+
+    # 2. getattr() results bound through tuple unpacking or a
+    # multi-target chain: _scope_getattr_bindings mirrors the target
+    # forms _scope_bindings already handles for string bindings.
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "import subprocess\n"
+            "r, s = getattr(subprocess, 'run'), len\nr(cmd, shell=True)\n",
+            "import subprocess\n"
+            "(r,) = (getattr(subprocess, 'run'),)\nr(cmd, shell=True)\n",
+            "import subprocess\n"
+            "r = q = getattr(subprocess, 'run')\nr(cmd, shell=True)\n",
+            "import subprocess\n"
+            "r = q = getattr(subprocess, 'run')\nq('ls -la')\n",
+        ],
+    )
+    def test_getattr_tuple_and_chain_bindings_are_flagged(self, source):
+        assert violations_from_source(source), f"guard missed: {source!r}"
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Tuple-bound getattr() to a non-spawn function is untouched.
+            "import os\ng, n = getattr(os, 'getcwd'), len\ng()\n",
+            # An unpacking from an unprovable value stays unflagged.
+            "import subprocess\nr, s = build_pair()\nr(cmd, shell=True)\n",
+            # A length-mismatched unpacking cannot be resolved
+            # element-wise: conservative, no flag.
+            "import subprocess\n"
+            "r, s = (getattr(subprocess, 'run'),)\nr(cmd, shell=True)\n",
+        ],
+    )
+    def test_getattr_tuple_and_chain_conservative_cases_are_clean(self, source):
+        assert violations_from_source(source) == []
+
+    # 3. .format() / .format_map() whose template is a name bound to a
+    # string: the receiver is resolved through the scope bindings, the
+    # same way a bare name passed as the command already is.
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "import subprocess\nt = 'ls {}'\nsubprocess.run(t.format(name))\n",
+            "import subprocess\n"
+            "t = 'ls {p}'\nsubprocess.run(t.format_map({'p': name}))\n",
+            # The unbound str.format spelling with a name-bound
+            # template as its first argument.
+            "import subprocess\n"
+            "t = 'ls {}'\nsubprocess.run(str.format(t, name))\n",
+            # Bound and used inside a function scope.
+            "import subprocess\n"
+            "def f():\n"
+            "    t = 'ls {}'\n"
+            "    subprocess.run(t.format(name))\n",
+            # Through a name bound to a getattr() run-family result.
+            "import subprocess\nr = getattr(subprocess, 'run')\n"
+            "t = 'ls {}'\nr(t.format(name))\n",
+        ],
+    )
+    def test_format_receiver_name_bound_string_is_flagged(self, source):
+        assert violations_from_source(source), f"guard missed: {source!r}"
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # A name bound to a non-string used as the format receiver.
+            "import subprocess\n"
+            "t = ['ls {}']\nsubprocess.run(t.format(name))\n",
+            # A name bound to something unprovable as the receiver.
+            "import subprocess\n"
+            "t = build_template()\nsubprocess.run(t.format(name))\n",
+            # Template bound only after the call: not its source.
+            "import subprocess\nsubprocess.run(t.format(name))\nt = 'ls {}'\n",
+            # A format result inside an argv element stays fine even
+            # when the template is a string-bound name.
+            "import subprocess\n"
+            "t = 'ls {}'\nsubprocess.run(['ls', t.format(name)])\n",
+            # Rebound to a list before the call: the list binding wins.
+            "import subprocess\nt = 'ls {}'\nt = ['ls']\n"
+            "subprocess.run(t.format(name))\n",
+        ],
+    )
+    def test_format_receiver_conservative_cases_are_clean(self, source):
         assert violations_from_source(source) == []
 
 

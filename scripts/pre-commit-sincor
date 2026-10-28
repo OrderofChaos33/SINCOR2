@@ -37,6 +37,10 @@ echo "=== SINCOR pre-commit: shell-injection guard (dev-watch 300) ==="
 # run-family result, ** unpacking on the asyncio spawn calls, .format_map()
 # and unbound str.format() command strings, and tuple / multi-target /
 # walrus / conditional name bindings.
+# Round 4: also same-line (';'-joined) binding -> call resolution by
+# statement order, getattr() results bound through tuple unpacking or
+# multi-target chains, and .format()/.format_map() templates that are
+# names bound to a string.
 # AST-based (mirrors tests/pytest/test_devwatch300_argv_only.py): docstrings,
 # comments and string literals that merely mention shell=True do not trip it.
 python3 - <<'PYEOF'
@@ -207,13 +211,15 @@ def _classify_binding(value: ast.AST) -> str:
     return "other"
 
 
-def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
-    """Name -> (kind, lineno) for assignments made directly in ``scope``
-    (module or one function), in source order — a later assignment wins.
-    Plain, tuple-unpacking, multi-target and walrus targets are tracked
-    per name; a name whose value shape is not provable is "other".
-    Nested scopes are not descended into."""
-    bindings: dict[str, tuple[str, int]] = {}
+def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int, int]]:
+    """Name -> (kind, lineno, col_offset) for assignments made directly
+    in ``scope`` (module or one function), in source order — a later
+    assignment wins. Plain, tuple-unpacking, multi-target and walrus
+    targets are tracked per name; a name whose value shape is not
+    provable is "other". Nested scopes are not descended into. The
+    position is the binding statement's (line, column) so a binding and
+    a call joined on one line by ``;`` still order correctly."""
+    bindings: dict[str, tuple[str, int, int]] = {}
 
     def target_names(target: ast.AST) -> list[str]:
         if isinstance(target, ast.Name):
@@ -227,22 +233,24 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
             return names
         return []
 
-    def bind_target(target: ast.AST, value: ast.AST, lineno: int) -> None:
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
         if isinstance(target, ast.Name):
-            bindings[target.id] = (_classify_binding(value), lineno)
+            bindings[target.id] = (_classify_binding(value), pos[0], pos[1])
         elif isinstance(target, ast.Starred):
             for name in target_names(target):
-                bindings[name] = ("other", lineno)
+                bindings[name] = ("other", pos[0], pos[1])
         elif isinstance(target, (ast.Tuple, ast.List)):
             if (
                 isinstance(value, (ast.Tuple, ast.List))
                 and len(value.elts) == len(target.elts)
             ):
                 for elt_target, elt_value in zip(target.elts, value.elts):
-                    bind_target(elt_target, elt_value, lineno)
+                    bind_target(elt_target, elt_value, pos)
             else:
                 for name in target_names(target):
-                    bindings[name] = ("other", lineno)
+                    bindings[name] = ("other", pos[0], pos[1])
 
     def collect(node: ast.AST) -> None:
         for child in ast.iter_child_nodes(node):
@@ -252,7 +260,9 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
                 continue
             if isinstance(child, ast.Assign):
                 for target in child.targets:
-                    bind_target(target, child.value, child.lineno)
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
             elif (
                 isinstance(child, ast.AnnAssign)
                 and isinstance(child.target, ast.Name)
@@ -261,19 +271,25 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
                 bindings[child.target.id] = (
                     _classify_binding(child.value),
                     child.lineno,
+                    child.col_offset,
                 )
             elif (
                 isinstance(child, ast.AugAssign)
                 and isinstance(child.target, ast.Name)
                 and _is_string_expr(child.value)
             ):
-                bindings[child.target.id] = ("string", child.lineno)
+                bindings[child.target.id] = (
+                    "string",
+                    child.lineno,
+                    child.col_offset,
+                )
             elif isinstance(child, ast.NamedExpr) and isinstance(
                 child.target, ast.Name
             ):
                 bindings[child.target.id] = (
                     _classify_binding(child.value),
                     child.lineno,
+                    child.col_offset,
                 )
             collect(child)
 
@@ -283,13 +299,18 @@ def _scope_bindings(scope: ast.AST) -> dict[str, tuple[str, int]]:
 
 def _scope_getattr_bindings(
     scope: ast.AST, modules: dict[str, str], funcs: dict[str, str]
-) -> dict[str, tuple[str, int]]:
-    """Name -> (canonical target, lineno) for names bound directly in
-    ``scope`` to a ``getattr(<process module>, '<spawn name>')`` result —
-    the assign-then-call spelling of dynamic dispatch. A later binding
-    of the same name to anything else shadows it with an empty target,
-    the same later-assignment-wins rule as ``_scope_bindings``."""
-    bindings: dict[str, tuple[str, int]] = {}
+) -> dict[str, tuple[str, int, int]]:
+    """Name -> (canonical target, lineno, col_offset) for names bound
+    directly in ``scope`` to a ``getattr(<process module>, '<spawn
+    name>')`` result — the assign-then-call spelling of dynamic
+    dispatch. A later binding of the same name to anything else shadows
+    it with an empty target, the same later-assignment-wins rule as
+    ``_scope_bindings``. Target forms mirror ``_scope_bindings``:
+    plain, tuple-unpacking and multi-target targets are tracked per
+    name, so ``r, s = getattr(subprocess, 'run'), len`` and
+    ``r = q = getattr(subprocess, 'run')`` resolve like the plain
+    spelling."""
+    bindings: dict[str, tuple[str, int, int]] = {}
 
     def target_names(target: ast.AST) -> list[str]:
         if isinstance(target, ast.Name):
@@ -303,12 +324,31 @@ def _scope_getattr_bindings(
             return names
         return []
 
-    def record(name: str, value: ast.AST, lineno: int) -> None:
+    def record(name: str, value: ast.AST, pos: tuple[int, int]) -> None:
         resolved = _getattr_target(value, modules, funcs)
         if resolved is not None and _is_spawn_canon(resolved):
-            bindings[name] = (resolved, lineno)
+            bindings[name] = (resolved, pos[0], pos[1])
         else:
-            bindings[name] = ("", lineno)
+            bindings[name] = ("", pos[0], pos[1])
+
+    def bind_target(
+        target: ast.AST, value: ast.AST, pos: tuple[int, int]
+    ) -> None:
+        if isinstance(target, ast.Name):
+            record(target.id, value, pos)
+        elif isinstance(target, ast.Starred):
+            for name in target_names(target):
+                bindings[name] = ("", pos[0], pos[1])
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            if (
+                isinstance(value, (ast.Tuple, ast.List))
+                and len(value.elts) == len(target.elts)
+            ):
+                for elt_target, elt_value in zip(target.elts, value.elts):
+                    bind_target(elt_target, elt_value, pos)
+            else:
+                for name in target_names(target):
+                    bindings[name] = ("", pos[0], pos[1])
 
     def collect(node: ast.AST) -> None:
         for child in ast.iter_child_nodes(node):
@@ -317,28 +357,36 @@ def _scope_getattr_bindings(
             ):
                 continue
             if isinstance(child, ast.Assign):
-                if len(child.targets) == 1 and isinstance(
-                    child.targets[0], ast.Name
-                ):
-                    record(child.targets[0].id, child.value, child.lineno)
-                else:
-                    for target in child.targets:
-                        for name in target_names(target):
-                            bindings[name] = ("", child.lineno)
+                for target in child.targets:
+                    bind_target(
+                        target, child.value, (child.lineno, child.col_offset)
+                    )
             elif (
                 isinstance(child, ast.AnnAssign)
                 and isinstance(child.target, ast.Name)
                 and child.value is not None
             ):
-                record(child.target.id, child.value, child.lineno)
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
             elif isinstance(child, ast.AugAssign) and isinstance(
                 child.target, ast.Name
             ):
-                bindings[child.target.id] = ("", child.lineno)
+                bindings[child.target.id] = (
+                    "",
+                    child.lineno,
+                    child.col_offset,
+                )
             elif isinstance(child, ast.NamedExpr) and isinstance(
                 child.target, ast.Name
             ):
-                record(child.target.id, child.value, child.lineno)
+                record(
+                    child.target.id,
+                    child.value,
+                    (child.lineno, child.col_offset),
+                )
             collect(child)
 
     collect(scope)
@@ -460,26 +508,51 @@ def _name_binding_violations(
     """Flag ``subprocess.*(name)`` where ``name`` was bound, earlier in an
     enclosing scope, to a string-shaped command. Conservative: only
     bindings whose shape is provable are tracked, and a later list
-    assignment wins (no flag).
+    assignment wins (no flag). "Earlier" is statement order — (line,
+    column) — so a binding and a call joined on one line by ``;``
+    resolve the same way as the multi-line spelling.
 
     Also resolves names bound to ``getattr(<module>, '<spawn name>')``
     results in an enclosing scope: the ordinary ``shell=`` / ``**`` /
     string-command checks apply at their call sites, exactly as for a
-    direct ``getattr(...)`` call."""
+    direct ``getattr(...)`` call. A ``.format()`` / ``.format_map()``
+    command whose template is a name bound to a string is resolved
+    through the same bindings."""
     found: list[str] = []
 
     def lookup(
-        name: str, scopes: list[dict[str, tuple[str, int]]]
-    ) -> tuple[str, int] | None:
+        name: str, scopes: list[dict[str, tuple[str, int, int]]]
+    ) -> tuple[str, int, int] | None:
         for scope in reversed(scopes):
             if name in scope:
                 return scope[name]
         return None
 
+    def format_template_name(node: ast.AST) -> str | None:
+        """For a ``<tpl>.format(...)`` / ``.format_map(...)`` call, the
+        template's name when the template is a bare name — the receiver,
+        or the first argument of the unbound ``str.format`` spelling.
+        Otherwise None."""
+        if not isinstance(node, ast.Call):
+            return None
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr in ("format", "format_map")
+        ):
+            return None
+        if isinstance(func.value, ast.Name):
+            if func.value.id == "str":
+                if node.args and isinstance(node.args[0], ast.Name):
+                    return node.args[0].id
+                return None
+            return func.value.id
+        return None
+
     def visit(
         node: ast.AST,
-        scopes: list[dict[str, tuple[str, int]]],
-        gscopes: list[dict[str, tuple[str, int]]],
+        scopes: list[dict[str, tuple[str, int, int]]],
+        gscopes: list[dict[str, tuple[str, int, int]]],
     ) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             inner = _scope_bindings(node)
@@ -506,7 +579,8 @@ def _name_binding_violations(
                 if (
                     gbinding is not None
                     and gbinding[0]
-                    and gbinding[1] < node.lineno
+                    and (gbinding[1], gbinding[2])
+                    < (node.lineno, node.col_offset)
                 ):
                     canon = gbinding[0]
                     via_getattr_name = True
@@ -537,7 +611,8 @@ def _name_binding_violations(
                         if (
                             binding is not None
                             and binding[0] == "string"
-                            and binding[1] < node.lineno
+                            and (binding[1], binding[2])
+                            < (node.lineno, node.col_offset)
                         ):
                             found.append(
                                 f"{filename}:{node.lineno}: subprocess.{leaf}() "
@@ -554,6 +629,23 @@ def _name_binding_violations(
                             "called with a string command instead of an "
                             "argv list"
                         )
+                    elif cmd is not None:
+                        template = format_template_name(cmd)
+                        if template is not None:
+                            binding = lookup(template, scopes)
+                            if (
+                                binding is not None
+                                and binding[0] == "string"
+                                and (binding[1], binding[2])
+                                < (node.lineno, node.col_offset)
+                            ):
+                                found.append(
+                                    f"{filename}:{node.lineno}: "
+                                    f"subprocess.{leaf}() called with a "
+                                    "string command built by .format() "
+                                    f"from '{template}', bound to a "
+                                    "string instead of an argv list"
+                                )
         for child in ast.iter_child_nodes(node):
             visit(child, scopes, gscopes)
 
