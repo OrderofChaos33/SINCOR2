@@ -393,8 +393,9 @@ def _pay(client, tx_hash: str) -> dict:
         "payer_wallet": BUYER,
         "signature": sig,
     })
-    assert r.status_code == 402, r.get_json()
-    assert r.get_json()["error"] == "payment_required"
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["ok"] is True
+    assert r.get_json()["ownership_proven"] is True
     r = client.post("/api/x402/verify", json={
         "challenge_id": ch["challenge_id"],
         "tx_hash": tx_hash,

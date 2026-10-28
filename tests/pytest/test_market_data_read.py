@@ -328,8 +328,9 @@ def _pay(client, tx_hash: str) -> dict:
         "payer_wallet": BUYER,
         "signature": sig,
     })
-    assert r.status_code == 402, r.get_json()
-    assert r.get_json()["error"] == "payment_required"
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["ok"] is True
+    assert r.get_json()["ownership_proven"] is True
     r = client.post("/api/x402/verify", json={
         "challenge_id": ch["challenge_id"],
         "tx_hash": tx_hash,
@@ -444,12 +445,27 @@ class TestFullLoop:
 
     def test_access_token_single_use(
             self, client, x402_db, mock_onchain, feed):
+        # This test must exercise the paid path, so exhaust the buyer's
+        # Wave 1 free ration for this resource first (same pattern as
+        # test_wave1_hook_funnel's ration-exhausted case); otherwise the
+        # serves below can be answered from the free ration and the
+        # token's single-use is never exercised. The single-use
+        # assertions below are unchanged.
+        from sincor2.free_ration import daily_ration_tracker
+        while daily_ration_tracker.remaining(BUYER.lower(), RESOURCE) > 0:
+            assert daily_ration_tracker.try_consume(
+                BUYER.lower(), RESOURCE, ip="203.0.113.9")
         paid = _pay(client, _tx("c7"))
         r1 = _serve_paid(client, paid["access_token"], {"pair": "ETH/USD"})
         assert r1.status_code == 200
         r2 = _serve_paid(client, paid["access_token"], {"pair": "ETH/USD"})
         assert r2.status_code != 200
-        assert "price" not in (r2.get_json() or {})
+        # R2 is the item-7a wallet-less 402 offer envelope: its "price"
+        # key is the public list price (an offer term), not served data.
+        # The single-use guarantee is that no SERVED market-data keys
+        # leak in the refused second serve.
+        assert "price_fp" not in (r2.get_json() or {})
+        assert "answer" not in (r2.get_json() or {})
 
     def test_unbound_challenge_cannot_settle(
             self, client, x402_db, mock_onchain, feed):

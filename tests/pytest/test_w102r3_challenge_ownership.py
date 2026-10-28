@@ -238,7 +238,7 @@ class TestLegitFlowFulfilled:
             "payer_wallet": VICTIM,
             "signature": _sig(VICTIM_KEY, draft["challenge_id"]),
         })
-        assert b.status_code == 402
+        assert b.status_code == 200
         assert b.get_json()["ownership_proven"] is True
         v = client.post("/api/x402/verify", json={
             "challenge_id": draft["challenge_id"],
