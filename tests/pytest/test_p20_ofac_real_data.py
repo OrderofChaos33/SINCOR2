@@ -9,6 +9,7 @@ network access (fetch is monkeypatched).
 import json
 import os
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -25,7 +26,10 @@ from sincor2.defi.ofac_sdn import (
     snapshot_path,
 )
 
-# Entries verified present in the vendored snapshot (OFAC SDN, pub 10/21/2026).
+# Entries verified present in the vendored snapshot (OFAC SDN). The
+# snapshot's publication date is always read dynamically (see
+# _vendored_publication_date) so a snapshot refresh never re-stales
+# these tests.
 KNOWN_EVM_ADDR = "0x252a8bd2319d8a555b872990601221b3a2053bce"  # MESRI, Behzad
 KNOWN_TRX_ADDR = "TNiq9AXBp9EjUqhDhrwrfvAA8U3GUQZH81"  # BANK MARKAZI (uid 4632)
 KNOWN_NAME = "BANK MARKAZI JOMHOURI ISLAMI IRAN"
@@ -35,6 +39,19 @@ CLEAN_ADDR = "0x000000000000000000000000000000000000dEaD"
 
 NS = ("https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview"
       "/exports/XML")
+
+
+def _vendored_publication_date() -> str:
+    """The vendored snapshot's own declared publication date, read from
+    the raw file on disk. Provenance assertions compare against this —
+    never a hardcoded date — so the next snapshot refresh stays green."""
+    with open(snapshot_path(), encoding="utf-8") as f:
+        return json.load(f)["publication_date"]
+
+
+def _shift_publication_date(pub_date: str, days: int) -> str:
+    shifted = datetime.strptime(pub_date, "%m/%d/%Y") + timedelta(days=days)
+    return shifted.strftime("%m/%d/%Y")
 
 
 def _fake_sdn_xml(pub_date: str, record_count: int = 15000) -> bytes:
@@ -54,7 +71,7 @@ def test_snapshot_loads_with_provenance():
     assert snap["source"] == "OFAC SDN List"
     assert snap["source_url"] == \
         "https://www.treasury.gov/ofac/downloads/sdn.xml"
-    assert snap["publication_date"] == "10/21/2026"
+    assert snap["publication_date"] == _vendored_publication_date()
     assert snap["entry_count"] == len(snap["entries"]) >= 15000
     assert snap["fetched_at"]  # ISO timestamp present
 
@@ -123,7 +140,7 @@ def test_clean_name_and_address_pass(oracle):
 
 def test_oracle_carries_provenance_not_reference_only(oracle):
     assert oracle.reference_only is False
-    assert oracle.ofac_publication_date == "10/21/2026"
+    assert oracle.ofac_publication_date == _vendored_publication_date()
     assert oracle.ofac_entry_count >= 15000
     assert oracle.ofac_screening_addresses >= 1000
 
@@ -165,7 +182,7 @@ def _patch_fetch(monkeypatch, payload: bytes):
 
 
 def test_updater_idempotent_on_same_publication_date(workdir, monkeypatch):
-    _patch_fetch(monkeypatch, _fake_sdn_xml("10/21/2026"))
+    _patch_fetch(monkeypatch, _fake_sdn_xml(_vendored_publication_date()))
     before = os.path.getmtime(workdir)
     result = ofac_sdn_updater.update_snapshot(out_path=workdir)
     assert result["status"] == "unchanged"
@@ -173,12 +190,14 @@ def test_updater_idempotent_on_same_publication_date(workdir, monkeypatch):
 
 
 def test_updater_installs_new_publication(workdir, monkeypatch):
-    _patch_fetch(monkeypatch, _fake_sdn_xml("10/16/2026"))
+    vendored = _vendored_publication_date()
+    newer = _shift_publication_date(vendored, 1)
+    _patch_fetch(monkeypatch, _fake_sdn_xml(newer))
     result = ofac_sdn_updater.update_snapshot(out_path=workdir)
     assert result["status"] == "updated"
-    assert result["publication_date"] == "10/16/2026"
-    assert result["previous_publication_date"] == "10/21/2026"
-    assert load_snapshot(workdir)["publication_date"] == "10/16/2026"
+    assert result["publication_date"] == newer
+    assert result["previous_publication_date"] == vendored
+    assert load_snapshot(workdir)["publication_date"] == newer
 
 
 def test_updater_rejects_garbage_atomically(workdir, monkeypatch):
