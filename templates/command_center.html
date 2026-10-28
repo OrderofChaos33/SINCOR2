@@ -668,6 +668,7 @@ function updateTopMetrics(snapshot) {
 }
 
 let _sse = null;
+let _sseFailures = 0;
 function connectSSE() {
   if (_sse) _sse.close();
   const cs = document.getElementById('conn-status');
@@ -676,6 +677,7 @@ function connectSSE() {
   _sse = new EventSource('/api/command-center/market-feed');
 
   _sse.addEventListener('open', () => {
+    _sseFailures = 0;
     cs.innerHTML = '<span class="dot dot-green"></span><span class="text-green-400">Connected</span>';
     toast('Market feed connected', 'success');
   });
@@ -693,8 +695,16 @@ function connectSSE() {
   });
 
   _sse.onerror = () => {
-    cs.innerHTML = '<span class="dot dot-red"></span><span class="text-red-400">Disconnected — retrying…</span>';
     _sse.close();
+    _sseFailures += 1;
+    if (_sseFailures >= 3) {
+      /* Honest terminal state: the feed is admin-gated, so a refused
+         connection (e.g. a non-admin session) must not retry forever —
+         say so and stop. */
+      cs.innerHTML = '<span class="dot dot-red"></span><span class="text-red-400">Feed unavailable — connection refused (admin sign-in required)</span>';
+      return;
+    }
+    cs.innerHTML = '<span class="dot dot-red"></span><span class="text-red-400">Disconnected — retrying…</span>';
     setTimeout(connectSSE, 5000);
   };
 }
@@ -822,9 +832,9 @@ async function loadRoster() {
     buildMemorySelect();
   } catch(e) {
     toast('Roster load failed: ' + e.message, 'error');
-    /* Honest state: these APIs are intentionally absent on the production
-       app, so the panels must say "unavailable" — never sit on "Loading…"
-       forever and never show fabricated agents. */
+    /* Honest state: these APIs are admin-gated, so a refused or failed
+       fetch must say "unavailable" — never sit on "Loading…" forever and
+       never show fabricated agents. */
     const msg = '<div class="text-slate-600 text-sm py-8 text-center">Agent roster unavailable — API unreachable.</div>';
     ['roster-identity', 'roster-personality', 'roster-career'].forEach(id => {
       const el = document.getElementById(id);
@@ -994,9 +1004,13 @@ setInterval(refreshKillswitch, 15_000);
   // Initial metric snapshot via polling fallback
   try {
     const r = await fetch('/api/command-center/market-snapshot');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const s = await r.json();
     updateTopMetrics(s);
-  } catch(_) {}
+  } catch(_) {
+    /* Refused/failed: leave the metric tiles on their "—" placeholder —
+       never render an error body as zeros. */
+  }
 })();
 </script>
 </body>

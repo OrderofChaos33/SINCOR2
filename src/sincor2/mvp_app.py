@@ -1024,16 +1024,35 @@ from sincor2.blueprints.vitals import vitals_bp as _vitals_bp
 app.register_blueprint(_vitals_bp)
 
 # /command-center page on production (GET only). Same login gate as the other
-# operator surfaces on this app (see /dashboard, /operator). The full
-# command-center API blueprint is deliberately NOT mounted here: its
-# killswitch POST is unauthenticated upstream and must not be exposed on
-# production until auth lands. The page renders; its live sections show
-# their own "unavailable" states where the APIs are absent.
+# operator surfaces on this app (see /dashboard, /operator). This page route
+# is registered BEFORE the command-center API blueprint below, so it stays
+# the handler for /command-center (the blueprint's own page route is
+# shadowed and never runs on this app).
 @app.get("/command-center")
 def _console_command_center_page():
     if not (_is_admin_session() or session.get("user_email")):
         return redirect("/login?next=/command-center")
     return render_template("command_center.html", nav_active="command")
+
+# Command Center APIs (/api/command-center/*) on production. The blueprint
+# was previously mounted ONLY by the legacy app because its killswitch POST
+# is unauthenticated upstream. It is mounted here behind the same admin gate
+# as every other operator API on this app: _require_admin (admin session /
+# admin token / admin key) runs as a before_request guard over EVERY
+# /api/command-center/* path — reads and writes alike, SSE included.
+# Anonymous and non-admin sessions get 401: no data, and no killswitch or
+# grade state can change. The blueprint declares no auth of its own; do not
+# mount it on any app without an equivalent guard in front of these paths.
+from sincor2.blueprints.command_center import command_center_bp as _command_center_bp
+
+app.register_blueprint(_command_center_bp)
+
+
+@app.before_request
+def _command_center_api_admin_gate():
+    if request.path.startswith("/api/command-center/"):
+        return _require_admin(request)
+    return None
 
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)
