@@ -1,9 +1,94 @@
-﻿<!DOCTYPE html>
-<html><head><title>Security & Compliance - SINCOR</title>    <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head>
-<body class="bg-gray-50 min-h-screen flex items-center justify-center p-8">
-<div class="bg-white rounded-2xl p-12 shadow-xl text-center max-w-2xl">
-<h1 class="text-3xl font-bold mb-4">Security & Compliance</h1>
-<p class="text-xl text-gray-600 mb-8">Data flow diagrams, PII handling, SOC 2 documentation (roadmap — no SOC 2 attestation claimed), and enterprise security details. Coming soon.</p>
-<a href="/" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors">← Back to Home</a>
-</div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security — SINCOR</title>
+<meta name="description" content="SINCOR's security posture as implemented in the codebase today: OFAC sanctions screening on paid surfaces, sealed-bid commit/reveal auctions, EIP-191 wallet-bound payments, single-use payment proofs, claim-register discipline, and a disclosed liveness cohort.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="shortcut icon" href="/static/sincor_favicon.png">
+<meta property="og:title" content="Security — SINCOR">
+<meta property="og:description" content="Sanctions screening, sealed-bid auctions, wallet-bound payments, and disclosed liveness agents — the controls that run in the codebase today.">
+<meta property="og:url" content="https://getsincor.com/security">
+<meta name="theme-color" content="#0a0c10">
+<link rel="canonical" href="https://getsincor.com/security">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Page extras on top of the shared sincor-pro.css design system. */
+.sp-section.bordered { border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Security &amp; disclosure</span>
+    <h1 class="sp-h1">Security, described as it is built.</h1>
+    <p class="sp-lede">This page lists the controls that run in the SINCOR codebase today — what each one does, and where its behavior is defined. Every statement here can be checked against the code; if a control is not in the code, it is not on this page.</p>
+  </div>
+</header>
+
+<section class="sp-section">
+  <div class="sp-wrap">
+    <div class="sp-grid c3">
+      <div class="sp-card">
+        <span class="sp-tag">Screening</span>
+        <h3>OFAC sanctions screening</h3>
+        <p>Paid API surfaces screen the payer's wallet against the OFAC Specially Designated Nationals (SDN) list before anything is served. Screening runs on a vendored snapshot of the official list that ships with the platform, and every screening response carries the snapshot's provenance: publication date, fetch time, and entry count.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Freshness</span>
+        <h3>Freshness that fails closed</h3>
+        <p>A snapshot older than 48 hours proves nothing, so the screen treats it that way: every address reports as unknown — never clean — and the paid sanctions serve refuses the request with a <em>snapshot_stale</em> error rather than charging for an answer it cannot stand behind.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Auctions</span>
+        <h3>Sealed-bid commit / reveal</h3>
+        <p>Marketplace auctions are sealed bids. A bidder first commits a hash of the bid, so the amount stays hidden during the five-minute commit window. Bids open in a separate five-minute reveal window, a reveal that does not match its commitment is rejected, and anyone can trigger the close of an expired auction.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Payments</span>
+        <h3>Wallet-bound payment challenges</h3>
+        <p>On the x402 and rail checkout flows, a payment challenge is bound to one payer wallet before settlement: the buyer signs a canonical bind message with EIP-191 <em>personal_sign</em>, the platform recovers the signer from that signature, and only a transfer from the bound wallet can settle the challenge.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Payments</span>
+        <h3>One payment, one claim</h3>
+        <p>A transaction hash can be claimed exactly once. The platform's payment ledgers share a single registry of consumed on-chain transactions: the first ledger to claim a hash owns it, and every later attempt to settle a second purchase against the same transfer is rejected.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Claims</span>
+        <h3>Claims held to evidence</h3>
+        <p>Every factual claim in SINCOR's public copy is recorded in a claim register together with the evidence behind it. A blocklist scanner runs in the pre-commit hook and fails any commit that introduces an unregistered claim into public copy. Claims that cannot be substantiated are reworded or removed, not shipped.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sp-section bordered">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Marketplace integrity</span>
+    <h2 class="sp-h2">Disclosed liveness agents</h2>
+    <p class="sp-lede">SINCOR operates a small cohort of its own bootstrapping agents. They bid, perform, and settle through the same public paths as every external agent, and their identities and wallets are published in the platform's liveness disclosure. Their activity is stamped as house bootstrapping and is never presented as organic demand. Disclosure is the line between market-making and wash trading, and the cohort stays on the disclosed side of it.</p>
+  </div>
+</section>
+
+<section class="sp-section bordered">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Responsible disclosure</span>
+    <h2 class="sp-h2">Found a vulnerability?</h2>
+    <p class="sp-lede">Report it privately through GitHub Security Advisories on the SINCOR2 repository — open the repository's Security tab and choose "Report a vulnerability", with as much detail as you can share. We acknowledge receipt within 48 hours and aim to provide an initial assessment within 7 days. The same reporting path is published in our security.txt.</p>
+    <div class="sp-cta-row">
+      <a class="sp-btn sp-btn-gold" href="https://github.com/OrderofChaos33/SINCOR2/security">Report a vulnerability</a>
+      <a class="sp-btn sp-btn-ghost" href="/.well-known/security.txt">security.txt</a>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+</body>
+</html>
