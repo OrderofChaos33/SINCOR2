@@ -50,8 +50,15 @@ body {
   max-width: var(--maxw); margin: 0 auto; padding: 14px 24px;
   display: flex; align-items: center; gap: 28px;
 }
-.sp-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-weight: 700; letter-spacing: 0.14em; font-size: 15px; }
-.sp-brand img { height: 30px; width: auto; }
+.sp-brand { display: inline-flex; align-items: center; text-decoration: none; }
+/* The hornet lockup already contains the full "SINCOR Business Solutions"
+   lettering, so the brand anchor is image-only — no adjacent wordmark text. */
+.sp-brand img {
+  height: 58px; width: auto; display: block; background: #000;
+  border-radius: 10px; border: 1px solid rgba(212, 169, 78, 0.4);
+  box-shadow: 0 0 20px rgba(212, 169, 78, 0.22);
+}
+.sp-footer .sp-brand img { height: 86px; }
 .sp-links { display: flex; gap: 22px; margin-left: auto; align-items: center; }
 .sp-links a { color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500; }
 .sp-links a:hover { color: var(--gold-bright); }
@@ -78,6 +85,12 @@ body {
 }
 .sp-btn-gold { background: linear-gradient(135deg, var(--gold-bright), var(--gold)); color: #14100a; box-shadow: 0 8px 24px rgba(212, 169, 78, 0.28); }
 .sp-btn-gold:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(212, 169, 78, 0.38); }
+/* Promoted call-to-action: the one button on a page that must be unmissable. */
+.sp-btn-xl {
+  padding: 19px 40px; font-size: 18px; border-radius: 12px; letter-spacing: 0.01em;
+  box-shadow: 0 14px 42px rgba(212, 169, 78, 0.5), 0 0 0 1px rgba(240, 198, 100, 0.35) inset;
+}
+.sp-btn-xl:hover { box-shadow: 0 18px 52px rgba(212, 169, 78, 0.62), 0 0 0 1px rgba(240, 198, 100, 0.5) inset; }
 .sp-btn-ghost { background: transparent; color: var(--text); border-color: var(--line-strong); }
 .sp-btn-ghost:hover { border-color: var(--gold); color: var(--gold-bright); }
 .sp-btn-sm { padding: 9px 18px; font-size: 13.5px; }
@@ -98,10 +111,14 @@ body {
   margin-bottom: 22px; background: rgba(212, 169, 78, 0.07);
 }
 .sp-h1 {
-  font-family: var(--font-display); font-size: clamp(38px, 5.4vw, 64px); line-height: 1.08;
-  font-weight: 800; letter-spacing: -0.02em; margin: 0 0 20px; max-width: 16ch;
+  font-family: var(--font-display); font-size: clamp(46px, 6.6vw, 82px); line-height: 1.04;
+  font-weight: 800; letter-spacing: -0.025em; margin: 0 0 22px; max-width: 15ch;
 }
-.sp-h1 .gold { color: var(--gold-bright); }
+.sp-h1 .gold {
+  background: linear-gradient(92deg, #f6d57e 0%, var(--gold) 52%, var(--gold-bright) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 26px rgba(240, 198, 100, 0.28));
+}
 .sp-lede { font-size: 19px; color: var(--text-dim); max-width: 62ch; margin: 0 0 34px; }
 .sp-cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
 
