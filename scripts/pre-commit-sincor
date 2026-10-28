@@ -23,6 +23,90 @@ if [ -n "$STAGED" ]; then
 fi
 echo "Secret scan clean."
 
+echo "=== SINCOR pre-commit: shell-injection guard (dev-watch 300) ==="
+# CVE-2026-117567/-117569/-117573: prompt-injection-reachable OS command
+# injection in MCP servers. Every external binary under src/sincor2 must be
+# invoked via argv arrays only — shell=True, create_subprocess_shell,
+# os.system/os.popen, subprocess.getoutput/getstatusoutput, or a string
+# command to subprocess.* anywhere in src/sincor2 is a hard failure.
+# AST-based (mirrors tests/pytest/test_devwatch300_argv_only.py): docstrings,
+# comments and string literals that merely mention shell=True do not trip it.
+python3 - <<'PYEOF'
+import ast, sys
+from pathlib import Path
+
+root = Path("src/sincor2")
+sub_funcs = {"run", "Popen", "call", "check_call", "check_output",
+             "getoutput", "getstatusoutput"}
+always_shell = {"getoutput", "getstatusoutput"}
+violations = []
+
+def dotted(node):
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+def is_str_cmd(node):
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, (str, bytes))
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Mod)):
+        return True
+    return False
+
+for path in sorted(root.rglob("*.py")):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    modules, funcs = {}, {}
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            for a in n.names:
+                modules[a.asname or a.name.split(".")[0]] = a.name
+        elif isinstance(n, ast.ImportFrom) and n.module:
+            for a in n.names:
+                funcs[a.asname or a.name] = f"{n.module}.{a.name}"
+    for n in ast.walk(tree):
+        if not isinstance(n, ast.Call):
+            continue
+        d = dotted(n.func)
+        if d in funcs:
+            canon = funcs[d]
+        else:
+            head, _, rest = d.partition(".")
+            canon = modules.get(head, head) + (f".{rest}" if rest else "")
+        where = f"{path}:{n.lineno}"
+        for kw in n.keywords:
+            if kw.arg == "shell" and isinstance(kw.value, ast.Constant) \
+                    and kw.value.value is True:
+                violations.append(f"{where}: shell=True in call to {canon}")
+        if canon in ("os.system", "os.popen"):
+            violations.append(f"{where}: {canon}() executes through a shell")
+        if "create_subprocess_shell" in canon:
+            violations.append(f"{where}: create_subprocess_shell (shell)")
+        if canon.startswith("subprocess."):
+            leaf = canon.rsplit(".", 1)[-1]
+            if leaf in always_shell:
+                violations.append(f"{where}: subprocess.{leaf}() (shell)")
+            elif leaf in sub_funcs and n.args and is_str_cmd(n.args[0]):
+                violations.append(
+                    f"{where}: subprocess.{leaf}() string command, not argv list")
+
+if violations:
+    print("BLOCKED: shell-injection guard (dev-watch 300) violations:")
+    for v in violations:
+        print(" ", v)
+    print("Use argv arrays only: subprocess.run([binary, arg, ...]).")
+    sys.exit(1)
+print("Shell-injection guard clean.")
+PYEOF
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
 echo "=== SINCOR pre-commit: claim-blocklist scan ==="
 # Block unproven marketing claims in staged public copy (README.md, templates/).
 # See scripts/claim-blocklist.txt for the list and rationale.
