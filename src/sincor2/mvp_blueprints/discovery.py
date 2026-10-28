@@ -40,6 +40,30 @@ def _serve_static_text(relpath: str, mimetype: str) -> Response:
     raise NotFound(f"discovery file not found: {relpath}")
 
 
+def _serve_static_binary(relpath: str, mimetype: str) -> Response:
+    candidates = [
+        os.path.join(current_app.static_folder, relpath),
+        os.path.join(_REPO_STATIC, relpath),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            with open(path, "rb") as fh:
+                body = fh.read()
+            resp = Response(body, mimetype=mimetype)
+            resp.headers["Cache-Control"] = "public, max-age=86400"
+            return resp
+    from werkzeug.exceptions import NotFound
+
+    raise NotFound(f"discovery file not found: {relpath}")
+
+
+@bp.route("/favicon.ico", methods=["GET"])
+def favicon_ico():
+    # Browsers request /favicon.ico at the root regardless of the <link>
+    # tags; serve the hornet brand asset so the request never 404s.
+    return _serve_static_binary("sincor_hornet_logo.jpg", "image/jpeg")
+
+
 @bp.route("/llms.txt", methods=["GET"])
 def llms_txt():
     return _serve_static_text("llms.txt", "text/plain")
