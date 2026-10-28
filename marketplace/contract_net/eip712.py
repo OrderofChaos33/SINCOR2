@@ -36,6 +36,17 @@ BID_TYPE = (
 EMPTY_EPOCH_ROOT = "0x" + "00" * 32
 
 
+class BidSummaryMismatchError(ValueError):
+    """A Bid summary/descriptor differs from the exact payload to be signed.
+
+    Dev-watch item 301: summaries must be generated from the exact bytes
+    being signed; a payload whose auxiliary fields (deadline/expiry,
+    agent/executor identity, price) differ from the summary shown must be
+    refused, not signed. Third-party descriptors are untrusted display
+    metadata, never verification.
+    """
+
+
 class ChainIdMismatchError(ValueError):
     """The signing domain's chainId does not match the chain we're on.
 
@@ -279,6 +290,93 @@ def typed_data_payload(
             "epochRoot": epoch_root,
         },
     }
+
+
+_BID_MESSAGE_FIELDS = frozenset(
+    {
+        "auctionId",
+        "taskId",
+        "agent",
+        "price",
+        "estimatedTokens",
+        "nonce",
+        "deadline",
+        "epochId",
+        "epochRoot",
+    }
+)
+
+
+def bid_signing_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Canonical summary generated FROM the exact Bid payload being signed.
+
+    Copied field-by-field from ``payload`` (from
+    :func:`typed_data_payload`) — never from a separate descriptor.
+    Additive only: does not alter the payload or its digest.
+    """
+    if not isinstance(payload, dict):
+        raise BidSummaryMismatchError("bid payload must be a dict")
+    message = payload.get("message")
+    domain = payload.get("domain")
+    if not isinstance(message, dict) or not isinstance(domain, dict):
+        raise BidSummaryMismatchError(
+            "bid payload must carry dict 'message' and 'domain'"
+        )
+    return {
+        "primaryType": payload.get("primaryType"),
+        "domain": dict(domain),
+        "message": dict(message),
+    }
+
+
+def validate_bid_summary(
+    payload: Dict[str, Any],
+    summary: Optional[Dict[str, Any]] = None,
+    *,
+    descriptor: Any = None,
+) -> Dict[str, Any]:
+    """Refuse a Bid payload whose summary differs from the exact payload.
+
+    - The payload message must carry exactly the nine Bid fields — any
+      extra (hidden) or missing field is refused.
+    - When ``summary`` (the summary shown to the signer) is supplied, it
+      must equal :func:`bid_signing_summary` for this exact payload; a
+      differing deadline (expiry), agent (executor identity), price, or
+      any other field is refused, not signed.
+    - ``descriptor`` is untrusted display metadata and is never consulted.
+
+    Returns the canonical summary. Additive gate only: honest payloads
+    and their digests are unchanged.
+    """
+    del descriptor  # untrusted display metadata: never verification input
+    if not isinstance(payload, dict):
+        raise BidSummaryMismatchError("bid payload must be a dict")
+    if payload.get("primaryType") != "Bid":
+        raise BidSummaryMismatchError(
+            f"unexpected primaryType: {payload.get('primaryType')!r}"
+        )
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        raise BidSummaryMismatchError("bid payload message must be a dict")
+    extra = set(message) - _BID_MESSAGE_FIELDS
+    missing = _BID_MESSAGE_FIELDS - set(message)
+    if extra or missing:
+        raise BidSummaryMismatchError(
+            "bid message field mismatch (hidden/missing fields refused): "
+            f"extra={sorted(extra)} missing={sorted(missing)}"
+        )
+    canonical = bid_signing_summary(payload)
+    if summary is not None and summary != canonical:
+        raise BidSummaryMismatchError(
+            "summary shown to the signer differs from the exact bid "
+            "payload being signed (deadline/agent/price mismatch "
+            f"refused): summary={summary!r} payload_summary={canonical!r}"
+        )
+    return canonical
+
+
+# Backwards-readable alias for call sites phrasing it as a signing gate.
+validate_bid_before_signing = validate_bid_summary
 
 
 def _secret_bytes(secret: str) -> bytes:
