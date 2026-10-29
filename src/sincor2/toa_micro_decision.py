@@ -104,6 +104,10 @@ def validate_payload(
     """
     if not isinstance(payload, dict):
         return None, _err("payload_must_be_object")
+    # D2 item 7b: payer_wallet is a TRANSPORT field for the x402
+    # layer, not a domain field here — strip before the allowlist
+    # check. Other unknown fields still fail closed below.
+    payload = {k: v for k, v in payload.items() if k != "payer_wallet"}
     unknown = set(payload) - _ALLOWED_TOP_KEYS
     if unknown:
         return None, _err("unknown_payload_fields")

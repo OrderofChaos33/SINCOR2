@@ -1,31 +1,18 @@
 """Production route blueprints extracted from mvp_app."""
 from __future__ import annotations
 
-from flask import Flask, redirect, request
+from flask import Flask
 
 
-def _browser_wants_html() -> bool:
-    if request.args.get("format") == "json" or request.args.get("raw") == "1":
-        return False
-    best = request.accept_mimetypes.best_match(["application/json", "text/html"])
-    return best == "text/html"
-
-
-def _install_human_a2a_redirects(app: Flask) -> None:
-    """Homepage one-click cards point at machine JSON. Send browsers to HTML."""
-
-    @app.before_request
-    def _humanize_a2a_clicks():
-        if request.method != "GET" or not _browser_wants_html():
-            return None
-        path = request.path.rstrip("/") or "/"
-        if path == "/docs/a2a":
-            return redirect("/register-agent")
-        if path == "/.well-known/agent-card.json":
-            return redirect("/agent-card")
-        if path == "/api/a2a/quote" and request.args.get("skill_id") == "toa-decision":
-            return redirect("/toa")
-        return None
+# NOTE (machine surfaces, 2026-10-28): there used to be a before_request
+# hook here that redirected browser-Accept GETs away from machine URLs
+# (/.well-known/agent-card.json -> /agent-card, /api/a2a/quote?skill_id=
+# toa-decision -> /toa, /docs/a2a -> /register-agent). It was removed on
+# purpose: those URLs are machine surfaces whose audience is agents and
+# integrators, so they must serve JSON regardless of Accept headers.
+# The human explainers live at /agent-card, /toa and /register-agent and
+# link TO the machine URLs; the machine URLs never bounce back to HTML.
+# Pinned by tests/pytest/test_machine_surfaces.py.
 
 
 def register_mvp_blueprints(app: Flask) -> None:
@@ -107,5 +94,3 @@ def register_mvp_blueprints(app: Flask) -> None:
         )
     except Exception as exc:  # pragma: no cover
         print(f"Treasury metrics route not available: {exc}")
-
-    _install_human_a2a_redirects(app)

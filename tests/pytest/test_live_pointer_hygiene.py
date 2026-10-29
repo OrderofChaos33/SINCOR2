@@ -200,9 +200,25 @@ def test_tokenlist_is_canonical() -> None:
         (ROOT / "static" / "tokenlists" / "sincor.tokenlist.json").read_text(encoding="utf-8")
     )
     tokens = listing["tokens"]
-    assert len(tokens) == 1
-    assert tokens[0]["address"].lower() == SINC_TOKEN.lower()
-    assert tokens[0]["decimals"] == 8
+    # Founder directive 2026-10-28 (site-audit fix wave): the tokenlist
+    # carries BOTH platform tokens — SINC and AXM — each at its canonical
+    # TOKEN_CANON.json address/decimals on Base, and nothing else.
+    assert len(tokens) == 2
+    by_symbol = {t["symbol"]: t for t in tokens}
+    assert set(by_symbol) == {"SINC", "AXM"}
+    sinc = by_symbol["SINC"]
+    assert sinc["address"] == "0xe1D836087F6573b665d25CE088793E916D7892f8"
+    assert sinc["address"].lower() == SINC_TOKEN.lower()
+    assert sinc["decimals"] == 8
+    assert sinc["chainId"] == 8453
+    axm = by_symbol["AXM"]
+    assert axm["address"] == "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a"
+    assert axm["address"].lower() == AXIOM_TOKEN.lower()
+    assert axm["decimals"] == 18
+    assert axm["chainId"] == 8453
+    blob = json.dumps(listing)
+    assert RETIRED_SINC.lower() not in blob.lower()
+    assert RETIRED_AXM.lower() not in blob.lower()
 
 
 def test_metadata_route_relocks_address_after_json_merge() -> None:
