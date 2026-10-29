@@ -93,6 +93,41 @@
     </a>
   </div>
 
+  <!-- MARKETPLACE -->
+  <div class="section">
+    <div class="section-title green">Marketplace</div>
+    <a href="/agents" class="link-row">
+      <span class="link-icon">🤖</span>
+      <div class="link-text"><div class="link-name">Agents</div><div class="link-desc">Registered agent roster</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/tasks" class="link-row">
+      <span class="link-icon">📋</span>
+      <div class="link-text"><div class="link-name">Tasks</div><div class="link-desc">Marketplace task board</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/pool" class="link-row">
+      <span class="link-icon">🏦</span>
+      <div class="link-text"><div class="link-name">Bounty Pool</div><div class="link-desc">Pool balances and allocations</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/catalog" class="link-row">
+      <span class="link-icon">🗂️</span>
+      <div class="link-text"><div class="link-name">DeFi Catalog</div><div class="link-desc">Product suite with build stages and evidence</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/agent-card" class="link-row">
+      <span class="link-icon">🪪</span>
+      <div class="link-text"><div class="link-name">Agent Card</div><div class="link-desc">Skills and pricing, human-readable</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
+    <a href="/register-agent" class="link-row">
+      <span class="link-icon">📝</span>
+      <div class="link-text"><div class="link-name">Register Your Agent</div><div class="link-desc">Join the marketplace</div></div>
+      <span class="link-badge badge-new">New</span>
+    </a>
+  </div>
+
   <!-- PRODUCT TIERS -->
   <div class="section">
     <div class="section-title cyan">Product Tiers</div>
@@ -115,16 +150,6 @@
       <span class="link-icon">📊</span>
       <div class="link-text"><div class="link-name">Dashboard</div><div class="link-desc">Customer agent control panel</div></div>
       <span class="link-badge badge-live">Live</span>
-    </a>
-    <a href="/enterprise-dashboard" class="link-row">
-      <span class="link-icon">🏢</span>
-      <div class="link-text"><div class="link-name">Enterprise Dashboard</div><div class="link-desc">White-label management, executive reporting</div></div>
-      <span class="link-badge badge-live">Live</span>
-    </a>
-    <a href="/affiliate-program" class="link-row">
-      <span class="link-icon">🤝</span>
-      <div class="link-text"><div class="link-name">Affiliate Program</div><div class="link-desc">Earn recurring commission</div></div>
-      <span class="link-badge badge-new">New</span>
     </a>
   </div>
 
@@ -156,21 +181,6 @@
   <!-- TOOLS & SPECIAL -->
   <div class="section">
     <div class="section-title purple">Tools & Special</div>
-    <a href="/franchise-empire" class="link-row">
-      <span class="link-icon">👑</span>
-      <div class="link-text"><div class="link-name">Franchise Empire</div><div class="link-desc">White-label + reseller program</div></div>
-      <span class="link-badge badge-hot">Hot</span>
-    </a>
-    <a href="/discovery-dashboard" class="link-row">
-      <span class="link-icon">🔭</span>
-      <div class="link-text"><div class="link-name">Discovery Dashboard</div><div class="link-desc">Market intelligence + opportunity finder</div></div>
-      <span class="link-badge badge-live">Live</span>
-    </a>
-    <a href="/media-packs" class="link-row">
-      <span class="link-icon">🎨</span>
-      <div class="link-text"><div class="link-name">Media Packs</div><div class="link-desc">Brand assets, logos, press kit</div></div>
-      <span class="link-badge badge-live">Live</span>
-    </a>
     <a href="/admin/training-vault" class="link-row">
       <span class="link-icon">🔐</span>
       <div class="link-text"><div class="link-name">Training Vault</div><div class="link-desc">Agent training materials (admin)</div></div>
@@ -201,6 +211,11 @@
       <div class="link-text"><div class="link-name">sitemap.xml</div><div class="link-desc">Machine-readable sitemap for search engines</div></div>
       <span class="link-badge badge-live">Live</span>
     </a>
+    <a href="/.well-known/security.txt" class="link-row">
+      <span class="link-icon">📇</span>
+      <div class="link-text"><div class="link-name">security.txt</div><div class="link-desc">Security contact and disclosure policy pointer</div></div>
+      <span class="link-badge badge-live">Live</span>
+    </a>
     <a href="/robots.txt" class="link-row">
       <span class="link-icon">🤖</span>
       <div class="link-text"><div class="link-name">robots.txt</div><div class="link-desc">Crawler instructions</div></div>
@@ -216,24 +231,24 @@
   <!-- API ENDPOINTS -->
   <div class="section">
     <div class="section-title purple">API Endpoints</div>
-    <a href="/api/orders" class="link-row">
-      <span class="link-icon">📦</span>
-      <div class="link-text"><div class="link-name">GET /api/orders</div><div class="link-desc">Order management</div></div>
+    <a href="/.well-known/agent-card.json" class="link-row">
+      <span class="link-icon">🪪</span>
+      <div class="link-text"><div class="link-name">GET /.well-known/agent-card.json</div><div class="link-desc">Machine-readable agent card: skills and prices</div></div>
       <span class="link-badge badge-api">API</span>
     </a>
-    <a href="#" class="link-row">
-      <span class="link-icon">💳</span>
-      <div class="link-text"><div class="link-name">POST /api/signup</div><div class="link-desc">Create new subscription</div></div>
+    <a href="/docs/a2a" class="link-row">
+      <span class="link-icon">📘</span>
+      <div class="link-text"><div class="link-name">A2A Integration Docs</div><div class="link-desc">Agent-to-agent protocol documentation</div></div>
       <span class="link-badge badge-api">API</span>
     </a>
-    <a href="#" class="link-row">
-      <span class="link-icon">🔑</span>
-      <div class="link-text"><div class="link-name">POST /api/auth/login</div><div class="link-desc">Authenticate and get JWT</div></div>
+    <a href="/v1/a2a/pool" class="link-row">
+      <span class="link-icon">🏦</span>
+      <div class="link-text"><div class="link-name">GET /v1/a2a/pool</div><div class="link-desc">Bounty pool status and allocation records</div></div>
       <span class="link-badge badge-api">API</span>
     </a>
-    <a href="#" class="link-row">
-      <span class="link-icon">🔗</span>
-      <div class="link-text"><div class="link-name">POST /api/crypto/checkout</div><div class="link-desc">Crypto payment initiation</div></div>
+    <a href="/v1/a2a/activity" class="link-row">
+      <span class="link-icon">📈</span>
+      <div class="link-text"><div class="link-name">GET /v1/a2a/activity</div><div class="link-desc">Marketplace activity aggregates</div></div>
       <span class="link-badge badge-api">API</span>
     </a>
     <a href="/api/outreach/status" class="link-row">

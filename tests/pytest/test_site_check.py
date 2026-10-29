@@ -296,6 +296,35 @@ class TestSSRFGuard:
         assert err[0] == 400
         assert err[1]["error"] == "invalid_target_host"
 
+    @pytest.mark.parametrize("dotted_url,plain_url", [
+        # CVE-2026-115751 class: a trailing root dot must not evade
+        # the blocked-target checks — `localhost.` names the same
+        # host as `localhost` once the dot is stripped, and the same
+        # holds for IP literals and local-suffix names.
+        ("http://localhost./", "http://localhost"),
+        ("http://127.0.0.1./", "http://127.0.0.1"),
+        ("http://192.168.1.1./router", "http://192.168.1.1/router"),
+        ("http://something.local./", "http://something.local"),
+    ])
+    def test_trailing_dot_blocked_targets_400_before_any_fetch(
+            self, dotted_url, plain_url):
+        # Dotted and plain spellings are rejected identically: same
+        # status, same error, and neither reaches the fetch seam.
+        for url in (dotted_url, plain_url):
+            calls = []
+
+            def _fetch(u):
+                calls.append(u)
+                return GOOD_PAGE
+
+            status, body = sc.serve_site_check({"url": url},
+                                               fetch=_fetch)
+            assert status == 400, (url, body)
+            assert body["ok"] is False
+            assert body["error"] == "invalid_target_host"
+            assert "verdict" not in body
+            assert calls == []
+
 
 class _FakeResponse:
     def __init__(self, status_code, url, text="", headers=None):
@@ -335,6 +364,38 @@ class TestSSRFRedirects:
         assert "verdict" not in body
         # The transport was invoked exactly once — with the public
         # URL — and never with the forbidden redirect target.
+        assert calls == ["https://shop.example.com/"]
+
+    @pytest.mark.parametrize("location", [
+        # No port on the IP case: rejection must come from the
+        # trailing-dot normalization itself, not the port rule.
+        "http://127.0.0.1./health",
+        "http://localhost./admin",
+    ])
+    def test_redirect_to_trailing_dot_target_rejected_before_connect(
+            self, monkeypatch, location):
+        # Redirect hops are re-validated with the same trailing-dot
+        # normalization as the initial target: a Location whose host
+        # is a blocked target spelled with a root dot is rejected
+        # before any connection to it.
+        calls = []
+
+        def _fake_get(url, **kwargs):
+            calls.append(url)
+            # Redirects must be handled manually, never auto-followed.
+            assert kwargs.get("allow_redirects") is False
+            return _FakeResponse(302, url, headers={
+                "Location": location})
+
+        monkeypatch.setattr("requests.get", _fake_get)
+        status, body = sc.serve_site_check(
+            {"url": "https://shop.example.com/"})
+        assert status == 400, body
+        assert body["ok"] is False
+        assert body["error"] == "invalid_target_host"
+        assert "verdict" not in body
+        # The transport was invoked exactly once — with the public
+        # URL — and never with the dotted redirect target.
         assert calls == ["https://shop.example.com/"]
 
     def test_redirect_to_public_target_is_followed(self, monkeypatch):
@@ -455,8 +516,9 @@ def _pay(client, tx_hash: str) -> dict:
         "payer_wallet": BUYER,
         "signature": sig,
     })
-    assert r.status_code == 402, r.get_json()
-    assert r.get_json()["error"] == "payment_required"
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["ok"] is True
+    assert r.get_json()["ownership_proven"] is True
     r = client.post("/api/x402/verify", json={
         "challenge_id": ch["challenge_id"],
         "tx_hash": tx_hash,

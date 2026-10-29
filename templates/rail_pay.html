@@ -32,6 +32,15 @@
   #tokenBox input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 12px;
                     background: #0b0e14; color: #cfd6e4; border: 1px solid #2c364c;
                     border-radius: 8px; }
+  .capture label { display: block; font-size: 13px; color: #9aa4b8; margin-top: 10px; }
+  .capture input { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 4px;
+                   font-size: 14px; background: #0b0e14; color: #cfd6e4;
+                   border: 1px solid #2c364c; border-radius: 8px; }
+  #fulfillmentLinks a { display: block; margin-top: 10px; padding: 13px; text-align: center;
+                        font-size: 15px; font-weight: 600; border-radius: 8px;
+                        background: #1d7a3d; color: #fff; text-decoration: none; }
+  #fulfillmentLinks a.secondary { background: #1d2433; color: #cfd6e4;
+                                  border: 1px solid #2c364c; }
   .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #2c364c;
              border-top-color: #2f6df6; border-radius: 50%; animation: spin 1s linear infinite;
              vertical-align: -2px; margin-right: 6px; }
@@ -65,6 +74,23 @@
       <button id="btnBind" type="button" disabled>Sign ownership message</button>
     </div>
 
+    <div class="step capture" id="buyerDetailsStep">
+      <h2>Buyer details (optional)</h2>
+      <div class="sub">Used for delivery and attribution only &mdash; email gets your download / intake link.</div>
+      <label>Email
+        <input id="buyerEmail" name="buyer_email" type="email" autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label>Business name
+        <input id="businessName" name="business_name" type="text" autocomplete="organization" placeholder="Acme Dental">
+      </label>
+      <label>Niche
+        <input id="buyerNiche" name="niche" type="text" placeholder="dental">
+      </label>
+      <label>Phone
+        <input id="buyerPhone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567">
+      </label>
+    </div>
+
     <div class="step">
       <h2><span id="payStepNum">2</span> &middot; Pay</h2>
       <button id="btnPay" type="button" disabled>Pay with USDC</button>
@@ -74,6 +100,12 @@
     <div id="tokenBox" hidden>
       <h2>Access token</h2>
       <input id="tokenField" readonly aria-label="access token">
+    </div>
+
+    <div id="fulfillmentLinks" hidden>
+      <h2>Your fulfillment</h2>
+      <a id="downloadLink" href="#" hidden>Download your pack &rarr;</a>
+      <a id="intakeLink" href="#" class="secondary" hidden>Complete your intake &rarr;</a>
     </div>
   </div>
 
@@ -373,7 +405,11 @@
       var settle = await postJSON("/rail/settle", {
         challenge_id: challenge.challenge_id,
         tx_hash: txHash,
-        payer_wallet: wallet
+        payer_wallet: wallet,
+        buyer_email: $("buyerEmail").value.trim(),
+        business_name: $("businessName").value.trim(),
+        niche: $("buyerNiche").value.trim(),
+        phone: $("buyerPhone").value.trim()
       });
       if (settle && settle.ok) {
         setMsg("Payment complete.", "ok");
@@ -383,6 +419,24 @@
           $("tokenBox").hidden = false;
           $("tokenField").value = settle.access_token;
         }
+        // Completion-screen fulfillment links, from the settle
+        // response's fulfillment object (digital packs carry a
+        // token-gated download_url; B2B packs carry an intake_url).
+        var fulfillment = settle.fulfillment || {};
+        var hasLink = false;
+        if (fulfillment.download_url) {
+          var dl = $("downloadLink");
+          dl.href = fulfillment.download_url;
+          dl.hidden = false;
+          hasLink = true;
+        }
+        if (fulfillment.intake_url) {
+          var il = $("intakeLink");
+          il.href = fulfillment.intake_url;
+          il.hidden = false;
+          hasLink = true;
+        }
+        if (hasLink) $("fulfillmentLinks").hidden = false;
       } else {
         throw new Error((settle && settle.error) || "settle rejected the payment");
       }

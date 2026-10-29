@@ -281,14 +281,16 @@ class TestChallengeCreationRequiresWallet:
     def test_challenge_endpoint_rejects_missing_wallet(
             self, client, x402_db, mock_onchain):
         r = client.get("/x402/agent_task")
-        assert r.status_code == 400
-        assert r.get_json()["error"] == "payer_wallet_required"
+        assert r.status_code == 402
+        assert r.get_json()["error"] == "payment_required"
+        assert "challenge_id" not in r.get_json()
 
     def test_challenge_endpoint_rejects_malformed_wallet(
             self, client, x402_db, mock_onchain):
         r = client.get("/x402/agent_task?wallet=not-a-wallet")
-        assert r.status_code == 400
-        assert r.get_json()["error"] == "payer_wallet_required"
+        assert r.status_code == 402
+        assert r.get_json()["error"] == "payment_required"
+        assert "challenge_id" not in r.get_json()
 
     def test_challenge_endpoint_mints_unbound_draft(
             self, client, x402_db, mock_onchain):
@@ -313,9 +315,10 @@ class TestChallengeCreationRequiresWallet:
         payable challenge redeemable at /api/x402/verify."""
         draft = client.get(f"/x402/agent_task?wallet={VICTIM}").get_json()
         r = _bind_via_route(client, draft["challenge_id"], VICTIM_KEY)
-        assert r.status_code == 402
+        assert r.status_code == 200
         body = r.get_json()
-        assert body["error"] == "payment_required"
+        assert body["ok"] is True
+        assert body["bound"] is True
         assert body["ownership_proven"] is True
         assert body["payer_wallet"] == VICTIM.lower()
         with x402._conn() as conn:
@@ -361,8 +364,9 @@ class TestChallengeCreationRequiresWallet:
     def test_paid_fallback_rejects_missing_wallet(
             self, client, x402_db, mock_onchain):
         r = client.get("/api/paid/agent_task")
-        assert r.status_code == 400
-        assert r.get_json()["error"] == "payer_wallet_required"
+        assert r.status_code == 402
+        assert r.get_json()["error"] == "payment_required"
+        assert "challenge_id" not in r.get_json()
 
     def test_paid_fallback_mints_draft_then_binds(
             self, client, x402_db, mock_onchain):
@@ -379,7 +383,7 @@ class TestChallengeCreationRequiresWallet:
         assert row["payer_wallet"] == ""
         # Bind through the route, then redeem through the route.
         b = _bind_via_route(client, body["challenge_id"], VICTIM_KEY)
-        assert b.status_code == 402
+        assert b.status_code == 200
         assert b.get_json()["ownership_proven"] is True
         ok = _verify(client, body["challenge_id"], _tx("cc"),
                      payer_wallet=VICTIM)

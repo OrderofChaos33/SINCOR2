@@ -452,6 +452,12 @@ def validate_payload(
     and ``business_name`` (may be ""). At least one is required."""
     if not isinstance(payload, dict):
         return None, _err("payload_must_be_object")
+    # D2 item 7b: payer_wallet is a TRANSPORT field for the x402
+    # layer, not a domain field here — strip before the allowlist
+    # check. Other unknown fields still fail closed below. NOTE:
+    # this is the ONLY change in this module; the SSRF guard above
+    # is untouched.
+    payload = {k: v for k, v in payload.items() if k != "payer_wallet"}
     if set(payload) - _ALLOWED_TOP_KEYS:
         return None, _err("unknown_payload_fields")
 

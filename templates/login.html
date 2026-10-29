@@ -21,6 +21,8 @@
       background:rgba(0,0,0,.2); color:var(--text); font-size:15px; margin-bottom:16px;
     }
     input:focus { outline:none; border-color:var(--cyan); }
+    input:disabled { opacity:.45; cursor:not-allowed; }
+    .btn:disabled { opacity:.45; cursor:not-allowed; filter:none; }
     .btn { width:100%; padding:14px; border:none; border-radius:10px; background:linear-gradient(135deg,var(--purple),#6d28d9); color:#fff; font-weight:700; font-size:15px; cursor:pointer; min-height:48px; }
     .btn:hover { filter:brightness(1.08); }
     .oauth { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
@@ -42,7 +44,7 @@
       <a href="/signup">Sign up</a>
     </div>
     <h1>Welcome back</h1>
-    <p class="sub">Sign in with your email or username.</p>
+    <p class="sub">Sign in to your SINCOR account.</p>
 
     {% if error or oauth_error %}
     <div class="msg err">{{ oauth_error or error }}</div>
@@ -51,11 +53,11 @@
     <form method="POST" action="/login" autocomplete="on">
       <input type="hidden" name="next" value="{{ next_url or '' }}">
       <label for="identifier">Email or username</label>
-      <input type="text" id="identifier" name="identifier" required placeholder="you@company.com or username" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ identifier or '' }}">
+      <input type="text" id="identifier" name="identifier" required disabled placeholder="you@company.com or username" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ identifier or '' }}">
       <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Password" autocomplete="current-password">
-      <p class="hint">Customer password sign-in is currently disabled — please use Google/GitHub sign-in below.</p>
-      <button type="submit" class="btn">Sign in</button>
+      <input type="password" id="password" name="password" disabled placeholder="Password" autocomplete="current-password">
+      <p class="hint">Customer password sign-in is currently disabled — please use {% if oauth_google and oauth_github %}Google or GitHub sign-in below{% elif oauth_google %}Google sign-in below{% elif oauth_github %}GitHub sign-in below{% else %}OAuth sign-in or contact support{% endif %}.</p>
+      <button type="submit" class="btn" disabled aria-disabled="true">Sign in</button>
     </form>
 
     {% if oauth_google or oauth_github %}

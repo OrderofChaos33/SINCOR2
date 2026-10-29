@@ -200,8 +200,9 @@ def paid_client():
 def _signed_bind(client, challenge_id: str, resource_id: str = RESOURCE):
     """POST /api/x402/challenge-bind with a fresh low-s EIP-191 signature.
 
-    Returns (response, wallet). A valid bind returns 402/payment_required —
-    that IS the paid surface under probe for this route.
+    Returns (response, wallet). A valid bind returns 200 with
+    ok/ownership_proven and no error key (D2 item 2 changed the bind
+    success contract from the old 402/payment_required envelope).
     """
     from eth_account import Account
     from eth_account.messages import encode_defunct
@@ -256,7 +257,7 @@ def _fetch_402(case: str, client, monkeypatch):
         ch = x402.create_challenge(RESOURCE)
         assert ch.get("challenge_id"), ch
         bind_resp, wallet = _signed_bind(client, ch["challenge_id"])
-        assert bind_resp.status_code == 402, bind_resp.get_json(silent=True)
+        assert bind_resp.status_code == 200, bind_resp.get_json(silent=True)
         return client.post(
             "/api/x402/verify",
             json={
@@ -290,6 +291,17 @@ UNDECLARED = [
 _CHALLENGE_402_ERRORS = {"ownership_proof_required", "payment_required", "tx_pending"}
 
 
+def _assert_bind_success_shape(resp, case):
+    """bind_post under the D2 item-2 contract: a valid bind now succeeds
+    instead of returning the old 402 payment_required envelope — 200,
+    ok + ownership_proven true, and no error key."""
+    assert resp.status_code == 200, (case, resp.status_code)
+    body = resp.get_json(silent=True) or {}
+    assert body.get("ok") is True, body
+    assert body.get("ownership_proven") is True, body
+    assert "error" not in body, body
+
+
 # ---------------------------------------------------------------------------
 # The paid surface itself: every declared method must 402 when unpaid
 # ---------------------------------------------------------------------------
@@ -299,6 +311,9 @@ class TestPaidSurface402Status:
     def test_unpaid_request_yields_402_challenge(self, paid_client, x402_db,
                                                 monkeypatch, case):
         resp = _fetch_402(case, paid_client, monkeypatch)
+        if case == "bind_post":
+            _assert_bind_success_shape(resp, case)
+            return
         assert resp.status_code == 402, (
             case, resp.status_code, resp.get_data(as_text=True)[:300])
         body = resp.get_json(silent=True) or {}
@@ -317,6 +332,9 @@ class TestChecklistRules:
     @pytest.mark.parametrize("case", CASES)
     def test_rule1_no_store_on_402(self, paid_client, x402_db, monkeypatch, case):
         resp = _fetch_402(case, paid_client, monkeypatch)
+        if case == "bind_post":
+            _assert_bind_success_shape(resp, case)
+            return
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule1_no_store(resp)
 
@@ -324,6 +342,9 @@ class TestChecklistRules:
     def test_rule2_header_body_consistency(self, paid_client, x402_db,
                                           monkeypatch, case):
         resp = _fetch_402(case, paid_client, monkeypatch)
+        if case == "bind_post":
+            _assert_bind_success_shape(resp, case)
+            return
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule2_header_body_consistent(resp)
 
@@ -331,6 +352,9 @@ class TestChecklistRules:
     def test_rule3a_cors_exposes_header(self, paid_client, x402_db,
                                         monkeypatch, case):
         resp = _fetch_402(case, paid_client, monkeypatch)
+        if case == "bind_post":
+            _assert_bind_success_shape(resp, case)
+            return
         assert resp.status_code == 402, (case, resp.status_code)
         check_rule3a_cors_exposes_payment_required(resp)
 

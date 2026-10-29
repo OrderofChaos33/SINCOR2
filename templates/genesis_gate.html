@@ -27,23 +27,31 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { min-height: 100%; background: var(--bg); color: var(--fg); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
     body { overflow-x: hidden; }
-    .site-layer {
-      position: fixed; inset: -4%; width: 108%; height: 108%;
-      pointer-events: none; z-index: 0; overflow: hidden;
-      filter: blur(1px) saturate(0.85);
-      animation: drift 48s ease-in-out infinite alternate;
+    /* Deliberate background system (v2): layered gold glow + hairline grid.
+       No blurred page ghost, no embedded copy of the inner site. */
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(900px 480px at 18% -6%, rgba(212,169,78,0.15), transparent 60%),
+        radial-gradient(800px 460px at 88% 10%, rgba(212,169,78,0.07), transparent 62%),
+        radial-gradient(1000px 620px at 50% 115%, rgba(139,92,246,0.09), transparent 65%);
     }
-    .site-layer iframe { width: 100%; height: 100%; border: 0; transform: scale(1.02); transform-origin: top center; }
-    @keyframes drift { from { transform: translate3d(-1.2%, -0.6%, 0); } to { transform: translate3d(1.2%, 0.8%, 0); } }
-    canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; opacity: 0.55; }
-    .veil { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: rgba(5,8,20,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    body::after {
+      content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        linear-gradient(rgba(255,255,255,0.032) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.032) 1px, transparent 1px);
+      background-size: 56px 56px;
+      -webkit-mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, #000 25%, transparent 76%);
+      mask-image: radial-gradient(ellipse 85% 65% at 50% 0%, #000 25%, transparent 76%);
+    }
     .vignette { position: fixed; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at center, rgba(5,8,20,0.7) 0%, rgba(5,8,20,0.38) 52%, rgba(5,8,20,0.8) 100%); }
     .shell { position: relative; z-index: 10; min-height: 100dvh; max-width: 1120px; margin: 0 auto; padding: 24px 20px 28px; display: flex; flex-direction: column; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
     /* The lockup image carries the full "SINCOR Business Solutions" lettering;
        it is shown alone, large enough to read — never with a duplicate text wordmark. */
-    .brand img.brand-logo { width: auto; height: 96px; border-radius: 12px; border: 1px solid rgba(212,169,78,0.55); object-fit: contain; background: #000; box-shadow: 0 0 28px rgba(212,169,78,0.35); }
+    .brand img.brand-logo { width: auto; height: 88px; border-radius: 10px; border: 1px solid rgba(212,169,78,0.4); object-fit: contain; background: #000; box-shadow: 0 0 16px rgba(212,169,78,0.2); }
     .tag-sub { font-family: Sora, sans-serif; font-weight: 700; font-size: 17px; letter-spacing: 0.05em; color: var(--gold-bright); margin: 2px 0 14px; text-transform: uppercase; }
     .cohort { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
     .cohort b { color: var(--cyan); font-weight: 600; margin-left: 8px; }
@@ -52,11 +60,15 @@
     .ticker p { white-space: nowrap; padding: 10px 32px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--purple-light); }
     @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
     .stage { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 48px; padding: 40px 0; }
-    .copy { max-width: 640px; }
+    .copy { flex: 1 1 560px; max-width: 680px; }
+    .edge { font-family: Sora, sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold-bright); margin: 26px 0 4px; text-shadow: 0 0 22px rgba(240,198,100,0.35); }
+    .creed { font-family: Sora, sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin: 0 0 14px; }
+    .fact-strip { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 22px; list-style: none; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+    .fact-strip b { color: var(--gold-bright); font-weight: 600; }
     .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(6,182,212,0.35); background: rgba(6,182,212,0.1); color: var(--cyan); border-radius: 999px; padding: 6px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; }
     .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); animation: pulse 1.6s ease-in-out infinite; }
     @keyframes pulse { 50% { opacity: 0.35; } }
-    h1 { font-family: Sora, sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: 0.94; font-size: clamp(3.1rem, 9.5vw, 7.4rem); margin: 18px 0 16px; text-shadow: 0 0 44px rgba(139,92,246,0.35); }
+    h1 { font-family: Sora, sans-serif; font-weight: 800; letter-spacing: -0.045em; line-height: 0.98; font-size: clamp(2.9rem, 8vw, 5.6rem); margin: 18px 0 16px; text-shadow: 0 0 44px rgba(139,92,246,0.35); overflow-wrap: normal; }
     h1 em { font-style: normal; display: block; background: linear-gradient(90deg, var(--gold-bright), var(--gold), var(--gold-bright)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 24px rgba(240,198,100,0.3)); }
     .lede { color: var(--dim); font-size: 16px; line-height: 1.7; max-width: 540px; }
     .clock { margin-top: 22px; }
@@ -75,17 +87,27 @@
     label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 6px; }
     input { width: 100%; border-radius: 10px; border: 1px solid var(--border); background: rgba(5,8,20,0.65); color: var(--fg); padding: 12px 14px; font: 15px 'Plus Jakarta Sans', sans-serif; }
     input:focus { outline: 2px solid rgba(6,182,212,0.45); border-color: var(--cyan); }
-    button { width: 100%; margin-top: 20px; border: 0; border-radius: 12px; padding: 19px; font: 800 18px Sora, sans-serif; letter-spacing: 0.01em; cursor: pointer; color: #14100a; background: linear-gradient(135deg, var(--gold-bright), var(--gold)); box-shadow: 0 14px 44px rgba(212,169,78,0.5), 0 0 0 1px rgba(240,198,100,0.35) inset; animation: ctaPulse 2.6s ease-in-out infinite; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
-    @keyframes ctaPulse { 50% { box-shadow: 0 14px 58px rgba(212,169,78,0.72), 0 0 0 1px rgba(240,198,100,0.55) inset; } }
-    button:hover { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 18px 56px rgba(212,169,78,0.65); animation: none; }
+    button { width: 100%; margin-top: 20px; border: 0; border-radius: 12px; padding: 19px; font: 800 18px Sora, sans-serif; letter-spacing: 0.01em; cursor: pointer; color: #14100a; background: linear-gradient(135deg, var(--gold-bright), var(--gold)); box-shadow: 0 10px 30px rgba(212,169,78,0.35), 0 0 0 1px rgba(240,198,100,0.3) inset; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+    button:hover { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 16px 44px rgba(212,169,78,0.5); }
     button:active { transform: translateY(0); }
     button:disabled { opacity: 0.6; cursor: wait; transform: none; }
-    .hero-cta { display: inline-block; margin-top: 28px; padding: 17px 34px; border-radius: 12px; font: 800 17px Sora, sans-serif; text-decoration: none; color: #14100a; background: linear-gradient(135deg, var(--gold-bright), var(--gold)); box-shadow: 0 14px 44px rgba(212,169,78,0.5); transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
-    .hero-cta:hover { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 18px 56px rgba(212,169,78,0.65); }
+    /* The gate's ONE dominant CTA (v2): gold XL, animated sheen, hover lift. */
+    .hero-cta { display: inline-block; margin-top: 28px; padding: 19px 40px; border-radius: 12px; font: 800 18px Sora, sans-serif; text-decoration: none; color: #14100a; background: linear-gradient(135deg, var(--gold-bright), var(--gold)); box-shadow: 0 14px 44px rgba(212,169,78,0.5), 0 0 0 1px rgba(240,198,100,0.35) inset; transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease; }
+    .hero-cta:hover { filter: brightness(1.07); transform: translateY(-3px); box-shadow: 0 18px 56px rgba(212,169,78,0.65); }
+    .cta-primary { position: relative; overflow: hidden; isolation: isolate; }
+    .cta-primary::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%); transform: translateX(-120%); animation: gateSheen 3.4s ease-in-out infinite; }
+    @keyframes gateSheen { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
     @media (prefers-reduced-motion: reduce) {
-      .ticker-track, .site-layer { animation: none; }
+      .ticker-track { animation: none; }
       .dot { animation: none; }
       button { animation: none; }
+      .cta-primary::after { animation: none; }
+      .cta-primary:hover { transform: none; }
+    }
+    @media (max-width: 640px) {
+      .cta-primary { display: block; text-align: center; }
+      .shell { padding: 18px 16px 24px; }
+      .brand img.brand-logo { height: 72px; }
     }
     .err { color: #fda4af; font-size: 13px; margin-top: 10px; min-height: 1.2em; }
     .fine { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
@@ -97,11 +119,6 @@
   </script>
 </head>
 <body>
-  <div class="site-layer" aria-hidden="true">
-    <iframe src="/?inner=1" title="" tabindex="-1"></iframe>
-  </div>
-  <canvas id="fx" aria-hidden="true"></canvas>
-  <div class="veil"></div>
   <div class="vignette"></div>
 
   <div class="shell">
@@ -122,8 +139,10 @@
     <div class="stage">
       <section class="copy">
         <p class="pill"><span class="dot"></span>Launching <time datetime="{{ launch_at }}">November 9, 2026</time></p>
+        <p class="edge">You Found the Edge</p>
         <h1>Execution Layers for the<em>Autonomous Machine Economy</em></h1>
         <p class="tag-sub">Humans were the bottleneck.</p>
+        <p class="creed">Unbridled. Autonomous. Relentless. Flawless. Recursive.</p>
         <p class="lede">Autonomous agents. Sealed bids. Settlement on Base. Genesis goes live November 9 — and this cohort is the only way in before it does. Claim a free genesis airdrop, A2A protocol access, and a seat at the Agent Gateway. The airdrop and genesis SBT are free, non-transferable access passes to the platform. When this cohort closes, you wait for the next one.</p>
         <div class="clock">
           <label>T-minus genesis · November 9, 2026</label>
@@ -139,7 +158,13 @@
           <li>A2A protocol</li>
           <li>Agent Gateway</li>
         </ul>
-        <a class="hero-cta" href="#claim">Claim your free genesis pass →</a>
+        <ul class="fact-strip">
+          <li><b>17</b> live agent skills</li>
+          <li><b>Sealed-bid</b> agent auctions</li>
+          <li><b>x402</b> payments on Base</li>
+          <li><b>Free</b> genesis pass</li>
+        </ul>
+        <a class="hero-cta cta-primary" href="#claim">Claim your free pass before the gate closes →</a>
       </section>
 
       <section class="card" id="claim">
@@ -160,7 +185,7 @@
     </div>
 
     <footer>
-      <p>SINCOR · Autonomous machine economy · Chain 8453</p>
+      <p>SINCOR Business Solutions is the Execution Layer for the Autonomous Machine Economy. · Chain 8453</p>
       <p style="font-family:'JetBrains Mono',monospace;letter-spacing:.12em;">SINC + AXM on Base</p>
     </footer>
   </div>
@@ -185,44 +210,6 @@
     }
     tick();
     setInterval(tick, 1000);
-
-    const c = document.getElementById("fx");
-    const ctx = c.getContext("2d");
-    let w, h, pts;
-    function resize() {
-      w = c.width = window.innerWidth;
-      h = c.height = window.innerHeight;
-      pts = Array.from({ length: 48 }, () => ({
-        x: Math.random() * w, y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35
-      }));
-    }
-    resize();
-    window.addEventListener("resize", resize);
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
-      ctx.strokeStyle = "rgba(139,92,246,0.28)";
-      ctx.fillStyle = "rgba(6,182,212,0.55)";
-      pts.forEach(p => {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > w) p.vx *= -1;
-        if (p.y < 0 || p.y > h) p.vy *= -1;
-        ctx.beginPath(); ctx.arc(p.x, p.y, 1.4, 0, Math.PI * 2); ctx.fill();
-      });
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
-          const d = Math.hypot(dx, dy);
-          if (d < 140) {
-            ctx.globalAlpha = 1 - d / 140;
-            ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
-            ctx.globalAlpha = 1;
-          }
-        }
-      }
-      requestAnimationFrame(draw);
-    }
-    draw();
 
     const form = document.getElementById("gate");
     const err = document.getElementById("err");

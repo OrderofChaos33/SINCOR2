@@ -287,7 +287,7 @@ def test_paid_path_unchanged_when_ration_exhausted(
     resp = client.post("/api/x402/challenge-bind", json={
         "challenge_id": ch["challenge_id"], "payer_wallet": buyer,
         "signature": sig})
-    assert resp.status_code == 402, resp.get_json()
+    assert resp.status_code == 200, resp.get_json()
     resp = client.post("/api/x402/verify", json={
         "challenge_id": ch["challenge_id"], "tx_hash": "0x" + "ab" * 32,
         "payer_wallet": buyer})

@@ -7,11 +7,11 @@
     "base",
     "ai"
   ],
-  "timestamp": "2026-08-30T16:30:00.000000Z",
+  "timestamp": "2026-10-28T00:00:00.000000Z",
   "version": {
     "major": 1,
-    "minor": 1,
-    "patch": 1
+    "minor": 2,
+    "patch": 0
   },
   "tokens": [
     {
@@ -37,6 +37,20 @@
         "hookFloorWallUsd": 0.15,
         "roguePoolDoNotUse": "0x85372932f9b151a076815d92cf71a97980ffd667",
         "metadata": "https://getsincor.com/.well-known/sinc-token.json"
+      }
+    },
+    {
+      "chainId": 8453,
+      "address": "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a",
+      "name": "AXIOM",
+      "symbol": "AXM",
+      "decimals": 18,
+      "tags": [
+        "defi",
+        "ai"
+      ],
+      "extensions": {
+        "website": "https://getsincor.com"
       }
     }
   ]

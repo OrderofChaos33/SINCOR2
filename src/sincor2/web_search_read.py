@@ -253,6 +253,12 @@ def validate_payload(
     ``query`` (search) or ``url`` (read)."""
     if not isinstance(payload, dict):
         return None, _err("payload_must_be_object")
+    # D2 item 7b: payer_wallet is a TRANSPORT field (it identifies the
+    # payer to the x402 layer), not a domain field of this resource —
+    # strip it before the allowlist check. Other unknown fields still
+    # fail closed below. (G1-G3 keep `wallet` as a domain field; this
+    # module never had one.)
+    payload = {k: v for k, v in payload.items() if k != "payer_wallet"}
     if set(payload) - _ALLOWED_TOP_KEYS:
         return None, _err("unknown_payload_fields")
 

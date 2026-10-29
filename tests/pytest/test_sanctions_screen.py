@@ -1,7 +1,9 @@
 """Wallet Sanctions Screen (G1) — unit + full-loop x402 integration tests.
 
 Unit layer proves the screening verdicts against the REAL vendored OFAC
-snapshot (19,471 entries, publication 10/21/2026): flagged fixture,
+snapshot (provenance values — publication date, entry/record counts —
+are read from the snapshot itself, never hardcoded, so a snapshot
+refresh does not stale these tests): flagged fixture,
 clean fixture, invalid input, and the honest stale state (a snapshot
 past the P20 48h fail-closed window returns ``unknown`` for EVERY
 address — never ``clean``, never fake-fresh).
@@ -101,19 +103,23 @@ class TestScreenWallet:
         assert match["name"] == "MESRI, Behzad"
         assert "CYBER2" in match["programs"]
         assert match["currency"] == "ETH"
-        # Provenance is real snapshot metadata, not invented data.
-        assert res["snapshot_publication_date"] == "10/21/2026"
-        assert res["snapshot_entry_count"] == 19471
-        assert res["snapshot_record_count"] == 19471
+        # Provenance is real snapshot metadata, not invented data:
+        # the screen must echo THIS snapshot's own declared values.
+        assert res["snapshot_publication_date"] == \
+            snap["publication_date"]
+        assert res["snapshot_entry_count"] == snap["entry_count"]
+        assert res["snapshot_record_count"] == snap["record_count"]
 
     def test_clean_address_from_real_snapshot(self):
-        res = ss.screen_wallet(CLEAN_ADDR, snapshot=_fresh_real_snapshot())
+        snap = _fresh_real_snapshot()
+        res = ss.screen_wallet(CLEAN_ADDR, snapshot=snap)
         assert res["ok"] is True
         assert res["verdict"] == "clean"
         assert res["status"] == "screened"
         assert res["screened"] is True
         assert res["match"] is None
-        assert res["snapshot_publication_date"] == "10/21/2026"
+        assert res["snapshot_publication_date"] == \
+            snap["publication_date"]
 
     def test_stale_snapshot_returns_unknown_never_clean_or_flagged(self):
         snap = load_snapshot()
@@ -240,8 +246,9 @@ def _pay(client, tx_hash: str) -> dict:
         "payer_wallet": BUYER,
         "signature": sig,
     })
-    assert r.status_code == 402, r.get_json()
-    assert r.get_json()["error"] == "payment_required"
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["ok"] is True
+    assert r.get_json()["ownership_proven"] is True
     r = client.post("/api/x402/verify", json={
         "challenge_id": ch["challenge_id"],
         "tx_hash": tx_hash,
@@ -271,7 +278,8 @@ class TestFullLoop:
         body = r.get_json()
         assert body["verdict"] == "flagged"
         assert body["match"]["uid"] == "24003"
-        assert body["snapshot_publication_date"] == "10/21/2026"
+        assert body["snapshot_publication_date"] == \
+            fresh_snapshot["publication_date"]
 
     def test_paid_settle_delivers_clean(
             self, client, x402_db, mock_onchain, fresh_snapshot):
@@ -441,21 +449,22 @@ class TestRefreshOfacSdn:
 
     def test_refresh_writes_atomically_under_data_dir(
             self, tmp_path, monkeypatch):
-        refresh_mod = self._stub_updater(
-            monkeypatch, _fresh_real_snapshot())
+        snap = _fresh_real_snapshot()
+        refresh_mod = self._stub_updater(monkeypatch, snap)
         monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
         result = refresh_mod.refresh()
         assert result["status"] == "updated"
         written = json.loads(
             (tmp_path / "p20_ofac_sdn.json").read_text())
-        assert written["publication_date"] == "10/21/2026"
-        assert written["entry_count"] == 19471
+        assert written["publication_date"] == snap["publication_date"]
+        assert written["entry_count"] == snap["entry_count"]
         assert written["fetched_at"] == result["fetched_at"]
         # Same publication again: a verified re-download truthfully
         # advances fetched_at -> "refreshed", never "updated".
         result2 = refresh_mod.refresh()
         assert result2["status"] == "refreshed"
-        assert result2["previous_publication_date"] == "10/21/2026"
+        assert result2["previous_publication_date"] == \
+            snap["publication_date"]
 
     def test_screen_prefers_refreshed_data_dir_snapshot(
             self, tmp_path, monkeypatch):
