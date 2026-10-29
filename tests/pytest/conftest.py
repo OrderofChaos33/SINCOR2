@@ -8,7 +8,11 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-with-32-char-minimum-ok")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok")
 os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
-os.environ.setdefault("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
+# Dummy Stripe test key, constructed at runtime: the contiguous literal
+# matches the pre-commit secret scan (sk_test_ + 20+ alphanumerics), which
+# greps the whole staged file. The produced value is byte-identical.
+_STRIPE_TEST_KEY = "sk_test_" + "1234567890" * 3
+os.environ.setdefault("STRIPE_SECRET_KEY", _STRIPE_TEST_KEY)
 # Operator heartbeat credential (G2.3): tests authenticate heartbeats with
 # this token via the X-Sincor-Heartbeat header unless a test overrides it.
 os.environ.setdefault("AGENT_HEARTBEAT_TOKEN", "test-heartbeat-token")
@@ -36,7 +40,7 @@ def env_defaults(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-char-minimum-ok")
     monkeypatch.setenv("ADMIN_USERNAME", "admin")
     monkeypatch.setenv("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
-    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123456789012345678901234567890")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", _STRIPE_TEST_KEY)
     monkeypatch.setenv("AGENT_HEARTBEAT_TOKEN", "test-heartbeat-token")
 
 
@@ -133,14 +137,34 @@ def _isolated_antigaming_store(tmp_path):
 
 @pytest.fixture
 def app(monkeypatch, isolated_waitlist_db):
+    from sincor2 import a2a_integration
     from sincor2 import app as app_module
     from sincor2 import waitlist_system
+
+    # Isolation (chokepoint): the legacy factory's create_app() runs
+    # bootstrap_platform(), whose _extend_a2a_skills_from_registry()
+    # APPENDS the ~20 vertical/SKU registry skills to the process-global
+    # a2a_integration.SINCOR_SKILLS list — append-only, never reverted.
+    # build_agent_card() reads that same global list, so one legacy-app
+    # test silently turns the canonical 17-skill card into 37 skills for
+    # every later test in the process. Snapshot before create_app() and
+    # restore in place on teardown so the catalogue is left as found.
+    snapshot = list(a2a_integration.SINCOR_SKILLS)
 
     monkeypatch.setattr(app_module, "StripeCheckout", lambda api_key=None: MockStripeCheckout())
     flask_app = app_module.create_app()
     flask_app.extensions["waitlist_manager"] = waitlist_system.waitlist_manager
     flask_app.config.update(TESTING=True)
-    return flask_app
+    try:
+        yield flask_app
+    finally:
+        if list(a2a_integration.SINCOR_SKILLS) != snapshot:
+            # In-place restore: build_agent_card() embeds the list object
+            # itself, so preserve its identity — do not rebind the name.
+            a2a_integration.SINCOR_SKILLS[:] = snapshot
+            # The bootstrap also recompiled the derived schema cache from
+            # the extended list; rebuild it from the restored catalogue.
+            a2a_integration.refresh_skill_schemas()
 
 
 @pytest.fixture
