@@ -674,6 +674,68 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+echo "=== SINCOR pre-commit: child_process guard (dev-watch 302) ==="
+# CVE-2026-117568 (mcp-ffmpeg): OS command injection via filenames through
+# child_process.exec string interpolation. The JS analogue of the guard
+# above: child_process.exec / execSync (direct, aliased or destructured)
+# and any shell: option that is not false in a JS/TS file importing
+# child_process are hard failures. Mirrors
+# tests/pytest/test_devwatch300_argv_only.py (TestChildProcessGuard).
+python3 - <<'PYEOF2'
+import re, sys
+from pathlib import Path
+
+_SUFFIXES = {".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"}
+_BANNED = ("exec", "execSync")
+violations = []
+for path in sorted(Path(".").rglob("*")):
+    if path.suffix not in _SUFFIXES or not path.is_file():
+        continue
+    if {"node_modules", ".git"}.intersection(path.parts):
+        continue
+    source = path.read_text(encoding="utf-8", errors="replace")
+    aliases = {"child_process"}
+    for pat in (
+        r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
+        r"import\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
+        r"import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
+    ):
+        aliases.update(re.findall(pat, source))
+    names = set()
+    for pat in (
+        r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
+        r"import\s*\{([^}]*)\}\s*from\s+['\"]child_process['\"]",
+    ):
+        for group in re.findall(pat, source):
+            for part in group.split(","):
+                name = part.strip().split(":")[0].strip().split(" as ")[0].strip()
+                if name in _BANNED:
+                    names.add(name)
+    for lineno, line in enumerate(source.splitlines(), start=1):
+        for alias in aliases:
+            for member in _BANNED:
+                if re.search(rf"\b{re.escape(alias)}\s*\.\s*{member}\s*\(", line):
+                    violations.append(f"{path}:{lineno}: {alias}.{member}() executes through a shell")
+        for name in names:
+            if re.search(rf"(?<![\w$.]){name}\s*\(", line) and "require(" not in line and "import" not in line:
+                violations.append(f"{path}:{lineno}: destructured child_process {name}() executes through a shell")
+        if aliases - {"child_process"} or names or "child_process" in source:
+            m = re.search(r"\bshell\s*:\s*(.+?)[,}\)]", line)
+            if m and m.group(1).strip() != "false":
+                violations.append(f"{path}:{lineno}: shell: option in a child_process call is not false")
+
+if violations:
+    print("BLOCKED: child_process guard (dev-watch 302) violations:")
+    for v in violations:
+        print(" ", v)
+    print("Use argv forms only: execFile / spawn with an args array, no shell.")
+    sys.exit(1)
+print("child_process guard clean.")
+PYEOF2
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
 echo "=== SINCOR pre-commit: claim-blocklist scan ==="
 # Block unproven marketing claims in staged public copy (README.md, templates/).
 # See scripts/claim-blocklist.txt for the list and rationale.

