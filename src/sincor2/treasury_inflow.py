@@ -183,6 +183,41 @@ def public_treasury_dto(
     }
 
 
+#: Bounty-pool figures that GET /v1/a2a/pool already publishes to anyone.
+#: The anonymous DTO below reuses exactly these keys — nothing new leaks.
+PUBLIC_POOL_FIELDS = (
+    "funded_axm",
+    "allocated_axm",
+    "available_axm",
+    "spent_axm",
+    "allocation_count",
+    "ledger",
+)
+
+
+def public_treasury_public_dto(
+    summary: Optional[Dict[str, Any]] = None,
+    pool_status: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Anonymous, ledger-only treasury view for public surfaces (homepage).
+
+    Deliberately narrower than the authenticated DTO: it is built from the
+    local inflow-ledger aggregates and the bounty-pool status only — no
+    on-chain snapshot, no token balances, no treasury address, no RPC
+    state, no per-source/per-asset breakdowns, no allocation rows. Every
+    pool figure here is already public via ``GET /v1/a2a/pool``.
+    """
+    summary = summary or {}
+    pool_status = pool_status or {}
+    return {
+        "status": "ok",
+        "kpi": "treasury_inflow_public",
+        "scope": "ledger_only",
+        "ledger_24h": {k: summary.get(k) for k in PUBLIC_TREASURY_LEDGER_FIELDS},
+        "pool": {k: pool_status.get(k) for k in PUBLIC_POOL_FIELDS},
+    }
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 

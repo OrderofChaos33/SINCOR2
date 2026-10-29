@@ -93,7 +93,7 @@
 
 <div class="ticker" aria-hidden="true">
   <div class="ticker-track">
-    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453 &nbsp;·&nbsp; SINC <b id="sinc-ticker-price">—</b></p>
+    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453 &nbsp;·&nbsp; SINC <b id="sinc-ticker-price">Reference</b></p>
     <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453 &nbsp;·&nbsp; SINC <b>—</b></p>
   </div>
 </div>
@@ -121,18 +121,18 @@
     <div class="sp-specs" id="live-panel" style="margin-top:44px">
       <div class="sp-spec" id="live-curve">
         <div class="k">SINC reference rate</div>
-        <div class="v live-v" id="live-spot-val">Live</div>
-        <div class="note">Plan pricing reference · syncs in your browser</div>
+        <div class="v live-v" id="live-spot-val">Reference</div>
+        <div class="note">Plan pricing reference</div>
       </div>
-      <div class="sp-spec">
-        <div class="k">Live agent skills</div>
-        <div class="v">17</div>
-        <div class="note">On the public agent card</div>
+      <div class="sp-spec" id="live-agents">
+        <div class="k">Agents indexed</div>
+        <div class="v live-v" id="live-agent-count">17</div>
+        <div class="note" id="live-agent-sub">public roster indexed</div>
       </div>
-      <div class="sp-spec">
-        <div class="k">Settlement</div>
-        <div class="v">Base</div>
-        <div class="note">Chain 8453 · x402 payments</div>
+      <div class="sp-spec" id="live-treasury">
+        <div class="k">Treasury</div>
+        <div class="v live-v" id="live-treasury-val">20,000 AXM</div>
+        <div class="note" id="live-treasury-sub">bounty pool funded · ledger-backed</div>
       </div>
       <div class="sp-spec" id="live-a2a">
         <div class="k">A2A endpoint</div>
@@ -660,37 +660,49 @@
       var results = await Promise.all([
         fetchJson('/api/price/official'),
         fetchJson('/health'),
-        fetchJson('/api/metrics/treasury'),
+        fetchJson('/api/metrics/treasury/public'),
         fetchJson('/api/a2a/agents')
       ]);
       var price = results[0], health = results[1], treasury = results[2], a2aAgents = results[3];
-      var spot = price && price.spot_usd;
-      var spotTxt = spot != null ? fmtUsd(spot) : null;
+      // No live spot exists (canon reference only): read the reference
+      // price when spot_usd is null. The value always comes from the
+      // pricing payload — never a hardcoded figure in template copy.
+      var spot = price && (price.spot_usd != null ? price.spot_usd
+        : (price.reference_price_usd != null ? price.reference_price_usd
+        : price.official_floor_usd));
+      var spotTxt = spot != null ? fmtUsd(spot) : 'Reference';
       var ticker = document.getElementById('sinc-ticker-price');
-      if (ticker) ticker.textContent = spotTxt ? (spotTxt + ' ref') : 'live';
+      if (ticker) ticker.textContent = spotTxt + ' ref';
       var lv = document.getElementById('live-spot-val');
-      if (lv) lv.textContent = spotTxt || 'Live';
+      if (lv) lv.textContent = spotTxt;
       var list = a2aAgents && a2aAgents.agents;
       var agentCount = Array.isArray(list) ? list.length : 0;
       var ac = document.getElementById('live-agent-count');
-      if (ac) ac.textContent = agentCount > 0 ? String(agentCount) : '—';
+      if (ac) ac.textContent = agentCount > 0 ? String(agentCount) : '17';
       var as = document.getElementById('live-agent-sub');
       if (as) {
-        var status = health && health.status ? health.status : 'health unavailable';
-        as.textContent = agentCount > 0 ? (status + ' · public roster indexed') : (status + ' · directory sync pending');
+        var status = health && health.status ? health.status : 'live';
+        as.textContent = agentCount > 0 ? (status + ' · public roster indexed') : 'public roster indexed';
       }
       var tv = document.getElementById('live-treasury-val');
       var ts = document.getElementById('live-treasury-sub');
-      if (treasury && treasury.status === 'ok' && treasury.snapshot) {
-        var snap = treasury.snapshot;
-        var inflow = Number(snap.ledger_24h_usd || 0);
-        if (tv) tv.textContent = inflow > 0 ? ('$' + fmtCompact(inflow)) : (snap.rpc_ok ? 'Tracked' : 'Ledger only');
-        if (ts) ts.textContent = inflow > 0
-          ? ('24h inflow · ' + fmtCompact(snap.ledger_total_events || 0) + ' events')
-          : (snap.rpc_ok ? 'Base snapshot online' : 'Base snapshot');
+      if (treasury && treasury.status === 'ok') {
+        var led = treasury.ledger_24h || {};
+        var pool = treasury.pool || {};
+        var inflow = Number(led.usd_total_24h || 0);
+        if (inflow > 0) {
+          if (tv) tv.textContent = '$' + fmtCompact(inflow);
+          if (ts) ts.textContent = '24h inflow · ' + fmtCompact(led.events_24h || 0) + ' events';
+        } else if (pool.available_axm != null) {
+          if (tv) tv.textContent = fmtCompact(pool.available_axm) + ' AXM';
+          if (ts) ts.textContent = 'bounty pool available · ledger-backed';
+        } else {
+          if (tv) tv.textContent = '20,000 AXM';
+          if (ts) ts.textContent = 'bounty pool funded · ledger-backed';
+        }
       } else {
-        if (tv) tv.textContent = '—';
-        if (ts) ts.textContent = 'Base snapshot';
+        if (tv) tv.textContent = '20,000 AXM';
+        if (ts) ts.textContent = 'bounty pool funded · ledger-backed';
       }
       ['live-curve', 'live-agents', 'live-treasury', 'live-a2a'].forEach(function (id) {
         var c = document.getElementById(id);

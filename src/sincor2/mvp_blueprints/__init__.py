@@ -76,10 +76,21 @@ def register_mvp_blueprints(app: Flask) -> None:
         # Consolidation: /api/metrics/treasury previously lived only on the
         # legacy sincor2.app. Attach the maintained view from the monitoring
         # blueprint (without its /health route, which mvp_app already serves).
-        from sincor2.blueprints.monitoring import treasury_metrics
+        from sincor2.blueprints.monitoring import (
+            treasury_metrics,
+            treasury_metrics_public,
+        )
 
         app.add_url_rule(
             "/api/metrics/treasury", view_func=treasury_metrics, methods=["GET"]
+        )
+        # Anonymous ledger-only variant for the homepage stats strip
+        # (observability build #1): the JWT-gated route above 401s every
+        # anonymous homepage fetch, which is what broke the strip.
+        app.add_url_rule(
+            "/api/metrics/treasury/public",
+            view_func=treasury_metrics_public,
+            methods=["GET"],
         )
     except Exception as exc:  # pragma: no cover
         print(f"Treasury metrics route not available: {exc}")

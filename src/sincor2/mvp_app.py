@@ -86,6 +86,21 @@ def inject_onchain_addresses():
 
 
 @app.context_processor
+def inject_build_stamp():
+    # Observability build #5: templates (shared footer) can render the
+    # deployed commit's short SHA. build_info() never raises and degrades
+    # to "unknown" off-Railway; the footer hides the stamp in that case.
+    from sincor2.build_info import build_info
+
+    info = build_info()
+    return {
+        'build_sha': info['sha'],
+        'build_sha_short': info['short'],
+        'build_time': info['time'],
+    }
+
+
+@app.context_processor
 def inject_auth_state():
     return {
         'is_admin': bool(session.get('is_admin')),

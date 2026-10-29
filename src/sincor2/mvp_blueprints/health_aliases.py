@@ -8,12 +8,22 @@ from flask import Blueprint, jsonify
 bp = Blueprint("health_aliases", __name__)
 
 
+def _build_stamp():
+    try:
+        from sincor2.build_info import build_info
+
+        return build_info()
+    except Exception:
+        return {"sha": "unknown", "short": "unknown", "time": "unknown"}
+
+
 def _payload():
     return {
         "status": "healthy",
         "service": "SINCOR2 MVP",
         "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "version": "1.0.0-mvp",
+        "build": _build_stamp(),
         "checks": {"process": {"ready": True, "critical": True, "detail": "up"}},
         "readiness": {"ready": True, "degraded": False, "confidence": 1.0},
     }

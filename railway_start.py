@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 
 logger = logging.getLogger("sincor2.railway_start")
 if not logging.getLogger().handlers:
@@ -148,6 +150,35 @@ def start_background_load() -> None:
     _start_ofac_auto_refresh()
 
 
+def _build_stamp() -> dict:
+    """Deployed-build identifier (observability build #5), stdlib-only —
+    this module must stay importable before sincor2.mvp_app loads. Mirrors
+    sincor2.build_info: RAILWAY_GIT_COMMIT_SHA, then SINCOR_BUILD_SHA,
+    then "unknown"; build time is SINCOR_BUILD_TIME or this process's
+    start. Never raises."""
+    try:
+        sha = ""
+        for var in ("RAILWAY_GIT_COMMIT_SHA", "SINCOR_BUILD_SHA"):
+            sha = (os.environ.get(var) or "").strip()
+            if sha:
+                break
+        stamp_time = (os.environ.get("SINCOR_BUILD_TIME") or "").strip()
+        if not stamp_time:
+            stamp_time = (
+                datetime.fromtimestamp(_started_at, timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+        return {
+            "sha": sha or "unknown",
+            "short": sha[:12] if sha else "unknown",
+            "time": stamp_time,
+        }
+    except Exception:
+        return {"sha": "unknown", "short": "unknown", "time": "unknown"}
+
+
 def boot_status() -> dict:
     with _lock:
         loaded = _full is not None
@@ -158,6 +189,7 @@ def boot_status() -> dict:
         "status": "ready" if loaded else ("loading" if attempts == 0 or error is None else "error"),
         "service": "SINCOR2 MVP",
         "entry": "railway_start",
+        "build": _build_stamp(),
         "loaded": loaded,
         "attempts": attempts,
         "error": error,

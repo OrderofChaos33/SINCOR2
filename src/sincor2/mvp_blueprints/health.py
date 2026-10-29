@@ -23,6 +23,17 @@ def _bind_mvp():
 _bind_mvp()
 
 
+def _build_stamp() -> dict:
+    """Deployed-build identifier (observability build #5). Never raises:
+    a stamp failure must not take the health probe down with it."""
+    try:
+        from sincor2.build_info import build_info
+
+        return build_info()
+    except Exception:
+        return {'sha': 'unknown', 'short': 'unknown', 'time': 'unknown'}
+
+
 @bp.route('/health', methods=['GET'])
 def health():
     """Fast liveness for Railway. No outbound RPC. Always 200 if the process is up and DB answers."""
@@ -32,6 +43,7 @@ def health():
         'service': 'SINCOR2 MVP',
         'timestamp': datetime.utcnow().isoformat(),
         'version': '1.0.0-mvp',
+        'build': _build_stamp(),
         'checks': {
             'database': {'ready': db_ready, 'critical': True, 'detail': db_detail},
             'process': {'ready': True, 'critical': True, 'detail': 'up'},
@@ -165,6 +177,7 @@ def _build_runtime_health_report(include_optional: bool = True) -> dict:
         'service': 'SINCOR2 MVP',
         'timestamp': now,
         'version': '1.0.0-mvp',
+        'build': _build_stamp(),
         'checks': checks,
         'readiness': {
             'ready': critical_ready,
