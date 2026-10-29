@@ -404,6 +404,36 @@ def sitemap_page():
     return render_template("sitemap.html")
 
 
+# Public pages listed in the machine-readable sitemap. Every path here is
+# asserted against this app's route table by
+# tests/pytest/test_sitemap_truth.py — do not add a path that does not
+# resolve on the production app.
+_SITEMAP_XML_PATHS = (
+    "/", "/pricing", "/signup", "/contact", "/docs", "/whitepaper",
+    "/products", "/products/starter", "/products/professional",
+    "/products/enterprise", "/dashboard", "/agents", "/tasks", "/pool",
+    "/catalog", "/agent-card", "/register-agent", "/toa", "/webbuilder",
+    "/sinc", "/axiom", "/sin-airdrop",
+    "/terms", "/privacy", "/security", "/sitemap",
+)
+
+
+@bp.route("/sitemap.xml")
+def sitemap_xml():
+    from flask import Response
+
+    root = request.url_root.rstrip("/")
+    urls = "".join(
+        f"<url><loc>{root}{path}</loc></url>" for path in _SITEMAP_XML_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return Response(body, mimetype="application/xml")
+
+
 @bp.route("/products/starter")
 def product_starter():
     return render_template("product_starter.html")
