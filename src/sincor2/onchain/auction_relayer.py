@@ -25,6 +25,17 @@ The relayer key comes from ``AUCTION_RELAYER_KEY`` only (Secure Vault in
 production).  Contract addresses from ``COMMIT_REVEAL_AUCTION_ADDRESS`` /
 ``EXECUTION_ESCROW_ADDRESS`` / ``AUCTION_RPC_URL`` (shared with
 ``auction_client``).
+
+Relayer constraint (dev-watch 306, zkLink forged-root lesson): a relayer
+is transport, never authority.  This relayer is OUTBOUND only — it signs
+the platform's own poster transactions with the platform key and accepts
+no third-party submitted roots, claims, winners, or prices.  The winner
+and price it funds are read from the source chain (``vickreyResult``) and
+enforced onchain by the poster-only ``selectWinnerAndFund``; a
+caller-supplied claim is never trusted, and any future inbound
+relayer-submitted claim must be cryptographically verified against the
+source chain's expected verification path onchain before any release,
+reverting — never falling back to a permissive path — on failure.
 """
 
 from __future__ import annotations
