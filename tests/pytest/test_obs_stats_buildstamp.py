@@ -28,6 +28,36 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # --------------------------------------------------------------------------
+# Isolation: the legacy app factory (conftest ``client``) runs
+# ``platform_bootstrap.bootstrap_platform()``, whose
+# ``_extend_a2a_skills_from_registry()`` APPENDS the ~20 vertical/SKU
+# registry skills to the process-global ``sincor2.a2a_integration``
+# ``SINCOR_SKILLS`` list — append-only, never reverted. The production
+# mvp app never bootstraps, so its agent card serves the canonical 17;
+# but ``build_agent_card()`` reads that same global list, so once any
+# test in this module builds the legacy app, every later card read in
+# the process (e.g. test_machine_surfaces.py) sees 37 skills. Imports
+# alone do not pollute (verified: imports leave 17; a legacy
+# ``create_app()`` call makes it 37). Snapshot/restore around every test
+# in this module so the global catalogue is left exactly as found.
+# --------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _restore_a2a_skill_catalogue():
+    from sincor2 import a2a_integration
+
+    snapshot = list(a2a_integration.SINCOR_SKILLS)
+    yield
+    if list(a2a_integration.SINCOR_SKILLS) != snapshot:
+        # In-place restore: build_agent_card() embeds the list object
+        # itself, so preserve its identity — do not rebind the name.
+        a2a_integration.SINCOR_SKILLS[:] = snapshot
+        # The bootstrap also recompiled the derived schema cache from
+        # the extended list; rebuild it from the restored catalogue.
+        a2a_integration.refresh_skill_schemas()
+
+
+# --------------------------------------------------------------------------
 # build_info unit behavior
 # --------------------------------------------------------------------------
 
