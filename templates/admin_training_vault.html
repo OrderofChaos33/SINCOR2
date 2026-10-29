@@ -20,10 +20,10 @@
             </div>
 
             <div class="guide-actions">
-                <a href="/download/guide-{{TIER_SLUG}}-{{CUSTOMER_ID}}.pdf" class="btn btn-primary" download>
+                <a href="{{DOWNLOAD_GUIDE_URL}}" class="btn btn-primary" download>
                     📥 Download Complete Guide (PDF)
                 </a>
-                <a href="/view/guide-{{TIER_SLUG}}-online" class="btn btn-secondary" target="_blank">
+                <a href="{{VIEW_GUIDE_URL}}" class="btn btn-secondary" target="_blank">
                     👁️ View Online (Interactive)
                 </a>
             </div>
@@ -53,7 +53,7 @@
             </div>
 
             <div class="guide-actions">
-                <a href="/download/quickstart-checklist-{{CUSTOMER_ID}}.pdf" class="btn btn-secondary" download>
+                <a href="{{DOWNLOAD_QUICKSTART}}" class="btn btn-secondary" download>
                     📥 Download Checklist
                 </a>
             </div>
@@ -87,97 +87,9 @@
         </div>
     </div>
 
-    <!-- Video Training Library -->
-    <div class="video-section">
-        <h3>🎥 Video Training Library</h3>
-        <p>Watch these short videos to see SINCOR in action</p>
-
-        <div class="video-grid">
-            <!-- Video 1 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-dashboard.jpg')">
-                    <span class="video-duration">8:23</span>
-                </div>
-                <h4>Dashboard Tour & Navigation</h4>
-                <p>Walk-through of your main control center</p>
-                <a href="/videos/dashboard-tour" class="video-link">▶️ Watch</a>
-            </div>
-
-            <!-- Video 2 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-setup.jpg')">
-                    <span class="video-duration">12:45</span>
-                </div>
-                <h4>Initial Setup & Activation</h4>
-                <p>First hour configuration steps</p>
-                <a href="/videos/initial-setup" class="video-link">▶️ Watch</a>
-            </div>
-
-            <!-- Video 3 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-integrations.jpg')">
-                    <span class="video-duration">15:30</span>
-                </div>
-                <h4>Connecting Your CRM & Email</h4>
-                <p>Step-by-step integration setup (Salesforce, HubSpot, Gmail, Outlook included)</p>
-                <a href="/videos/crm-integration" class="video-link">▶️ Watch</a>
-            </div>
-
-            <!-- Video 4 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-workflows.jpg')">
-                    <span class="video-duration">18:15</span>
-                </div>
-                <h4>Building Your First Workflow</h4>
-                <p>From template to customized automation</p>
-                <a href="/videos/workflow-builder" class="video-link">▶️ Watch</a>
-            </div>
-
-            <!-- Video 5 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-analytics.jpg')">
-                    <span class="video-duration">10:45</span>
-                </div>
-                <h4>Reading Your Analytics Dashboard</h4>
-                <p>Understanding KPIs and performance metrics</p>
-                <a href="/videos/analytics" class="video-link">▶️ Watch</a>
-            </div>
-
-            {% if PROFESSIONAL %}
-            <!-- Video 6 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-multiagent.jpg')">
-                    <span class="video-duration">14:20</span>
-                </div>
-                <h4>Multi-Agent Coordination</h4>
-                <p>How agents work together in a swarm</p>
-                <a href="/videos/agent-coordination" class="video-link">▶️ Watch</a>
-            </div>
-            {% endif %}
-
-            {% if ENTERPRISE %}
-            <!-- Video 6 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-whitelabel.jpg')">
-                    <span class="video-duration">20:15</span>
-                </div>
-                <h4>White-Label Branding Setup</h4>
-                <p>Customize SINCOR to match your brand</p>
-                <a href="/videos/white-label-setup" class="video-link">▶️ Watch</a>
-            </div>
-
-            <!-- Video 7 -->
-            <div class="video-card">
-                <div class="video-thumbnail" style="background-image: url('/images/video-thumb-custom-agents.jpg')">
-                    <span class="video-duration">25:45</span>
-                </div>
-                <h4>Building Custom Agents</h4>
-                <p>Develop specialized agents for unique workflows</p>
-                <a href="/videos/custom-agent-dev" class="video-link">▶️ Watch</a>
-            </div>
-            {% endif %}
-        </div>
-    </div>
+    <!-- Video Training Library removed: the linked video pages do not
+         exist anywhere in the product, so the entries are gone rather
+         than linking to nothing (working-products-only). -->
 
     <!-- Industry & Use-Case Guides -->
     <div class="usecase-section">
@@ -364,7 +276,7 @@
             <a href="#yourTierName" class="btn btn-light" onclick="document.querySelector('.guide-card.primary .btn-primary').click()">
                 📥 Download Guide Now
             </a>
-            <a href="/onboarding/next-step" class="btn btn-light-outline">
+            <a href="/onboarding" class="btn btn-light-outline">
                 → Continue Setup Wizard
             </a>
         </div>
