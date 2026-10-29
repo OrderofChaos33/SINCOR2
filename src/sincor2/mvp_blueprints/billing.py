@@ -222,7 +222,9 @@ def buy_page():
     """Platform checkout — SINC + AXM on Base (default). Legacy Stripe if explicitly enabled."""
     if fiat_payments_enabled() and STRIPE_AVAILABLE and stripe_processor and stripe_processor.enabled:
         return render_template('buy_converting.html')
-    return render_template('buy_tokens.html')
+    # D2 item 6: buy.html is the rewired rail offer (10 /rail/pay links);
+    # buy_tokens.html (0 rail links) was the legacy token page.
+    return render_template('buy.html')
 
 
 @bp.route('/buy-sinc', methods=['GET'])
@@ -691,6 +693,46 @@ def kya_verify():
     return jsonify(body), status
 
 
+def _x402_walletless_offer(resource_id):
+    """D2 item 7a: the 402 offer envelope for a wallet-less discovery
+    probe, or None when the resource is unknown.
+
+    A probe with no wallet hint cannot receive a payable challenge:
+    minting one requires the wallet to build the EIP-191 bind message,
+    and an unbound draft minted for nobody would be a bearer
+    instrument. So the probe gets the standard 402 challenge terms —
+    the payment envelope (resource, price, payTo, asset) — with NO
+    challenge_id and NO row written. The buyer re-requests with
+    ?wallet=<address> to mint the payable (unbound-draft) challenge,
+    exactly as before.
+    """
+    from sincor2.x402_payments import build_payment_payload, get_resource
+    resource = get_resource(resource_id)
+    if not resource:
+        return None
+    payment = build_payment_payload(resource, resource_id, '')
+    # The envelope for an unminted offer carries no challenge binding.
+    payment = dict(payment)
+    extra = dict(payment.get('extra') or {})
+    extra.pop('challenge_id', None)
+    payment['extra'] = extra
+    return {
+        'ok': False,
+        'error': 'payment_required',
+        'resource': resource_id,
+        'resource_id': resource_id,
+        'price': resource['amount_display'],
+        'token': resource['token'],
+        'payTo': payment['payTo'],
+        'asset': payment['asset'],
+        'payment': payment,
+        'accepts': [payment],
+        'note': 'Discovery offer only — pass ?wallet=<your 0x address> '
+                '(or payer_wallet in the JSON body) to receive a '
+                'payable challenge.',
+    }
+
+
 @bp.route('/x402/<resource_id>', methods=['GET'])
 @limiter.limit("200 per hour")
 def x402_challenge(resource_id):
@@ -712,8 +754,13 @@ def x402_challenge(resource_id):
     # /api/x402/challenge-bind. The draft can never be fulfilled before
     # that (verify rejects unbound challenges as challenge_unbound).
     if not wallet:
-        return jsonify({'ok': False, 'error': 'payer_wallet_required',
-                        'note': 'Pass ?wallet=<your 0x address> to receive a payable challenge.'}), 400
+        # D2 item 7a: a wallet-less discovery probe gets the 402 offer
+        # envelope, not a 400 — no challenge is minted (see
+        # _x402_walletless_offer).
+        offer = _x402_walletless_offer(resource_id)
+        if offer is None:
+            return jsonify({'ok': False, 'error': 'unknown_resource'}), 404
+        return jsonify(offer), 402
     challenge = create_challenge(resource_id)
     if challenge.get('challenge_id'):
         challenge['sign_message'] = challenge_bind_message(
@@ -750,7 +797,28 @@ def x402_challenge_bind():
         return jsonify({'ok': False, 'error': 'ownership_signature_required'}), 400
     result = bind_challenge_payer(challenge_id, payer_wallet, signature)
     if result.get('error') == 'payment_required':
-        return jsonify(result), 402
+        # D2 item 2 (P0): bind_challenge_payer reports a SUCCESSFUL
+        # bind as error='payment_required' (the challenge is now bound
+        # and awaiting payment) with ownership_proven=True — but a 402
+        # here is a browser-buyer blocker: rail_pay.html's postJSON
+        # throws on any non-2xx, so "Pay" never enabled. Translate the
+        # successful bind into the 2xx success response the page (and
+        # any API buyer) accepts. The binding itself is unchanged:
+        # the payment envelope is carried through, ownership_proven
+        # stays True, and every failure shape below (409 second bind,
+        # 403 wrong signer, expired, not found) is untouched.
+        return jsonify({
+            'ok': True,
+            'ownership_proven': True,
+            'bound': True,
+            'status': 'bound',
+            'challenge_id': result.get('challenge_id'),
+            'resource_id': result.get('resource_id'),
+            'payer_wallet': result.get('payer_wallet'),
+            'expires_at': result.get('expires_at'),
+            'payment': result.get('payment'),
+            'message': result.get('message'),
+        }), 200
     status = {
         'challenge_not_found': 404,
         'challenge_expired': 410,
@@ -1028,8 +1096,13 @@ def _x402_paid_resource_leader(resource_id, token, access_granted):
             or body.get('payer_wallet', '')
             or body.get('wallet', ''))
         if not wallet:
-            return jsonify({'ok': False, 'error': 'payer_wallet_required',
-                            'note': 'Pass ?wallet=<your 0x address> (or payer_wallet in the JSON body) to receive a payable challenge.'}), 400
+            # D2 item 7a: wallet-less discovery probe — the 402 offer
+            # envelope, no challenge minted (see _x402_walletless_offer).
+            offer = _x402_walletless_offer(resource_id)
+            if offer is None:
+                return jsonify({'ok': False,
+                                'error': 'unknown_resource'}), 404
+            return jsonify(offer), 402
         ch = create_challenge(resource_id)
         if ch.get('challenge_id'):
             ch['sign_message'] = challenge_bind_message(
