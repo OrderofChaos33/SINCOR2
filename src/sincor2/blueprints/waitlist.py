@@ -61,8 +61,13 @@ def _is_admin_request() -> bool:
     admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
     key = request.headers.get("X-Admin-Key", "")
     if key and admin_password:
-        if hmac.compare_digest(str(key), admin_password):
-            return True
+        try:
+            if hmac.compare_digest(str(key), admin_password):
+                return True
+        except (TypeError, ValueError):
+            # Non-ASCII header value: un-comparable in constant time —
+            # fail closed instead of surfacing a 500 (hunt-32 W-44).
+            pass
 
     return False
 

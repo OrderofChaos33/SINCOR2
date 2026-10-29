@@ -321,3 +321,152 @@ def test_login_minted_token_admitted(mvp_client, isolated_controller):
     token = r.get_json()["access_token"]
     r = mvp_client.get(f"{CC}/agents", headers=_bearer(token))
     assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Legacy factory (sincor2.app.create_app): the Command Center mount must
+# carry the SAME gate. Builder B's adversarial pass found this mount was
+# bare — anonymous killswitch POST flipped the controller, anonymous GETs
+# returned the roster/status, anonymous grade-task was accepted — while
+# the production factory held. mvp_app's rule: never mount this blueprint
+# without an equivalent guard in front of /api/command-center/*.
+# ---------------------------------------------------------------------------
+
+def _mint_legacy(app, identity, claims=None):
+    from flask_jwt_extended import create_access_token
+
+    with app.app_context():
+        if claims is None:
+            return create_access_token(identity=identity)
+        return create_access_token(identity=identity, additional_claims=claims)
+
+
+@pytest.mark.parametrize("path", CC_GET_PATHS)
+def test_legacy_anon_get_routes_refused(client, isolated_controller, path):
+    r = client.get(path)
+    assert r.status_code == 401, path
+
+
+def test_legacy_anon_market_feed_refused(client, isolated_controller):
+    r = client.get(f"{CC}/market-feed")
+    try:
+        assert r.status_code == 401
+        assert "text/event-stream" not in (r.content_type or "")
+    finally:
+        r.close()
+
+
+def test_legacy_anon_killswitch_post_refused_and_state_unchanged(
+    client, isolated_controller
+):
+    isolated_controller.register_agent(PROBE_AGENT, 1000)
+    assert isolated_controller.get_status(PROBE_AGENT)["killed"] is False
+
+    r = client.post(
+        f"{CC}/killswitch/{PROBE_AGENT}",
+        json={"action": "kill", "reason": "w44-bprobe"},
+    )
+    assert r.status_code == 401
+    assert isolated_controller.get_status(PROBE_AGENT)["killed"] is False
+
+
+def test_legacy_anon_grade_task_refused(client, isolated_controller):
+    r = client.post(
+        f"{CC}/grade-task",
+        json={"task_id": "t-1", "agent_id": PROBE_AGENT, "grade": 9.0},
+    )
+    assert r.status_code == 401
+
+
+def test_legacy_body_key_killswitch_refused_and_state_unchanged(
+    client, isolated_controller
+):
+    isolated_controller.register_agent(PROBE_AGENT, 1000)
+    r = client.post(
+        f"{CC}/killswitch/{PROBE_AGENT}",
+        json={"action": "kill", "reason": "w44-bprobe", "admin_key": _admin_pw()},
+    )
+    assert r.status_code == 401
+    assert isolated_controller.get_status(PROBE_AGENT)["killed"] is False
+
+
+def test_legacy_roleless_jwt_refused(client, app, isolated_controller):
+    isolated_controller.register_agent(PROBE_AGENT, 1000)
+    token = _mint_legacy(app, _admin_user())
+    r = client.get(f"{CC}/agents", headers=_bearer(token))
+    assert r.status_code == 401
+    r = client.post(
+        f"{CC}/killswitch/{PROBE_AGENT}",
+        json={"action": "kill", "reason": "w44-bprobe"},
+        headers=_bearer(token),
+    )
+    assert r.status_code == 401
+    assert isolated_controller.get_status(PROBE_AGENT)["killed"] is False
+
+
+def test_legacy_header_key_cc_agents_ok(client, isolated_controller):
+    r = client.get(f"{CC}/agents", headers={"X-Admin-Key": _admin_pw()})
+    assert r.status_code == 200
+
+
+def test_legacy_header_key_killswitch_ok(client, isolated_controller):
+    # Positive control: the gate admits the real admin credential and the
+    # handler actually runs (state flips) — the gate is a gate, not a wall.
+    isolated_controller.register_agent(PROBE_AGENT, 1000)
+    r = client.post(
+        f"{CC}/killswitch/{PROBE_AGENT}",
+        json={"action": "kill", "reason": "w44-control"},
+        headers={"X-Admin-Key": _admin_pw()},
+    )
+    assert r.status_code == 200
+    assert isolated_controller.get_status(PROBE_AGENT)["killed"] is True
+
+
+def test_legacy_role_jwt_cc_agents_ok(client, app, isolated_controller):
+    token = _mint_legacy(app, _admin_user(), claims={"role": "admin"})
+    r = client.get(f"{CC}/agents", headers=_bearer(token))
+    assert r.status_code == 200
+
+
+def test_legacy_admin_session_cc_agents_ok(client, isolated_controller):
+    with client.session_transaction() as sess:
+        sess["is_admin"] = True
+        sess["admin_username"] = _admin_user()
+    r = client.get(f"{CC}/agents")
+    assert r.status_code == 200
+
+
+def test_legacy_non_ascii_admin_key_refused_not_500(client, isolated_controller):
+    r = client.get(f"{CC}/agents", headers={"X-Admin-Key": _admin_pw() + "ü"})
+    assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Non-ASCII X-Admin-Key: hmac.compare_digest raises TypeError on
+# non-ASCII str input. Every key compare must fail CLOSED (401 / False),
+# never surface the exception as a 500.
+# ---------------------------------------------------------------------------
+
+def test_non_ascii_admin_key_mvp_cc_refused_not_500(mvp_client, isolated_controller):
+    r = mvp_client.get(f"{CC}/agents", headers={"X-Admin-Key": _admin_pw() + "ü"})
+    assert r.status_code == 401
+
+
+def test_non_ascii_admin_key_legacy_waitlist_stats_refused_not_500(client):
+    # Exercises the waitlist handler's own _is_admin_request mirror on
+    # the legacy mount (the mirror's header compare).
+    r = client.get(STATS, headers={"X-Admin-Key": _admin_pw() + "ü"})
+    assert r.status_code == 401
+    _assert_no_counts(r)
+
+
+def test_non_ascii_admin_key_sponsored_stake_fails_closed(app):
+    # sponsored_stake._admin_key_ok is the identical one-spot compare
+    # pattern (X-Admin-Key vs ADMIN_PASSWORD); it must return False,
+    # not raise, on an un-comparable header value.
+    from sincor2.sponsored_stake import _admin_key_ok
+
+    with app.test_request_context(headers={"X-Admin-Key": _admin_pw() + "ü"}):
+        assert _admin_key_ok() is False
+    with app.test_request_context(headers={"X-Admin-Key": _admin_pw()}):
+        assert _admin_key_ok() is True

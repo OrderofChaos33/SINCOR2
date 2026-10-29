@@ -1018,7 +1018,15 @@ def _check_admin_key(req) -> bool:
     # Same posture as sponsored_stake._admin_key_ok and the waitlist
     # handler's _is_admin_request.
     key = req.headers.get('X-Admin-Key', '')
-    return bool(key) and hmac.compare_digest(str(key), str(expected))
+    if not key:
+        return False
+    try:
+        return hmac.compare_digest(str(key), str(expected))
+    except (TypeError, ValueError):
+        # hmac.compare_digest raises TypeError on non-ASCII str input;
+        # an un-comparable header value fails CLOSED (401), never a 500
+        # (hunt-32 W-44, Builder B minor).
+        return False
 
 
 def _is_admin_session() -> bool:
