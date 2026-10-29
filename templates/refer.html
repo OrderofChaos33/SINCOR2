@@ -36,7 +36,7 @@
 <body>
 <div class="wrap">
   <span class="badge">SINC Referral Program</span>
-  <h1>Bring a buyer. <span class="grad">Earn 3% — on-chain, instant.</span></h1>
+  <h1>Bring a buyer. <span class="grad">Earn 3% — on-chain.</span></h1>
   <p class="sub">Every purchase made through your link pays you <b>3% of the buy, automatically, in the same transaction.</b> No sign-up, no payout delay, no middleman — it's enforced by the bonding-curve contract itself.</p>
 
   <div class="card">
@@ -64,7 +64,7 @@
   <div class="card">
     <div class="step"><div class="n">1</div><div>Connect your wallet above to mint your unique <span class="mono">?ref=</span> link.</div></div>
     <div class="step"><div class="n">2</div><div>Share it anywhere — X, Telegram, Discord, your group chat.</div></div>
-    <div class="step"><div class="n">3</div><div>Anyone who buys SINC through your link triggers an instant <span class="hl">3% payout</span> to your wallet, paid by the contract in the same buy transaction.</div></div>
+    <div class="step"><div class="n">3</div><div>Anyone who buys SINC through your link triggers a <span class="hl">3% payout</span> to your wallet, paid by the contract in the same buy transaction.</div></div>
   </div>
 
   <p class="muted">SINC token <span class="mono">{{ sinc_token }}</span> · Base · Sourcify-verified, ownership renounced. The 3% referral is hard-coded in the bonding curve <span class="mono">0x75dE…619C</span> — verify it yourself on Basescan. Referral rewards are not investment advice; buyers should do their own research.</p>
@@ -96,7 +96,7 @@
 
   $('connectBtn').onclick = connect;
   $('copyBtn').onclick = ()=>{ navigator.clipboard.writeText(refUrl).then(()=>{ $('copyBtn').textContent='Copied ✓'; setTimeout(()=>$('copyBtn').textContent='Copy',1500); }); };
-  $('tweetBtn').onclick = ()=>{ const t = encodeURIComponent('I\'m earning 3% on every SINC buy through my link. Verified + audited token on @base. Grab some 👇'); window.open('https://twitter.com/intent/tweet?text='+t+'&url='+encodeURIComponent(refUrl),'_blank'); };
+  $('tweetBtn').onclick = ()=>{ const t = encodeURIComponent('I\'m earning 3% on every SINC buy through my link. SINC is the access token for the @sincor agent marketplace on @base 👇'); window.open('https://twitter.com/intent/tweet?text='+t+'&url='+encodeURIComponent(refUrl),'_blank'); };
   $('tgBtn').onclick = ()=>{ window.open('https://t.me/share/url?url='+encodeURIComponent(refUrl)+'&text='+encodeURIComponent('Earn 3% on every SINC buy via my link:'),'_blank'); };
   $('qrBtn').onclick = ()=>{ const q=$('qr'); q.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(refUrl); q.style.display = q.style.display==='block'?'none':'block'; };
 
