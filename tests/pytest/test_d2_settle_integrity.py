@@ -188,9 +188,26 @@ def _settle_pack(client, cid, tx_hash):
     return res.get_json()
 
 
+def _platform_sign(payment_id: str) -> str:
+    """W-113: EIP-191 payer signature over the platform bind message,
+    as the buyer's connected wallet produces via personal_sign."""
+    return _PAYER_ACCT.sign_message(_encode_defunct(
+        text=pp.platform_bind_message(
+            payment_id, _PAYER_ACCT.address))).signature.hex()
+
+
+def _verify_bound(payment_id: str, tx_hash: str):
+    """verify_checkout under the W-113 bound flow: the checkout's bound
+    payer (PAYER) plus its EIP-191 ownership proof."""
+    return pp.verify_checkout(
+        payment_id, tx_hash, payer_wallet=PAYER,
+        payer_signature=_platform_sign(payment_id))
+
+
 def _insert_starter_checkout(payment_id: str) -> None:
     """A platform 'starter' checkout denominated in USDC ($297) — the
-    documented settle_plan_quote USDC-fallback shape for this plan."""
+    documented settle_plan_quote USDC-fallback shape for this plan.
+    W-113: the payer wallet (PAYER) is bound at creation."""
     now = datetime.now(timezone.utc)
     with pp._conn() as conn:
         conn.execute(
@@ -199,8 +216,8 @@ def _insert_starter_checkout(payment_id: str) -> None:
                 amount_display, usd_reference, payer_wallet, customer_email,
                 status, tx_hash, created_at, expires_at, metadata)
                VALUES (?, 'starter', 'Starter', 'USDC', ?, 297.0, 297.0,
-                       '', 'buyer@example.com', 'pending', NULL, ?, ?, ?)""",
-            (payment_id, str(USDC_297), now.isoformat(),
+                       ?, 'buyer@example.com', 'pending', NULL, ?, ?, ?)""",
+            (payment_id, str(USDC_297), PAYER, now.isoformat(),
              (now + timedelta(hours=1)).isoformat(),
              '{"order_type": "subscription", "billing": "month"}'),
         )
@@ -245,7 +262,7 @@ def test_double_spend_rail_first_platform_refused(
     assert _intake_count(env["tmp"]) == 1
 
     _insert_starter_checkout("PLAT-D2-RAILFIRST")
-    r = pp.verify_checkout("PLAT-D2-RAILFIRST", TX_A)
+    r = _verify_bound("PLAT-D2-RAILFIRST", TX_A)
     assert r["ok"] is False, r
     assert r["error"] == "tx_already_used"
     # No second fulfillment: checkout never finalized, cannot fulfill.
@@ -267,7 +284,7 @@ def test_double_spend_platform_first_rail_refused(
     is never fulfilled."""
     env["chain"].register(TX_B, PAYER, USDC_297)
     _insert_starter_checkout("PLAT-D2-PLATFIRST")
-    r = pp.verify_checkout("PLAT-D2-PLATFIRST", TX_B)
+    r = _verify_bound("PLAT-D2-PLATFIRST", TX_B)
     assert r["ok"] is True and r["status"] == "finalized", r
     assert pp.mark_checkout_fulfilled("PLAT-D2-PLATFIRST") is True
 
@@ -293,7 +310,7 @@ def test_double_spend_subscription_first_platform_refused(env):
     assert res["ok"] is True, res
 
     _insert_starter_checkout("PLAT-D2-SUBFIRST")
-    r = pp.verify_checkout("PLAT-D2-SUBFIRST", TX_H)
+    r = _verify_bound("PLAT-D2-SUBFIRST", TX_H)
     assert r["ok"] is False, r
     assert r["error"] == "tx_already_used"
     assert pp._load_checkout("PLAT-D2-SUBFIRST")["status"] not in (
@@ -329,9 +346,9 @@ def test_same_tx_twice_same_platform_ledger_refused(env):
     env["chain"].register(TX_D, PAYER, USDC_297)
     _insert_starter_checkout("PLAT-D2-SAME-A")
     _insert_starter_checkout("PLAT-D2-SAME-B")
-    r1 = pp.verify_checkout("PLAT-D2-SAME-A", TX_D)
+    r1 = _verify_bound("PLAT-D2-SAME-A", TX_D)
     assert r1["ok"] is True and r1["status"] == "finalized", r1
-    r2 = pp.verify_checkout("PLAT-D2-SAME-B", TX_D)
+    r2 = _verify_bound("PLAT-D2-SAME-B", TX_D)
     assert r2["ok"] is False, r2
     assert r2["error"] == "tx_already_used"
     assert pp._load_checkout("PLAT-D2-SAME-B")["status"] == "pending"
@@ -347,7 +364,7 @@ def test_different_txs_both_succeed_no_false_positive(
     assert body["ok"] is True, body
 
     _insert_starter_checkout("PLAT-D2-DISTINCT")
-    r = pp.verify_checkout("PLAT-D2-DISTINCT", TX_F)
+    r = _verify_bound("PLAT-D2-DISTINCT", TX_F)
     assert r["ok"] is True and r["status"] == "finalized", r
     assert pp.mark_checkout_fulfilled("PLAT-D2-DISTINCT") is True
     assert _intake_count(env["tmp"]) == 1

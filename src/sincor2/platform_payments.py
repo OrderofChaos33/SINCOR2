@@ -1420,6 +1420,32 @@ def _maybe_finalize(
         confirmations=conf,
         required_confirmations=depth,
     )
+    # W-113 (defense in depth): never record a registry claim without a
+    # payer. Callers reach here either through the proof-gated
+    # verify_checkout (payer proven by EIP-191 signature) or through
+    # _advance_finality, which verifies against the checkout's bound
+    # wallet; an empty payer here means neither happened.
+    if not str(vr.get("payer_wallet") or "").strip():
+        _set_checkout_status(
+            payment_id, "pending",
+            only_from=("verifying", "awaiting_finality"),
+        )
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            "registry claim refused: no proven payer")
+        return {"ok": False, "error": "payer_wallet_required", **base}
+    # W-113 (defense in depth): when the checkout carries a bound payer,
+    # the verified payer must BE that payer. A verification result naming
+    # anyone else (e.g. a merely chain-recovered payer for a row bound to
+    # a different wallet) never finalizes and never claims.
+    bound_payer = str(row.get("payer_wallet") or "").strip().lower()
+    if bound_payer and \
+            str(vr.get("payer_wallet") or "").strip().lower() != bound_payer:
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            "registry claim refused: verified payer contradicts the "
+            "checkout's bound payer")
+        return {"ok": False, "error": "payer_wallet_mismatch", **base}
     # D2: claim the tx in the shared consumed_onchain_txs registry BEFORE
     # any finality/fulfillment transition, so the same on-chain transfer
     # cannot also fulfill an x402 challenge or a rail settle under a
@@ -1545,6 +1571,19 @@ def _advance_finality(payment_id: str) -> dict[str, Any]:
     tx_hash = row["tx_hash"] or ""
     if not tx_hash:
         return {"ok": False, "error": "tx_hash_missing", "payment_id": payment_id}
+    if not str(row["payer_wallet"] or "").strip():
+        # W-113: a legacy row can sit in 'awaiting_finality' with NO
+        # bound payer (first verify predates the payer-proof gate).
+        # Re-verifying it would hand back the chain-recovered payer and
+        # finalize on a payer nobody ever proved — the squat through
+        # the recheck door. Refuse and leave the row exactly as found;
+        # it can only advance once a payer is bound by a proven verify.
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            "finality recheck refused: checkout has no bound payer")
+        return {"ok": False, "error": "payer_wallet_required",
+                "status": row["status"], "payment_id": payment_id,
+                "tx_hash": tx_hash}
     vr = verify_treasury_transfer(
         tx_hash,
         token=row["token"],
@@ -1646,12 +1685,122 @@ def mark_checkout_fulfilled(payment_id: str) -> bool:
                                 only_from=("finalized",)) == 1
 
 
+# --- W-113: platform checkout payer binding (EIP-191 ownership proof) ---
+# Before W-113, verify_checkout accepted a bare (payment_id, tx_hash):
+# verify_treasury_transfer rejected only a SUPPLIED payer_wallet that
+# mismatched the chain payer, so a caller supplying NO wallet finalized a
+# checkout against ANY observed treasury transfer and claimed the tx in
+# the shared consumed_onchain_txs registry under the chain-recovered
+# payer — recorded as if proven. Anyone watching the treasury could
+# squat a victim's payment: the attacker's checkout finalized and
+# fulfilled on the victim's transfer, and the victim's own rail/x402
+# settle then failed tx_hash_already_used (hunt-31 PoC,
+# poc31_d2_platform_squat.py; reproduced 2026-10-28).
+#
+# The rail/x402 legs already require an EIP-191-bound challenge
+# (hunt-29 B1: bind_challenge_payer + require_bound_challenge). The
+# platform leg now requires the same class of proof at verify:
+#   * the checkout's payer is its BOUND wallet — the wallet stored at
+#     creation, or, for checkouts created wallet-less, the wallet proven
+#     at first verify (the binding is then written to the row);
+#   * verify must present payer_wallet == the bound payer AND an EIP-191
+#     personal_sign signature from that wallet over
+#     platform_bind_message(payment_id, payer_wallet);
+#   * the proven wallet is passed into verify_treasury_transfer, so the
+#     on-chain payer must equal it.
+# A registry claim is therefore only ever recorded for a payer the
+# caller proved it controls — never one merely recovered from chain.
+
+#: EIP-191 personal_sign domain for platform-checkout payer binding.
+PLATFORM_BIND_DOMAIN = "SINCOR-PLATFORM-CHECKOUT-BIND"
+
+
+def platform_bind_message(payment_id: str, payer_wallet: str) -> str:
+    """Canonical message the payer signs to prove wallet ownership for a
+    platform checkout verify. Public so clients/SDKs can build
+    byte-identical messages; the server always rebuilds it from its own
+    payment_id and the claimed wallet, so a signature obtained for one
+    checkout or wallet cannot be replayed for another."""
+    return "|".join(
+        [
+            PLATFORM_BIND_DOMAIN,
+            str(payment_id),
+            str(payer_wallet).strip().lower(),
+        ]
+    )
+
+
+def _recover_platform_bind_signer(message: str, signature: str) -> str:
+    """Recover the signer of a platform-bind signature.
+
+    Mirrors x402_payments._recover_bind_signer: require_low_s
+    canonicality first (high-s twins are rejected even though they
+    recover to the same address — the codebase standard), then
+    eth_account EIP-191 recovery. Raises ValueError on any failure;
+    callers fail closed.
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        raw = require_low_s(signature)
+        return str(
+            Account.recover_message(encode_defunct(text=message), signature=raw)
+        )
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def _payer_proof_gate(
+    payment_id: str,
+    row: dict[str, Any],
+    payer_wallet: str,
+    payer_signature: str,
+) -> tuple[str, dict[str, Any] | None]:
+    """W-113 payer-proof gate for verify_checkout.
+
+    Returns (proven_wallet, None) when the caller proved control of the
+    checkout's payer wallet, else ("", error_dict). Enforces, in order:
+      1. an effective payer exists — the checkout's bound wallet, or the
+         supplied wallet for a wallet-less checkout (bound at verify);
+      2. a supplied wallet contradicting the bound wallet is refused;
+      3. an EIP-191 signature from the effective wallet over
+         platform_bind_message(payment_id, wallet) recovers to it.
+    """
+    bound = str(row.get("payer_wallet") or "").strip().lower()
+    supplied = str(payer_wallet or "").strip().lower()
+    if bound and supplied and supplied != bound:
+        return "", {"ok": False, "error": "payer_wallet_mismatch",
+                    "payment_id": payment_id}
+    wallet = bound or supplied
+    if not wallet:
+        return "", {"ok": False, "error": "payer_wallet_required",
+                    "payment_id": payment_id}
+    if not payer_signature:
+        return "", {"ok": False, "error": "ownership_signature_required",
+                    "payment_id": payment_id}
+    message = platform_bind_message(payment_id, wallet)
+    try:
+        recovered = _recover_platform_bind_signer(message, payer_signature)
+    except ValueError:
+        return "", {"ok": False, "error": "ownership_proof_failed",
+                    "payment_id": payment_id}
+    if recovered.lower() != wallet:
+        return "", {"ok": False, "error": "ownership_proof_failed",
+                    "payment_id": payment_id}
+    return wallet, None
+
+
 def verify_checkout(
     payment_id: str,
     tx_hash: str,
     *,
     customer_email: str = "",
     payer_wallet: str = "",
+    payer_signature: str = "",
 ) -> dict[str, Any]:
     """Verify an onchain treasury payment for a checkout.
 
@@ -1661,6 +1810,13 @@ def verify_checkout(
     provisioned, via `mark_checkout_fulfilled`. Re-polling an
     'awaiting_finality' checkout re-checks the chain: a vanished tx means a
     reorg/drop and the order goes to 'reverted' with an audit record.
+
+    W-113: the pending->verify transition additionally requires payer
+    proof (see _payer_proof_gate): the caller must prove control of the
+    checkout's bound payer wallet with an EIP-191 signature, and the
+    on-chain payer must equal that proven wallet. A bare
+    (payment_id, tx_hash) pair proves nothing and is refused before any
+    chain call or registry claim.
     """
     if not payment_id or not tx_hash:
         return {"ok": False, "error": "payment_id_and_tx_hash_required"}
@@ -1745,10 +1901,31 @@ def verify_checkout(
     finally:
         conn.close()
 
+    # W-113: payer proof BEFORE any chain call or registry claim. Only
+    # the pending->verify transition passes through here; re-polls of an
+    # 'awaiting_finality'/'finalized' checkout returned above via
+    # _advance_finality, which re-verifies against the wallet bound (and
+    # proven) by this first verify.
+    proven_wallet, proof_error = _payer_proof_gate(
+        payment_id, row, payer_wallet, payer_signature)
+    if proof_error is not None:
+        with _conn() as conn:
+            conn.execute(
+                "UPDATE platform_checkouts SET status='pending' "
+                "WHERE payment_id=? AND status='verifying'",
+                (payment_id,),
+            )
+            conn.commit()
+        _audit_payment_event(
+            payment_id, "payer_proof_refused", tx_hash,
+            str(proof_error.get("error") or ""))
+        return proof_error
+
     token = row["token"]
     expected = int(row["amount_atomic"])
     vr = verify_treasury_transfer(
-        tx_hash, token=token, expected_atomic=expected, payer_wallet=payer_wallet
+        tx_hash, token=token, expected_atomic=expected,
+        payer_wallet=proven_wallet
     )
     if not vr.get("ok"):
         with _conn() as conn:
@@ -1760,6 +1937,20 @@ def verify_checkout(
             conn.commit()
         base = _checkout_result_payload(row, tx_hash=tx_hash)
         return {**vr, **base}
+
+    if not str(row.get("payer_wallet") or "").strip():
+        # W-113: the first proven verify binds a wallet-less checkout to
+        # the proven payer, so every later finality advance re-verifies
+        # against this wallet (never a merely chain-recovered one).
+        with _conn() as conn:
+            conn.execute(
+                "UPDATE platform_checkouts SET payer_wallet=? "
+                "WHERE payment_id=? "
+                "AND (payer_wallet IS NULL OR payer_wallet='')",
+                (proven_wallet, payment_id),
+            )
+            conn.commit()
+        row["payer_wallet"] = proven_wallet
 
     if customer_email:
         with _conn() as conn:
