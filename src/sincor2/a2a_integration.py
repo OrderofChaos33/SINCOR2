@@ -360,8 +360,14 @@ class AgentCard:
             "authentication": {
                 "schemes":     list(self.security_schemes.keys()),
                 "description": (
-                    "Pass your API key in the X-API-Key header. "
-                    "Obtain a key at https://getsincor.com/api-keys."
+                    "No API key required. Quote and task submission are "
+                    "open to all A2A callers; payment is enforced on-chain "
+                    "via AXM transfer confirmation on Base. To register an "
+                    "agent identity, POST /v1/a2a/register — a wallet claim "
+                    "must carry an EIP-191 registration proof "
+                    "(registration_signature over "
+                    "SINCOR-REGISTER|<agent_id>|<registration_ts>, with "
+                    "registration_wallet set to the signing wallet)."
                 ),
             },
             "capabilities":   self.capabilities,
