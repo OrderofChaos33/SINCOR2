@@ -229,6 +229,28 @@ class WaitlistManager:
             
             return position + 1
     
+    def get_signup_stats(self):
+        """Aggregate signup counts computed directly from the waitlist table.
+
+        Aggregates ONLY — total rows, verified rows, and the most recent
+        signup timestamp. No emails, email hashes, company names, or
+        per-user rows ever leave this method. Computed from the waitlist
+        table itself, never the product_analytics rollup (whose counters
+        can drift from the table they summarize).
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            total, verified, latest = conn.execute('''
+                SELECT COUNT(*),
+                       COALESCE(SUM(is_verified), 0),
+                       MAX(signup_date)
+                FROM waitlist
+            ''').fetchone()
+        return {
+            'total_signups': int(total or 0),
+            'verified_signups': int(verified or 0),
+            'latest_signup_at': latest,
+        }
+
     def get_analytics(self):
         """Get waitlist analytics"""
         with sqlite3.connect(self.db_path) as conn:

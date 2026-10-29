@@ -1089,6 +1089,42 @@ def _command_center_api_admin_gate():
         return _require_admin(request)
     return None
 
+# Waitlist on production: the waitlist blueprint was previously mounted
+# ONLY by the legacy app, so production served no /api/waitlist/* routes
+# at all and the website signup count was trapped in the Railway host's
+# SQLite file (data/waitlist.db) with no read path. Mount it here with
+# the production WaitlistManager singleton (the same data/waitlist.db
+# the signups land in). POST join stays public — it IS the signup
+# endpoint and its behavior is unchanged. The aggregate stats route
+# (GET /api/waitlist/stats) is admin-gated twice: _require_admin runs
+# as a before_request guard over that path (same treatment as the
+# command-center APIs above), and the handler re-checks admin itself.
+from sincor2.blueprints.waitlist import waitlist_bp as _waitlist_bp
+from sincor2.error_handling import ApiError as _WaitlistApiError
+from sincor2.error_handling import api_error as _waitlist_api_error
+from sincor2.waitlist_system import waitlist_manager as _waitlist_manager
+
+app.extensions["waitlist_manager"] = _waitlist_manager
+app.register_blueprint(_waitlist_bp)
+
+
+# The waitlist handlers raise ApiError (400 invalid payload / 400 join
+# failure / 503 unavailable). The legacy app renders those through
+# register_error_handlers; this app never registered an ApiError
+# handler, so without this the newly mounted routes would surface
+# every refusal as a bare 500. Register ONLY the ApiError handler —
+# this app's own 404/500/413 handlers below stay exactly as they are.
+@app.errorhandler(_WaitlistApiError)
+def _waitlist_api_error_handler(error):
+    return _waitlist_api_error(error.code, error.message, error.status, error.details)
+
+
+@app.before_request
+def _waitlist_stats_admin_gate():
+    if request.path.startswith("/api/waitlist/stats"):
+        return _require_admin(request)
+    return None
+
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)
 
