@@ -22,8 +22,11 @@ Security posture (same as ``payment_verifier.py`` / ``auction_client.py``):
   the cursor rewinds REORG_WINDOW blocks and the range is rescanned.
   Re-recording is idempotent — obligation IDs derive from
   (tx_hash, fee amount) — so a rescan can never create duplicates.
-* RPC failures fail closed: the cursor never advances on error and
-  ``run_once()`` returns ``ok=False``; the next run retries the same range.
+* RPC failures fail closed: scans fetch ``eth_getLogs`` in bounded
+  chunks and the cursor advances ONLY past fully scanned chunks, so a
+  failure mid-scan leaves the cursor at the last completed chunk
+  boundary and ``run_once()`` returns ``ok=False``; the next run resumes
+  there — blocks are never skipped and recording is idempotent.
 * Dust filter: inflows below ``min_recordable_wei`` are observed but not
   recorded as obligations (logged at debug level).
 * Client-side log verification: every returned log is re-checked against
@@ -90,6 +93,50 @@ BPS_DENOM = 10_000
 REORG_WINDOW = 64
 # Cap on blocks scanned per run_once() so one run cannot exceed RPC limits.
 MAX_BLOCKS_PER_SCAN = 2_000
+# Default eth_getLogs chunk size.  Real providers cap the block range per
+# getLogs call (1rpc rejects >50 blocks; publicnode has had proxy
+# episodes), so scans fetch in bounded chunks instead of one whole-range
+# call that a large backlog can make impossible to clear.
+DEFAULT_LOG_CHUNK_BLOCKS = 500
+# Halving floor when a provider rejects a chunk for range size: keep
+# halving until a single block — the smallest possible getLogs range.
+# If even that is rejected, the error propagates (fail-closed).
+MIN_LOG_CHUNK_BLOCKS = 1
+
+# Substrings (lowercased) that identify a provider's range-size rejection
+# of an eth_getLogs call, as opposed to a hard failure (outage, auth,
+# rate limit) which must NOT trigger splitting.
+_RANGE_ERROR_HINTS = (
+    "block range",
+    "range too large",
+    "range is too large",
+    "too large",
+    "exceeds",
+    "maximum number of blocks",
+    "too many results",
+    "response size exceeded",
+)
+
+
+def _is_range_error(exc: BaseException) -> bool:
+    """True if ``exc`` is a provider rejecting the getLogs block range."""
+    msg = str(exc).lower()
+    return any(hint in msg for hint in _RANGE_ERROR_HINTS)
+
+
+def _checksum_address(addr: str) -> str:
+    """EIP-55 checksum an address at the RPC boundary.
+
+    Mirrors ``fee_conversion_executor._ck()``: the in-repo AXIOM_TOKEN
+    constant is lowercase and web3.py v8 rejects non-checksum
+    eth_getLogs filter addresses, so without this the listener can
+    never complete a live cycle (the FEE_LISTENER_TOKEN env override
+    was only a workaround).  Raises on a malformed address, which
+    run_once() surfaces as a fail-closed RPC failure.
+    """
+    from web3 import Web3
+
+    return Web3.to_checksum_address(addr)
 
 
 def _default_cursor_path() -> str:
@@ -163,6 +210,20 @@ class FeeListenerConfig:
             int(v) if (v := os.getenv("FEE_LISTENER_START_BLOCK", "").strip()) else None
         )
     )
+    # Overall cap on blocks scanned per run_once() cycle.
+    max_blocks_per_scan: int = field(
+        default_factory=lambda: int(
+            os.getenv("FEE_LISTENER_MAX_BLOCKS_PER_SCAN", str(MAX_BLOCKS_PER_SCAN))
+        )
+    )
+    # eth_getLogs chunk size: a scan fetches in bounded chunks and the
+    # cursor advances only past fully scanned chunks.  A provider that
+    # rejects a chunk for range size triggers halving below this size.
+    log_chunk_blocks: int = field(
+        default_factory=lambda: int(
+            os.getenv("FEE_LISTENER_LOG_CHUNK_BLOCKS", str(DEFAULT_LOG_CHUNK_BLOCKS))
+        )
+    )
 
     def __post_init__(self) -> None:
         if self.fee_bps != 500:
@@ -171,6 +232,18 @@ class FeeListenerConfig:
                 "recording obligations at the configured rate",
                 self.fee_bps,
             )
+        if self.log_chunk_blocks < 1:
+            logger.warning(
+                "FEE_LISTENER_LOG_CHUNK_BLOCKS=%d is not positive; clamping to 1",
+                self.log_chunk_blocks,
+            )
+            self.log_chunk_blocks = 1
+        if self.max_blocks_per_scan < 1:
+            logger.warning(
+                "FEE_LISTENER_MAX_BLOCKS_PER_SCAN=%d is not positive; clamping to 1",
+                self.max_blocks_per_scan,
+            )
+            self.max_blocks_per_scan = 1
 
 
 # --- Listener ----------------------------------------------------------------
@@ -265,20 +338,64 @@ class FeeEventListener:
             return []
         recipient_topic = _topic_address(self.config.fee_recipient)
         token = self.config.token
-        logs = w3.eth.get_logs(
-            {
-                "fromBlock": from_block,
-                "toBlock": to_block,
-                "address": token,
-                "topics": [TRANSFER_TOPIC, None, recipient_topic],
-            }
-        )
+        logs = self._get_logs_chunked(w3, from_block, to_block)
         events: List[Dict[str, Any]] = []
         for log in logs:
             parsed = self._parse_log(log, token, recipient_topic)
             if parsed is not None:
                 events.append(parsed)
         return events
+
+    def _get_logs_chunked(
+        self, w3: Any, from_block: int, to_block: int
+    ) -> List[Any]:
+        """Raw eth_getLogs over [from_block, to_block] in bounded chunks."""
+        logs: List[Any] = []
+        start = from_block
+        while start <= to_block:
+            end = min(to_block, start + self.config.log_chunk_blocks - 1)
+            logs.extend(self._get_logs_adaptive(w3, start, end))
+            start = end + 1
+        return logs
+
+    def _get_logs_adaptive(
+        self, w3: Any, from_block: int, to_block: int
+    ) -> List[Any]:
+        """One eth_getLogs call, halving the span on range-size rejection.
+
+        The token address is EIP-55 checksummed at this RPC boundary
+        (web3.py v8 rejects the lowercase in-repo constant as a filter
+        address); the recipient is checksummed likewise before being
+        padded into the topic filter.  Non-range errors (outages, rate
+        limits) propagate unchanged so callers fail closed.
+        """
+        try:
+            return w3.eth.get_logs(
+                {
+                    "fromBlock": from_block,
+                    "toBlock": to_block,
+                    "address": _checksum_address(self.config.token),
+                    "topics": [
+                        TRANSFER_TOPIC,
+                        None,
+                        _topic_address(
+                            _checksum_address(self.config.fee_recipient)),
+                    ],
+                }
+            )
+        except Exception as exc:
+            span = to_block - from_block + 1
+            if span > MIN_LOG_CHUNK_BLOCKS and _is_range_error(exc):
+                mid = from_block + span // 2 - 1
+                logger.warning(
+                    "fee-listener: provider rejected a %d-block getLogs "
+                    "range (%s); halving and retrying", span, exc,
+                )
+                return (
+                    self._get_logs_adaptive(w3, from_block, mid)
+                    + self._get_logs_adaptive(w3, mid + 1, to_block)
+                )
+            raise
 
     def _parse_log(
         self, log: Any, token: str, recipient_topic: str
@@ -384,9 +501,10 @@ class FeeEventListener:
     def run_once(self) -> Dict[str, Any]:
         """One poll cycle.  Returns a summary dict; never raises on RPC errors.
 
-        The cursor advances ONLY after events are fetched and recorded
-        successfully — an RPC failure anywhere fails closed (ok=False) and
-        the next run retries the same range.
+        The cursor advances ONLY past chunks whose events were fetched
+        and recorded successfully — an RPC failure fails closed
+        (ok=False) with the cursor at the last completed chunk boundary,
+        and the next run resumes there.
         """
         try:
             w3 = self._w3()
@@ -429,33 +547,55 @@ class FeeEventListener:
                 return self._rpc_failure(str(exc))
 
         # Cap the scan window so one run cannot exceed RPC log limits.
-        to_block = min(tip, from_block + MAX_BLOCKS_PER_SCAN)
+        to_block = min(tip, from_block + self.config.max_blocks_per_scan)
         if to_block <= from_block:
             return {"ok": True, "scanned": 0, "recorded_count": 0,
                     "from_block": from_block, "to_block": to_block,
                     "tip": tip, "reorg": reorg}
 
+        # Scan in bounded chunks.  The cursor advances ONLY past a chunk
+        # whose events were fetched AND recorded, so a hard failure
+        # mid-scan fails closed with the cursor at the last completed
+        # chunk boundary (untouched if the first chunk failed); the next
+        # run resumes there.  Recording is idempotent, so a resumed scan
+        # can never duplicate obligations.
+        totals: Dict[str, Any] = {"recorded": [], "recorded_count": 0,
+                                  "reencountered": 0, "skipped_dust": 0}
+        scanned_events = 0
+        tip_hash = ""
+        chunk_start = from_block + 1
         try:
-            events = self.fetch_transfer_events(w3, from_block + 1, to_block)
-            result = self.process_events(events)
-            tip_hash = self._block_hash(w3, to_block)
-            self.save_cursor(to_block, tip_hash)
+            while chunk_start <= to_block:
+                chunk_end = min(
+                    to_block,
+                    chunk_start + self.config.log_chunk_blocks - 1,
+                )
+                events = self.fetch_transfer_events(w3, chunk_start, chunk_end)
+                result = self.process_events(events)
+                tip_hash = self._block_hash(w3, chunk_end)
+                self.save_cursor(chunk_end, tip_hash)
+                scanned_events += len(events)
+                totals["recorded"].extend(result["recorded"])
+                totals["recorded_count"] += result["recorded_count"]
+                totals["reencountered"] += result["reencountered"]
+                totals["skipped_dust"] += result["skipped_dust"]
+                chunk_start = chunk_end + 1
         except Exception as exc:
             # Ledger-write or disk failures land here too: nothing was
-            # committed past the cursor, so the next run retries the same
-            # range (recording is idempotent).  Never advance on error.
+            # committed past the last completed chunk, so the next run
+            # resumes at that boundary.  Never advance on error.
             return self._rpc_failure(f"scan/process/cursor failed: {exc}")
 
         summary = {
             "ok": True,
-            "scanned": len(events),
+            "scanned": scanned_events,
             "from_block": from_block + 1,
             "to_block": to_block,
             "tip": tip,
             "reorg": reorg,
             "cursor": {"block": to_block, "hash": tip_hash},
         }
-        summary.update(result)
+        summary.update(totals)
         return summary
 
     def _rpc_failure(self, error: str) -> Dict[str, Any]:
