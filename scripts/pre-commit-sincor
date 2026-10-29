@@ -681,12 +681,46 @@ echo "=== SINCOR pre-commit: child_process guard (dev-watch 302) ==="
 # and any shell: option that is not false in a JS/TS file importing
 # child_process are hard failures. Mirrors
 # tests/pytest/test_devwatch300_argv_only.py (TestChildProcessGuard).
+# 302 follow-up: also the node: specifier, whitespace-tight import /
+# destructured-require spellings, same-line declaration+call, and
+# renamed bindings ({exec: run} / {exec as run} — the local name is
+# what gets called). Dynamic dispatch stays the accepted residual.
 python3 - <<'PYEOF2'
 import re, sys
 from pathlib import Path
 
 _SUFFIXES = {".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"}
 _BANNED = ("exec", "execSync")
+_MODULE_SPEC = r"(?:node:)?child_process"
+_ALIAS_PATTERNS = (
+    r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(\s*['\"]" + _MODULE_SPEC + r"['\"]\s*\)",
+    r"import\s+([A-Za-z_$][\w$]*)\s+from\s*['\"]" + _MODULE_SPEC + r"['\"]",
+    r"import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from\s*['\"]" + _MODULE_SPEC + r"['\"]",
+    r"import\s+([A-Za-z_$][\w$]*)\s*,\s*\{[^}]*\}\s*from\s*['\"]" + _MODULE_SPEC + r"['\"]",
+)
+_DESTRUCTURE_PATTERNS = (
+    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\s*\(\s*['\"]" + _MODULE_SPEC + r"['\"]\s*\)",
+    r"import\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\s*['\"]" + _MODULE_SPEC + r"['\"]",
+)
+
+def _destructured_locals(group):
+    names = set()
+    for part in group.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            exported, _, local = part.partition(":")
+        elif " as " in part:
+            exported, _, local = part.partition(" as ")
+        else:
+            exported = local = part
+        exported = exported.strip()
+        local = local.strip().split("=")[0].strip()
+        if exported in _BANNED and re.fullmatch(r"[A-Za-z_$][\w$]*", local):
+            names.add(local)
+    return names
+
 violations = []
 for path in sorted(Path(".").rglob("*")):
     if path.suffix not in _SUFFIXES or not path.is_file():
@@ -695,29 +729,22 @@ for path in sorted(Path(".").rglob("*")):
         continue
     source = path.read_text(encoding="utf-8", errors="replace")
     aliases = {"child_process"}
-    for pat in (
-        r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
-        r"import\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
-        r"import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
-    ):
+    for pat in _ALIAS_PATTERNS:
         aliases.update(re.findall(pat, source))
     names = set()
-    for pat in (
-        r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
-        r"import\s*\{([^}]*)\}\s*from\s+['\"]child_process['\"]",
-    ):
+    for pat in _DESTRUCTURE_PATTERNS:
         for group in re.findall(pat, source):
-            for part in group.split(","):
-                name = part.strip().split(":")[0].strip().split(" as ")[0].strip()
-                if name in _BANNED:
-                    names.add(name)
+            names.update(_destructured_locals(group))
     for lineno, line in enumerate(source.splitlines(), start=1):
         for alias in aliases:
             for member in _BANNED:
                 if re.search(rf"\b{re.escape(alias)}\s*\.\s*{member}\s*\(", line):
                     violations.append(f"{path}:{lineno}: {alias}.{member}() executes through a shell")
+        code = line
+        for pat in _ALIAS_PATTERNS + _DESTRUCTURE_PATTERNS:
+            code = re.sub(pat, "", code)
         for name in names:
-            if re.search(rf"(?<![\w$.]){name}\s*\(", line) and "require(" not in line and "import" not in line:
+            if re.search(rf"(?<![\w$.]){name}\s*\(", code):
                 violations.append(f"{path}:{lineno}: destructured child_process {name}() executes through a shell")
         if aliases - {"child_process"} or names or "child_process" in source:
             m = re.search(r"\bshell\s*:\s*(.+?)[,}\)]", line)

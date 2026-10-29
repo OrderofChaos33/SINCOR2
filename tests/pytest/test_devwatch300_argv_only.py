@@ -49,6 +49,17 @@ filenames, where a media tool interpolated a filename argument into a
   alongside the Python ``shell=True`` / ``create_subprocess_shell``
   spellings, which are additionally asserted explicitly against the MCP
   server modules by name;
+* 302 follow-up (coordinator adversarial pass): two static spelling
+  classes that slipped the first JS guard are closed — (1) destructured
+  ``require`` written tight (``const {exec}=require('child_process')``,
+  ``let``/``var``, no-space variants), including a call sharing the
+  declaration line and renamed bindings (``{exec: run}`` /
+  ``{exec as run}`` — the *local* name is what gets called); and
+  (2) the ``node:`` module specifier (``import * as cp from
+  "node:child_process"``, ``require('node:child_process')`` …) plus
+  whitespace-tight ``import`` spellings. The dynamic class (computed
+  member access, alias assignment) remains the accepted residual it
+  has been since item 300;
 * a negative test passes a filename containing ``$(touch <sentinel>)``
   (and the backtick spelling) through the nearest real tool surfaces —
   this codebase has no media/ffmpeg tool and no MCP tool taking a
@@ -1706,28 +1717,85 @@ _JS_SKIP_DIRS = {"node_modules", ".git"}
 # class): exec / execSync run their argument through a shell by design.
 _JS_BANNED_MEMBERS = ("exec", "execSync")
 
+# The module specifier may carry the ``node:`` prefix — same builtin.
+# Whitespace between tokens is optional wherever the JS lexer does not
+# need it to separate two word tokens (``import{exec}from'…'``,
+# ``const{exec}=require(…)``, ``import*as cp from'…'`` are all legal),
+# and required where it does (``const cp``, ``cp from``, ``as cp``).
+_JS_MODULE_SPEC = r"(?:node:)?child_process"
+_JS_ALIAS_PATTERNS = (
+    r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*\(\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]\s*\)",
+    r"import\s+([A-Za-z_$][\w$]*)\s+from\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]",
+    r"import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]",
+    # Mixed default + named import: the default binding is a module
+    # alias too (``import cp, {execFile} from '…'``; ``cp.exec`` bites).
+    r"import\s+([A-Za-z_$][\w$]*)\s*,\s*\{[^}]*\}\s*from\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]",
+)
+_JS_DESTRUCTURE_PATTERNS = (
+    r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\s*\(\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]\s*\)",
+    r"import\s*(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\s*['\"]"
+    + _JS_MODULE_SPEC
+    + r"['\"]",
+)
+
+
+def _js_destructured_locals(group: str) -> set[str]:
+    """Local binding names bound to banned child_process members in a
+    destructuring group. The LOCAL name is what later gets called, so
+    ``{exec: run}`` / ``{exec as run}`` track ``run``; a renamed
+    argv-form member (``{spawn: s}``) tracks nothing."""
+    names: set[str] = set()
+    for part in group.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" in part:
+            exported, _, local = part.partition(":")
+        elif " as " in part:
+            exported, _, local = part.partition(" as ")
+        else:
+            exported = local = part
+        exported = exported.strip()
+        local = local.strip().split("=")[0].strip()
+        if exported in _JS_BANNED_MEMBERS and re.fullmatch(
+            r"[A-Za-z_$][\w$]*", local
+        ):
+            names.add(local)
+    return names
+
 
 def _js_child_process_aliases(source: str) -> tuple[set[str], set[str]]:
     """(module aliases, destructured banned names) for child_process
     imports in a JS/TS source string."""
     aliases = {"child_process"}
-    for pattern in (
-        r"(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
-        r"import\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
-        r"import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['\"]child_process['\"]",
-    ):
+    for pattern in _JS_ALIAS_PATTERNS:
         aliases.update(re.findall(pattern, source))
     names: set[str] = set()
-    for pattern in (
-        r"(?:const|let|var)\s*\{([^}]*)\}\s*=\s*require\(\s*['\"]child_process['\"]\s*\)",
-        r"import\s*\{([^}]*)\}\s*from\s+['\"]child_process['\"]",
-    ):
+    for pattern in _JS_DESTRUCTURE_PATTERNS:
         for group in re.findall(pattern, source):
-            for part in group.split(","):
-                name = part.strip().split(":")[0].strip().split(" as ")[0].strip()
-                if name in _JS_BANNED_MEMBERS:
-                    names.add(name)
+            names.update(_js_destructured_locals(group))
     return aliases, names
+
+
+def _js_strip_declarations(line: str) -> str:
+    """Remove child_process import / require declarations from a line,
+    so a call sharing the declaration's line
+    (``const {exec}=require('child_process');exec(cmd);``) is still
+    seen as a call — the first guard skipped any line containing
+    ``require(`` wholesale, which is exactly that evasion."""
+    for pattern in _JS_ALIAS_PATTERNS + _JS_DESTRUCTURE_PATTERNS:
+        line = re.sub(pattern, "", line)
+    return line
 
 
 def js_shell_violations_from_source(
@@ -1752,10 +1820,9 @@ def js_shell_violations_from_source(
                         "through a shell (child_process argv forms only: "
                         "execFile / spawn with an args array)"
                     )
+        code = _js_strip_declarations(line)
         for name in destructured:
-            if re.search(rf"(?<![\w$.]){name}\s*\(", line) and (
-                "require(" not in line and "import" not in line
-            ):
+            if re.search(rf"(?<![\w$.]){name}\s*\(", code):
                 found.append(
                     f"{filename}:{lineno}: destructured child_process "
                     f"{name}() executes through a shell"
@@ -1833,4 +1900,110 @@ class TestChildProcessGuard:
         ],
     )
     def test_guard_ignores_argv_forms_and_unrelated_exec(self, source):
+        assert js_shell_violations_from_source(source) == []
+
+
+class TestChildProcessGuardFollowup:
+    """Dev-watch 302 follow-up — the two static spelling classes the
+    coordinator's adversarial pass slipped past the first JS guard:
+    whitespace-tight destructured require (incl. same-line calls and
+    renamed bindings) and the ``node:`` specifier / tight ``import``
+    spellings. The dynamic class (computed member access, alias
+    assignment) stays the accepted residual — deliberately untested
+    here."""
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Call sharing the declaration line: the first guard skipped
+            # any line containing "require(" wholesale.
+            "const {exec}=require('child_process');exec(cmd);\n",
+            "const{exec}=require('child_process');exec(cmd);\n",
+            'let {execSync}=require("child_process");execSync(cmd);\n',
+            "var {exec} = require('child_process'); exec(cmd);\n",
+            "const {exec} = require('child_process'); exec(cmd);\n",
+            # Renamed bindings: the local name is what gets called.
+            "const {exec:run}=require('child_process');\nrun(cmd);\n",
+            "const{execSync:run}=require('child_process');run(cmd);\n",
+            "const { exec: run } = require('child_process');\n"
+            "run(cmd);\n",
+            "import {exec as run} from 'child_process';\nrun(cmd);\n",
+            "import { execSync as run } from 'child_process';\n"
+            "run(cmd);\n",
+            # Mixed default + named import binds both spellings.
+            "import cp, {exec} from 'child_process';\nexec(cmd);\n",
+            "import cp, {execFile} from 'child_process';\n"
+            "cp.exec(cmd);\n",
+        ],
+    )
+    def test_guard_detects_tight_destructured_require(self, source):
+        assert js_shell_violations_from_source(source), (
+            f"guard missed: {source!r}"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # ESM namespace import via the node: specifier.
+            'import * as cp from "node:child_process";\ncp.exec(cmd);\n',
+            "import * as cp from 'node:child_process';\n"
+            "cp.execSync(cmd);\n",
+            'import * as cp from"node:child_process";\ncp.exec(cmd);\n',
+            "import * as cp from 'node:child_process';\n"
+            "cp.spawn('ffmpeg', args, { shell: true });\n",
+            # The node: specifier on the other import/require forms.
+            "const cp=require('node:child_process');\ncp.exec(cmd);\n",
+            "const{exec}=require('node:child_process');\nexec(cmd);\n",
+            "const { exec } = require('node:child_process');\n"
+            "exec(cmd);\n",
+            "import { execSync } from 'node:child_process';\n"
+            "execSync(cmd);\n",
+            "import cp from 'node:child_process';\ncp.exec(cmd);\n",
+        ],
+    )
+    def test_guard_detects_node_prefixed_child_process(self, source):
+        assert js_shell_violations_from_source(source), (
+            f"guard missed: {source!r}"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Whitespace-tight import spellings (no node: prefix).
+            "import*as cp from 'child_process';\ncp.execSync(cmd);\n",
+            "import * as cp from'child_process';\ncp.exec(cmd);\n",
+            "import{exec}from'child_process';\nexec(cmd);\n",
+            'import{execSync}from"child_process";\nexecSync(cmd);\n',
+        ],
+    )
+    def test_guard_detects_tight_esm_imports(self, source):
+        assert js_shell_violations_from_source(source), (
+            f"guard missed: {source!r}"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [
+            # Tight spellings of the argv forms stay clean.
+            "const{execFile}=require('child_process');\n"
+            "execFile('ffmpeg',['-i',name]);\n",
+            "import*as cp from'node:child_process';\n"
+            "cp.execFile('ffmpeg',['-i',name]);\n"
+            "cp.spawn('ffmpeg',args,{shell:false});\n",
+            "import{execFile}from'child_process';\nexecFile('x',[]);\n",
+            # Renamed argv-form binding: spawn under a local name.
+            "const{spawn:s}=require('child_process');\n"
+            "s('ffmpeg',['-i',name]);\n",
+            "const {execFile: ef} = require('child_process');\n"
+            "ef('ffmpeg', ['-i', name]);\n",
+            # A banned name imported but never called under its local
+            # binding is not a violation (the guard flags calls).
+            "const {exec: run} = require('child_process');\n"
+            "other(cmd);\n",
+            # Same member names, different module entirely.
+            "import * as fs from 'node:fs';\nfs.exec(cmd);\n",
+            "const{exec}=require('some-other-lib');\nexec(cmd);\n",
+        ],
+    )
+    def test_guard_ignores_tight_argv_forms_and_renames(self, source):
         assert js_shell_violations_from_source(source) == []
