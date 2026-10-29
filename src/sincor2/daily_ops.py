@@ -6,6 +6,7 @@ import json
 import sqlite3
 import subprocess
 import sys
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,13 +25,27 @@ def _chain_snapshot() -> dict:
     return stats
 
 
+def _connect_readonly(db_path) -> sqlite3.Connection:
+    """Open a SQLite DB read-only at the driver level (dev-watch 304).
+
+    This module is read-only by contract ("Safe read-only daily ops");
+    that contract is enforced by SQLite itself — a ``mode=ro`` URI plus
+    ``PRAGMA query_only`` — not by an app-layer flag, so no query issued
+    on this connection can write, however it is constructed.
+    """
+    uri = "file:" + urllib.parse.quote(str(db_path)) + "?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    conn.execute("PRAGMA query_only = ON")
+    return conn
+
+
 def _revenue_digest() -> dict:
     from sincor2.data_paths import orders_db_path
 
     db_path = orders_db_path()
     if not db_path.exists():
         return {"ok": False, "reason": "orders.db missing", "path": str(db_path)}
-    conn = sqlite3.connect(db_path)
+    conn = _connect_readonly(db_path)
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM orders")
     total = cur.fetchone()[0]

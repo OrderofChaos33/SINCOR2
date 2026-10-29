@@ -74,11 +74,38 @@ def _db_path() -> Path:
     return orders_db_path()
 
 
+#: The only migrations ``_ensure_column`` may perform (dev-watch 304,
+#: CVE-2026-118378 hedge): column name -> expected DDL type. PRAGMA and
+#: ALTER cannot bind identifiers as parameters, so identifiers are
+#: selected from this allowlist and the SQL executed below is a constant
+#: string per entry — a caller-supplied table/column/ddl value is never
+#: interpolated into a query string.
+_X402_ENSURE_COLUMN_SQL = {
+    "token_expires_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_expires_at TEXT",
+    ),
+    "token_consumed_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_consumed_at TEXT",
+    ),
+}
+
+
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
-    """Add a column if missing (migration for DBs created before this patch)."""
-    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    """Add a column if missing (migration for DBs created before this patch).
+
+    ``table``/``column``/``ddl`` must match the allowlist exactly; any
+    other value raises ValueError without touching the database.
+    """
+    entry = _X402_ENSURE_COLUMN_SQL.get(column)
+    if table != "x402_challenges" or entry is None or entry[0] != ddl:
+        raise ValueError(
+            f"migration not allowlisted: table={table!r} column={column!r} ddl={ddl!r}"
+        )
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(x402_challenges)").fetchall()}
     if column not in cols:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+        conn.execute(entry[1])
 
 
 def init_x402_db() -> None:
