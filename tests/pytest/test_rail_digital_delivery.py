@@ -231,6 +231,25 @@ def _settle(client, challenge_id, tx_hash=TX_HASH, payer=PAYER,
         "buyer_name": "Digital Buyer"})
 
 
+def _resettle_with_proof(client, challenge_id, tx_hash=TX_HASH):
+    """W-115: a re-settle that reveals the fulfillment links must carry
+    the payer's W-103 replay proof (EIP-191 sign of
+    build_replay_message(challenge_id, ts_ms)). An unproven re-settle
+    now returns a status-only ack with NO download_url — see
+    test_hunt32_w115_settle_payer_proof.py."""
+    import time
+
+    ts_ms = int(time.time() * 1000)
+    sig = "0x" + _PAYER_ACCT.sign_message(_encode_defunct(
+        text=x402.build_replay_message(challenge_id, ts_ms))
+    ).signature.hex()
+    return client.post("/rail/settle", json={
+        "challenge_id": challenge_id, "tx_hash": tx_hash,
+        "payer_wallet": PAYER, "buyer_email": "buyer@example.com",
+        "buyer_name": "Digital Buyer",
+        "replay_signature": sig, "replay_ts_ms": ts_ms})
+
+
 # ---------------------------------------------------------------------------
 # SKU registration: documented prices, real assets, catalog + yaml parity
 # ---------------------------------------------------------------------------
@@ -433,7 +452,11 @@ def test_resettle_returns_original_token_no_second_issuance(
     token1 = url1.split("?token=")[1]
     assert len(token1) == 43
 
-    second = _settle(client, cid)
+    # W-115 (hunt 32): the duplicate settle must present the payer's
+    # replay proof to receive the URL back — an unproven re-settle gets
+    # a status-only ack (this assertion block previously pinned the
+    # unauthenticated leak itself).
+    second = _resettle_with_proof(client, cid)
     body = second.get_json()
     assert second.status_code == 200
     assert body["ok"] is True
