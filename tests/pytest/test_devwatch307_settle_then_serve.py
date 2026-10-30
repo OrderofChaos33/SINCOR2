@@ -880,3 +880,162 @@ class TestCouldNotCompleteFamilyRealPath:
         assert body.get("error") == "rpc_failed", body
         _assert_no_content(body, res.get_data(as_text=True))
         assert _checkout_status("pay_dw307_r3_rpc") == "pending"
+
+
+# ---------------------------------------------------------------------------
+# (e) Tidy (coordinator-ruled; Builder B round-2 re-check, observation
+# 1): claim-step race outcomes agree on 402.
+#
+# store_busy / fulfill_conflict are NOT verification failures: the
+# on-chain transfer verified fine, but the claim step — the atomic
+# BEGIN IMMEDIATE transaction that turns a verified transfer into a
+# fulfilled challenge — lost a transient store race, and a clean
+# retry settles. /rail/settle already answers 402 for both (its
+# default for any verify failure outside its client-error list);
+# /api/x402/verify answered 400 because neither string was in
+# _PAID_SURFACE_VERIFY_402_ERRORS — a 400 tells the buyer "your
+# request was wrong" for what is really "payment not settled (yet)".
+# The fix adds both strings to that one tuple.
+#
+# Levels pinned, plainly:
+#   * store_busy — REAL PATH, HTTP level: the orders-DB write lock
+#     is taken on a side connection from inside the _rpc_call stub,
+#     i.e. in the window between verify_challenge's read/verify
+#     phase and its claim phase (the technique Builder B used), so
+#     the real verify_challenge produces the result end-to-end.
+#   * fulfill_conflict — ROUTE-DECISION level only. The claim UPDATE
+#     returning rowcount != 1 is not deterministically reachable
+#     through the real store: the UPDATE runs inside the same
+#     BEGIN IMMEDIATE transaction that just re-read the row, SQLite
+#     serializes writers, so the row cannot vanish between that
+#     read and the update, and there is no injectable seam between
+#     them. The test therefore injects the result at the
+#     verify_challenge seam (the seam the round-2 raising-verifier
+#     tests use) and pins the route's status DECISION for a
+#     fulfill_conflict result — the same one-line mapping fixed.
+# ---------------------------------------------------------------------------
+
+class _WriteLockHolder:
+    """Holds the orders-DB write lock (BEGIN IMMEDIATE) on a side
+    connection, acquired lazily from inside the RPC seam and held
+    until release(). Release rolls the empty transaction back."""
+
+    def __init__(self):
+        self.conn = None
+        self.armed = True
+
+    def acquire(self):
+        if self.armed and self.conn is None:
+            conn = sqlite3.connect(str(x402._db_path()))
+            conn.execute("BEGIN IMMEDIATE")
+            self.conn = conn
+
+    def release(self):
+        self.armed = False
+        if self.conn is not None:
+            self.conn.close()
+            self.conn = None
+
+
+def _locking_rpc(chain, holder):
+    """The real chain, except the verify's first RPC takes the
+    orders-DB write lock, which stays held into the claim phase."""
+    def rpc(method, params, attempts=3):
+        holder.acquire()
+        return chain.rpc(method, params, attempts)
+    return rpc
+
+
+class TestClaimStepRaceOutcomes:
+    def test_x402_verify_store_busy_is_402_and_retry_settles(
+            self, env, billing_client, monkeypatch):
+        """store_busy through the REAL path: the transfer verifies,
+        but the claim transaction cannot acquire the store write
+        lock -> /api/x402/verify answers 402 store_busy (pre-fix:
+        400), mints nothing, challenge stays pending — and once the
+        lock clears, the clean retry settles (200 + token)."""
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+        amount = int(x402.get_resource(SKILL_RESOURCE)["amount_atomic"])
+        env["chain"].register(TX_OK, PAYER, amount, token="SINC")
+        holder = _WriteLockHolder()
+        monkeypatch.setattr(
+            pp, "_rpc_call", _locking_rpc(env["chain"], holder))
+        try:
+            res = billing_client.post("/api/x402/verify", json={
+                "challenge_id": cid, "tx_hash": TX_OK,
+                "payer_wallet": PAYER})
+        finally:
+            holder.release()
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "store_busy", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+
+        # The lock has cleared: the same verify now settles.
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert res.status_code == 200, (res.status_code, body)
+        assert body.get("access_token"), body
+        assert _challenge_status(cid) == "fulfilled"
+
+    def test_rail_settle_store_busy_stays_402(
+            self, env, rail_client, monkeypatch):
+        """Control: the same store race through /rail/settle already
+        answers 402 (rail's default for non-client verify failures)
+        — pinned so the two surfaces cannot drift apart again."""
+        res = rail_client.post("/rail/checkout", json={
+            "pack_sku": PACK_SKU, "payer_wallet": PAYER,
+            "buyer_email": "buyer@example.com"})
+        assert res.status_code == 402, res.get_json()
+        cid = res.get_json()["challenge_id"]
+        _bind(cid, PACK_RESOURCE)
+        amount = int(x402.get_resource(PACK_RESOURCE)["amount_atomic"])
+        env["chain"].register(TX_OK, PAYER, amount)
+        holder = _WriteLockHolder()
+        monkeypatch.setattr(
+            pp, "_rpc_call", _locking_rpc(env["chain"], holder))
+        try:
+            res = rail_client.post("/rail/settle", json={
+                "challenge_id": cid, "tx_hash": TX_OK,
+                "payer_wallet": PAYER,
+                "buyer_email": "buyer@example.com"})
+        finally:
+            holder.release()
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "store_busy", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _intake_count(env["tmp"]) == 0
+        assert _challenge_status(cid) == "pending"
+
+    def test_x402_verify_fulfill_conflict_maps_to_402(
+            self, env, billing_client, monkeypatch):
+        """fulfill_conflict, ROUTE-DECISION pin (see the section (e)
+        header for why the real store cannot produce it
+        deterministically): a fulfill_conflict result out of
+        verify_challenge must be answered 402 by /api/x402/verify
+        (pre-fix: 400) — the same transient-race family as
+        store_busy, which rail already answers 402."""
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+        monkeypatch.setattr(
+            x402, "verify_challenge",
+            lambda *a, **kw: {"ok": False,
+                              "error": "fulfill_conflict"})
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("ok") is False, body
+        assert body.get("error") == "fulfill_conflict", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+

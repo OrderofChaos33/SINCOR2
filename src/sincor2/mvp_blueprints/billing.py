@@ -549,7 +549,14 @@ _PAID_SURFACE_VERIFY_402_ERRORS = ('tx_pending', 'insufficient_amount',
                                    'no_treasury_transfer', 'tx_failed',
                                    'awaiting_finality', 'rpc_failed',
                                    'receipt_malformed',
-                                   'confirmations_unavailable')
+                                   'confirmations_unavailable',
+                                   # Item 307 tidy: claim-step store
+                                   # races — the transfer verified, the
+                                   # atomic claim lost a transient lock
+                                   # race; a clean retry settles, so the
+                                   # answer is 402 (rail agrees), not a
+                                   # 400 client-error label.
+                                   'store_busy', 'fulfill_conflict')
 
 
 def _merge_header_tokens(existing, *tokens):
