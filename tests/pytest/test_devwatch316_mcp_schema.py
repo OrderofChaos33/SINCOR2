@@ -617,3 +617,109 @@ def test_validator_tuple_items_positional():
         with pytest.raises(guard.SchemaValidationError) as excinfo:
             guard.validate_arguments("t", _TUPLE_SCHEMA, {"pair": bad})
         assert "pair" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# Repair round 2 — Builder B re-check: the payment representability rule
+# must cover JSON integers, not only floats.
+#
+# Round 1 nested BOTH the non-finite check and the wei-scaling check
+# under ``isinstance(value, float)``, so an integer skipped both — and
+# downstream ``_plan_bid`` converts through float and scales by 1e18:
+# ``bid_axm: 10**400`` crashed the float() conversion itself and
+# ``bid_axm: 10**308`` crashed the wei scaling, both surfacing as a raw
+# -32603 OverflowError instead of the guard's named-field -32602.
+# ---------------------------------------------------------------------------
+
+# Ground truth, independent of the guard: the largest finite double is
+# 2**1024 - 2**971 (sys.float_info.max) and a product rounds to
+# infinity from half an ulp above it, so an exact scaled magnitude is
+# representable iff it stays strictly below 2**1024 - 2**970.
+_WEI_LIMIT = 2**1024 - 2**970
+_LARGEST_SCALABLE_INT = (_WEI_LIMIT - 1) // 10**18
+
+
+@pytest.mark.parametrize("bad", [
+    10**400,                    # float() conversion itself overflows
+    10**308,                    # converts (1e308); wei scaling overflows
+    10**291,                    # just past the representable boundary
+    -10**291,                   # magnitude rule is symmetric
+    _LARGEST_SCALABLE_INT + 1,  # first unrepresentable integer
+])
+def test_validator_rejects_unrepresentable_payment_ints(bad):
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": bad})
+    assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_accepts_largest_representable_payment_int():
+    # The razor pin, in exact arithmetic: this integer's wei scaling
+    # stays below the float-overflow threshold; one more does not.
+    assert _LARGEST_SCALABLE_INT * 10**18 < _WEI_LIMIT
+    assert (_LARGEST_SCALABLE_INT + 1) * 10**18 >= _WEI_LIMIT
+    guard.validate_arguments("t", _SCHEMA, {
+        "task_id": "a", "bid_axm": _LARGEST_SCALABLE_INT})
+    guard.validate_arguments("t", _SCHEMA,
+                             {"task_id": "a", "bid_axm": 10**290})
+    guard.validate_arguments("t", _SCHEMA,
+                             {"task_id": "a", "bid_axm": 10**18})
+
+
+@pytest.mark.parametrize("as_int,as_float,accepted", [
+    (10**290, 1e290, True),    # same magnitude, both types: accepted
+    (10**291, 1e291, False),   # same magnitude, both types: rejected
+])
+def test_validator_payment_int_float_agree_at_boundary(
+        as_int, as_float, accepted):
+    # 10**290 / 10**291 straddle the practical boundary (their wei
+    # scalings are 1e308, finite, and 1e309, infinity); the int and
+    # float spellings of each magnitude must get the SAME verdict.
+    assert float(as_int) == as_float  # same double, same magnitude
+    if accepted:
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": as_int})
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": as_float})
+    else:
+        for value in (as_int, as_float):
+            with pytest.raises(guard.SchemaValidationError) as excinfo:
+                guard.validate_arguments("t", _SCHEMA,
+                                         {"task_id": "a", "bid_axm": value})
+            assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_nonpayment_number_accepts_huge_int():
+    # The representability rule is payment-only: arbitrary-precision
+    # JSON integers are legitimate non-payment data and stay accepted.
+    schema = {"type": "object",
+              "properties": {"reading": {"type": "number"}}}
+    guard.validate_arguments("t", schema, {"reading": 10**400})
+    guard.validate_arguments("t", schema, {"reading": -(10**400)})
+
+
+def test_discovery_huge_int_bid_rejected_at_guard(stub_upstream):
+    # 10**400 in the default (auto) mode crashed float() conversion in
+    # _plan_bid with -32603; the guard must refuse it first, by name.
+    resp = _call_rpc("submit_bid", {
+        "task_id": "tsk_1", "agent_id": "a1", "bid_axm": 10**400})
+    _assert_loud_rejection(resp, "bid_axm")
+    assert stub_upstream == []
+
+
+def test_discovery_huge_int_bid_rejected_in_legacy_mode(stub_upstream):
+    resp = _call_rpc("submit_bid", {
+        "task_id": "tsk_1", "agent_id": "a1", "bid_axm": 10**400,
+        "mode": "legacy"})
+    _assert_loud_rejection(resp, "bid_axm")
+    assert stub_upstream == []
+
+
+def test_discovery_unscalable_int_bid_rejected_at_guard(stub_upstream):
+    # 10**308 converts to a finite float (1e308) but its wei scaling
+    # overflows in auto mode's commit path — same -32603 crash class,
+    # now refused by the guard before dispatch.
+    resp = _call_rpc("submit_bid", {
+        "task_id": "tsk_1", "agent_id": "a1", "bid_axm": 10**308})
+    _assert_loud_rejection(resp, "bid_axm")
+    assert stub_upstream == []

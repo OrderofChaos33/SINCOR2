@@ -28,9 +28,10 @@ repo (marketplace discovery ``sincor2.mcp_server``, Swarm Command
    ``true`` is not a number), or a non-finite number (Python's
    ``json.loads`` accepts ``NaN``/``Infinity`` literals, so they DO
    arrive from the wire). Payment amounts must additionally survive
-   the platform's 18-decimal fixed-point conversion — a finite float
-   whose wei scaling overflows (``1e308 * 1e18``) is rejected here
-   rather than crashing downstream. Object fields whose schema
+   the platform's 18-decimal fixed-point conversion — a value whose
+   wei scaling overflows (``1e308 * 1e18`` as a float, or an integer
+   too large for the downstream float conversion at all) is rejected
+   here rather than crashing downstream. Object fields whose schema
    declares no ``properties`` still get leaf rules applied
    recursively: no ``"null"`` strings and no JSON nulls anywhere
    inside, though arbitrary structure/types are otherwise accepted.
@@ -68,6 +69,32 @@ def _is_payment_field(name: str) -> bool:
     n = name.lower()
     return (n in _PAYMENT_EXACT or "x402" in n or "payment" in n
             or n.endswith(_PAYMENT_SUFFIXES))
+
+
+#: Representability limit for 18-decimal (wei) scaling of a payment
+#: amount: the scaled magnitude must stay strictly below
+#: ``2**1024 - 2**970`` — the largest finite double is
+#: ``2**1024 - 2**971`` and float products round to infinity from
+#: half an ulp above it, so this is exactly the bound
+#: ``math.isfinite(v * 1e18)`` enforces for float inputs, expressed as
+#: an integer so integer inputs are checked in exact arithmetic.
+#: The int check must never convert through float: ``float(10**400)``
+#: itself raises OverflowError.
+_WEI_SCALING_LIMIT = 2**1024 - 2**970
+
+
+def _payment_amount_representable(value: Any) -> bool:
+    """True iff a payment amount survives 18-decimal wei scaling.
+
+    The caller guarantees a non-bool ``int`` or a finite ``float``
+    (non-finite floats are rejected before this runs). Floats keep the
+    original float-product check; integers compare exactly —
+    ``abs(value) * 10**18`` against the same limit — so both types
+    agree at the boundary and neither computation can itself overflow.
+    """
+    if isinstance(value, float):
+        return math.isfinite(value * 1e18)
+    return abs(value) * 10**18 < _WEI_SCALING_LIMIT
 
 
 def _path_names(field: str) -> List[str]:
@@ -215,20 +242,23 @@ def _validate_value(tool: str, field: str, schema: Dict[str, Any],
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise _fail(tool, field,
                         "expected number, got %s" % type(value).__name__)
-        if isinstance(value, float):
-            if not math.isfinite(value):
-                raise _fail(tool, field,
-                            "non-finite number %r rejected — NaN and "
-                            "Infinity are not valid values" % (value,))
-            leaf = _path_names(field)[-1] if _path_names(field) else field
-            if _is_payment_field(leaf) and not math.isfinite(value * 1e18):
-                # A payment amount is denominated in 18-decimal fixed
-                # point across the platform; a magnitude whose wei
-                # scaling overflows is unrepresentable, not a bid.
-                raise _fail(tool, field,
-                            "number %r rejected — its magnitude cannot "
-                            "be represented in 18-decimal fixed point "
-                            "(wei scaling overflows)" % (value,))
+        if isinstance(value, float) and not math.isfinite(value):
+            raise _fail(tool, field,
+                        "non-finite number %r rejected — NaN and "
+                        "Infinity are not valid values" % (value,))
+        leaf = _path_names(field)[-1] if _path_names(field) else field
+        if _is_payment_field(leaf) and not _payment_amount_representable(
+                value):
+            # A payment amount is denominated in 18-decimal fixed
+            # point across the platform; a magnitude whose wei
+            # scaling overflows is unrepresentable, not a bid. The
+            # rule covers integers as well as floats: a JSON integer
+            # reaches the same downstream float conversion + scaling,
+            # and a huge one crashes the conversion itself.
+            raise _fail(tool, field,
+                        "number %r rejected — its magnitude cannot "
+                        "be represented in 18-decimal fixed point "
+                        "(wei scaling overflows)" % (value,))
     elif t == "boolean":
         if not isinstance(value, bool):
             raise _fail(tool, field,
