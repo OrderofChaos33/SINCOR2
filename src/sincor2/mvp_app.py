@@ -1123,6 +1123,8 @@ def _waitlist_api_error_handler(error):
 def _waitlist_stats_admin_gate():
     if request.path.startswith("/api/waitlist/stats"):
         return _require_admin(request)
+    if request.path.startswith("/api/airdrop/stats"):
+        return _require_admin(request)
     return None
 
 from sincor2.mvp_blueprints import register_mvp_blueprints
