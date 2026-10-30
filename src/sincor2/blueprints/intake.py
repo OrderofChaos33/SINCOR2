@@ -41,6 +41,7 @@ import html
 import logging
 import os
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -202,6 +203,28 @@ def _clean_value(raw: Any) -> Optional[str]:
     return value.strip()
 
 
+def _judged_blank(value: str) -> bool:
+    """True when a cleaned value carries no actual answer.
+
+    Emptiness is judged on a COPY with invisible characters removed:
+    Unicode format characters (category Cf — zero-width space and
+    joiners, BOM, word joiner, Mongolian vowel separator) and
+    non-whitespace control characters (category Cc — BEL, NUL, …)
+    are not whitespace to str.strip(), so a value made of only those
+    survived cleaning as a 1-character "answer" that renders blank.
+    Whitespace-class controls (tab, VT, NEL, …) need no removal
+    here: they ARE whitespace and strip() already eliminates them.
+
+    The judgment is copy-only — the STORED value keeps its Cf
+    characters, because ZWJ/ZWNJ are meaningful inside real text
+    (Persian/Arabic/Indic names) and must never be altered.
+    """
+    judged = "".join(
+        ch for ch in value
+        if unicodedata.category(ch) not in ("Cf", "Cc") or ch.isspace())
+    return judged.strip() == ""
+
+
 def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
     """Validate a submission against the SKU's allowlist.
 
@@ -210,7 +233,9 @@ def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
     fields. Every rejection names the offending fields. Required-ness
     is judged on the CLEANED value: a field whose submission cleans
     to nothing (pure markup or entities, e.g. "<b></b>") was not
-    answered, so it is reported missing, not stored blank.
+    answered, so it is reported missing, not stored blank. A value
+    of only invisible characters (see _judged_blank) is likewise no
+    answer and is reported missing.
     """
     fields = _fields_for_sku(pack_sku)
     unknown = sorted(set(payload) - set(fields))
@@ -228,7 +253,7 @@ def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
             # value is an invalid one.
             (invalid if raw else missing).append(field)
             continue
-        if value == "":
+        if _judged_blank(value):
             missing.append(field)
             continue
         if len(value) > MAX_FIELD_LEN:
@@ -273,7 +298,8 @@ def sanitize_prefill_answers(pack_sku: str,
         if key not in allowed:
             continue
         value = _clean_value(raw)
-        if value is None or value == "" or len(value) > MAX_FIELD_LEN:
+        if value is None or _judged_blank(value) \
+                or len(value) > MAX_FIELD_LEN:
             continue
         choices = FIELD_CHOICES.get(key)
         if choices and value not in choices:

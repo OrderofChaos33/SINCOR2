@@ -937,3 +937,144 @@ def test_settle_prefill_is_sanitized_and_allowlisted(
     assert answers["contact_email"] == BUYER_EMAIL
     assert all(len(v) <= 500 for v in answers.values())
     assert not any("<" in v or ">" in v for v in answers.values())
+
+
+# ---------------------------------------------------------------------------
+# Round-2 repair (B1 residual): invisible-Unicode-only values are blank
+# ---------------------------------------------------------------------------
+
+# Invisible Unicode format characters (category Cf), built with
+# chr() so this source stays plain ASCII. str.strip() does not treat
+# them as whitespace, so a "value" consisting of only one of these
+# survived cleaning and counted as a 1-character answer (Builder B
+# delta re-check, defect 4's last variant).
+_CF_ONLY_BLANKS = [chr(cp) for cp in (
+    0x200B,  # ZERO WIDTH SPACE
+    0xFEFF,  # ZERO WIDTH NO-BREAK SPACE (BOM)
+    0x200C,  # ZERO WIDTH NON-JOINER
+    0x200D,  # ZERO WIDTH JOINER
+    0x2060,  # WORD JOINER
+    0x180E,  # MONGOLIAN VOWEL SEPARATOR
+)]
+
+
+def test_post_cf_only_required_value_counts_as_missing(
+        intake_app, intake_env, mock_comms):
+    """B1 residual: a required value made solely of invisible Cf
+    characters is NO answer — 400 missing_required_fields naming the
+    field, nothing stored, no owner notification."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    url = f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}"
+    for blank in _CF_ONLY_BLANKS:
+        res = client.post(
+            url, json=dict(CRED_ANSWERS, business_name=blank))
+        assert res.status_code == 400, repr(blank)
+        body = res.get_json()
+        assert body["error"] == "missing_required_fields"
+        assert "business_name" in (body.get("fields") or [])
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+    assert _owner_sends(mock_comms) == []
+
+
+def test_post_cf_only_value_on_second_sku_counts_as_missing(
+        intake_app, intake_env, mock_comms):
+    """The Cf judgment is not credentialing-specific: a Cf-only value
+    on a chroma_compliance required field is likewise missing."""
+    _seed_intake(intake_env["db"], pack_sku="chroma_compliance")
+    client = intake_app.test_client()
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=dict(CHROMA_ANSWERS,
+                  compliance_target=chr(0x2060) + chr(0x200C)))
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body["error"] == "missing_required_fields"
+    assert "compliance_target" in (body.get("fields") or [])
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+    assert _owner_sends(mock_comms) == []
+
+
+def test_post_cc_only_required_value_counts_as_missing(
+        intake_app, intake_env, mock_comms):
+    """Cc probe outcome: non-whitespace control characters (BEL
+    U+0007, NUL U+0000) also survived strip() as 'answers' pre-fix,
+    so the judgment removes them too. (Whitespace-class Cc — VT,
+    NEL, unit separator — already cleaned to '' via strip() before
+    this fix.)"""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    url = f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}"
+    for blank in (chr(0x07), chr(0x00)):
+        res = client.post(
+            url, json=dict(CRED_ANSWERS, business_name=blank))
+        assert res.status_code == 400, repr(blank)
+        body = res.get_json()
+        assert body["error"] == "missing_required_fields"
+        assert "business_name" in (body.get("fields") or [])
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+    assert _owner_sends(mock_comms) == []
+
+
+def test_settle_prefill_cf_only_value_is_dropped(
+        intake_app, intake_env, mock_comms):
+    """Prefill path: a Cf-only settle-supplied value is dropped by
+    sanitize_prefill_answers exactly like a blank — never stored,
+    never fatal to the settle, and it cannot complete the intake."""
+    client = intake_app.test_client()
+    cid = _checkout_challenge(client)
+    res = client.post("/rail/settle", json={
+        "challenge_id": cid, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": BUYER_EMAIL,
+        "business_name": chr(0x200B) + chr(0xFEFF),
+        "contact_name": "Amy Acme",
+        "state": "IA",
+    })
+    assert res.status_code == 200, res.get_json()
+    row = pl.get_pack_intake(intake_env["db"], f"intake-rail-{cid}")
+    answers = row.details["intake_answers"]
+    assert "business_name" not in answers  # Cf-only: dropped as blank
+    assert answers["contact_name"] == "Amy Acme"
+    assert answers["state"] == "IA"
+    assert row.status != "intake_complete"
+
+
+def test_post_real_text_with_cf_chars_is_stored_intact(
+        intake_app, intake_env, mock_comms):
+    """The fix is judgment-side only: Cf characters INSIDE real text
+    are meaningful (ZWNJ in Persian/Arabic names) and the stored
+    value keeps them byte-for-byte."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    name = "Ali" + chr(0x200C) + "Reza Mohammadi"  # ZWNJ inside text
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=dict(CRED_ANSWERS, business_name=name))
+    assert res.status_code == 200
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "intake_complete"
+    assert row.details["intake_answers"]["business_name"] == name
+
+
+def test_post_cf_padded_real_text_passes(
+        intake_app, intake_env, mock_comms):
+    """Real text PADDED with Cf characters passes: the judgment sees
+    the text as the content (and storage keeps the value as
+    submitted, padding included)."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    padded = chr(0x200B) + chr(0xFEFF) + "Acme Dental LLC" + chr(0x200B)
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=dict(CRED_ANSWERS, business_name=padded))
+    assert res.status_code == 200
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "intake_complete"
+    assert "Acme Dental LLC" in \
+        row.details["intake_answers"]["business_name"]
