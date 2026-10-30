@@ -688,6 +688,26 @@ def sign_digest(
     return sign_hmac(digest, signing_secret), SigType.HMAC.value
 
 
+def _typed_data_digest(typed_data: Dict[str, Any]) -> Optional[bytes]:
+    """The EIP-712 digest ``typed_data`` actually commits to.
+
+    Computed through eth_account's public ``encode_typed_data`` — the same
+    encoding signer recovery uses — so the digest a signature is recovered
+    against can be compared byte-for-byte with the digest a verifier was
+    asked to check (W-116). Fail-closed: a malformed payload yields
+    ``None`` and the caller refuses.
+    """
+    try:
+        from eth_account.messages import encode_typed_data
+    except Exception:
+        return None
+    try:
+        message = encode_typed_data(full_message=typed_data)
+        return keccak256(b"\x19\x01" + message.header + message.body)
+    except Exception:
+        return None
+
+
 def verify_digest(
     digest: bytes,
     signature: str,
@@ -701,10 +721,23 @@ def verify_digest(
 
     secp256k1 verification recovers the signer through eth_account's public
     typed-data API, so ``typed_data`` (the payload from
-    :func:`typed_data_payload`) is required for that path. HMAC is demo-only.
+    :func:`typed_data_payload`) is required for that path. The signature is
+    bound to ``digest``: the digest committed by ``typed_data`` itself
+    must equal ``digest``, otherwise the signature may commit to entirely
+    different terms (price, chain, domain) than the ones under
+    verification (W-116). HMAC is demo-only.
     """
     if sig_type == SigType.SECP256K1.value:
         if not typed_data:
+            return False
+        bound_digest = _typed_data_digest(typed_data)
+        if bound_digest is None:
+            return False
+        try:
+            presented = bytes(digest)
+        except Exception:
+            return False
+        if not hmac.compare_digest(bound_digest, presented):
             return False
         recovered = _recover_secp256k1(typed_data, signature)
         if recovered is None:
