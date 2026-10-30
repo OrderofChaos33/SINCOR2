@@ -230,8 +230,12 @@ class ExpiredAuthorizationError(PaymentRefusedError):
     The one deterministically-invalid class whose correction is sound:
     the token contract refuses transferWithAuthorization after
     validBefore, so the rejected bytes can never settle. The client
-    discards them, re-signs a FRESH validity window over the SAME nonce /
-    amount / recipient, and resends exactly once (CORRECT_AND_RETRY).
+    discards them, re-signs a FRESH validity window — one that STRICTLY
+    EXTENDS the rejected window while staying inside the 1h absurdity
+    bound — over the SAME nonce / amount / recipient, and resends
+    exactly once (CORRECT_AND_RETRY). When no in-bound window can
+    strictly extend the rejected one, the failure is uncorrectable and
+    this error is raised with no resend.
     """
 
 
@@ -537,6 +541,15 @@ def _error_for_failure(failure: FacilitatorFailure) -> AmbiguousPayment:
         f"reason {failure.reason or 'unknown'} (class {failure.klass}, "
         f"action {failure.action.value})"
     )
+    if failure.tx_hash:
+        # A failure body may carry a broadcast hash even without a
+        # settlement_pending reason (item 310's dropped-hash shape):
+        # surface it on the error so the reconciliation lead survives
+        # instead of being dropped with the classification.
+        detail += (
+            f"; failure body carried broadcast tx {failure.tx_hash} — "
+            "reconcile it onchain before any retry"
+        )
     if failure.klass == FAILURE_INVALID_SIGNATURE:
         return InvalidSignatureError(failure.reason, detail)
     if failure.klass == FAILURE_INSUFFICIENT_FUNDS:
@@ -1277,14 +1290,27 @@ class X402Buyer:
                 # validBefore), so discarding them cannot double-pay.
                 # Re-sign over the SAME nonce / amount / recipient with
                 # a validity window that strictly EXTENDS the rejected
-                # one (capped inside the 1h absurdity bound) and resend
-                # exactly once. Any second failure — of any class —
-                # raises below; nothing loops.
+                # one and resend exactly once. The extension must stay
+                # inside the 1h absurdity bound (now + 3599): when the
+                # rejected window already reaches that bound, NO in-bound
+                # window strictly extends it, so the failure is
+                # uncorrectable — raise the expired-authorization error
+                # WITHOUT signing or sending anything, rather than
+                # resending a window that merely equals (or is shorter
+                # than) the rejected one. Any second failure — of any
+                # class — raises below; nothing loops.
                 corrected = True
-                self._clear_inflight(url)
                 now = int(time.time())
                 rejected_vb = int(signed.authorization.get("validBefore") or 0)
-                corrected_vb = min(max(rejected_vb, now) + 600, now + 3599)
+                corrected_vb = max(rejected_vb, now) + 600
+                if corrected_vb > now + 3599:
+                    raise _error_for_failure(failure)
+                # W-75 record-then-clear: sign the corrected
+                # authorization FIRST and only then replace the journal
+                # entry. If signing raises, the journaled record of the
+                # already-transmitted authorization survives untouched,
+                # so a caller retry must reuse it instead of minting a
+                # brand-new spendable authorization.
                 signed = self.sign_authorization(
                     replace(req, valid_before=corrected_vb)
                 )

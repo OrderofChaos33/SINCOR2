@@ -25,6 +25,7 @@ import time
 
 import pytest
 
+import sincor2.x402_buyer as x402_buyer_module
 from sincor2.x402_buyer import (
     AmbiguousPayment,
     ExpiredAuthorizationError,
@@ -427,4 +428,154 @@ def test_310_fetch_pending_reconciler_failure_never_retries():
     # Reconciliation failure is recorded on the error, never turned into
     # a retry or a second payment.
     assert "error" in (exc_info.value.reconciliation or {})
+    assert len(buyer.requests) == 2
+
+
+# ---------------------------------------------------------------------------
+# Repair round (adversarial review NOT CONFIRMED on 110be4d8):
+# FLAW 1 — the corrected validity window must STRICTLY extend the rejected
+# one; at the 1h cap boundary that is impossible, so the client must HOLD
+# (raise the expired-authorization error) instead of resending a window
+# that merely equals — or is shorter than — the rejected one.
+# FLAW 2 — the W-75 in-flight journal must survive a FAILED re-sign: it is
+# replaced only after the corrected signature exists, never cleared first.
+# The buyer's clock is frozen so the boundary arithmetic is exact.
+# ---------------------------------------------------------------------------
+
+FROZEN_NOW = 1_800_000_000
+
+
+class _FrozenClock:
+    @staticmethod
+    def time():
+        return FROZEN_NOW
+
+
+def _freeze_buyer_clock(monkeypatch):
+    monkeypatch.setattr(x402_buyer_module, "time", _FrozenClock)
+
+
+def _paid_authorization(buyer, request_index):
+    header = buyer.requests[request_index]["headers"]["X-PAYMENT"]
+    return json.loads(header)["payload"]["authorization"]
+
+
+@pytest.mark.parametrize("offset", [3599, 3600])
+def test_309_repair_window_at_cap_cannot_extend_holds(monkeypatch, offset):
+    # rejected_vb = now+3599: the old formula's corrected window EQUALS
+    # the rejected one. rejected_vb = now+3600: it is strictly SHORTER.
+    # Neither may be resent — the failure is uncorrectable, so fetch()
+    # raises the expired-authorization error with NO second request and
+    # NO second signature.
+    _freeze_buyer_clock(monkeypatch)
+    signer, signed_calls = _counting_signer()
+    rejected_vb = FROZEN_NOW + offset
+    buyer = _MockBuyer(
+        signer_fn=signer,
+        responses=[
+            _resp(402, _challenge_402(validBefore=rejected_vb)),
+            _resp(500, {"error": "authorization_expired"}),
+            _resp(200, {"block_number": 999}),
+        ],
+    )
+    raised = None
+    try:
+        buyer.fetch(URL)
+    except ExpiredAuthorizationError as exc:
+        raised = exc
+    if raised is None and len(buyer.requests) == 3:
+        # A corrected authorization was resent: capture both windows so
+        # the failure shows the broken invariant directly.
+        resent_vb = int(_paid_authorization(buyer, 2)["validBefore"])
+        assert resent_vb > rejected_vb, (
+            f"corrected validBefore {resent_vb} does not strictly extend "
+            f"rejected validBefore {rejected_vb}"
+        )
+    assert raised is not None, (
+        "uncorrectable window must HOLD with ExpiredAuthorizationError, "
+        "not resend a non-extended window"
+    )
+    assert failure_action_for_error(raised) is FailureAction.CORRECT_AND_RETRY
+    assert len(buyer.requests) == 2  # NO second payment request was sent
+    assert len(signed_calls) == 1  # NO corrected authorization was signed
+
+
+def test_309_repair_window_just_inside_cap_still_extends(monkeypatch):
+    # rejected_vb = now+2999: a strict extension fits exactly at the cap
+    # (now+3599), so the correction still goes through — the HOLD above
+    # must not over-block correctable expiries.
+    _freeze_buyer_clock(monkeypatch)
+    signer, signed_calls = _counting_signer()
+    rejected_vb = FROZEN_NOW + 2999
+    buyer = _MockBuyer(
+        signer_fn=signer,
+        responses=[
+            _resp(402, _challenge_402(validBefore=rejected_vb)),
+            _resp(500, {"error": "authorization_expired"}),
+            _resp(200, {"block_number": 999}),
+        ],
+    )
+    out = buyer.fetch(URL)
+    assert out["ok"] and out["paid"] is True
+    assert len(buyer.requests) == 3
+    assert len(signed_calls) == 2
+    corrected_vb = int(_paid_authorization(buyer, 2)["validBefore"])
+    assert corrected_vb == FROZEN_NOW + 3599
+    assert corrected_vb > rejected_vb
+
+
+def test_309_repair_failed_resign_leaves_inflight_journal_intact(monkeypatch):
+    # Signer succeeds on call 1, raises on call 2 (the corrected re-sign).
+    # The W-75 journal record of the already-transmitted authorization
+    # must survive byte-identical: a later caller retry is forced to
+    # REUSE it instead of minting a brand-new spendable authorization.
+    _freeze_buyer_clock(monkeypatch)
+    signer_calls = []
+
+    def flaky_signer(typed_data):
+        signer_calls.append(typed_data)
+        if len(signer_calls) == 2:
+            raise RuntimeError("signer unavailable")
+        return _fake_signer(typed_data)
+
+    buyer = _MockBuyer(
+        signer_fn=flaky_signer,
+        responses=[
+            _resp(402, _challenge_402(validBefore=FROZEN_NOW + 600)),
+            _resp(500, {"error": "authorization_expired"}),
+            _resp(402, _challenge_402(validBefore=FROZEN_NOW + 600)),
+            _resp(200, {"block_number": 7}),
+        ],
+    )
+    with pytest.raises(RuntimeError):
+        buyer.fetch(URL)
+    transmitted = json.loads(buyer.requests[1]["headers"]["X-PAYMENT"])["payload"]
+    entry = buyer._inflight.get(URL)
+    assert entry is not None, "in-flight journal entry was destroyed by a failed re-sign"
+    assert entry[1].signature == transmitted["signature"]
+    assert entry[1].authorization == transmitted["authorization"]
+    # Caller retry reuses the journaled authorization — no fresh mint.
+    out = buyer.fetch(URL)
+    assert out["ok"] and out["paid"] is True
+    assert len(signer_calls) == 2  # the retry did NOT sign again
+    retried = json.loads(buyer.requests[3]["headers"]["X-PAYMENT"])["payload"]
+    assert retried["authorization"] == transmitted["authorization"]
+    assert retried["signature"] == transmitted["signature"]
+
+
+def test_309_repair_unknown_500_with_tx_hash_surfaces_hash():
+    # Optional repair: a bare 500 carrying a well-formed broadcast hash
+    # but no recognizable reason stays UNKNOWN/HOLD, but the hash is a
+    # reconciliation lead and must survive onto the raised error instead
+    # of being dropped.
+    buyer = _MockBuyer(
+        responses=[
+            _resp(402, _challenge_402()),
+            _resp(500, {"txHash": TX_HASH}),
+        ],
+    )
+    with pytest.raises(UnknownFacilitatorFailure) as exc_info:
+        buyer.fetch(URL)
+    assert failure_action_for_error(exc_info.value) is FailureAction.HOLD
+    assert TX_HASH in str(exc_info.value)
     assert len(buyer.requests) == 2
