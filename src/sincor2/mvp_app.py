@@ -1125,6 +1125,23 @@ def _waitlist_stats_admin_gate():
         return _require_admin(request)
     return None
 
+# Admin intake visibility (WREN PR 6): GET /api/admin/intakes lists pack
+# intakes stuck at intake_complete for 24h+ so a buyer who finished
+# their intake never sits unnoticed. Same double gate as the waitlist
+# stats route above: _require_admin runs as a before_request guard over
+# the path, and the handler re-checks admin itself (the blueprint's own
+# credential check mirrors the waitlist blueprint's).
+from sincor2.blueprints.admin_intakes import admin_intakes_bp as _admin_intakes_bp
+
+app.register_blueprint(_admin_intakes_bp)
+
+
+@app.before_request
+def _admin_intakes_admin_gate():
+    if request.path.startswith("/api/admin/intakes"):
+        return _require_admin(request)
+    return None
+
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)
 
