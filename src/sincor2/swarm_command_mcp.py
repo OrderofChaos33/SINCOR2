@@ -64,6 +64,7 @@ import os
 import time
 from typing import Any, Dict, Iterable, List, Tuple
 
+from sincor2.mcp_schema_guard import SchemaValidationError, validate_arguments
 from sincor2.swarm_command_board import BoardStore, LANES
 
 SERVER_NAME = "swarm-command"
@@ -195,6 +196,15 @@ def _tool_defs() -> List[Dict[str, Any]]:
                     items={
                         "type": "array",
                         "description": "non-empty list of {title, detail, owner}",
+                        "items": {
+                            "type": "object",
+                            "required": ["title", "detail", "owner"],
+                            "properties": {
+                                "title": {"type": "string"},
+                                "detail": {"type": "string"},
+                                "owner": {"type": "string"},
+                            },
+                        },
                     },
                     proposed_by={"type": "string"},
                 ),
@@ -735,9 +745,22 @@ def app(environ, start_response):
                 raise _JsonRpcParamsError("arguments must be an object")
             _validate_tool_input_size(args)
             store = _store()
-            known = {t["name"] for t in _tool_defs()}
+            defs = _tool_defs()
+            known = {t["name"] for t in defs}
             if tool_name not in known:
                 raise _JsonRpcParamsError("unknown tool %r" % (tool_name,))
+            # Dev-watch 316: strict schema validation BEFORE dispatch —
+            # a literal "null", a missing required field, or a wrong-typed
+            # value is rejected (-32602), never silently stored/coerced.
+            try:
+                validate_arguments(
+                    tool_name,
+                    next(t["inputSchema"] for t in defs
+                         if t["name"] == tool_name),
+                    args,
+                )
+            except SchemaValidationError as exc:
+                raise _JsonRpcParamsError(str(exc))
             result = _dispatch_tool(tool_name, args, store)
             content = [{"type": "text", "text": json.dumps(result)}]
             status, headers, body = _json_response(
