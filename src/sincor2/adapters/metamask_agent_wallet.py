@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -55,29 +56,66 @@ class MetaMaskAgentNotReady(RuntimeError):
     """mm CLI missing, not authenticated, or not initialized."""
 
 
+_TX_HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
+
+
+def _is_tx_hash(value: Any) -> bool:
+    """True only for a well-formed EVM transaction hash string.
+
+    A candidate that fails the shape — wrong length, non-hex characters,
+    a U+FFFD replacement char left by tolerant stream decoding of
+    corrupted bytes, a lone surrogate from a ``\\uXXXX`` escape — can
+    never match the onchain hash, so it is not a usable order_id.
+    """
+    return isinstance(value, str) and _TX_HASH_RE.match(value) is not None
+
+
 def _extract_tx_hash(data: Any) -> str:
     """Total tx-hash extraction from an mm CLI payload.
 
     The CLI's exit code is the execution signal: ``_run`` returns only
     after a 0 exit, and what it returns is raw ``json.loads(stdout)`` —
     ANY JSON value, not necessarily a dict. Extraction therefore guards
-    every level with isinstance and coerces the hash to str-or-empty, so
-    no parse outcome can throw (and be swallowed by the caller's broad
-    except into a failure result for a trade that already executed) or
-    leak a wrong-typed ``order_id`` downstream. Hash-less success with an
-    empty order_id is the pinned design for every unparseable/hash-less
-    shape.
+    every level with isinstance, so no parse outcome can throw (and be
+    swallowed by the caller's broad except into a failure result for a
+    trade that already executed).
+
+    The hash itself must be well-formed (``_is_tx_hash``): ``txHash``
+    wins when it matches the tx-hash shape, else ``hash`` when IT
+    matches, else "" — the pinned hash-less-success design. A truthy
+    non-string or malformed ``txHash`` must not shadow a valid ``hash``
+    (an ``or`` chain would pick the wrong value and discard both), and a
+    malformed string must not land in ``order_id``: a corrupted hash
+    recorded as a clean success can never be reconciled onchain.
     """
     payload = data.get("data") if isinstance(data, dict) else None
     if not isinstance(payload, dict):
         return ""
-    # Consult the fallback properly: a truthy non-string txHash must not
-    # shadow a valid string ``hash`` (an ``or`` chain would pick the
-    # wrong-typed value and the coercion below would discard both).
     tx_hash = payload.get("txHash")
-    if not isinstance(tx_hash, str):
-        tx_hash = payload.get("hash")
-    return tx_hash if isinstance(tx_hash, str) else ""
+    if _is_tx_hash(tx_hash):
+        return tx_hash
+    fallback = payload.get("hash")
+    if _is_tx_hash(fallback):
+        return fallback
+    return ""
+
+
+def _doctor_flag(value: Any) -> bool:
+    """Strict interpretation of an ``mm doctor`` readiness flag.
+
+    Fail closed: a flag counts as true ONLY for boolean ``True`` or the
+    string ``"true"`` (any case, surrounding whitespace ignored). The
+    previous ``bool(value)`` coercion read the STRING ``"false"`` as
+    ready — ``bool("false")`` is True — so a doctor payload reporting
+    string flags would let a write method execute against a wallet that
+    is not actually authenticated/initialized. Everything else (False,
+    "false", "yes", 1, 0, None, missing) is NOT ready.
+    """
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return False
 
 
 @dataclass
@@ -204,8 +242,8 @@ class MetaMaskAgentWallet:
         except Exception:
             pass
         return WalletStatus(
-            authenticated=bool(data.get("authenticated")),
-            initialized=bool(data.get("initialized")),
+            authenticated=_doctor_flag(data.get("authenticated")),
+            initialized=_doctor_flag(data.get("initialized")),
             address=address,
             trading_mode=trading_mode,
             cli_version=str(data.get("cli") or ""),
