@@ -70,7 +70,12 @@ class _FakeChain:
 
     def __init__(self):
         self.transfers: dict[str, dict] = {}
+        self.raw: dict[str, object] = {}
         self.head = 112  # receipt at block 100 -> 13 confirmations
+
+    def register_raw(self, tx_hash, receipt):
+        """Serve ``receipt`` verbatim for this tx (malformed shapes)."""
+        self.raw[tx_hash.lower()] = receipt
 
     def register(self, tx_hash, payer, amount_atomic, token="USDC",
                  block=100):
@@ -90,6 +95,8 @@ class _FakeChain:
     def rpc(self, method, params, attempts=3):
         if method == "eth_getTransactionReceipt":
             tx = params[0].lower()
+            if tx in self.raw:
+                return self.raw[tx]
             t = self.transfers.get(tx)
             if t is None:
                 return None
@@ -459,3 +466,236 @@ class TestRouteShapeMatrix:
         assert MATRIX_RULES <= all_rules, (
             "matrix lists route(s) no longer in the URL map: "
             f"{sorted(MATRIX_RULES - all_rules)}")
+
+
+# ---------------------------------------------------------------------------
+# (c) Malformed receipts / raising verifiers -> 402, never 500 HTML / 400.
+#
+# Builder B round-2 break: the settle-before-serve ORDERING held (zero
+# content leaked), but a class of mid-flow verification failures escaped
+# with the wrong response SHAPE — 500 HTML (or a 400 where the sibling
+# surface answers 402) — because verify_treasury_transfer only guarded
+# its RPC calls while _parse_transfer_logs consumed the receipt with no
+# shape validation, and neither settle route guarded the verify call.
+# The invariant's response-shape half: on EVERY settle/verify surface,
+# a verification that cannot complete means "payment not settled" —
+# HTTP 402 with the endpoint's JSON error envelope, no token minted,
+# no intake recorded, challenge still pending.
+# ---------------------------------------------------------------------------
+
+def _transfer_log(data="0x1", topic0=None, token="USDC"):
+    return {
+        "address": pp.token_address(token),
+        "topics": [topic0 if topic0 is not None else pp.TRANSFER_TOPIC,
+                   _pad(PAYER), _pad(pp.TREASURY)],
+        "data": data,
+    }
+
+
+def _receipt(logs, status="0x1", block=100):
+    return {"status": status, "blockNumber": hex(block), "logs": logs}
+
+
+def _malformed_receipts(token):
+    """(shape id, canned receipt) — the transfer log must carry the
+    surface's own token address, or the parser legitimately skips it
+    before ever reaching the malformed field (skill resources settle
+    in SINC, rail packs in USDC)."""
+    return [
+        ("log_data_not_hex",
+         _receipt([_transfer_log(data="nothex", token=token)])),
+        ("topic_wrong_type",
+         _receipt([_transfer_log(topic0=123, token=token)])),
+        ("receipt_is_a_list", ["not", "a", "receipt", "object"]),
+    ]
+
+
+MALFORMED_RECEIPTS = _malformed_receipts("USDC")
+MALFORMED_RECEIPTS_SINC = _malformed_receipts("SINC")
+
+
+class TestMalformedReceiptResponseShape:
+    @pytest.mark.parametrize(
+        "shape,receipt", MALFORMED_RECEIPTS_SINC,
+        ids=[m[0] for m in MALFORMED_RECEIPTS_SINC])
+    def test_x402_verify_malformed_receipt_is_402_not_500(
+            self, env, billing_client, shape, receipt):
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+        env["chain"].register_raw(TX_OK, receipt)
+
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert body is not None, (shape, res.get_data(as_text=True)[:200])
+        assert res.status_code == 402, (shape, res.status_code, body)
+        assert body.get("error") == "receipt_malformed", (shape, body)
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+
+    @pytest.mark.parametrize(
+        "shape,receipt", MALFORMED_RECEIPTS,
+        ids=[m[0] for m in MALFORMED_RECEIPTS])
+    def test_rail_settle_malformed_receipt_is_402_not_500(
+            self, env, rail_client, shape, receipt):
+        res = rail_client.post("/rail/checkout", json={
+            "pack_sku": PACK_SKU, "payer_wallet": PAYER,
+            "buyer_email": "buyer@example.com"})
+        assert res.status_code == 402, res.get_json()
+        cid = res.get_json()["challenge_id"]
+        _bind(cid, PACK_RESOURCE)
+        env["chain"].register_raw(TX_OK, receipt)
+
+        res = rail_client.post("/rail/settle", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER, "buyer_email": "buyer@example.com"})
+        body = res.get_json()
+        assert body is not None, (shape, res.get_data(as_text=True)[:200])
+        assert res.status_code == 402, (shape, res.status_code, body)
+        assert body.get("error") == "receipt_malformed", (shape, body)
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _intake_count(env["tmp"]) == 0
+        assert _challenge_status(cid) == "pending"
+
+    def test_x402_verify_raising_verify_challenge_is_402(
+            self, env, billing_client, monkeypatch):
+        """Even if verify_challenge itself raises, the route answers
+        402 (payment not settled) — never Flask's 500 HTML page."""
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+
+        def _boom(*a, **kw):
+            raise RuntimeError("verify exploded")
+
+        monkeypatch.setattr(x402, "verify_challenge", _boom)
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("ok") is False, body
+        assert body.get("error") == "rpc_failed", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+
+    def test_rail_settle_raising_verify_challenge_is_402(
+            self, env, rail_client, monkeypatch):
+        res = rail_client.post("/rail/checkout", json={
+            "pack_sku": PACK_SKU, "payer_wallet": PAYER,
+            "buyer_email": "buyer@example.com"})
+        assert res.status_code == 402, res.get_json()
+        cid = res.get_json()["challenge_id"]
+        _bind(cid, PACK_RESOURCE)
+
+        def _boom(*a, **kw):
+            raise RuntimeError("verify exploded")
+
+        monkeypatch.setattr(x402, "verify_challenge", _boom)
+        res = rail_client.post("/rail/settle", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER, "buyer_email": "buyer@example.com"})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("ok") is False, body
+        assert body.get("error") == "rpc_failed", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _intake_count(env["tmp"]) == 0
+        assert _challenge_status(cid) == "pending"
+
+    def test_rpc_failure_agrees_402_on_both_surfaces(
+            self, env, billing_client, rail_client, monkeypatch):
+        """_rpc_call raising -> verify reports rpc_failed. Both settle
+        surfaces must answer 402 for it (pre-fix drift: billing 400,
+        rail 402 — the disagreement this item exists to eliminate)."""
+        def _boom(method, params, attempts=3):
+            raise RuntimeError("rpc down")
+
+        monkeypatch.setattr(pp, "_rpc_call", _boom)
+
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "rpc_failed", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+
+        res = rail_client.post("/rail/checkout", json={
+            "pack_sku": PACK_SKU, "payer_wallet": PAYER,
+            "buyer_email": "buyer@example.com"})
+        assert res.status_code == 402, res.get_json()
+        cid = res.get_json()["challenge_id"]
+        _bind(cid, PACK_RESOURCE)
+        res = rail_client.post("/rail/settle", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER, "buyer_email": "buyer@example.com"})
+        body = res.get_json()
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "rpc_failed", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _intake_count(env["tmp"]) == 0
+        assert _challenge_status(cid) == "pending"
+
+    def test_platform_verify_raising_verifier_is_402_not_500(
+            self, env, billing_client, monkeypatch):
+        """POST /api/platform/verify: a raising checkout verifier must
+        surface as 402 + the JSON envelope, not 500 HTML (same class,
+        corroborated by Builder B on the third surface)."""
+        import sincor2.mvp_blueprints.billing as billing_mod
+
+        def _boom(*a, **kw):
+            raise RuntimeError("verify exploded")
+
+        monkeypatch.setattr(
+            billing_mod, "platform_verify_checkout", _boom)
+        res = billing_client.post("/api/platform/verify", json={
+            "payment_id": "pay_devwatch307", "tx_hash": TX_OK,
+            "payer_wallet": PAYER,
+            "customer_email": "buyer@example.com"})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("ok") is False, body
+        _assert_no_content(body, res.get_data(as_text=True))
+
+
+class TestVerifyTreasuryTransferTotality:
+    """Unit pins for fix requirement 1: verify_treasury_transfer (and
+    its log parser) return a failure RESULT for every malformed
+    receipt shape — they never raise on receipt-shaped input."""
+
+    @pytest.mark.parametrize(
+        "shape,receipt", MALFORMED_RECEIPTS,
+        ids=[m[0] for m in MALFORMED_RECEIPTS])
+    def test_malformed_receipts_return_receipt_malformed(
+            self, env, shape, receipt):
+        env["chain"].register_raw(TX_OK, receipt)
+        vr = pp.verify_treasury_transfer(
+            TX_OK, token="USDC", expected_atomic=1000,
+            payer_wallet=PAYER)
+        assert vr.get("ok") is False, (shape, vr)
+        assert vr.get("error") == "receipt_malformed", (shape, vr)
+
+    @pytest.mark.parametrize("logs", [
+        "not-a-list",
+        [None, 42, "junk"],
+        [{"address": 123, "topics": "nope", "data": None}],
+        [{"topics": [pp.TRANSFER_TOPIC], "data": "0x1"}],
+    ], ids=["logs_not_list", "log_entries_not_dicts",
+            "fields_wrong_types", "log_missing_address"])
+    def test_parser_never_raises_on_garbage_logs(self, env, logs):
+        env["chain"].register_raw(TX_OK, _receipt(logs))
+        vr = pp.verify_treasury_transfer(
+            TX_OK, token="USDC", expected_atomic=1000,
+            payer_wallet=PAYER)
+        # A result, never an exception: either malformed, or no
+        # qualifying treasury transfer could be parsed from the junk.
+        assert vr.get("ok") is False, vr
+        assert vr.get("error") in (
+            "receipt_malformed", "no_treasury_transfer"), vr

@@ -290,10 +290,19 @@ def platform_verify():
     # message with the payer wallet (EIP-191 personal_sign); a bare
     # tx_hash no longer verifies anything.
     signature = sanitize_string(data.get('payer_signature', ''), max_length=256)
-    result = platform_verify_checkout(
-        payment_id, tx_hash, customer_email=email, payer_wallet=wallet or '',
-        payer_signature=signature,
-    )
+    try:
+        result = platform_verify_checkout(
+            payment_id, tx_hash, customer_email=email, payer_wallet=wallet or '',
+            payer_signature=signature,
+        )
+    except Exception as exc:
+        # Item 307 round 2 (belt-and-braces): a raising verifier has
+        # settled nothing — answer the payment-required shape (402 +
+        # this endpoint's JSON envelope), never a 500 HTML page.
+        logger.exception('[PAYMENTS] platform verify raised for %s',
+                         payment_id)
+        return jsonify({'ok': False, 'error': 'rpc_failed',
+                        'detail': str(exc)}), 402
     if not result.get('ok'):
         error = result.get('error')
         if error == 'sanctions_hit':
@@ -519,11 +528,17 @@ def api_sinc_burn_stats():
 #: a settlement that fails mid-flow — the tx reverted on-chain
 #: (tx_failed) or the finality gate refuses below 12 confirmations
 #: (awaiting_finality) — belongs to this family exactly like a still-
-#: pending transfer. x402_verify consults this same tuple for its
-#: status mapping, so the two can never drift apart.
+#: pending transfer. Item 307 round 2: verification that could not be
+#: COMPLETED — the RPC layer failed (rpc_failed) or the receipt was
+#: malformed (receipt_malformed) — is the same family: the payment is
+#: not settled, so the answer is 402 on every surface (rail/settle
+#: already answered 402 for rpc_failed; this tuple is what made
+#: /api/x402/verify drift to 400). x402_verify consults this same
+#: tuple for its status mapping, so the two can never drift apart.
 _PAID_SURFACE_VERIFY_402_ERRORS = ('tx_pending', 'insufficient_amount',
                                    'no_treasury_transfer', 'tx_failed',
-                                   'awaiting_finality')
+                                   'awaiting_finality', 'rpc_failed',
+                                   'receipt_malformed')
 
 
 def _merge_header_tokens(existing, *tokens):
@@ -881,15 +896,23 @@ def x402_verify():
             replay_ts_ms = int(replay_ts_raw)
         except (TypeError, ValueError):
             replay_ts_ms = None
-    result = verify_challenge(
-        sanitize_string(data.get('challenge_id', ''), max_length=64),
-        sanitize_string(data.get('tx_hash', ''), max_length=66),
-        payer_wallet=payer_wallet,
-        require_bound_challenge=True,
-        replay_signature=sanitize_string(
-            data.get('replay_signature', ''), max_length=140),
-        replay_ts_ms=replay_ts_ms,
-    )
+    try:
+        result = verify_challenge(
+            sanitize_string(data.get('challenge_id', ''), max_length=64),
+            sanitize_string(data.get('tx_hash', ''), max_length=66),
+            payer_wallet=payer_wallet,
+            require_bound_challenge=True,
+            replay_signature=sanitize_string(
+                data.get('replay_signature', ''), max_length=140),
+            replay_ts_ms=replay_ts_ms,
+        )
+    except Exception as exc:
+        # Item 307 round 2 (belt-and-braces): a verifier that RAISES
+        # has not settled anything — answer 402 (rpc_failed family)
+        # with the JSON envelope, never Flask's 500 HTML page. The
+        # challenge stays pending; no token is minted.
+        logger.exception('[X402] verify_challenge raised')
+        result = {'ok': False, 'error': 'rpc_failed', 'detail': str(exc)}
     if not result.get('ok'):
         # Item 307 (settle-then-serve): every "payment has not settled"
         # failure — pending, reverted, or below the finality gate — is

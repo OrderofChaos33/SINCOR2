@@ -860,22 +860,52 @@ def _rpc_call(method: str, params: list, attempts: int = 3) -> Any:
     raise last_err or RuntimeError("rpc_failed")
 
 
+class _MalformedReceipt(Exception):
+    """A receipt/log shape the parser cannot safely interpret.
+
+    Raised only inside _parse_transfer_logs; verify_treasury_transfer
+    converts it to the ``receipt_malformed`` failure result. Malformed
+    receipts are a verification FAILURE (payment not settled), never a
+    server error — a hostile or broken RPC response must not turn a
+    settle/verify call into a 500.
+    """
+
+
 def _parse_transfer_logs(receipt: dict, token_addr: str, treasury: str) -> list[dict[str, Any]]:
     treasury_l = treasury.lower()
     token_l = token_addr.lower()
     matches = []
-    for log in receipt.get("logs") or []:
-        if (log.get("address") or "").lower() != token_l:
+    logs = receipt.get("logs") or []
+    if not isinstance(logs, (list, tuple)):
+        raise _MalformedReceipt("receipt logs is not a list")
+    for log in logs:
+        if not isinstance(log, dict):
+            continue
+        address = log.get("address")
+        if not isinstance(address, str) or address.lower() != token_l:
             continue
         topics = log.get("topics") or []
-        if not topics or topics[0].lower() != TRANSFER_TOPIC.lower():
+        if not isinstance(topics, (list, tuple)) or not topics:
+            raise _MalformedReceipt("transfer log topics missing or not a list")
+        topic0 = topics[0]
+        if not isinstance(topic0, str):
+            raise _MalformedReceipt("transfer log topic is not a string")
+        if topic0.lower() != TRANSFER_TOPIC.lower():
             continue
         if len(topics) < 3:
             continue
+        if not isinstance(topics[1], str) or not isinstance(topics[2], str):
+            raise _MalformedReceipt("transfer log topics are not strings")
         to_addr = "0x" + topics[2][-40:].lower()
         if to_addr != treasury_l:
             continue
-        amount = int(log.get("data", "0x0"), 16)
+        data = log.get("data", "0x0")
+        if not isinstance(data, str):
+            raise _MalformedReceipt("transfer log data is not a string")
+        try:
+            amount = int(data, 16)
+        except ValueError:
+            raise _MalformedReceipt("transfer log data is not hex") from None
         from_addr = "0x" + topics[1][-40:].lower()
         matches.append({"from": from_addr, "to": to_addr, "amount_atomic": amount})
     return matches
@@ -979,6 +1009,9 @@ def verify_treasury_transfer(
 
     if not receipt:
         return {"ok": False, "error": "tx_pending"}
+    if not isinstance(receipt, dict):
+        return {"ok": False, "error": "receipt_malformed",
+                "detail": "receipt is not a JSON object"}
     if receipt.get("status") != "0x1":
         return {"ok": False, "error": "tx_failed"}
 
@@ -1003,7 +1036,11 @@ def verify_treasury_transfer(
 
     token_addr = token_address(token)
     min_amount = expected_atomic * (10000 - AMOUNT_TOLERANCE_BPS) // 10000
-    transfers = _parse_transfer_logs(receipt, token_addr, treasury)
+    try:
+        transfers = _parse_transfer_logs(receipt, token_addr, treasury)
+    except _MalformedReceipt as exc:
+        return {"ok": False, "error": "receipt_malformed",
+                "detail": str(exc), **chain_ctx}
     if not transfers:
         return {"ok": False, "error": "no_treasury_transfer", "token": token, **chain_ctx}
 
