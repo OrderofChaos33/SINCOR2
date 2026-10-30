@@ -1712,6 +1712,51 @@ def update_pack_intake_status(
         conn.close()
 
 
+def transition_pack_intake_status_if(
+    store_or_db: PaymentLedgerStore | str | Path,
+    intake_id: str,
+    *,
+    from_statuses: tuple[str, ...],
+    to_status: str,
+    details: Optional[dict[str, Any]] = None,
+) -> bool:
+    """Atomically transition a pack intake's status iff its current
+    status is one of ``from_statuses``.
+
+    Returns True iff THIS call performed the transition — the
+    conditional UPDATE's affected-row count is the decision, so under
+    concurrency exactly one caller wins a given transition. This is
+    the primitive the rail fulfillment uses to claim a pack-agent
+    kickoff exactly once (WREN PR 10 repair round 2): unlike a
+    read-then-write check, the rowcount stays authoritative even when
+    separate ledger reads are failing.
+    """
+    statuses = tuple(from_statuses)
+    if not statuses:
+        return False
+    db_path = _pack_intake_db_path(store_or_db)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        placeholders = ",".join("?" for _ in statuses)
+        if details is None:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET status=? WHERE intake_id=? "
+                f"AND status IN ({placeholders})",
+                (to_status, intake_id, *statuses),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET status=?, details=? "
+                f"WHERE intake_id=? AND status IN ({placeholders})",
+                (to_status, json.dumps(details), intake_id, *statuses),
+            )
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
 def allowed_transitions() -> dict[str, list[str]]:
     """Return the legal transition table as plain strings (for docs/UIs)."""
     return {s.value: sorted(t.value for t in targets) for s, targets in _ALLOWED_TRANSITIONS.items()}
