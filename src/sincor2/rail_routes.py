@@ -885,16 +885,20 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
             # the settle into the record as pre-filled intake answers —
             # a buyer who already told us their details is not asked
             # twice, and the answers are on file even if they never
-            # revisit the form.
-            prefill = {
-                k: v.strip()
-                for k, v in (order.get("details") or {}).items()
-                if isinstance(v, str) and v.strip()
-            }
-            if customer_email and "contact_email" not in prefill:
+            # revisit the form. A settle body is buyer-controlled
+            # input, so the details pass through the intake form's own
+            # allowlist + sanitizer first (the same step a form POST
+            # takes): off-SKU keys, markup, and over-length values are
+            # dropped, never stored verbatim.
+            from sincor2.blueprints.intake import \
+                sanitize_prefill_answers
+
+            raw_prefill = dict(order.get("details") or {})
+            if customer_email and "contact_email" not in raw_prefill:
                 # The settle's buyer_email is the intake contact email
                 # unless the buyer gave a distinct contact address.
-                prefill["contact_email"] = customer_email
+                raw_prefill["contact_email"] = customer_email
+            prefill = sanitize_prefill_answers(pack_sku, raw_prefill)
             if prefill:
                 details["intake_answers"] = prefill
             access_url = _intake_url(intake_id, intake_token)

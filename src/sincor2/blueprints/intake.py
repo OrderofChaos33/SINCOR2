@@ -163,7 +163,17 @@ def _authorized_intake(intake_id: str, token: str):
     if details.get("digital"):
         return None
     expected = str(details.get("intake_token") or "")
-    if not expected or not hmac.compare_digest(expected, str(token)):
+    if not expected:
+        return None
+    # Compare as BYTES: hmac.compare_digest on str raises TypeError
+    # for non-ASCII input, which would 500 on a KNOWN id while an
+    # unknown id cleanly 404s — an unauthenticated existence oracle.
+    # Byte comparison keeps every token shape on the identical 404
+    # path (surrogatepass makes the encode total, and UTF-8 encoding
+    # is injective, so equality semantics are unchanged).
+    if not hmac.compare_digest(
+            expected.encode("utf-8", "surrogatepass"),
+            str(token).encode("utf-8", "surrogatepass")):
         return None
     return intake
 
@@ -176,15 +186,20 @@ def _request_token() -> str:
 def _clean_value(raw: Any) -> Optional[str]:
     """Sanitize one submitted value; None means 'not a usable string'.
 
-    HTML is stripped: script/style blocks go entirely (contents
-    included), every other tag is removed keeping its text, entities
-    are unescaped, and the result is trimmed.
+    HTML is stripped: entities are unescaped FIRST, script/style
+    blocks go entirely (contents included), every other tag is
+    removed keeping its text, and the result is trimmed. Unescaping
+    before stripping matters: "&lt;script&gt;…" only becomes markup
+    after decoding, and decoding after stripping would store that
+    markup literally — stored answers never contain markup the
+    unescape step introduced.
     """
     if not isinstance(raw, str):
         return None
-    value = _BLOCK_RE.sub("", raw)
-    value = html.unescape(_TAG_RE.sub("", value)).strip()
-    return value
+    value = html.unescape(raw)
+    value = _BLOCK_RE.sub("", value)
+    value = _TAG_RE.sub("", value)
+    return value.strip()
 
 
 def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
@@ -192,23 +207,31 @@ def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
 
     Returns (answers, error_body, error_status). On success error_body
     is None and answers holds exactly the allowlisted, sanitized
-    fields. Every rejection names the offending fields.
+    fields. Every rejection names the offending fields. Required-ness
+    is judged on the CLEANED value: a field whose submission cleans
+    to nothing (pure markup or entities, e.g. "<b></b>") was not
+    answered, so it is reported missing, not stored blank.
     """
     fields = _fields_for_sku(pack_sku)
     unknown = sorted(set(payload) - set(fields))
     if unknown:
         return None, {"ok": False, "error": "unknown_fields",
                       "fields": unknown}, 400
-    missing = [f for f in fields
-               if not str(payload.get(f) or "").strip()]
-    if missing:
-        return None, {"ok": False, "error": "missing_required_fields",
-                      "fields": missing}, 400
-    answers: Dict[str, str] = {}
+    missing: List[str] = []
     invalid: List[str] = []
+    answers: Dict[str, str] = {}
     for field in fields:
-        value = _clean_value(payload.get(field))
-        if value is None or len(value) > MAX_FIELD_LEN:
+        raw = payload.get(field)
+        value = _clean_value(raw)
+        if value is None:
+            # Absent/null is a missing answer; a present non-string
+            # value is an invalid one.
+            (invalid if raw else missing).append(field)
+            continue
+        if value == "":
+            missing.append(field)
+            continue
+        if len(value) > MAX_FIELD_LEN:
             invalid.append(field)
             continue
         choices = FIELD_CHOICES.get(field)
@@ -219,10 +242,46 @@ def _validate_answers(pack_sku: str, payload: Dict[str, Any]):
             invalid.append(field)
             continue
         answers[field] = value
+    if missing:
+        return None, {"ok": False, "error": "missing_required_fields",
+                      "fields": missing}, 400
     if invalid:
         return None, {"ok": False, "error": "invalid_fields",
                       "fields": invalid}, 400
     return answers, None, 200
+
+
+def sanitize_prefill_answers(pack_sku: str,
+                             raw_details: Any) -> Dict[str, str]:
+    """Sanitize settle-supplied order details into prefill answers.
+
+    The rail settle collects the same per-SKU fields on /rail/pay
+    BEFORE payment, and whatever the buyer typed there is stored on
+    the intake record as pre-filled answers. A settle body is
+    buyer-controlled input, not a trusted internal write, so it goes
+    through the exact same allowlist + cleaning as a form POST before
+    anything is stored. Partial by design: off-allowlist keys,
+    non-strings, values that clean to nothing, over-length values,
+    and enum/email failures are DROPPED (never stored, never fatal to
+    the settle) — the buyer can still complete the real form.
+    """
+    if not isinstance(raw_details, dict):
+        return {}
+    allowed = set(_fields_for_sku(pack_sku))
+    answers: Dict[str, str] = {}
+    for key, raw in raw_details.items():
+        if key not in allowed:
+            continue
+        value = _clean_value(raw)
+        if value is None or value == "" or len(value) > MAX_FIELD_LEN:
+            continue
+        choices = FIELD_CHOICES.get(key)
+        if choices and value not in choices:
+            continue
+        if key == "contact_email" and not _EMAIL_RE.match(value):
+            continue
+        answers[key] = value
+    return answers
 
 
 def _notify_owner(intake) -> None:
@@ -329,13 +388,18 @@ def intake_submit(intake_id):
 
     from sincor2.payment_ledger import update_pack_intake_status
 
-    was_complete = intake.status == "intake_complete"
-    update_pack_intake_status(
+    # The owner notification keys off the ledger write's own atomic
+    # transition signal — not the status this request happened to
+    # read beforehand. Under concurrent first POSTs every request can
+    # observe the pre-completion record, but only the one whose write
+    # actually advanced the record into intake_complete is told so,
+    # and only that one notifies.
+    advanced = update_pack_intake_status(
         _intake_db_path(), intake.intake_id, "intake_complete",
         details={"intake_answers": answers})
     logger.info("[INTAKE] intake %s completed (sku=%s)",
                 intake.intake_id, intake.pack_sku)
-    if not was_complete:
+    if advanced:
         _notify_owner(intake)
     return jsonify({"ok": True, "status": "intake_complete"}), 200
 

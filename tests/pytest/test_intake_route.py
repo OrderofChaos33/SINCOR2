@@ -36,6 +36,8 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -684,3 +686,254 @@ def test_intake_route_mounted_on_mvp_app(intake_env):
     rules = {rule.rule for rule in mvp.app.url_map.iter_rules()}
     assert "/intake/<intake_id>" in rules
     assert mvp.RAIL_MOUNT_STATUS["rail_intake"] is True
+
+
+# ---------------------------------------------------------------------------
+# Repair round (Builder B NOT CONFIRMED): five defects
+#   1. non-ASCII token 500'd on known ids (existence oracle)
+#   2. non-atomic read-merge-write lost keys under concurrency;
+#      corrupt details JSON raised out of the update
+#   3. duplicate owner notifications under concurrent POSTs
+#   4. tag-only values passed the required-field check (B1)
+#   5. settle prefill bypassed sanitization (F1); entity-encoded markup
+#      survived cleaning (B2)
+# ---------------------------------------------------------------------------
+
+def test_non_ascii_token_takes_identical_404_path(
+        intake_app, intake_env):
+    """hmac.compare_digest on str raises TypeError for non-ASCII input:
+    a non-ASCII token on a KNOWN id 500'd while an unknown id cleanly
+    404'd — an unauthenticated existence oracle. Every bad-token shape
+    must take the identical 404 path, byte for byte, on GET and POST."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    unknown = client.get("/intake/intake-rail-nope?token=whatever")
+    assert unknown.status_code == 404
+
+    weird = "tökén-üñïcode-🔑"
+    known_get = client.get(
+        "/intake/intake-rail-x402-test0001",
+        query_string={"token": weird})
+    assert known_get.status_code == 404
+    assert known_get.data == unknown.data
+
+    known_post = client.post(
+        "/intake/intake-rail-x402-test0001",
+        query_string={"token": weird}, json=CRED_ANSWERS)
+    assert known_post.status_code == 404
+    assert known_post.data == unknown.data
+
+    # The header path takes the same comparison.
+    known_hdr = client.get(
+        "/intake/intake-rail-x402-test0001",
+        headers={"X-Intake-Token": "tökén"})
+    assert known_hdr.status_code == 404
+    assert known_hdr.data == unknown.data
+
+    # Nothing was written by any of the rejected requests.
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+
+
+def test_update_status_concurrent_merges_lose_no_keys(intake_env):
+    """Six concurrent read-merge-writes with distinct keys must ALL
+    survive: the merge is serialized (BEGIN IMMEDIATE), not a
+    last-writer-wins snapshot race."""
+    db = intake_env["db"]
+    _seed_intake(db)
+    barrier = threading.Barrier(6)
+    errors = []
+
+    def worker(i):
+        try:
+            barrier.wait(timeout=10)
+            pl.update_pack_intake_status(
+                db, "intake-rail-x402-test0001", "agent_kickoff",
+                details={f"key_{i}": i})
+        except Exception as exc:  # recorded, asserted below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,))
+               for i in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert not errors
+    row = pl.get_pack_intake(db, "intake-rail-x402-test0001")
+    for i in range(6):
+        assert row.details[f"key_{i}"] == i
+    # The fulfillment details rode through every merge.
+    assert row.details["intake_token"] == INTAKE_TOKEN
+    assert row.details["payer_wallet"] == PAYER.lower()
+
+
+def test_update_status_heals_corrupt_details_json(intake_env):
+    """A row whose stored details are invalid JSON must not raise out
+    of the update — the old replace-write healed such rows by
+    overwriting them; the merge treats unparseable details as {}."""
+    db = intake_env["db"]
+    _seed_intake(db)
+    conn = sqlite3.connect(db)
+    conn.execute(
+        "UPDATE pack_intakes SET details=? WHERE intake_id=?",
+        ("{not valid json", "intake-rail-x402-test0001"))
+    conn.commit()
+    conn.close()
+
+    advanced = pl.update_pack_intake_status(
+        db, "intake-rail-x402-test0001", "agent_kickoff",
+        details={"fresh": "value"})
+    assert advanced is True
+    row = pl.get_pack_intake(db, "intake-rail-x402-test0001")
+    assert row.status == "agent_kickoff"
+    assert row.details == {"fresh": "value"}
+
+
+def test_update_status_reports_whether_it_advanced(intake_env):
+    """The return value is the CAS signal the intake route keys its
+    exactly-once owner notification on: True only when THIS call moved
+    the record onto the requested status."""
+    db = intake_env["db"]
+    _seed_intake(db)
+    assert pl.update_pack_intake_status(
+        db, "intake-rail-x402-test0001", "agent_kickoff") is True
+    # Already there: no transition performed by this call.
+    assert pl.update_pack_intake_status(
+        db, "intake-rail-x402-test0001", "agent_kickoff") is False
+    # Backwards request: details merge, status untouched, no advance.
+    assert pl.update_pack_intake_status(
+        db, "intake-rail-x402-test0001", "created") is False
+    # Unknown row: nothing happened.
+    assert pl.update_pack_intake_status(
+        db, "intake-rail-nope", "agent_kickoff") is False
+    # Forward jump still reports its advance.
+    assert pl.update_pack_intake_status(
+        db, "intake-rail-x402-test0001", "intake_complete") is True
+
+
+def test_post_concurrent_burst_notifies_owner_exactly_once(
+        intake_app, intake_env, mock_comms, monkeypatch):
+    """Concurrent first POSTs (auth read artificially slowed, so every
+    request observes the pre-completion record) must produce exactly
+    ONE owner notification per recipient: the notify decision rides on
+    the atomic transition signal from the ledger write, not on a
+    status read taken before it."""
+    monkeypatch.setenv("SUPPORT_EMAIL", "support@example.com")
+    _seed_intake(intake_env["db"])
+
+    real_get = pl.get_pack_intake
+
+    def slow_get(store_or_db, intake_id):
+        time.sleep(0.3)
+        return real_get(store_or_db, intake_id)
+
+    monkeypatch.setattr(pl, "get_pack_intake", slow_get)
+
+    barrier = threading.Barrier(6)
+    statuses = []
+    errors = []
+
+    def worker():
+        try:
+            client = intake_app.test_client()
+            barrier.wait(timeout=10)
+            res = client.post(
+                f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+                json=CRED_ANSWERS)
+            statuses.append(res.status_code)
+        except Exception as exc:  # recorded, asserted below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+    assert not errors
+    assert statuses == [200] * 6
+
+    owner = [s for s in mock_comms["sent"] if s["to"] == OWNER_EMAIL]
+    support = [s for s in mock_comms["sent"]
+               if s["to"] == "support@example.com"]
+    assert len(owner) == 1
+    assert len(support) == 1
+
+    monkeypatch.setattr(pl, "get_pack_intake", real_get)
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "intake_complete"
+    assert row.details["intake_answers"] == CRED_ANSWERS
+
+
+def test_post_tag_only_required_value_counts_as_missing(
+        intake_app, intake_env, mock_comms):
+    """B1: required fields are validated on the CLEANED value — a
+    business_name of '<b></b>' (or its entity-encoded twin) cleans to
+    '' and is no answer at all: 400 naming the field, nothing stored,
+    no owner notification about a blank intake."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    url = f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}"
+    for blank in ("<b></b>", "&lt;b&gt;&lt;/b&gt;"):
+        res = client.post(
+            url, json=dict(CRED_ANSWERS, business_name=blank))
+        assert res.status_code == 400
+        body = res.get_json()
+        assert body["error"] == "missing_required_fields"
+        assert "business_name" in (body.get("fields") or [])
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+    assert _owner_sends(mock_comms) == []
+
+
+def test_post_entity_encoded_markup_is_stripped_not_stored(
+        intake_app, intake_env, mock_comms):
+    """B2: cleaning unescapes BEFORE stripping, so markup that only
+    exists after entity-decoding ('&lt;b&gt;…') is stripped like
+    literal markup — the stored answer holds the text, never tags the
+    unescape introduced."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    payload = dict(CRED_ANSWERS,
+                   business_name="&lt;b&gt;Acme&lt;/b&gt; Dental LLC")
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=payload)
+    assert res.status_code == 200
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.details["intake_answers"]["business_name"] == \
+        "Acme Dental LLC"
+
+
+def test_settle_prefill_is_sanitized_and_allowlisted(
+        intake_app, intake_env, mock_comms):
+    """F1: details supplied at settle are buyer-controlled input and
+    pass through the intake form's own allowlist + sanitizer before
+    they are stored as pre-filled answers: off-SKU keys are dropped,
+    entity-encoded script blocks are stripped, over-length values are
+    dropped — never stored verbatim."""
+    client = intake_app.test_client()
+    cid = _checkout_challenge(client)
+    res = client.post("/rail/settle", json={
+        "challenge_id": cid, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": BUYER_EMAIL,
+        "business_name":
+            "&lt;script&gt;alert(1)&lt;/script&gt;Acme Dental LLC",
+        "contact_name": "Amy <b>Acme</b>",
+        "state": "IA",
+        "specialties": "x" * 5000,
+        "phone": "+1 555 000 1111",  # webbuilder field, not credentialing
+    })
+    assert res.status_code == 200, res.get_json()
+    row = pl.get_pack_intake(intake_env["db"], f"intake-rail-{cid}")
+    answers = row.details["intake_answers"]
+    assert "phone" not in answers  # off-allowlist keys are dropped
+    assert "specialties" not in answers  # 10x the POST cap: dropped
+    assert answers["business_name"] == "Acme Dental LLC"
+    assert answers["contact_name"] == "Amy Acme"
+    assert answers["state"] == "IA"
+    assert answers["contact_email"] == BUYER_EMAIL
+    assert all(len(v) <= 500 for v in answers.values())
+    assert not any("<" in v or ">" in v for v in answers.values())
