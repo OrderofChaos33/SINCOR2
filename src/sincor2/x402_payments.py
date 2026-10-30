@@ -214,6 +214,44 @@ class MANDATES_API_WATCH:
     Tracked here so the primitive is evaluated, not silently skipped."""
 
 
+class EIP7702_DELEGATION_LIFECYCLE:
+    """Design constraint (dev-watch item 312, 2026-10-30): any EIP-7702
+    delegation SINCOR ever issues or accepts must follow this lifecycle.
+
+    Why: a signed 7702 authorization is a STANDING capability, not a
+    one-shot approval. Whoever holds the signed authorization can attach
+    it later, and the delegating account keeps executing the delegate's
+    code until the delegation is explicitly cleared (the sven.eth drain,
+    2026-10-14: one signature, reused as a standing capability).
+
+    Current state: there is NO 7702 surface anywhere in this codebase --
+    no delegation is issued, accepted, or executed today. This note is
+    the gate for the day that changes. Guarded by
+    tests/pytest/test_devwatch312_delegation_guard.py.
+
+    The rule, for any future 7702 delegation:
+
+    1. Short-lived and scoped: every authorization carries an explicit
+       expiry (block or timestamp) and names ONE specific implementation
+       address. No open-ended delegations, no wildcard implementation.
+    2. Revocable by a single clearing transaction: the delegating
+       account can revoke the delegation with one clearing transaction
+       that restores it to a plain account, and the clearing path is
+       tested before the delegation is ever used.
+    3. Inventoried: every active delegation is recorded in a delegation
+       inventory (account, implementation, expiry, purpose) at issuance
+       time. An active delegation that is not in the inventory is
+       treated as a compromise until cleared -- clear first, investigate
+       second.
+    4. Re-verified at use time: no money-path code may accept an action
+       from a 7702-delegated account on the strength of a previously
+       signed authorization. The current delegate address must be
+       re-verified onchain at use time, and the action refused if the
+       onchain delegation does not match the inventoried, unexpired
+       scope.
+    """
+
+
 def build_route_config(
     *,
     scheme: str = "exact",
