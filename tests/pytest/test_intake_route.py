@@ -1078,3 +1078,141 @@ def test_post_cf_padded_real_text_passes(
     assert row.status == "intake_complete"
     assert "Acme Dental LLC" in \
         row.details["intake_answers"]["business_name"]
+
+
+# ---------------------------------------------------------------------------
+# Round-3 repair (defect 4, widened): marks-only and blank-rendering
+# filler values are blank too -- the harm is the invisible answer, not
+# the specific codepoint class that carries it.
+# ---------------------------------------------------------------------------
+
+# Effectively-invisible values OUTSIDE Cf/Cc, all built with chr() so
+# this source stays plain ASCII. Builder B's round-2 delta re-check
+# reproduced the original defect-4 harm with each of these as the
+# sole business_name: HTTP 200, row advanced to intake_complete,
+# exactly one owner notification, value stored verbatim.
+_MARK_AND_FILLER_BLANKS = [
+    chr(0x2800),        # BRAILLE BLANK (So) -- renders as a blank cell
+    chr(0x2800) * 2,    # BRAILLE BLANK x2
+    chr(0x3164),        # HANGUL FILLER (Lo) -- renders blank
+    chr(0x115F),        # HANGUL CHOSEONG FILLER (Lo) -- renders blank
+    chr(0x1160),        # HANGUL JUNGSEONG FILLER (Lo) -- renders blank
+    chr(0xFFA0),        # HALFWIDTH HANGUL FILLER (Lo) -- renders blank
+    chr(0x034F),        # COMBINING GRAPHEME JOINER (Mn) -- invisible
+    chr(0xFE0F),        # VARIATION SELECTOR-16 (Mn) -- invisible alone
+    chr(0x17B4),        # KHMER VOWEL INHERENT AQ (Mn) -- invisible
+    chr(0x0301),        # COMBINING ACUTE ACCENT (Mn) -- floating mark
+    chr(0x0301) * 3,    # COMBINING ACUTE ACCENT x3
+    # A stack mixing all three invisible families (Mn + Cf + Cc):
+    chr(0x0301) + chr(0x200B) + chr(0x07),
+]
+
+
+def test_post_marks_only_required_value_counts_as_missing(
+        intake_app, intake_env, mock_comms):
+    """Defect 4 widened: a required value whose only content is
+    combining marks and/or blank-rendering fillers carries NO visible
+    answer -- 400 missing_required_fields naming the field, the row
+    stays created, and no owner notification fires."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    url = f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}"
+    for blank in _MARK_AND_FILLER_BLANKS:
+        res = client.post(
+            url, json=dict(CRED_ANSWERS, business_name=blank))
+        assert res.status_code == 400, repr(blank)
+        body = res.get_json()
+        assert body["error"] == "missing_required_fields"
+        assert "business_name" in (body.get("fields") or [])
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "created"
+    assert "intake_answers" not in (row.details or {})
+    assert _owner_sends(mock_comms) == []
+
+
+@pytest.mark.parametrize("blank", [
+    chr(0x2800),   # BRAILLE BLANK (So)
+    chr(0x0301),   # COMBINING ACUTE ACCENT (Mn)
+    chr(0x3164),   # HANGUL FILLER (Lo)
+    chr(0xFE0F),   # VARIATION SELECTOR-16 (Mn)
+], ids=["braille_blank", "combining_acute", "hangul_filler",
+        "variation_selector"])
+def test_settle_prefill_marks_only_value_is_dropped(
+        intake_app, intake_env, mock_comms, blank):
+    """Prefill path, same widening: a marks-only / filler-only
+    settle-supplied value is dropped by sanitize_prefill_answers --
+    never stored, never fatal to the settle. (Parametrized, one
+    settle per case: the rail rightly refuses to reuse one tx hash
+    across challenges.)"""
+    client = intake_app.test_client()
+    cid = _checkout_challenge(client)
+    res = client.post("/rail/settle", json={
+        "challenge_id": cid, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": BUYER_EMAIL,
+        "business_name": blank,
+        "contact_name": "Amy Acme",
+        "state": "IA",
+    })
+    assert res.status_code == 200, res.get_json()
+    row = pl.get_pack_intake(intake_env["db"], f"intake-rail-{cid}")
+    answers = row.details["intake_answers"]
+    assert "business_name" not in answers, repr(blank)
+    assert answers["contact_name"] == "Amy Acme"
+    assert answers["state"] == "IA"
+    assert row.status != "intake_complete"
+
+
+def test_post_combining_mark_on_real_text_is_stored_intact(
+        intake_app, intake_env, mock_comms):
+    """Judgment-side only, again: a combining mark ATTACHED to real
+    text is orthography, not blankness. 'Cafe' + U+0301 is a valid
+    business name, accepted and stored byte-for-byte as submitted --
+    the judgment copy's mark removal never leaks into storage."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    name = "Cafe" + chr(0x0301)  # decomposed 'Cafe-acute'
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=dict(CRED_ANSWERS, business_name=name))
+    assert res.status_code == 200
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "intake_complete"
+    assert row.details["intake_answers"]["business_name"] == name
+
+
+def test_post_braille_blank_padded_real_text_stored_intact(
+        intake_app, intake_env, mock_comms):
+    """U+2800 AROUND real text is padding, not the answer: the value
+    passes and is stored byte-for-byte, padding included (only a
+    value with nothing BUT fillers/marks is blank)."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    padded = chr(0x2800) + "Acme Dental LLC" + chr(0x2800)
+    res = client.post(
+        f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}",
+        json=dict(CRED_ANSWERS, business_name=padded))
+    assert res.status_code == 200
+    row = pl.get_pack_intake(intake_env["db"], "intake-rail-x402-test0001")
+    assert row.status == "intake_complete"
+    assert row.details["intake_answers"]["business_name"] == padded
+
+
+def test_post_emoji_only_answer_is_accepted(
+        intake_app, intake_env, mock_comms):
+    """Category So is VISIBLE: the U+2800 exception must not widen
+    into 'symbols are blank'. A single emoji, and an emoji ZWJ
+    family sequence, are real (if terse) answers -- accepted and
+    stored byte-for-byte."""
+    _seed_intake(intake_env["db"])
+    client = intake_app.test_client()
+    url = f"/intake/intake-rail-x402-test0001?token={INTAKE_TOKEN}"
+    for value in (chr(0x1F600),  # single emoji (So)
+                  chr(0x1F468) + chr(0x200D) + chr(0x1F469)
+                  + chr(0x200D) + chr(0x1F467)):  # ZWJ family sequence
+        res = client.post(
+            url, json=dict(CRED_ANSWERS, business_name=value))
+        assert res.status_code == 200, repr(value)
+        row = pl.get_pack_intake(
+            intake_env["db"], "intake-rail-x402-test0001")
+        assert row.status == "intake_complete"
+        assert row.details["intake_answers"]["business_name"] == value

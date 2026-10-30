@@ -203,6 +203,15 @@ def _clean_value(raw: Any) -> Optional[str]:
     return value.strip()
 
 
+# Codepoints that render as a blank cell even though Unicode classes
+# them as visible letters/symbols: the braille blank (category So)
+# and the Hangul fillers (category Lo). They carry no answer on their
+# own, so the blankness judgment removes them alongside the truly
+# invisible classes below.
+_INVISIBLE_BASES = frozenset(
+    chr(cp) for cp in (0x2800, 0x115F, 0x1160, 0x3164, 0xFFA0))
+
+
 def _judged_blank(value: str) -> bool:
     """True when a cleaned value carries no actual answer.
 
@@ -215,13 +224,25 @@ def _judged_blank(value: str) -> bool:
     Whitespace-class controls (tab, VT, NEL, …) need no removal
     here: they ARE whitespace and strip() already eliminates them.
 
+    The judgment ALSO removes combining marks (categories Mn/Me --
+    accents, variation selectors, the grapheme joiner) and the
+    blank-rendering bases in _INVISIBLE_BASES: a value whose only
+    content is marks and blank-rendering fillers carries no visible
+    answer either -- a lone U+0301 is a floating accent, not a name.
+    Marks ATTACHED to real text are untouched by this: the base
+    characters survive the judgment copy, so "Cafe" + U+0301 is a
+    valid answer. Unassigned codepoints (Cn) are deliberately NOT
+    removed -- they render as a visible placeholder glyph.
+
     The judgment is copy-only — the STORED value keeps its Cf
     characters, because ZWJ/ZWNJ are meaningful inside real text
     (Persian/Arabic/Indic names) and must never be altered.
     """
     judged = "".join(
         ch for ch in value
-        if unicodedata.category(ch) not in ("Cf", "Cc") or ch.isspace())
+        if (unicodedata.category(ch) not in ("Cf", "Cc", "Mn", "Me")
+            and ch not in _INVISIBLE_BASES)
+        or ch.isspace())
     return judged.strip() == ""
 
 
