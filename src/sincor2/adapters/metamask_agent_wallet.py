@@ -227,9 +227,7 @@ class MetaMaskAgentWallet:
             return OrderResult(
                 True,
                 simulated=True,
-                side="TRANSFER",
                 size_usd=0.0,
-                raw={"to": to, "amount": amount, "token": token, "chain_id": chain_id},
             )
 
         self.require_ready()
@@ -244,12 +242,11 @@ class MetaMaskAgentWallet:
             tx_hash = None
             if isinstance(data.get("data"), dict):
                 tx_hash = data["data"].get("txHash") or data["data"].get("hash")
+            logger.info("MetaMask TRANSFER executed: tx=%s", tx_hash)
             return OrderResult(
                 True,
                 simulated=False,
-                order_id=tx_hash,
-                side="TRANSFER",
-                raw=data,
+                order_id=tx_hash or "",
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask transfer failed")
@@ -282,7 +279,7 @@ class MetaMaskAgentWallet:
 
         if not (self.is_live() or force_live):
             logger.info("[DRY RUN] swap execute quote_id=%s", quote_id)
-            return OrderResult(True, simulated=True, side="SWAP", raw={"quote_id": quote_id})
+            return OrderResult(True, simulated=True)
 
         self.require_ready()
         try:
@@ -290,7 +287,8 @@ class MetaMaskAgentWallet:
             tx_hash = None
             if isinstance(data.get("data"), dict):
                 tx_hash = data["data"].get("txHash") or data["data"].get("hash")
-            return OrderResult(True, simulated=False, order_id=tx_hash, side="SWAP", raw=data)
+            logger.info("MetaMask SWAP executed: quote_id=%s tx=%s", quote_id, tx_hash)
+            return OrderResult(True, simulated=False, order_id=tx_hash or "")
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask swap execute failed")
             return OrderResult(False, simulated=False, error=str(exc))
