@@ -121,6 +121,19 @@ class SiteFetch:
 # is never rewritten, so Host header, TLS SNI and certificate
 # verification against the original hostname are all preserved
 # (verification is never disabled).
+#
+# W-114 (backslash parser differential): the W-108 threat model
+# assumed validator and transport parse the SAME host out of the
+# URL. A backslash in the authority breaks that assumption:
+# urlparse treats the text before the last "@" as userinfo (so
+# "http://127.0.0.1\@93.184.216.34/" validates as the public decoy
+# 93.184.216.34), while urllib3 treats "\" as a path separator and
+# dials 127.0.0.1. Two layers close it: _resolve_target rejects any
+# URL with a backslash in its authority, so the parsers can never
+# diverge on host parsing; and _guarded_resolution fails closed on
+# a connect-time resolution request for ANY host other than the
+# validated target, so even a future parser divergence has no
+# unchecked resolution to escape through.
 # ---------------------------------------------------------------------------
 
 _ALLOWED_PORTS = {80, 443}
@@ -158,6 +171,24 @@ def _ip_is_forbidden(ip: ipaddress._BaseAddress) -> bool:
     return False
 
 
+def _authority_of(url: str) -> str:
+    """Return ``url``'s authority (netloc) component, as raw text.
+
+    The authority is everything between ``scheme://`` and the first
+    ``/``, ``?`` or ``#``. Extracted textually — NOT via urlparse —
+    because the W-114 check below must inspect exactly the bytes
+    the transport will parse, and urlparse's own splitting is one
+    side of the divergence being closed.
+    """
+    rest = url.split("://", 1)[1] if "://" in url else url
+    end = len(rest)
+    for sep in "/?#":
+        idx = rest.find(sep)
+        if idx != -1:
+            end = min(end, idx)
+    return rest[:end]
+
+
 def _resolve_target(
     url: str,
 ) -> Tuple[Optional[str], frozenset, str]:
@@ -172,6 +203,15 @@ def _resolve_target(
     safe to connect to, so the fetcher fails closed on an empty set).
     Pure check — never opens a connection.
     """
+    # W-114: a backslash in the authority makes validator and
+    # transport parse DIFFERENT hosts (urlparse treats the text
+    # before the last "@" as userinfo; urllib3 treats "\" as a path
+    # separator, so the dial target is the text before the first
+    # backslash). Reject the shape outright so the two parsers can
+    # never diverge on host parsing; a backslash later in the URL
+    # (path/query) is not authority and stays legal.
+    if "\\" in _authority_of(url):
+        return "invalid_target_host", frozenset(), ""
     parts = urlparse(url)
     if parts.scheme not in ("http", "https"):
         return "invalid_target_host", frozenset(), ""
@@ -241,11 +281,19 @@ def _guarded_resolution(host: str, validated_ips: frozenset):
     the resolution fails with ``socket.gaierror`` and the transport
     aborts BEFORE connecting — the classic DNS-rebinding flip
     (public at validation, private at connect) can no longer land
-    the fetch on an internal peer. Resolutions of any other host
-    pass through unmodified, and the original resolver is always
-    restored on exit. (The fetch never delegates to a proxy — see
-    the ``proxies=`` note in :func:`fetch_site_page` — so the
-    guarded target is the only host the transport resolves.)
+    the fetch on an internal peer.
+
+    W-114: a resolution request for ANY host other than the
+    validated target also fails closed with ``socket.gaierror``.
+    The earlier behaviour passed foreign resolutions through
+    unmodified, which let a transport-side parser divergence
+    (backslash authority: the transport resolves a different host
+    than the one that was validated) escape the pin entirely.
+    Failing closed is safe here by construction: the fetch never
+    delegates to a proxy (see the ``proxies=`` note in
+    :func:`fetch_site_page`), so the guarded target is the only
+    host the transport legitimately resolves during the call. The
+    original resolver is always restored on exit.
     """
     original = socket.getaddrinfo
     target = host.strip().lower().rstrip(".")
@@ -255,13 +303,18 @@ def _guarded_resolution(host: str, validated_ips: frozenset):
             try:
                 name = host_arg.decode("utf-8", "strict")
             except UnicodeDecodeError:
-                return original(host_arg, port, family, type, proto,
-                                flags)
+                raise socket.gaierror(
+                    socket.EAI_NONAME,
+                    "connect-time resolution requested for an "
+                    "undecodable host during a guarded fetch")
         else:
             name = host_arg
         if not isinstance(name, str) \
                 or name.strip().lower().rstrip(".") != target:
-            return original(host_arg, port, family, type, proto, flags)
+            raise socket.gaierror(
+                socket.EAI_NONAME,
+                "connect-time resolution requested for a host other "
+                "than the validated target of this fetch")
         infos = original(host_arg, port, family, type, proto, flags)
         for info in infos:
             try:

@@ -992,6 +992,15 @@ def _check_admin_token(req):
         return False
     try:
         decoded = decode_token(token)
+        # BOTH the admin identity AND the admin role claim are required
+        # (hunt-32 W-44): sub alone used to suffice, which admitted any
+        # token minted for the admin identity without a role — e.g. a
+        # customer OAuth cookie token or a role='user' token. Every real
+        # admin login mints role='admin' (mvp_blueprints/auth.py,
+        # auth_system.py, _admin_cookie_response). Mirrors
+        # auth_system.admin_required semantics.
+        if decoded.get('role') != 'admin':
+            return False
         return _ct_eq(str(decoded.get('sub') or '').lower(), _admin_username().lower())
     except Exception:
         return False
@@ -1002,11 +1011,22 @@ def _check_admin_key(req) -> bool:
     expected = _admin_password()
     if not expected:
         return False
+    # Header ONLY (hunt-32 W-44): the admin key is never accepted from
+    # the request body, query string, form, or cookies — the
+    # secret-in-body fallback admitted anyone who could place the key
+    # in a JSON payload (it flipped the Command Center killswitch).
+    # Same posture as sponsored_stake._admin_key_ok and the waitlist
+    # handler's _is_admin_request.
     key = req.headers.get('X-Admin-Key', '')
     if not key:
-        data = req.get_json(silent=True) or {}
-        key = str(data.get('admin_key', ''))
-    return bool(key) and hmac.compare_digest(str(key), str(expected))
+        return False
+    try:
+        return hmac.compare_digest(str(key), str(expected))
+    except (TypeError, ValueError):
+        # hmac.compare_digest raises TypeError on non-ASCII str input;
+        # an un-comparable header value fails CLOSED (401), never a 500
+        # (hunt-32 W-44, Builder B minor).
+        return False
 
 
 def _is_admin_session() -> bool:
