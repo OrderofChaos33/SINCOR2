@@ -1935,6 +1935,11 @@ def crypto_checkout():
     if not wallet:
         return jsonify({'error': 'Invalid wallet address'}), 400
 
+    # DW-308 REPAIR 3 (S1b): the product named at checkout is persisted
+    # with the expectation and governs verify/fulfillment — the verify
+    # caller's product_name never overrides a recorded checkout.
+    product_name = sanitize_string(data.get('product_name', ''), max_length=100)
+
     recipient_address = os.environ.get('BASE_PAYMENT_ADDRESS')
     if not recipient_address:
         logger.error('[CRYPTO] BASE_PAYMENT_ADDRESS not configured')
@@ -1966,7 +1971,14 @@ def crypto_checkout():
     else:
         return jsonify({'error': f'unsupported currency: {currency}'}), 400
 
-    payment_id = f"CRYPTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    # DW-308 REPAIR 3 (S1): the timestamp alone has one-second
+    # resolution and is fully predictable — two checkouts in the same
+    # second minted the SAME payment_id and the later persist silently
+    # replaced the earlier expectation (INSERT OR REPLACE). The id now
+    # carries a random suffix, and the persist below is a plain INSERT
+    # that refuses to overwrite: on the astronomically unlikely suffix
+    # collision the id is regenerated and the insert retried.
+    payment_id = None
 
     # DW-308 REPAIR (Builder B): persist the expected payment server-side,
     # keyed by payment_id. Verify must compare the on-chain Transfer value
@@ -1984,10 +1996,24 @@ def crypto_checkout():
         token_address = ''
         expected_atomic = int(round(crypto_amount * (10 ** 18)))
     try:
-        _persist_crypto_checkout(payment_id, currency, token_address,
-                                 expected_atomic, amount, wallet)
+        for _attempt in range(5):
+            candidate = (
+                f"CRYPTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                f"-{_unique_id_suffix()}"
+            )
+            try:
+                _persist_crypto_checkout(candidate, currency, token_address,
+                                         expected_atomic, amount, wallet,
+                                         product_name)
+            except sqlite3.IntegrityError:
+                continue  # id collision — regenerate and retry the insert
+            payment_id = candidate
+            break
     except Exception as e:
-        logger.error(f'[CRYPTO] Could not persist checkout {payment_id}: {e}')
+        logger.error(f'[CRYPTO] Could not persist checkout: {e}')
+        return jsonify({'error': 'Could not create checkout. Please try again.'}), 503
+    if payment_id is None:
+        logger.error('[CRYPTO] Could not mint a unique payment_id after retries')
         return jsonify({'error': 'Could not create checkout. Please try again.'}), 503
 
     return jsonify({
@@ -2004,6 +2030,18 @@ def crypto_checkout():
     }), 201
 
 
+def _unique_id_suffix() -> str:
+    """Random suffix for timestamp-based ids (DW-308 REPAIR 3, S1/S2).
+
+    A bare second-resolution timestamp is predictable and collides for
+    any two ids minted in the same second; the random suffix makes the
+    id unique and unguessable while keeping the readable prefix.
+    """
+    import secrets
+
+    return secrets.token_hex(4)
+
+
 def _ensure_crypto_checkout_table(db):
     db.execute(
         '''CREATE TABLE IF NOT EXISTS crypto_checkouts
@@ -2013,23 +2051,59 @@ def _ensure_crypto_checkout_table(db):
             expected_atomic INTEGER NOT NULL,
             amount_usd REAL NOT NULL,
             wallet TEXT,
+            product_name TEXT NOT NULL DEFAULT '',
+            settled_tx_hash TEXT,
+            settled_at TEXT,
             created_at TEXT NOT NULL)'''
     )
+    # DW-308 REPAIR 3: columns added after the table first shipped —
+    # add them to pre-existing tables (S1b product binding, S3
+    # consumption marker).
+    columns = {row[1] for row in db.execute(
+        'PRAGMA table_info(crypto_checkouts)')}
+    altered = False
+    if 'product_name' not in columns:
+        db.execute(
+            "ALTER TABLE crypto_checkouts "
+            "ADD COLUMN product_name TEXT NOT NULL DEFAULT ''")
+        altered = True
+    if 'settled_tx_hash' not in columns:
+        db.execute(
+            'ALTER TABLE crypto_checkouts ADD COLUMN settled_tx_hash TEXT')
+        altered = True
+    if 'settled_at' not in columns:
+        db.execute(
+            'ALTER TABLE crypto_checkouts ADD COLUMN settled_at TEXT')
+        altered = True
+    if altered:
+        db.commit()
 
 
 def _persist_crypto_checkout(payment_id, currency, token_address,
-                             expected_atomic, amount_usd, wallet):
-    """Record the server-side expectation for a crypto checkout."""
+                             expected_atomic, amount_usd, wallet,
+                             product_name=''):
+    """Record the server-side expectation for a crypto checkout.
+
+    DW-308 REPAIR 3 (S1): plain INSERT — an existing record is NEVER
+    overwritten. A payment_id collision raises sqlite3.IntegrityError
+    (after rolling back the failed statement); the caller regenerates
+    the id and retries.
+    """
     db = get_db()
     _ensure_crypto_checkout_table(db)
-    db.execute(
-        '''INSERT OR REPLACE INTO crypto_checkouts
-           (payment_id, currency, token_address, expected_atomic,
-            amount_usd, wallet, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)''',
-        (payment_id, currency, token_address, int(expected_atomic),
-         float(amount_usd), wallet, datetime.utcnow().isoformat()),
-    )
+    try:
+        db.execute(
+            '''INSERT INTO crypto_checkouts
+               (payment_id, currency, token_address, expected_atomic,
+                amount_usd, wallet, product_name, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (payment_id, currency, token_address, int(expected_atomic),
+             float(amount_usd), wallet, product_name or '',
+             datetime.utcnow().isoformat()),
+        )
+    except sqlite3.IntegrityError:
+        db.rollback()
+        raise
     db.commit()
 
 
@@ -2038,7 +2112,8 @@ def _crypto_checkout_record(payment_id):
     db = get_db()
     _ensure_crypto_checkout_table(db)
     row = db.execute(
-        '''SELECT currency, token_address, expected_atomic, amount_usd
+        '''SELECT currency, token_address, expected_atomic, amount_usd,
+                  product_name, settled_tx_hash
            FROM crypto_checkouts WHERE payment_id=?''',
         (payment_id,),
     ).fetchone()
@@ -2049,6 +2124,8 @@ def _crypto_checkout_record(payment_id):
         'token_address': row[1],
         'expected_atomic': int(row[2]),
         'amount_usd': row[3],
+        'product_name': row[4] or '',
+        'settled_tx_hash': row[5] or '',
     }
 
 
@@ -2078,12 +2155,44 @@ def _settled_transfer_total(receipt, token_address, recipient_address) -> int:
 
     live_logs = [log for log in receipt.get('logs') or []
                  if not log.get('removed')]
+    # DW-308 REPAIR 3 (S4): a log listed twice in one receipt (same
+    # transactionHash + logIndex) is ONE transfer — the reference
+    # parser sums every entry it is handed, so duplicates are dropped
+    # HERE (platform_payments is shared with other consumers and keeps
+    # its current behavior). Logs without a logIndex cannot be told
+    # apart this way and are kept as-is.
+    seen_logs = set()
+    unique_logs = []
+    for log in live_logs:
+        log_index = log.get('logIndex')
+        if log_index is not None:
+            key = (
+                str(log.get('transactionHash')
+                    or receipt.get('transactionHash') or '').lower(),
+                _log_index_key(log_index),
+            )
+            if key in seen_logs:
+                continue
+            seen_logs.add(key)
+        unique_logs.append(log)
     try:
         transfers = _parse_transfer_logs(
-            {**receipt, 'logs': live_logs}, token_address, recipient_address)
+            {**receipt, 'logs': unique_logs}, token_address, recipient_address)
     except (ValueError, TypeError, AttributeError):
         return 0
     return sum(t['amount_atomic'] for t in transfers)
+
+
+def _log_index_key(value):
+    """Normalize a receipt logIndex (int, decimal or 0x-hex) so the
+    same index compares equal in any representation."""
+    if isinstance(value, int):
+        return ('n', value)
+    text = str(value).strip().lower()
+    try:
+        return ('n', int(text, 16) if text.startswith('0x') else int(text))
+    except ValueError:
+        return ('s', text)
 
 
 @bp.route('/api/crypto/verify-payment', methods=['POST'])
@@ -2173,9 +2282,21 @@ def crypto_verify_payment():
         # underpayment is a 402 with zero orders and zero fulfillments.
         record = _crypto_checkout_record(payment_id)
         if record is not None:
+            # DW-308 REPAIR 3 (S3): a checkout settles exactly once.
+            # Settlement consumes the record (settled_tx_hash, marked
+            # in the settle transaction below); any later verify
+            # against a consumed payment_id is refused like a replay.
+            if record.get('settled_tx_hash'):
+                logger.warning(f'[CRYPTO] payment_id already settled: {payment_id}')
+                return jsonify({'error': 'Payment already settled for this checkout'}), 409
             expected_atomic = record['expected_atomic']
             expected_token = record['token_address']
             order_amount = record['amount_usd']
+            # DW-308 REPAIR 3 (S1b): the persisted product governs —
+            # the verify caller's product_name never overrides the
+            # product the checkout was created for.
+            if record.get('product_name'):
+                product_name = record['product_name']
         else:
             from sincor2.onchain.constants import (
                 USDC_DECIMALS as _USDC_DECIMALS,
@@ -2213,8 +2334,19 @@ def crypto_verify_payment():
         # Do NOT fulfill if verification fails
         return jsonify({'error': 'Blockchain verification failed. Please try again or contact support.'}), 503
 
-    # Verification passed � store order and fulfill
-    order_id = f"CRYPTO-ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    # Verification passed � store order, consume the checkout, fulfill.
+    # DW-308 REPAIR 3 (S2): the order_id carries a random suffix — the
+    # bare second-resolution timestamp collided for two settlements in
+    # the same second, and because the insert's IntegrityError was
+    # swallowed while fulfillment ran unconditionally, the second
+    # payment fulfilled with NO order row (so its tx replayed into a
+    # second fulfillment later). Now: unique ids, an insert failure is
+    # a logged 5xx with ZERO fulfillments, and fulfillment fires only
+    # after the order row (and the S3 consumption mark) have committed.
+    order_id = (
+        f"CRYPTO-ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        f"-{_unique_id_suffix()}"
+    )
     product_info = PRODUCT_CATALOG.get(product_name, {'type': 'generic'})
     order_type = product_info.get('type', 'generic')
 
@@ -2231,10 +2363,38 @@ def crypto_verify_payment():
                  datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
                  json.dumps({'tx_hash': tx_hash, 'payment_id': payment_id}))
             )
-            db.commit()
-        except sqlite3.IntegrityError:
-            pass
+        except sqlite3.Error as e:
+            db.rollback()
+            logger.error(f'[CRYPTO] Order insert failed for {payment_id} ({order_id}): {e}')
+            return jsonify({'error': 'Could not record this order. Please contact support.'}), 500
 
+    # DW-308 REPAIR 3 (S3): consume the checkout record in the same
+    # transaction as the order insert — mark it settled with the tx
+    # that paid it, only if it is still unconsumed (the early check
+    # above refused the already-consumed case; rowcount guards the
+    # race). The record-less fallback path has nothing to consume.
+    if record is not None:
+        try:
+            consumed = db.execute(
+                "UPDATE crypto_checkouts "
+                "SET settled_tx_hash=?, settled_at=? "
+                "WHERE payment_id=? "
+                "AND COALESCE(settled_tx_hash, '') = ''",
+                (tx_hash, datetime.utcnow().isoformat(), payment_id),
+            )
+        except sqlite3.Error as e:
+            db.rollback()
+            logger.error(f'[CRYPTO] Could not consume checkout {payment_id}: {e}')
+            return jsonify({'error': 'Could not record this order. Please contact support.'}), 500
+        if consumed.rowcount != 1:
+            db.rollback()
+            logger.warning(f'[CRYPTO] Checkout {payment_id} was already consumed')
+            return jsonify({'error': 'Payment already settled for this checkout'}), 409
+
+    if email or record is not None:
+        db.commit()
+
+    if email:
         trigger_fulfillment(order_id, email, product_name, order_amount, order_type, product_info)
 
     logger.info(f'[CRYPTO] Payment verified and fulfilled: {tx_hash} ? {order_id}')
