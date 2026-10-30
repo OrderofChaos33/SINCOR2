@@ -631,10 +631,11 @@ def test_validator_tuple_items_positional():
 # -32603 OverflowError instead of the guard's named-field -32602.
 # ---------------------------------------------------------------------------
 
-# Ground truth, independent of the guard: the largest finite double is
-# 2**1024 - 2**971 (sys.float_info.max) and a product rounds to
-# infinity from half an ulp above it, so an exact scaled magnitude is
-# representable iff it stays strictly below 2**1024 - 2**970.
+# Ground truth, independent of the guard — RETARGETED in repair
+# round 3 (below): through round 2 the boundary was the float/wei
+# step (exact scaled magnitude strictly below 2**1024 - 2**970).
+# Round 3 tightened it to the commit path's uint256 packing bound, so
+# these pins now assert the WEI amounts fit in 32 bytes instead.
 _WEI_LIMIT = 2**1024 - 2**970
 _LARGEST_SCALABLE_INT = (_WEI_LIMIT - 1) // 10**18
 
@@ -642,9 +643,9 @@ _LARGEST_SCALABLE_INT = (_WEI_LIMIT - 1) // 10**18
 @pytest.mark.parametrize("bad", [
     10**400,                    # float() conversion itself overflows
     10**308,                    # converts (1e308); wei scaling overflows
-    10**291,                    # just past the representable boundary
+    10**291,                    # just past the round-2 boundary
     -10**291,                   # magnitude rule is symmetric
-    _LARGEST_SCALABLE_INT + 1,  # first unrepresentable integer
+    _LARGEST_SCALABLE_INT + 1,  # first unrepresentable integer (r2)
 ])
 def test_validator_rejects_unrepresentable_payment_ints(bad):
     with pytest.raises(guard.SchemaValidationError) as excinfo:
@@ -654,27 +655,33 @@ def test_validator_rejects_unrepresentable_payment_ints(bad):
 
 
 def test_validator_accepts_largest_representable_payment_int():
-    # The razor pin, in exact arithmetic: this integer's wei scaling
-    # stays below the float-overflow threshold; one more does not.
+    # Round-2 razor pin, retargeted to the round-3 bound: the round-2
+    # largest scalable integer's wei scaling stays below the float-
+    # overflow threshold (ground truth above), but nothing that large
+    # fits the uint256 packing — the guard's largest accepted integer
+    # is _LARGEST_FITTING_INT (round-3 block below), and its wei amount
+    # fits in 32 bytes while the next integer's does not survive the
+    # downstream float pipeline.
     assert _LARGEST_SCALABLE_INT * 10**18 < _WEI_LIMIT
     assert (_LARGEST_SCALABLE_INT + 1) * 10**18 >= _WEI_LIMIT
+    assert _downstream_price_wei(_LARGEST_FITTING_INT) < 2**256
     guard.validate_arguments("t", _SCHEMA, {
-        "task_id": "a", "bid_axm": _LARGEST_SCALABLE_INT})
-    guard.validate_arguments("t", _SCHEMA,
-                             {"task_id": "a", "bid_axm": 10**290})
+        "task_id": "a", "bid_axm": _LARGEST_FITTING_INT})
     guard.validate_arguments("t", _SCHEMA,
                              {"task_id": "a", "bid_axm": 10**18})
 
 
 @pytest.mark.parametrize("as_int,as_float,accepted", [
-    (10**290, 1e290, True),    # same magnitude, both types: accepted
+    (10**290, 1e290, False),   # r3: both rejected — uint256 packing
     (10**291, 1e291, False),   # same magnitude, both types: rejected
 ])
 def test_validator_payment_int_float_agree_at_boundary(
         as_int, as_float, accepted):
-    # 10**290 / 10**291 straddle the practical boundary (their wei
-    # scalings are 1e308, finite, and 1e309, infinity); the int and
-    # float spellings of each magnitude must get the SAME verdict.
+    # The int and float spellings of each magnitude must get the SAME
+    # verdict. Through round 2, 10**290/1e290 were accepted (their wei
+    # scalings are 1e308, finite); round 3 rejects both spellings —
+    # the sealed commitment cannot pack a 1e308 wei amount into
+    # 32 bytes, in any mode, so the guard refuses them up front.
     assert float(as_int) == as_float  # same double, same magnitude
     if accepted:
         guard.validate_arguments("t", _SCHEMA,
@@ -723,3 +730,204 @@ def test_discovery_unscalable_int_bid_rejected_at_guard(stub_upstream):
         "task_id": "tsk_1", "agent_id": "a1", "bid_axm": 10**308})
     _assert_loud_rejection(resp, "bid_axm")
     assert stub_upstream == []
+
+
+# ---------------------------------------------------------------------------
+# Repair round 3 — Builder B re-check 2: the representability bound
+# must ALSO cover the commit path's uint256 packing.
+#
+# Rounds 1–2 bounded only the float/wei-scaling step (~2**1024). One
+# call deeper, submit_bid's commit planning computes
+# ``price_wei = int(round(bid_axm * 1e18))`` and
+# ``a2a_inbound_market.sealed_commitment`` packs it via
+# ``int(price_wei).to_bytes(32, "big")`` — the wei amount must fit
+# uint256, capping the bid near 2**256 / 1e18 ≈ 1.158e59 AXM. B's
+# probes on the round-2 branch: ``bid_axm: 10**290`` (int), ``1.3e59``
+# (float) and ``10**60`` (int) in commit mode (explicit, or auto
+# resolving to commit on a sealed-auction task) crashed with a raw
+# -32603 OverflowError; ``10**59`` / ``1e59`` issued confirmations.
+# The razor integer ``(2**256 - 1) // 10**18`` crashes too: the
+# planner float-converts first and the double rounds UP across
+# 2**256, so the guard's bound carries headroom for the conversion.
+# The guard runs before mode dispatch, so the tightened bound is
+# global — legacy/reveal spellings of the same magnitudes are refused
+# up front as well, rather than crashing if the mode ever resolves
+# to commit.
+# ---------------------------------------------------------------------------
+
+# The guard's own safety margin, restated independently: the exact
+# scaled magnitude must stay below 2**256 - 2**210 (the double
+# product near 2**256 rounds by up to 2**202; the margin covers that
+# plus the int->double conversion once integers are judged by the
+# double they become).
+_GUARD_LIMIT = 2**256 - 2**210
+# Largest integer the guard accepts, derived from the guard's rule in
+# exact arithmetic. Doubles first: find the largest double whose exact
+# scaled value stays below the limit (a nextafter walk of a few steps
+# from the cap's own double — the predicate is monotone in the
+# double). The largest accepted integer is then the largest n whose
+# float() conversion IS that double; near 1.16e59 an integer is ~2**144
+# times finer than a double, so n must be located from the double,
+# never by stepping integers one at a time.
+import math as _math
+from fractions import Fraction as _Fraction
+
+
+def _largest_fitting_int():
+    d = float(_GUARD_LIMIT // 10**18)
+    while _Fraction(_math.nextafter(d, _math.inf)) * 10**18 < _GUARD_LIMIT:
+        d = _math.nextafter(d, _math.inf)
+    while _Fraction(d) * 10**18 >= _GUARD_LIMIT:
+        d = _math.nextafter(d, -_math.inf)
+    # d is the boundary double: accepted, one step up is not.
+    assert _Fraction(d) * 10**18 < _GUARD_LIMIT
+    assert (_Fraction(_math.nextafter(d, _math.inf)) * 10**18
+            >= _GUARD_LIMIT)
+    # Every integer within half a spacing of d rounds to d — at this
+    # magnitude that is ~2**143 integers, so the top one is located
+    # arithmetically (the midpoint itself is a ties-to-even case:
+    # step back one if it rounded up to the next double).
+    n = int(d) + int(_math.ulp(d)) // 2
+    if float(n) != d:
+        n -= 1
+    assert float(n) == d and float(n + 1) != d
+    return n
+
+
+_LARGEST_FITTING_INT = _largest_fitting_int()
+
+# The downstream pipeline being modelled, restated from the sources:
+# mcp_server._plan_bid float-converts, scales, rounds; then
+# a2a_inbound_market.sealed_commitment packs the wei integer.
+def _downstream_price_wei(value):
+    return int(round(float(value) * 1e18))
+
+
+@pytest.mark.parametrize("bad", [
+    10**290,                    # B probe: guard-accepted in r2, crashed
+    10**60,                     # B probe: just past the uint256 cap
+    -10**60,                    # magnitude rule is symmetric
+    (2**256 - 1) // 10**18,     # the razor: float() rounds it UP over
+])
+def test_validator_rejects_commit_overflowing_payment_ints(bad):
+    # Ground truth, independent of the guard: each of these crashes
+    # the commit pipeline — the wei amount does not fit 32 bytes.
+    with pytest.raises(OverflowError):
+        _downstream_price_wei(bad).to_bytes(32, "big")
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": bad})
+    assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_rejects_first_int_past_the_boundary():
+    # The first integer past the guard's boundary is refused even
+    # though the pipeline would (just) survive it: it sits inside the
+    # headroom margin the bound deliberately carries for the float
+    # pipeline's roundings, and the guard's verdict is the contract.
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", _SCHEMA, {
+            "task_id": "a", "bid_axm": _LARGEST_FITTING_INT + 1})
+    assert "bid_axm" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("bad", [1.3e59, 1e60, -1.3e59])
+def test_validator_rejects_commit_overflowing_payment_floats(bad):
+    with pytest.raises(OverflowError):
+        _downstream_price_wei(bad).to_bytes(32, "big")
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": bad})
+    assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_boundary_sweep_int_float_agree():
+    # Sweep the new boundary: the largest fitting integer is accepted,
+    # one more is rejected, and the float spelling of each magnitude
+    # (the very double the planner will see) gets the same verdict.
+    assert _downstream_price_wei(_LARGEST_FITTING_INT) < 2**256
+    guard.validate_arguments("t", _SCHEMA, {
+        "task_id": "a", "bid_axm": _LARGEST_FITTING_INT})
+    guard.validate_arguments("t", _SCHEMA, {
+        "task_id": "a", "bid_axm": float(_LARGEST_FITTING_INT)})
+    for value in (_LARGEST_FITTING_INT + 1,
+                  float(_LARGEST_FITTING_INT + 1)):
+        with pytest.raises(guard.SchemaValidationError) as excinfo:
+            guard.validate_arguments("t", _SCHEMA,
+                                     {"task_id": "a", "bid_axm": value})
+        assert "bid_axm" in str(excinfo.value)
+    # Practical magnitudes straddling the cap agree too.
+    for as_int, as_float, accepted in ((10**59, 1e59, True),
+                                       (10**60, 1e60, False)):
+        assert float(as_int) == as_float  # same double
+        if accepted:
+            guard.validate_arguments("t", _SCHEMA,
+                                     {"task_id": "a", "bid_axm": as_int})
+            guard.validate_arguments("t", _SCHEMA, {
+                "task_id": "a", "bid_axm": as_float})
+        else:
+            for value in (as_int, as_float):
+                with pytest.raises(guard.SchemaValidationError):
+                    guard.validate_arguments("t", _SCHEMA, {
+                        "task_id": "a", "bid_axm": value})
+
+
+def test_guard_never_accepts_a_commit_crashing_bid():
+    # Property pin over the boundary neighbourhood: every value the
+    # guard accepts — int or float — must survive the commit pipeline
+    # (scale + 32-byte pack) without OverflowError.
+    import math as _math
+    candidates = [10**59, 1e59, _LARGEST_FITTING_INT]
+    x = float(_LARGEST_FITTING_INT)
+    for _ in range(2000):
+        x = _math.nextafter(x, _math.inf)
+        candidates.append(x)
+    x = float(_LARGEST_FITTING_INT)
+    for _ in range(2000):
+        x = _math.nextafter(x, -_math.inf)
+        candidates.append(x)
+    for n in range(_LARGEST_FITTING_INT - 2000,
+                   _LARGEST_FITTING_INT + 2000):
+        candidates.append(n)
+    accepted = 0
+    for value in candidates:
+        try:
+            guard.validate_arguments("t", _SCHEMA,
+                                     {"task_id": "a", "bid_axm": value})
+        except guard.SchemaValidationError:
+            continue
+        accepted += 1
+        _downstream_price_wei(value).to_bytes(32, "big")  # must not raise
+    assert accepted > 0
+
+
+# -- RPC shapes: B's exact probes, every mode spelling -----------------------
+
+@pytest.mark.parametrize("mode", ["commit", "auto", "legacy", "reveal"])
+@pytest.mark.parametrize("bad", [10**290, 10**60, 1.3e59])
+def test_discovery_commit_overflowing_bids_rejected_at_guard(
+        stub_upstream, mode, bad):
+    # With the stub upstream answering ok, "auto" resolves to commit
+    # (bidder-kit found) — the exact resolution B probed. The guard
+    # refuses every spelling before dispatch: -32602 naming bid_axm,
+    # zero upstream calls, never the raw -32603 OverflowError.
+    resp = _call_rpc("submit_bid", {
+        "task_id": "tsk_1", "agent_id": "a1", "bid_axm": bad,
+        "mode": mode})
+    _assert_loud_rejection(resp, "bid_axm")
+    assert stub_upstream == []
+
+
+@pytest.mark.parametrize("good", [10**59, 1e59])
+def test_discovery_commit_mode_controls_still_confirm(stub_upstream,
+                                                      good):
+    # B's controls: at the cap's near side, commit-mode bids still
+    # plan end-to-end (commitment computed, confirmation issued).
+    resp = _call_rpc("submit_bid", {
+        "task_id": "tsk_1", "agent_id": "a1", "bid_axm": good,
+        "mode": "commit"})
+    assert resp is not None and "result" in resp, resp
+    payload = json.loads(resp["result"]["content"][0]["text"])
+    assert payload.get("confirmation_token") or payload.get(
+        "action_id"), payload
+    assert stub_upstream == []  # confirmation only; nothing executed

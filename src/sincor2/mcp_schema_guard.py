@@ -28,10 +28,12 @@ repo (marketplace discovery ``sincor2.mcp_server``, Swarm Command
    ``true`` is not a number), or a non-finite number (Python's
    ``json.loads`` accepts ``NaN``/``Infinity`` literals, so they DO
    arrive from the wire). Payment amounts must additionally survive
-   the platform's 18-decimal fixed-point conversion — a value whose
-   wei scaling overflows (``1e308 * 1e18`` as a float, or an integer
-   too large for the downstream float conversion at all) is rejected
-   here rather than crashing downstream. Object fields whose schema
+   the platform's full downstream pipeline — float conversion, the
+   18-decimal wei scaling, and the sealed-bid commitment's 32-byte
+   packing of the wei integer, which caps it at uint256: a value
+   whose wei amount would not fit (``1e308``, ``10**290``, or even
+   ``1.3e59`` in commit mode) is rejected here rather than crashing
+   downstream with a raw ``OverflowError``. Object fields whose schema
    declares no ``properties`` still get leaf rules applied
    recursively: no ``"null"`` strings and no JSON nulls anywhere
    inside, though arbitrary structure/types are otherwise accepted.
@@ -42,6 +44,7 @@ Stdlib only, like the servers that consume it.
 from __future__ import annotations
 
 import math
+from fractions import Fraction
 from typing import Any, Dict, List
 
 
@@ -71,30 +74,50 @@ def _is_payment_field(name: str) -> bool:
             or n.endswith(_PAYMENT_SUFFIXES))
 
 
-#: Representability limit for 18-decimal (wei) scaling of a payment
-#: amount: the scaled magnitude must stay strictly below
-#: ``2**1024 - 2**970`` — the largest finite double is
-#: ``2**1024 - 2**971`` and float products round to infinity from
-#: half an ulp above it, so this is exactly the bound
-#: ``math.isfinite(v * 1e18)`` enforces for float inputs, expressed as
-#: an integer so integer inputs are checked in exact arithmetic.
-#: The int check must never convert through float: ``float(10**400)``
-#: itself raises OverflowError.
-_WEI_SCALING_LIMIT = 2**1024 - 2**970
+#: Representability limit for a payment amount, set by the TIGHTEST
+#: downstream bound — not by float range. The bid planner converts a
+#: payment amount through ``float``, scales it to an 18-decimal wei
+#: integer (``int(round(bid_axm * 1e18))``), and the sealed-bid
+#: commitment packs that integer into 32 bytes
+#: (``int(price_wei).to_bytes(32, "big")`` in
+#: ``a2a_inbound_market.sealed_commitment``) — so the wei amount must
+#: fit uint256, capping the bid itself near ``2**256 / 1e18`` ≈
+#: 1.158e59. (Rounds 1–2 of this guard bounded only the float/wei
+#: step, ~2**1024; Builder B showed commit-mode bids like ``1.3e59``
+#: sailed through and crashed at the packing step.) The guard runs
+#: before mode dispatch, so this bound applies in EVERY mode.
+#:
+#: Two roundings stand between the wire value and the packing step,
+#: and the bound carries headroom for both: the double product near
+#: 2**256 rounds by up to 2**202, so the exact scaled magnitude must
+#: stay below ``2**256 - 2**210``. An integer input is judged by the
+#: double it actually becomes downstream (``_plan_bid`` float-converts
+#: first, and that conversion alone rounds a near-boundary integer by
+#: up to ~2**203 once scaled — the naive razor
+#: ``(2**256 - 1) // 10**18`` float-converts UP across 2**256 and
+#: crashes). ``float()`` of a too-large integer raises OverflowError,
+#: which is itself a rejection. All comparisons are exact (Fraction),
+#: so neither type's check can overflow and both agree at the boundary.
+_WEI_UINT256_LIMIT = 2**256 - 2**210
 
 
 def _payment_amount_representable(value: Any) -> bool:
-    """True iff a payment amount survives 18-decimal wei scaling.
+    """True iff a payment amount survives the downstream pipeline.
 
     The caller guarantees a non-bool ``int`` or a finite ``float``
-    (non-finite floats are rejected before this runs). Floats keep the
-    original float-product check; integers compare exactly —
-    ``abs(value) * 10**18`` against the same limit — so both types
-    agree at the boundary and neither computation can itself overflow.
+    (non-finite floats are rejected before this runs). The verdict is
+    computed on the exact value of the double the amount becomes
+    downstream: for a float, the value itself; for an integer, its
+    ``float()`` conversion (a conversion that overflows is a
+    rejection). Magnitudes only — the rule is sign-symmetric.
     """
     if isinstance(value, float):
-        return math.isfinite(value * 1e18)
-    return abs(value) * 10**18 < _WEI_SCALING_LIMIT
+        return Fraction(abs(value)) * 10**18 < _WEI_UINT256_LIMIT
+    try:
+        as_double = float(abs(value))
+    except OverflowError:
+        return False
+    return Fraction(as_double) * 10**18 < _WEI_UINT256_LIMIT
 
 
 def _path_names(field: str) -> List[str]:
@@ -249,16 +272,17 @@ def _validate_value(tool: str, field: str, schema: Dict[str, Any],
         leaf = _path_names(field)[-1] if _path_names(field) else field
         if _is_payment_field(leaf) and not _payment_amount_representable(
                 value):
-            # A payment amount is denominated in 18-decimal fixed
-            # point across the platform; a magnitude whose wei
-            # scaling overflows is unrepresentable, not a bid. The
-            # rule covers integers as well as floats: a JSON integer
-            # reaches the same downstream float conversion + scaling,
-            # and a huge one crashes the conversion itself.
+            # A payment amount is converted downstream to an
+            # 18-decimal wei integer that must fit uint256 (the
+            # sealed-bid commitment packs it into 32 bytes); a
+            # magnitude beyond that is unrepresentable, not a bid.
+            # The rule covers integers as well as floats: a JSON
+            # integer reaches the same float conversion + scaling +
+            # packing, and a huge one crashes the conversion itself.
             raise _fail(tool, field,
                         "number %r rejected — its magnitude cannot "
-                        "be represented in 18-decimal fixed point "
-                        "(wei scaling overflows)" % (value,))
+                        "be represented as an 18-decimal wei amount "
+                        "within uint256" % (value,))
     elif t == "boolean":
         if not isinstance(value, bool):
             raise _fail(tool, field,
