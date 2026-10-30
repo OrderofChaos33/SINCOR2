@@ -196,8 +196,12 @@ def test_home_stats_strip_never_reads_broken(client):
     assert "public snapshot unavailable" not in html
     assert "connecting to Base snapshot" not in html
     specs = html.split('class="sp-specs"', 1)[1].split("</div>\n  </div>", 1)[0]
-    assert "17" in specs  # static skills tile, not a dynamic placeholder
-    assert specs.count('class="v live-v"') <= 1  # at most one live-fed value
+    assert "17" in specs  # skills tile value, not a dynamic placeholder
+    # Founder ruling 2026-10-29: the strip carries exactly 3 live-fed values
+    # (the live-wired strip kept by the #562 conflict resolution).
+    assert specs.count('class="v live-v"') == 3
+    for tile_id in ("live-spot-val", "live-agent-count", "live-treasury-val"):
+        assert f'id="{tile_id}"' in specs, tile_id
 
 
 def test_home_hero_has_structured_visual_and_grid(client):
