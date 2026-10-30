@@ -1235,6 +1235,24 @@ def _verify_fail(result: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _verify_challenge_guarded(x402: Any, challenge_id: str, tx_hash: str,
+                              **kwargs: Any) -> Dict[str, Any]:
+    """verify_challenge with exception totality (item 307 round 2).
+
+    A verifier that RAISES has settled nothing: convert the exception
+    to the rpc_failed failure dict the settle pipeline already maps to
+    HTTP 402, instead of letting it escape the route as a 500 HTML
+    page. The challenge stays pending, no event is marked verified,
+    and nothing is fulfilled.
+    """
+    try:
+        return x402.verify_challenge(challenge_id, tx_hash, **kwargs)
+    except Exception as exc:
+        logger.exception("[RAIL] verify_challenge raised for %s",
+                         challenge_id)
+        return {"ok": False, "error": "rpc_failed", "detail": str(exc)}
+
+
 def settle_rail_order(challenge_id: str, tx_hash: str, *,
                       payer_wallet: str = "",
                       buyer_email: str = "",
@@ -1353,7 +1371,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
         if not event.get("verified"):
             # The first attempt died before verify completed — re-verify
             # (the challenge is still pending, so no replay auth needed).
-            verify = x402.verify_challenge(
+            verify = _verify_challenge_guarded(
+                x402,
                 challenge_id, event.get("tx_hash") or tx_hash,
                 payer_wallet=payer_wallet,
                 require_bound_challenge=True,
@@ -1386,8 +1405,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
         # settle to fail tx_hash_already_used. The legitimate buyer binds
         # their wallet during checkout via the existing EIP-191 bind flow
         # (bind_challenge_payer / POST /api/x402/challenge-bind).
-        verify = x402.verify_challenge(
-            challenge_id, tx_hash, payer_wallet=payer_wallet,
+        verify = _verify_challenge_guarded(
+            x402, challenge_id, tx_hash, payer_wallet=payer_wallet,
             require_bound_challenge=True,
             replay_signature=replay_signature, replay_ts_ms=replay_ts_ms)
         if not verify.get("ok"):
