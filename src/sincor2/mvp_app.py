@@ -637,16 +637,26 @@ for _endpoint, _limit in (
 
 
 def _settle_request_challenge_id() -> str:
-    """challenge_id from the in-flight /rail/settle body (JSON or form).
+    """challenge_id from the in-flight /rail/settle JSON body.
 
-    Stays silent on malformed bodies — '' makes the caller fall back to
-    the plain address bucket. Never raises.
+    Mirrors the settle view's extraction exactly: rail_settle reads
+    request.get_json(force=True, silent=True) and never touches form
+    data, so this helper force-parses too and has NO form fallback. A
+    mimetype-gated parse keys the same body into the plain-address
+    bucket whenever the Content-Type is not JSON — exhaust the
+    per-challenge bucket, resend as text/plain, and the cap is diluted
+    2x (B delta re-check F2). Absent, malformed, or non-string ids
+    return '' — the caller falls back to the plain address bucket.
+    Never raises.
     """
     try:
-        data = request.get_json(silent=True)
+        data = request.get_json(force=True, silent=True)
         if not isinstance(data, dict):
-            data = request.form
-        return str(data.get("challenge_id") or "").strip()
+            return ""
+        cid = data.get("challenge_id")
+        if not isinstance(cid, str):
+            return ""
+        return cid.strip()
     except Exception:
         return ""
 
@@ -666,21 +676,26 @@ def _settle_limit_key() -> str:
 
 
 def _settle_limit() -> str:
-    """60/hour per (client, challenge); unthrottled once fulfilled.
+    """60/hour per (client, challenge); 600/hour once fulfilled.
 
     A settle against an already-fulfilled challenge is the W-115
-    proven-duplicate ack — a paid buyer re-asking for their delivery —
-    and must never be throttled, so fulfilled challenges get a nominal
-    ceiling no real retry pattern reaches. The status lookup is
-    read-only; ANY failure applies the normal limit (fail toward
-    limiting, never toward crashing).
+    proven-duplicate ack — a paid buyer re-asking for their delivery.
+    Recovering a delivery takes dozens of retries at most, so fulfilled
+    challenges get a bounded but generous ceiling (600/hour per
+    (client, challenge)): far beyond any real retry pattern, yet finite
+    on trees where the ack path is not yet proof-gated (PR #577) — an
+    unbounded exemption there would let anyone who learns a fulfilled
+    challenge_id harvest its ack at full rate (B delta re-check F1).
+    Once #577 lands in the same tree this bound is belt-and-braces.
+    The status lookup is read-only; ANY failure applies the normal
+    limit (fail toward limiting, never toward crashing).
     """
     cid = _settle_request_challenge_id()
     if cid:
         try:
             from sincor2.x402_payments import challenge_status
             if challenge_status(cid) == "fulfilled":
-                return "1000000 per hour"
+                return "600 per hour"
         except Exception:
             logger.warning(
                 "[RAIL] settle-limit status lookup failed for %s; "

@@ -17,9 +17,14 @@ pins, against the real production app (sincor2.mvp_app):
     so junk settles against OTHER challenges cannot strand a buyer
     whose challenge TTL (900s) is shorter than the limiter window
     (1h); settles against an already-fulfilled challenge (the
-    proven-duplicate ack path) are effectively unthrottled; first
-    settles against one unfulfilled challenge are still capped at
-    60/hour per (client, challenge).
+    proven-duplicate ack path) get a bounded but generous exemption
+    (600/hour per (client, challenge) — far beyond any real retry
+    pattern, finite while the ack path is not yet proof-gated);
+    first settles against one unfulfilled challenge are still capped
+    at 60/hour per (client, challenge). The limiter extracts
+    challenge_id exactly as the settle view does (force-parsed JSON,
+    no form fallback), so re-sending the same body under another
+    Content-Type cannot switch buckets and dilute the cap.
   - The first GET /download/<unknown> is still the fail-closed 404,
     not a 429.
   - Challenge minting is capped per source (wallet when known, else
@@ -32,6 +37,7 @@ The "chain" is a canned _rpc_call stub: zero network, zero keys.
 """
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -253,10 +259,14 @@ def test_settle_idempotent_retry_within_limits_returns_200(client, chain):
 
 
 # ---------------------------------------------------------------------------
-# REPAIR: settle limiting is per (client, challenge) + fulfilled acks are
-# unthrottled. The challenge TTL is 900s but the limiter window is 1h, so
-# a per-address settle bucket shared across challenges lets 60 junk
-# settles strand a paid buyer whose first settle then 429s past expiry.
+# REPAIR: settle limiting is per (client, challenge) + fulfilled acks get
+# a bounded, generous exemption (600/hour). The challenge TTL is 900s
+# but the limiter window is 1h, so a per-address settle bucket shared
+# across challenges lets 60 junk settles strand a paid buyer whose first
+# settle then 429s past expiry. Round 2: the limiter's challenge_id
+# extraction mirrors the view's (force-parsed JSON, no form fallback) —
+# a mimetype-gated parse lets a Content-Type switch dilute the cap 2x —
+# and the fulfilled exemption is finite, not a nominal 1000000/hour.
 # ---------------------------------------------------------------------------
 
 def _settle(client, body, *, ip=None):
@@ -302,8 +312,8 @@ def test_junk_settles_on_other_challenges_do_not_strand_buyer(client,
     assert res.get_json().get("ok") is True, res.get_json()
 
 
-def test_fulfilled_challenge_duplicate_acks_are_never_throttled(client,
-                                                                 chain):
+def test_fulfilled_challenge_duplicate_acks_not_throttled_at_buyer_scale(
+        client, chain):
     ip = "203.0.113.31"
     challenge_id = _checkout_and_bind(client, ip=ip)
     settle_body = {
@@ -314,8 +324,11 @@ def test_fulfilled_challenge_duplicate_acks_are_never_throttled(client,
     assert first.status_code == 200, first.get_json()
     # 60 further settles against the now-FULFILLED challenge: every one
     # is the proven-duplicate ack path and must answer 200 — the ack is
-    # the paid buyer's only delivery-recovery path and must never be
-    # throttled into the 900s-TTL stranding window.
+    # the paid buyer's only delivery-recovery path and must not be
+    # throttled into the 900s-TTL stranding window. The exemption is
+    # bounded (600/hour per (client, challenge), pinned directly in
+    # test_settle_limit_callable_bounds_fulfilled_exemption below) but
+    # sits far above any real buyer retry pattern.
     for i in range(60):
         res = _settle(client, settle_body, ip=ip)
         assert res.status_code == 200, (i, res.status_code, res.get_json())
@@ -336,6 +349,101 @@ def test_first_settles_on_one_unfulfilled_challenge_still_capped(client,
     res = _settle(client, {"challenge_id": challenge_id}, ip=ip)
     assert res.status_code == 429, res.status_code
     assert res.get_json()["error"] == "rate_limited"
+
+
+def test_settle_text_plain_resend_does_not_dilute_challenge_cap(client,
+                                                                 chain):
+    # B delta re-check F2, exact PoC: the limiter must extract
+    # challenge_id exactly as the view does (force-parsed JSON). With a
+    # mimetype-gated parse, re-sending the exhausted body as text/plain
+    # misses the per-challenge bucket, lands in the plain-address
+    # bucket, and reaches the view another 60 times (cap diluted 2x).
+    ip = "203.0.113.34"
+    challenge_id = _checkout_and_bind(client, ip=ip)
+    body = {"challenge_id": challenge_id}
+    for i in range(60):
+        res = _settle(client, body, ip=ip)
+        assert res.status_code == 400, (i, res.status_code)
+    res = _settle(client, body, ip=ip)
+    assert res.status_code == 429, res.status_code
+    # Identical JSON body, Content-Type: text/plain. The SAME
+    # per-challenge bucket must answer — every resend is a 429, never a
+    # view-reaching 400.
+    for i in range(10):
+        res = client.post(
+            "/rail/settle", data=json.dumps(body),
+            content_type="text/plain",
+            environ_base={"REMOTE_ADDR": ip})
+        assert res.status_code == 429, (i, res.status_code)
+        assert res.get_json()["error"] == "rate_limited"
+
+
+def test_settle_form_body_keys_plain_address_bucket_not_challenge(client,
+                                                                    chain):
+    # The view never reads form data, so the limiter must not either:
+    # a form-encoded challenge_id keys the PLAIN address bucket. If the
+    # limiter read the form (the old fallback), the 60 posts below
+    # would burn the per-challenge bucket and the final JSON settle on
+    # that challenge would 429 instead of reaching the view.
+    ip = "203.0.113.35"
+    challenge_id = _checkout_and_bind(client, ip=ip)
+    for i in range(60):
+        res = client.post(
+            "/rail/settle", data={"challenge_id": challenge_id},
+            environ_base={"REMOTE_ADDR": ip})
+        assert res.status_code == 400, (i, res.status_code)
+    res = client.post(
+        "/rail/settle", data={"challenge_id": challenge_id},
+        environ_base={"REMOTE_ADDR": ip})
+    assert res.status_code == 429, res.status_code
+    assert res.get_json()["error"] == "rate_limited"
+    # The per-challenge bucket is untouched: a JSON settle on the same
+    # challenge still reaches the view (400 here — no tx_hash).
+    res = _settle(client, {"challenge_id": challenge_id}, ip=ip)
+    assert res.status_code == 400, res.status_code
+
+
+def test_settle_limit_callable_bounds_fulfilled_exemption(client, chain,
+                                                          mvp_app_obj,
+                                                          monkeypatch):
+    # Direct pin on the dynamic-limit callable (B delta re-check F1):
+    # fulfilled challenges get a BOUNDED generous ceiling — 600/hour,
+    # not the nominal 1000000/hour — so the exemption cannot be
+    # harvested at full rate on trees where the ack path is not yet
+    # proof-gated. Everything else, including lookup failures, applies
+    # the normal limit and never crashes the callable.
+    from sincor2.mvp_app import _settle_limit
+
+    def _limit_for(body):
+        with mvp_app_obj.test_request_context(
+                "/rail/settle", method="POST", json=body):
+            return _settle_limit()
+
+    # Unfulfilled (minted + bound, never settled): normal limit.
+    unfulfilled_id = _checkout_and_bind(client)
+    assert _limit_for({"challenge_id": unfulfilled_id}) == "60 per hour"
+    # Unknown id, missing id, non-string id: normal limit, no crash.
+    assert _limit_for({"challenge_id": "x402-no-such"}) == "60 per hour"
+    assert _limit_for({}) == "60 per hour"
+    assert _limit_for({"challenge_id": 12345}) == "60 per hour"
+
+    # Fulfilled: bounded generous ceiling.
+    fulfilled_id = _checkout_and_bind(client)
+    settle_body = {
+        "challenge_id": fulfilled_id, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": "buyer@example.com",
+    }
+    first = _settle(client, settle_body)
+    assert first.status_code == 200, first.get_json()
+    assert _limit_for({"challenge_id": fulfilled_id}) == "600 per hour"
+
+    # Lookup failure fails toward the normal limit, never toward a
+    # crash or an exemption.
+    def _boom(_cid):
+        raise RuntimeError("status store unavailable")
+
+    monkeypatch.setattr(x402, "challenge_status", _boom)
+    assert _limit_for({"challenge_id": fulfilled_id}) == "60 per hour"
 
 
 def test_settle_without_challenge_id_falls_back_to_address_bucket(client):
