@@ -1982,6 +1982,43 @@ def crypto_checkout():
     }), 201
 
 
+# ERC-20 Transfer event topic: keccak256("Transfer(address,address,uint256)")
+_CRYPTO_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+
+
+def _receipt_has_payment_transfer(receipt, recipient_address) -> bool:
+    """True iff *receipt* logs carry the expected payment Transfer event.
+
+    DW-308: a mined receipt with status 0x1 is NOT settlement proof by
+    itself. Settlement requires an ERC-20 Transfer(address,address,
+    uint256) event in the receipt logs whose `to` is *recipient_address*
+    and whose value is > 0. The receipt's own `to` field names the token
+    contract for ERC-20 payments — the payment recipient appears ONLY in
+    the Transfer event — and a bare value-less call to the recipient
+    address produces a successful receipt with no Transfer event at all
+    while moving no tokens. Neither shape may settle an order.
+    """
+    recipient = (recipient_address or "").lower()
+    if not recipient:
+        return False
+    for log in receipt.get('logs') or []:
+        topics = log.get('topics') or []
+        if len(topics) < 3:
+            continue
+        if str(topics[0]).lower() != _CRYPTO_TRANSFER_TOPIC:
+            continue
+        to_addr = ("0x" + str(topics[2])[-40:]).lower()
+        if to_addr != recipient:
+            continue
+        try:
+            value = int(str(log.get('data') or '0x0'), 16)
+        except ValueError:
+            continue
+        if value > 0:
+            return True
+    return False
+
+
 @bp.route('/api/crypto/verify-payment', methods=['POST'])
 @limiter.limit("200 per minute")
 def crypto_verify_payment():
@@ -2051,11 +2088,16 @@ def crypto_verify_payment():
             logger.warning(f'[CRYPTO] tx failed on chain: {tx_hash}')
             return jsonify({'error': 'Transaction failed or was reverted on blockchain'}), 402
 
-        # Must be sent to our address
-        tx_to = (receipt.get('to') or '').lower()
-        if tx_to != recipient_address:
-            logger.warning(f'[CRYPTO] tx recipient mismatch: expected {recipient_address}, got {tx_to}')
-            return jsonify({'error': 'Transaction was not sent to the correct address'}), 402
+        # DW-308: status 0x1 alone is not settlement. The expected
+        # Transfer event must be present in the receipt logs, paying
+        # our recipient address a positive value. A bare call to the
+        # recipient (status 0x1, no Transfer event) moves no tokens and
+        # must never fulfill; for ERC-20 payments the receipt's `to` is
+        # the token contract, so the recipient is verified here, in the
+        # event, not in the receipt header.
+        if not _receipt_has_payment_transfer(receipt, recipient_address):
+            logger.warning(f'[CRYPTO] no qualifying Transfer event to {recipient_address} in tx: {tx_hash}')
+            return jsonify({'error': 'Transaction does not show a payment transfer to the correct address'}), 402
 
         # Check tx isn't already used (replay protection)
         db = get_db()
