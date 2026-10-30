@@ -36,6 +36,29 @@ Pins:
     the handler ran. _queue_pack_agent_job / the fallback check the
     row before enqueueing and return the existing-execution reference
     ('already-ran:<intake_id>') instead of enqueueing again.
+  * REPAIR ROUND 2 — a SLOW-DRIP broker defeats the per-recv socket
+    bound: every recv() succeeds inside the 1s socket timeout, so no
+    timeout ever fires and the settle stalls for the whole drip
+    (reviewer PoC: 16.92s at 1 byte/0.4s, scaling toward the 180s
+    gunicorn limit). The Celery publish attempt now carries a hard
+    TOTAL-duration deadline at the call site
+    (_PACK_JOB_PUBLISH_DEADLINE_SECONDS); a deadline-exceeded publish
+    is a connection-class failure, so the task_queue fallback engages
+    and the settle completes in bounded time.
+  * REPAIR ROUND 2 — the at-most-once guard was a non-atomic check:
+    concurrent _queue_pack_agent_job callers could ALL pass the
+    already-ran check before any handler executed (reviewer PoC: 6
+    threads, barrier-synced -> 6 enqueues, 6 kickoff executions), and
+    a ledger READ outage degraded the check to 'not proven run' even
+    for a kickoff that had provably executed. The enqueue decision is
+    now an ATOMIC claim — a conditional UPDATE
+    (created -> kickoff_claimed) whose rowcount is the decision —
+    and the worker side gates execution on the same state machine, so
+    a late duplicate delivery (e.g. a deadline-abandoned publish that
+    eventually lands) can never re-execute the kickoff. A claim whose
+    enqueue fails totally is RELEASED (back to created) so the
+    pending + re-queueable semantics survive; a claim orphaned for
+    > _PACK_KICKOFF_CLAIM_STALE_SECONDS is reclaimable on re-settle.
 """
 from __future__ import annotations
 
@@ -637,3 +660,319 @@ def test_settle_eager_enqueue_raises_after_kickoff_ran_not_pending(
     assert ref == f"already-ran:intake-rail-{cid}"
     assert enqueued == [], "re-queue must not enqueue a second execution"
     assert len(kickoffs) == 1
+
+
+# ---------------------------------------------------------------------------
+# REPAIR ROUND 2 — slow-drip broker: hard total-duration publish deadline
+# ---------------------------------------------------------------------------
+
+def test_celery_publish_deadline_is_bounded_and_connection_class():
+    # The deadline is a hard TOTAL bound on the publish attempt
+    # (single-digit seconds), and exceeding it must be a
+    # connection-class failure so _queue_pack_agent_job's
+    # broker-unavailable handling engages the task_queue fallback —
+    # exactly like a refused or wedged broker.
+    assert 0 < rr._PACK_JOB_PUBLISH_DEADLINE_SECONDS <= 5
+    assert issubclass(rr._PackPublishDeadlineExceeded, ConnectionError)
+    assert rr._PackPublishDeadlineExceeded in (
+        rr._broker_unavailable_exceptions())
+
+
+class _DripServer:
+    """TCP listener that accepts connections and drips a partial RESP
+    subscribe-confirmation at ~1 byte / 0.35s — the slow-drip broker
+    shape. Every individual recv() succeeds well inside the 1s socket
+    timeout, so NO per-recv timeout ever fires; an unbounded
+    apply_async stalls for the whole drip (~33s for one frame)."""
+
+    _FRAME = (b"*3\r\n$9\r\nsubscribe\r\n$64\r\n" + b"a" * 64
+              + b"\r\n:1\r\n")
+
+    def __init__(self, byte_interval=0.35):
+        self._interval = byte_interval
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.setsockopt(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(50)
+        self.port = self._listener.getsockname()[1]
+        self._held = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self):
+        return f"redis://127.0.0.1:{self.port}/0"
+
+    def _loop(self):
+        while not self._stop.is_set():
+            try:
+                conn, _ = self._listener.accept()
+            except OSError:
+                return
+            self._held.append(conn)
+            threading.Thread(target=self._drip, args=(conn,),
+                             daemon=True).start()
+
+    def _drip(self, conn):
+        try:
+            while not self._stop.is_set():
+                for i in range(len(self._FRAME)):
+                    if self._stop.is_set():
+                        return
+                    conn.sendall(self._FRAME[i:i + 1])
+                    time.sleep(self._interval)
+        except OSError:
+            return
+
+    def close(self):
+        self._stop.set()
+        try:
+            self._listener.close()
+        except OSError:
+            pass
+        for conn in self._held:
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+
+def test_settle_slow_drip_broker_falls_back_within_deadline(
+        rail_app, rail_env, email_ok, monkeypatch):
+    """Reviewer PoC shape: a broker dripping a partial subscribe
+    confirmation defeats the per-recv socket timeout — the settle
+    must STILL fail over in bounded time (publish deadline + fallback)
+    with exactly one fallback enqueue."""
+    drip = _DripServer()
+    try:
+        _unreachable_broker_task(monkeypatch, url=drip.url)
+
+        enqueued = []
+
+        def fake_enqueue(kind, payload=None, **kw):
+            enqueued.append({"kind": kind, "payload": payload or {}})
+            return SimpleNamespace(id="taskqueue-job-wren10-drip")
+
+        monkeypatch.setattr(task_queue, "enqueue", fake_enqueue)
+
+        client = rail_app.test_client()
+        cid = _checkout(client)
+
+        box = {}
+
+        def _do_settle():
+            start = time.monotonic()
+            try:
+                box["res"] = _settle(rail_app.test_client(), cid)
+            except Exception as exc:  # noqa: BLE001 — reported below
+                box["error"] = exc
+            box["elapsed"] = time.monotonic() - start
+
+        worker = threading.Thread(target=_do_settle, daemon=True)
+        worker.start()
+        worker.join(20)
+        assert not worker.is_alive(), (
+            "settle is still blocked after 20s against a slow-drip "
+            "broker — the publish has no total-duration deadline")
+        assert "error" not in box, box.get("error")
+
+        res = box["res"]
+        body = res.get_json()
+        assert res.status_code == 200, body
+        assert box["elapsed"] < 10, (
+            f"slow-drip settle took {box['elapsed']:.1f}s — the "
+            "publish deadline is not bounding the total attempt")
+        assert body["ok"] is True
+        assert body["fulfillment"]["status"] == "delivered"
+        assert body["fulfillment"]["job_id"] == "taskqueue-job-wren10-drip"
+        assert len(enqueued) == 1, "exactly one fallback enqueue"
+        assert enqueued[0]["payload"]["intake_id"] == f"intake-rail-{cid}"
+    finally:
+        drip.close()
+
+
+# ---------------------------------------------------------------------------
+# REPAIR ROUND 2 — atomic kickoff claim (enqueue side) + worker gate
+# ---------------------------------------------------------------------------
+
+def _record_direct_intake(db_path, intake_id, event_id):
+    import sincor2.payment_ledger as pl
+
+    intake, _is_new = pl.record_pack_intake(
+        db_path,
+        intake_id=intake_id,
+        customer_email="buyer@example.com",
+        pack_sku="credentialing_launch",
+        event_id=event_id,
+        intake_url=f"https://getsincor.com/intake/{intake_id}",
+        details={"pack_name": "Credentialing Launch",
+                 "module": "verticals/healthcare"},
+    )
+    return intake
+
+
+def test_queue_pack_agent_job_concurrent_callers_enqueue_and_execute_once(
+        rail_env, monkeypatch):
+    """Reviewer PoC shape: 6 threads call _queue_pack_agent_job
+    simultaneously for one fresh intake, barrier-synced so ALL of
+    them pass the already-ran proof check before any handler can
+    execute. The atomic claim must still admit exactly ONE enqueue
+    and ONE kickoff execution."""
+    kickoffs = _count_kickoffs(monkeypatch)
+    monkeypatch.setattr(rr, "_celery_app", None)
+    db_path = rail_env["tmp"] / "revenue.db"
+    intake_id = "intake-race-wren10-r2"
+    _record_direct_intake(db_path, intake_id, "evt-race-wren10-r2")
+
+    real_already_ran = rr._pack_kickoff_already_ran
+    barrier = threading.Barrier(6)
+    calls = {"n": 0}
+    calls_lock = threading.Lock()
+
+    def synced_already_ran(iid):
+        with calls_lock:
+            calls["n"] += 1
+            n = calls["n"]
+        if n <= 6:
+            try:
+                barrier.wait(timeout=15)
+            except threading.BrokenBarrierError:
+                pass
+        return real_already_ran(iid)
+
+    monkeypatch.setattr(rr, "_pack_kickoff_already_ran", synced_already_ran)
+    enqueued = _counting_enqueue(monkeypatch)
+
+    refs, errors = [], []
+
+    def _call():
+        try:
+            refs.append(rr._queue_pack_agent_job(
+                intake_id=intake_id, pack_sku="credentialing_launch",
+                customer_email="buyer@example.com"))
+        except Exception as exc:  # noqa: BLE001 — asserted below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=_call) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert all(not t.is_alive() for t in threads), "a caller hung"
+    assert errors == [], errors
+    assert len(refs) == 6
+    assert len(enqueued) == 1, (
+        f"concurrent callers produced {len(enqueued)} enqueues")
+    assert len(kickoffs) == 1, (
+        f"kickoff executed {len(kickoffs)} times for one payment")
+    real_refs = [r for r in refs if not r.startswith(
+        ("already-ran:", "claim-held:"))]
+    assert len(real_refs) == 1, refs
+    assert _intake_status(db_path, intake_id) == "agent_kickoff"
+
+
+def test_queue_after_kickoff_with_ledger_reads_failing_does_not_reexecute(
+        rail_env, monkeypatch):
+    """Reviewer PoC shape: the kickoff has executed (row at
+    agent_kickoff) but ledger READS now fail while writes still work.
+    The old proof check degraded to 'not proven run' and a second
+    execution followed. The atomic claim's rowcount is authoritative
+    even when reads fail: no second enqueue, no second execution —
+    and a late duplicate delivery is refused at the worker gate too."""
+    import sincor2.payment_ledger as pl
+
+    kickoffs = _count_kickoffs(monkeypatch)
+    db_path = rail_env["tmp"] / "revenue.db"
+    intake_id = "intake-degraded-wren10-r2"
+    _record_direct_intake(db_path, intake_id, "evt-degraded-wren10-r2")
+    payload = {"intake_id": intake_id,
+               "pack_sku": "credentialing_launch",
+               "customer_email": "buyer@example.com"}
+
+    rr._pack_agent_queue_handler(payload, "job-degraded-1")
+    assert len(kickoffs) == 1
+    assert _intake_status(db_path, intake_id) == "agent_kickoff"
+
+    def _read_outage(*args, **kwargs):
+        raise RuntimeError("ledger read outage")
+
+    monkeypatch.setattr(pl, "get_pack_intake", _read_outage)
+    monkeypatch.setattr(rr, "_celery_app", None)
+    enqueued = _counting_enqueue(monkeypatch)
+
+    ref = rr._queue_pack_agent_job(
+        intake_id=intake_id, pack_sku="credentialing_launch",
+        customer_email="buyer@example.com")
+    assert ref == f"claim-held:{intake_id}", ref
+    assert enqueued == [], "no enqueue while the state is unprovable"
+    assert len(kickoffs) == 1, "kickoff must not execute a second time"
+
+    receipt = rr._pack_agent_queue_handler(payload, "job-degraded-2")
+    assert receipt["status"] == "already_ran", receipt
+    assert len(kickoffs) == 1
+
+
+def test_late_duplicate_delivery_after_fallback_does_not_reexecute(
+        rail_env, monkeypatch):
+    """The deadline-abandoned publish eventually lands AFTER the
+    task_queue fallback already executed the kickoff: the worker-side
+    gate must refuse the second execution."""
+    kickoffs = _count_kickoffs(monkeypatch)
+    monkeypatch.setattr(rr, "_celery_app", None)
+    db_path = rail_env["tmp"] / "revenue.db"
+    intake_id = "intake-late-wren10-r2"
+    _record_direct_intake(db_path, intake_id, "evt-late-wren10-r2")
+    enqueued = _counting_enqueue(monkeypatch)
+
+    ref = rr._queue_pack_agent_job(
+        intake_id=intake_id, pack_sku="credentialing_launch",
+        customer_email="buyer@example.com")
+    assert len(enqueued) == 1
+    assert len(kickoffs) == 1
+    assert _intake_status(db_path, intake_id) == "agent_kickoff"
+
+    # The abandoned Celery publish lands now — a worker picks the job
+    # up and runs the same kickoff entrypoint a second time.
+    receipt = rr.fulfill_pack_agent(
+        intake_id=intake_id, pack_sku="credentialing_launch",
+        customer_email="buyer@example.com")
+    assert receipt["status"] == "already_ran", receipt
+    assert receipt["intake_id"] == intake_id
+    assert len(kickoffs) == 1, "late delivery must not re-execute"
+    assert _intake_status(db_path, intake_id) == "agent_kickoff"
+
+
+def test_failed_enqueue_releases_kickoff_claim_for_retry(
+        rail_env, monkeypatch):
+    """Claim-release pin: if enqueueing fails TOTALLY (Celery absent
+    AND the task_queue fallback raises), the claim must be released
+    (status back to 'created') so the fulfillment stays re-queueable
+    and a later retry executes the kickoff exactly once."""
+    kickoffs = _count_kickoffs(monkeypatch)
+    monkeypatch.setattr(rr, "_celery_app", None)
+    db_path = rail_env["tmp"] / "revenue.db"
+    intake_id = "intake-release-wren10-r2"
+    _record_direct_intake(db_path, intake_id, "evt-release-wren10-r2")
+    real_enqueue = task_queue.enqueue  # capture BEFORE patching it dead
+
+    def dead_enqueue(kind, payload=None, **kw):
+        raise RuntimeError("task_queue store unavailable")
+
+    monkeypatch.setattr(task_queue, "enqueue", dead_enqueue)
+    with pytest.raises(rr._PackJobQueueUnavailable):
+        rr._queue_pack_agent_job(
+            intake_id=intake_id, pack_sku="credentialing_launch",
+            customer_email="buyer@example.com")
+    assert _intake_status(db_path, intake_id) == "created", (
+        "a failed enqueue must release the kickoff claim")
+    assert len(kickoffs) == 0
+
+    enqueued = _counting_enqueue(monkeypatch, real_enqueue=real_enqueue)
+    ref = rr._queue_pack_agent_job(
+        intake_id=intake_id, pack_sku="credentialing_launch",
+        customer_email="buyer@example.com")
+    assert len(enqueued) == 1
+    assert len(kickoffs) == 1
+    assert _intake_status(db_path, intake_id) == "agent_kickoff"

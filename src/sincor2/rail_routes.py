@@ -38,6 +38,7 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -171,15 +172,45 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
     The agent's buyer-specific work starts once the buyer completes intake
     (via the intake link in their email) — this job never fabricates domain
     payloads (no fake credentialing requests, no demo SBOMs).
+
+    Worker-side at-most-once gate (WREN PR 10 repair round 2): before
+    executing, the delivery must win the atomic intake transition
+    into agent_kickoff (from created / kickoff_claimed — see
+    _begin_pack_kickoff). A duplicate or late delivery — e.g. a
+    publish that was abandoned at its deadline but eventually landed
+    after the fallback already ran the kickoff — loses the transition
+    and returns an 'already_ran' receipt WITHOUT instantiating the
+    agent a second time.
     """
     from sincor2.payment_ledger import update_pack_intake_status
 
+    gate, prior_status = _begin_pack_kickoff(intake_id)
+    if gate == "already":
+        logger.info(
+            "[FULFILLMENT] pack agent kickoff already executed for "
+            "intake=%s — duplicate delivery not re-executed", intake_id)
+        return {
+            "status": "already_ran",
+            "intake_id": intake_id,
+            "pack_sku": pack_sku,
+            "agent": None,
+        }
+
     pack = PACK_SKUS.get(pack_sku or "")
     agent_info: Optional[Dict[str, Any]] = None
-    if pack is not None:
-        agent_info = _instantiate_pack_agent(pack)
-    elif (pack_sku or "") not in ("", "agent_services"):
-        raise ValueError(f"unknown pack_sku {pack_sku!r} for intake {intake_id}")
+    try:
+        if pack is not None:
+            agent_info = _instantiate_pack_agent(pack)
+        elif (pack_sku or "") not in ("", "agent_services"):
+            raise ValueError(
+                f"unknown pack_sku {pack_sku!r} for intake {intake_id}")
+    except Exception:
+        if gate == "begun":
+            # The kickoff body failed before recording completion:
+            # hand the consumed status back so a retry delivery can
+            # execute (the failure itself still propagates).
+            _release_pack_kickoff_run(intake_id, prior_status)
+        raise
 
     update_pack_intake_status(
         _rail_db_path(),
@@ -714,6 +745,9 @@ def _broker_unavailable_exceptions() -> tuple:
         excs.append(_KombuOperationalError)
     except Exception:
         pass
+    # A publish that exceeds its total-duration deadline (repair
+    # round 2) is a wedged-broker shape: fall back the same way.
+    excs.append(_PackPublishDeadlineExceeded)
     return tuple(dict.fromkeys(excs))
 
 
@@ -729,10 +763,16 @@ def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
 
 
 # Pack-intake lifecycle (payment_ledger.pack_intakes.status):
-# created -> agent_kickoff -> intake_complete -> in_progress ->
-# delivered. The agent_kickoff write is the pack-agent job's OWN final
-# step, so a row sitting at agent_kickoff or beyond is proof the
-# kickoff executed — no matter what the queue reported afterwards.
+# created -> kickoff_claimed -> agent_kickoff -> intake_complete ->
+# in_progress -> delivered. The agent_kickoff write is the pack-agent
+# job's OWN final step, so a row sitting at agent_kickoff or beyond
+# is proof the kickoff executed — no matter what the queue reported
+# afterwards. kickoff_claimed (WREN PR 10 repair round 2) is the
+# atomic enqueue claim: exactly one _queue_pack_agent_job caller may
+# transition a row out of 'created', and only that caller enqueues;
+# the worker gate (_begin_pack_kickoff) transitions the claimed (or
+# freshly created) row into agent_kickoff before executing, so a
+# duplicate delivery can never execute the kickoff a second time.
 _PACK_KICKOFF_DONE_STATUSES = frozenset({
     "agent_kickoff", "intake_complete", "in_progress", "delivered",
 })
@@ -774,6 +814,285 @@ def _existing_pack_job_ref(intake_id: str) -> str:
     return f"already-ran:{intake_id}"
 
 
+# --- WREN PR 10 repair round 2: atomic kickoff claim + publish deadline --
+#
+# Round 1's at-most-once guard was a read-only proof check
+# (_pack_kickoff_already_ran) in front of the enqueue — a non-atomic
+# check-then-act. The delta re-check defeated it twice: concurrent
+# _queue_pack_agent_job callers all passed the check before any
+# handler ran (6 callers -> 6 enqueues -> 6 executions), and a ledger
+# READ outage degraded the check to 'not proven run' for a kickoff
+# that had provably executed. The claim below makes the conditional
+# UPDATE's rowcount the enqueue decision (authoritative even when
+# reads fail), and _begin_pack_kickoff applies the same state machine
+# on the worker side so a late duplicate delivery cannot re-execute.
+
+_KICKOFF_CLAIMED_STATUS = "kickoff_claimed"
+
+# A claim whose job evidently never landed (broker lost the message,
+# worker never picked it up) must not strand the fulfillment forever:
+# after this long the claim is reclaimable on a later re-settle. The
+# worker gate keeps reclamation safe — even if two jobs end up
+# enqueued across a reclaim, exactly one delivery executes.
+_PACK_KICKOFF_CLAIM_STALE_SECONDS = 120.0
+
+# Sentinel for "the intake row could not be read at all" — distinct
+# from a missing row (None): a missing row follows the legacy flow,
+# an unprovable state must fail closed (never enqueue blind).
+_STATUS_UNKNOWN = object()
+
+
+def _pack_intake_state(intake_id: str):
+    """(status, details) for a pack intake, read quietly.
+
+    Returns (None, {}) when no row exists and (_STATUS_UNKNOWN, {})
+    when the read itself fails."""
+    if not intake_id:
+        return None, {}
+    try:
+        from sincor2.payment_ledger import get_pack_intake
+
+        intake = get_pack_intake(_rail_db_path(), intake_id)
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] pack intake read failed for intake=%s",
+            intake_id, exc_info=True)
+        return _STATUS_UNKNOWN, {}
+    if intake is None:
+        return None, {}
+    return intake.status, (intake.details or {})
+
+
+def _try_claim_pack_kickoff(intake_id: str) -> bool:
+    """Atomically claim the pack-agent kickoff for an intake:
+    created -> kickoff_claimed. True iff THIS caller won the
+    transition — the conditional UPDATE's rowcount is the decision,
+    so exactly one concurrent caller can win and the answer stays
+    authoritative even while ledger reads are failing. The claim
+    timestamp merged into details (best effort; the transition does
+    not depend on it) drives orphan-claim staleness."""
+    if not intake_id:
+        return False
+    from sincor2.payment_ledger import transition_pack_intake_status_if
+
+    details = None
+    status, current = _pack_intake_state(intake_id)
+    if status == "created":
+        details = dict(current)
+        details["kickoff_claimed_at"] = _utc_now_iso()
+    try:
+        return transition_pack_intake_status_if(
+            _rail_db_path(), intake_id,
+            from_statuses=("created",),
+            to_status=_KICKOFF_CLAIMED_STATUS, details=details)
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff claim failed for intake=%s",
+            intake_id, exc_info=True)
+        return False
+
+
+def _release_pack_kickoff_claim(intake_id: str) -> bool:
+    """Release a kickoff claim (kickoff_claimed -> created) — used
+    when enqueueing failed totally, so the fulfillment keeps its
+    pending + re-queueable semantics and a later retry can claim and
+    enqueue afresh."""
+    if not intake_id:
+        return False
+    from sincor2.payment_ledger import transition_pack_intake_status_if
+
+    try:
+        return transition_pack_intake_status_if(
+            _rail_db_path(), intake_id,
+            from_statuses=(_KICKOFF_CLAIMED_STATUS,), to_status="created")
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff claim release failed for intake=%s",
+            intake_id, exc_info=True)
+        return False
+
+
+def _kickoff_claim_is_stale(details: Dict[str, Any]) -> bool:
+    """True when a kickoff claim is old enough to presume orphaned.
+    A missing/unparseable claim timestamp counts as stale: orphan
+    safety beats double-enqueue risk because the worker gate still
+    guarantees at-most-once execution across a reclaim."""
+    claimed_at = details.get("kickoff_claimed_at")
+    if not claimed_at:
+        return True
+    try:
+        ts = datetime.fromisoformat(str(claimed_at))
+    except ValueError:
+        return True
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - ts).total_seconds()
+    return age > _PACK_KICKOFF_CLAIM_STALE_SECONDS
+
+
+def _acquire_pack_kickoff_claim(intake_id: str) -> str:
+    """Decide who may enqueue the pack-agent kickoff for an intake.
+
+    Returns 'won' (this caller claimed the kickoff and MUST enqueue
+    or release the claim), 'already' (the kickoff provably executed —
+    answer with the existing-execution reference), 'held' (another
+    caller owns a live claim, or the state is unprovable — never
+    enqueue), or 'legacy' (no claim applies: missing row or a
+    legacy/unknown status — proceed with the pre-claim flow)."""
+    if not intake_id:
+        return "legacy"
+    if _try_claim_pack_kickoff(intake_id):
+        return "won"
+    if _pack_kickoff_already_ran(intake_id):
+        return "already"
+    status, details = _pack_intake_state(intake_id)
+    if status in _PACK_KICKOFF_DONE_STATUSES:
+        return "already"
+    if status == _KICKOFF_CLAIMED_STATUS:
+        if _kickoff_claim_is_stale(details):
+            # Orphaned claim: release it and re-claim atomically;
+            # exactly one reclaimer can win the fresh claim.
+            _release_pack_kickoff_claim(intake_id)
+            if _try_claim_pack_kickoff(intake_id):
+                return "won"
+            if _pack_kickoff_already_ran(intake_id):
+                return "already"
+        return "held"
+    if status is _STATUS_UNKNOWN:
+        # Reads are failing AND the claim could not be won: the state
+        # is unprovable. Fail closed — enqueueing blind here is
+        # exactly how the read-outage double execution happened.
+        return "held"
+    return "legacy"
+
+
+def _claim_held_pack_job_ref(intake_id: str) -> str:
+    """Job reference for a kickoff another caller has claimed and is
+    queueing: the claim owner's enqueue is the delivery vehicle, so
+    this caller neither enqueues nor errors."""
+    return f"claim-held:{intake_id}"
+
+
+def _begin_pack_kickoff(intake_id: str):
+    """Worker-side execution gate for fulfill_pack_agent.
+
+    Returns (outcome, prior_status). 'begun': this delivery won the
+    atomic transition into agent_kickoff (from kickoff_claimed, or
+    from created for a directly delivered job) and may execute; if
+    the kickoff body then fails, _release_pack_kickoff_run hands the
+    consumed status back so a retry can execute. 'already': the
+    kickoff provably executed, is claimed by a queue operation whose
+    own delivery will execute it, or the state is unprovable — this
+    delivery must NOT execute. 'legacy': no gate applies (missing
+    row, legacy/unknown status, no intake id) — proceed exactly as
+    the pre-claim code did."""
+    if not intake_id:
+        return "legacy", None
+    from sincor2.payment_ledger import transition_pack_intake_status_if
+
+    db_path = _rail_db_path()
+    try:
+        if transition_pack_intake_status_if(
+                db_path, intake_id,
+                from_statuses=(_KICKOFF_CLAIMED_STATUS,),
+                to_status="agent_kickoff"):
+            return "begun", _KICKOFF_CLAIMED_STATUS
+        if transition_pack_intake_status_if(
+                db_path, intake_id,
+                from_statuses=("created",), to_status="agent_kickoff"):
+            return "begun", "created"
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution gate failed for "
+            "intake=%s — declining to execute", intake_id, exc_info=True)
+        return "already", None
+    status, _details = _pack_intake_state(intake_id)
+    if (status in _PACK_KICKOFF_DONE_STATUSES
+            or status == _KICKOFF_CLAIMED_STATUS
+            or status is _STATUS_UNKNOWN):
+        return "already", None
+    return "legacy", None
+
+
+def _release_pack_kickoff_run(intake_id: str,
+                              prior_status: Optional[str]) -> bool:
+    """Undo a worker-gate begin after the kickoff body failed:
+    agent_kickoff -> the status the gate consumed ('created' or
+    'kickoff_claimed'), so a retry delivery can execute instead of
+    the failed run being mistaken for a completed kickoff."""
+    if prior_status not in ("created", _KICKOFF_CLAIMED_STATUS):
+        return False
+    from sincor2.payment_ledger import transition_pack_intake_status_if
+
+    try:
+        return transition_pack_intake_status_if(
+            _rail_db_path(), intake_id,
+            from_statuses=("agent_kickoff",), to_status=prior_status)
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff run release failed for intake=%s",
+            intake_id, exc_info=True)
+        return False
+
+
+# Hard TOTAL-duration bound on one Celery publish attempt. The
+# round-1 fix bounded per-recv silence (redis_socket_timeout=1), but
+# a slow-drip broker — every recv succeeding inside the socket
+# timeout while the response never completes — defeats any per-recv
+# bound: the delta re-check measured a 16.92s settle at 1 byte/0.4s,
+# scaling with drip rate toward the 180s gunicorn timeout. A deadline
+# on the whole attempt is the only bound a drip cannot stretch.
+# 5s is ~2x the measured dead-broker fail-over (~2.4s, which still
+# raises on its own long before the deadline) and far inside the
+# gunicorn limit; healthy local-Redis publishes take milliseconds.
+_PACK_JOB_PUBLISH_DEADLINE_SECONDS = 5.0
+
+
+class _PackPublishDeadlineExceeded(ConnectionError):
+    """The Celery publish attempt exceeded its total-duration
+    deadline. A ConnectionError subclass (and an explicit member of
+    _broker_unavailable_exceptions) so the queue path treats a
+    deadline-abandoned publish exactly like a wedged broker and
+    engages the task_queue fallback."""
+
+
+def _publish_pack_agent_job(*, intake_id: str, pack_sku: str,
+                            customer_email: str):
+    """fulfill_pack_agent.apply_async under a hard total deadline.
+
+    Runs the publish on a daemon helper thread and joins it for
+    _PACK_JOB_PUBLISH_DEADLINE_SECONDS; the attempt's own result or
+    exception is re-raised in the caller. On deadline expiry raises
+    _PackPublishDeadlineExceeded and ABANDONS the attempt: the daemon
+    thread (at most one per queue call; it holds no locks and no
+    request state) may still complete the publish later — that is
+    safe by design, because the kickoff claim plus the worker gate
+    (_begin_pack_kickoff) guarantee the kickoff executes at most once
+    no matter how many deliveries eventually land."""
+    box: Dict[str, Any] = {}
+
+    def _run() -> None:
+        try:
+            box["result"] = fulfill_pack_agent.apply_async(
+                args=[intake_id, pack_sku, customer_email],
+                queue=PACK_AGENT_QUEUE,
+            )
+        except BaseException as exc:  # noqa: BLE001 — re-raised in caller
+            box["error"] = exc
+
+    thread = threading.Thread(
+        target=_run, name=f"pack-job-publish-{intake_id}", daemon=True)
+    thread.start()
+    thread.join(_PACK_JOB_PUBLISH_DEADLINE_SECONDS)
+    if thread.is_alive():
+        raise _PackPublishDeadlineExceeded(
+            f"celery publish for intake {intake_id} exceeded the "
+            f"{_PACK_JOB_PUBLISH_DEADLINE_SECONDS:.0f}s deadline")
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
+
+
 class _PackJobQueueUnavailable(RuntimeError):
     """The pack-agent job could not be queued anywhere: Celery is
     absent (or its broker is down) AND the in-process task_queue
@@ -784,7 +1103,8 @@ class _PackJobQueueUnavailable(RuntimeError):
 
 def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
                                        customer_email: str,
-                                       reason: str) -> str:
+                                       reason: str,
+                                       _claim_held: bool = False) -> str:
     """Last-resort queue for the pack-agent job: the in-process
     task_queue (the Directive #2 broker-down fallback path). Raises
     _PackJobQueueUnavailable if even this enqueue fails.
@@ -794,12 +1114,31 @@ def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
     AND re-checked when the enqueue raises, because the eager
     task_queue runs the handler BEFORE its post-run store write can
     fail — return the existing-execution reference instead of
-    enqueueing (or erroring) a second run."""
+    enqueueing (or erroring) a second run.
+
+    Atomic claim (repair round 2): unless the caller already holds
+    the kickoff claim (_claim_held=True — _queue_pack_agent_job
+    claimed it and its Celery attempt failed over to here), this
+    function acquires the claim itself; only the claim winner
+    enqueues. If this call won the claim and the enqueue then fails,
+    the claim is released before raising so a retry can re-claim."""
     if _pack_kickoff_already_ran(intake_id):
         logger.info(
             "[FULFILLMENT] Pack agent kickoff already executed for "
             "intake=%s — not enqueueing again (%s)", intake_id, reason)
         return _existing_pack_job_ref(intake_id)
+    own_claim = False
+    if not _claim_held:
+        claim = _acquire_pack_kickoff_claim(intake_id)
+        if claim == "already":
+            return _existing_pack_job_ref(intake_id)
+        if claim == "held":
+            logger.info(
+                "[FULFILLMENT] Pack agent kickoff already claimed "
+                "for intake=%s — not enqueueing again (%s)",
+                intake_id, reason)
+            return _claim_held_pack_job_ref(intake_id)
+        own_claim = claim == "won"
     from sincor2 import task_queue
 
     try:
@@ -818,6 +1157,8 @@ def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
                 "kickoff had already executed for intake=%s (%s) — "
                 "treating the job as queued: %s", intake_id, reason, exc)
             return _existing_pack_job_ref(intake_id)
+        if own_claim:
+            _release_pack_kickoff_claim(intake_id)
         raise _PackJobQueueUnavailable(
             f"task_queue fallback failed ({reason}): {exc}") from exc
     logger.info(
@@ -844,6 +1185,18 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     proves the kickoff executed for this payment (agent_kickoff or
     beyond), return the existing-execution reference without
     enqueueing — a re-settle must never run the kickoff twice.
+
+    Atomic claim (repair round 2): the enqueue decision is the
+    created -> kickoff_claimed transition (see
+    _acquire_pack_kickoff_claim) — only the claim winner enqueues,
+    concurrent callers get the existing-execution or claim-held
+    reference, and a claim whose enqueue fails totally is released
+    before the failure propagates, keeping the fulfillment pending
+    and re-queueable. The Celery publish runs under a hard
+    total-duration deadline (_publish_pack_agent_job): a wedged or
+    slow-drip broker fails over to task_queue in bounded time, and a
+    publish abandoned at the deadline that lands later is harmless
+    because the worker gate executes the kickoff at most once.
     """
     if _pack_kickoff_already_ran(intake_id):
         logger.info(
@@ -851,28 +1204,50 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
             "intake=%s pack=%s — skipping re-queue",
             intake_id, pack_sku)
         return _existing_pack_job_ref(intake_id)
-    if _celery_app is None:
-        logger.warning(
-            "[FULFILLMENT] Celery not configured — queueing pack agent "
-            "job via task_queue fallback intake=%s pack=%s",
+    claim = _acquire_pack_kickoff_claim(intake_id)
+    if claim == "already":
+        return _existing_pack_job_ref(intake_id)
+    if claim == "held":
+        logger.info(
+            "[FULFILLMENT] Pack agent kickoff already claimed for "
+            "intake=%s pack=%s — the claim owner's enqueue is the "
+            "delivery vehicle; not enqueueing again",
             intake_id, pack_sku)
-        return _enqueue_pack_agent_via_task_queue(
-            intake_id=intake_id, pack_sku=pack_sku,
-            customer_email=customer_email, reason="celery unavailable")
+        return _claim_held_pack_job_ref(intake_id)
+    claimed = claim == "won"
     try:
-        result = fulfill_pack_agent.apply_async(
-            args=[intake_id, pack_sku, customer_email],
-            queue=PACK_AGENT_QUEUE,
-        )
-    except _broker_unavailable_exceptions() as exc:
-        logger.warning(
-            "[FULFILLMENT] Celery broker unavailable (%s) — falling back "
-            "to task_queue.enqueue for pack agent job intake=%s pack=%s",
-            exc, intake_id, pack_sku)
-        return _enqueue_pack_agent_via_task_queue(
-            intake_id=intake_id, pack_sku=pack_sku,
-            customer_email=customer_email,
-            reason=f"broker unavailable: {exc}")
+        if _celery_app is None:
+            logger.warning(
+                "[FULFILLMENT] Celery not configured — queueing pack agent "
+                "job via task_queue fallback intake=%s pack=%s",
+                intake_id, pack_sku)
+            return _enqueue_pack_agent_via_task_queue(
+                intake_id=intake_id, pack_sku=pack_sku,
+                customer_email=customer_email, reason="celery unavailable",
+                _claim_held=claimed)
+        try:
+            result = _publish_pack_agent_job(
+                intake_id=intake_id, pack_sku=pack_sku,
+                customer_email=customer_email)
+        except _broker_unavailable_exceptions() as exc:
+            logger.warning(
+                "[FULFILLMENT] Celery broker unavailable (%s) — falling "
+                "back to task_queue.enqueue for pack agent job "
+                "intake=%s pack=%s", exc, intake_id, pack_sku)
+            return _enqueue_pack_agent_via_task_queue(
+                intake_id=intake_id, pack_sku=pack_sku,
+                customer_email=customer_email,
+                reason=f"broker unavailable: {exc}",
+                _claim_held=claimed)
+    except Exception:
+        # The enqueue did not land (total queue failure) or the
+        # publish failed for real (Directive #2 pin): the claim must
+        # not leak — release it so the failure keeps its pre-claim
+        # semantics (pending + re-queueable, or a retryable real
+        # failure) instead of stranding the intake at kickoff_claimed.
+        if claimed:
+            _release_pack_kickoff_claim(intake_id)
+        raise
     logger.info(
         "[FULFILLMENT] Queued pack agent job %s on %s", result.id, PACK_AGENT_QUEUE)
     return result.id
