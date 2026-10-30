@@ -54,17 +54,40 @@ celery.conf.update(
     # backend.on_task_call BEFORE publishing, and the Redis backend's
     # default reconnect policy (20 retries x 1s steps) stalls
     # apply_async for ~19s against a dead broker before the publish is
-    # even attempted (measured) — cap it at one fast retry via the
-    # backend transport options' retry_policy.
+    # even attempted (measured) — bound it via the backend transport
+    # options' retry_policy (zero retries; see the redis_socket_timeout
+    # note below for why a retry buys nothing in the send path).
     broker_transport_options={"socket_timeout": 2,
                               "socket_connect_timeout": 2},
     broker_connection_timeout=2,
     task_publish_retry_policy={"max_retries": 1, "interval_start": 0,
                                "interval_max": 0.2},
     result_backend_transport_options={
-        "retry_policy": {"max_retries": 1, "interval_start": 0,
+        "retry_policy": {"max_retries": 0, "interval_start": 0,
                          "interval_step": 0.1, "interval_max": 0.2},
     },
+    # WREN PR 10 (repair): bound the result-backend client's socket
+    # READS, not just its retries. A broker that accepts TCP but never
+    # replies (wedged proxy / half-dead Redis) makes no call fail — the
+    # read simply never returns, so no retry policy ever engages.
+    # send_task -> RedisBackend.on_task_call -> ResultConsumer.subscribe
+    # blocks in redis connection.on_connect's read_response on the
+    # backend client's socket_timeout, which celery's Redis backend
+    # takes ONLY from the redis_socket_timeout conf key (the transport
+    # options above feed retry_policy, never socket timeouts) and
+    # whose default is 120s. Measured against a dumb TCP acceptor with
+    # the production conf: backend SET and apply_async both blocked
+    # >15s (reviewer probe: still blocked at 306s) while the kombu
+    # publish alone failed cleanly in ~2s. With the 1s timeouts below
+    # (and the zero-retry policy above — a failed on_task_call is
+    # tolerated, publish proceeds regardless, so the retry only ever
+    # multiplied the stall) apply_async raises OperationalError in
+    # ~2s and the caller falls back to task_queue. 1s is ~1000x the
+    # healthy local-Redis round trip; celery result values are not
+    # this system's record (the sqlite ledgers are), so a spurious
+    # timeout costs a result write, never a fulfillment.
+    redis_socket_timeout=1,
+    redis_socket_connect_timeout=1,
     beat_schedule={
         "refresh-onchain-snapshot-hourly": {
             "task": "sincor2.onchain.tasks.refresh_onchain_snapshot",

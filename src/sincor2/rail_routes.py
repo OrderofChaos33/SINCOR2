@@ -728,6 +728,52 @@ def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
     )
 
 
+# Pack-intake lifecycle (payment_ledger.pack_intakes.status):
+# created -> agent_kickoff -> intake_complete -> in_progress ->
+# delivered. The agent_kickoff write is the pack-agent job's OWN final
+# step, so a row sitting at agent_kickoff or beyond is proof the
+# kickoff executed — no matter what the queue reported afterwards.
+_PACK_KICKOFF_DONE_STATUSES = frozenset({
+    "agent_kickoff", "intake_complete", "in_progress", "delivered",
+})
+
+
+def _pack_kickoff_already_ran(intake_id: str) -> bool:
+    """True when the pack-intake row proves the kickoff already ran.
+
+    Queue outcomes can be ambiguous: a Celery publish whose reply is
+    lost after a worker already executed the job, or the eager
+    task_queue raising on its post-run store write after the handler
+    ran. In both shapes a blind fallback / re-settle enqueue would
+    execute the kickoff a second time for one payment, so callers
+    check the row — the execution record — before enqueueing again.
+    Never raises: a failed check degrades to 'not proven run' and the
+    kickoff's convergent status write remains the second line of
+    defense.
+    """
+    if not intake_id:
+        return False
+    try:
+        from sincor2.payment_ledger import get_pack_intake
+
+        intake = get_pack_intake(_rail_db_path(), intake_id)
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff-state check failed for intake=%s — "
+            "treating the kickoff as not-yet-run", intake_id,
+            exc_info=True)
+        return False
+    return bool(intake is not None
+                and intake.status in _PACK_KICKOFF_DONE_STATUSES)
+
+
+def _existing_pack_job_ref(intake_id: str) -> str:
+    """Job reference for a kickoff that already executed: the intake
+    row (status agent_kickoff or beyond) IS the execution record, so
+    the reference names it instead of inventing a new job id."""
+    return f"already-ran:{intake_id}"
+
+
 class _PackJobQueueUnavailable(RuntimeError):
     """The pack-agent job could not be queued anywhere: Celery is
     absent (or its broker is down) AND the in-process task_queue
@@ -741,7 +787,19 @@ def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
                                        reason: str) -> str:
     """Last-resort queue for the pack-agent job: the in-process
     task_queue (the Directive #2 broker-down fallback path). Raises
-    _PackJobQueueUnavailable if even this enqueue fails."""
+    _PackJobQueueUnavailable if even this enqueue fails.
+
+    At-most-once guard (WREN PR 10 repair): if the pack-intake row
+    already proves the kickoff executed — checked before enqueueing
+    AND re-checked when the enqueue raises, because the eager
+    task_queue runs the handler BEFORE its post-run store write can
+    fail — return the existing-execution reference instead of
+    enqueueing (or erroring) a second run."""
+    if _pack_kickoff_already_ran(intake_id):
+        logger.info(
+            "[FULFILLMENT] Pack agent kickoff already executed for "
+            "intake=%s — not enqueueing again (%s)", intake_id, reason)
+        return _existing_pack_job_ref(intake_id)
     from sincor2 import task_queue
 
     try:
@@ -754,6 +812,12 @@ def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
              "customer_email": customer_email},
         )
     except Exception as exc:
+        if _pack_kickoff_already_ran(intake_id):
+            logger.warning(
+                "[FULFILLMENT] task_queue enqueue raised after the "
+                "kickoff had already executed for intake=%s (%s) — "
+                "treating the job as queued: %s", intake_id, reason, exc)
+            return _existing_pack_job_ref(intake_id)
         raise _PackJobQueueUnavailable(
             f"task_queue fallback failed ({reason}): {exc}") from exc
     logger.info(
@@ -775,7 +839,18 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     pin). If the task_queue fallback itself fails, raise
     _PackJobQueueUnavailable: the caller keeps the fulfillment pending
     and re-queueable rather than failing a verified payment.
+
+    At-most-once (WREN PR 10 repair): if the pack-intake row already
+    proves the kickoff executed for this payment (agent_kickoff or
+    beyond), return the existing-execution reference without
+    enqueueing — a re-settle must never run the kickoff twice.
     """
+    if _pack_kickoff_already_ran(intake_id):
+        logger.info(
+            "[FULFILLMENT] Pack agent kickoff already executed for "
+            "intake=%s pack=%s — skipping re-queue",
+            intake_id, pack_sku)
+        return _existing_pack_job_ref(intake_id)
     if _celery_app is None:
         logger.warning(
             "[FULFILLMENT] Celery not configured — queueing pack agent "

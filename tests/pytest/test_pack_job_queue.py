@@ -20,10 +20,28 @@ Pins:
     structured non-5xx, and a later re-settle re-queues and delivers.
     (Distinct from the Directive #2 pin: a NON-connection apply_async
     error with Celery present is still a real fulfillment failure.)
+  * A HANGING broker (accepts TCP, never replies) fails over just as
+    fast: celery's Redis result backend takes its client socket
+    timeout ONLY from the redis_socket_timeout conf key (default
+    120s — send_task's backend.on_task_call subscribe read blocks on
+    it, measured blocked >15s / 306s), so the conf pins it to 1s and
+    drops the backend retry (a failed on_task_call is tolerated —
+    publish proceeds anyway — so the retry only ever added stall).
+    Settle against a dumb-acceptor broker: < 5s, one fallback enqueue.
+  * Ambiguous queue outcomes never run the kickoff twice: if the
+    pack-intake row already sits at agent_kickoff or beyond (the
+    kickoff's own final write), the job HAS executed — a Celery
+    publish whose reply was lost after the worker ran, or an eager
+    task_queue enqueue that raised on its post-run store write after
+    the handler ran. _queue_pack_agent_job / the fallback check the
+    row before enqueueing and return the existing-execution reference
+    ('already-ran:<intake_id>') instead of enqueueing again.
 """
 from __future__ import annotations
 
+import socket
 import sqlite3
+import threading
 import time
 from types import SimpleNamespace
 
@@ -264,21 +282,22 @@ def test_resettle_after_no_celery_settle_is_idempotent(
 # Real unreachable broker -> bounded stall, fallback engages
 # ---------------------------------------------------------------------------
 
-def _unreachable_broker_task(monkeypatch):
-    """A REAL Celery app + task pointed at an unreachable broker, using
-    the production celery_app conf (so this test tracks the real
-    timeout settings). Returns the task object to patch in."""
+def _unreachable_broker_task(monkeypatch, url=UNREACHABLE):
+    """A REAL Celery app + task pointed at the given broker/backend
+    URL, using the production celery_app conf (so this test tracks the
+    real timeout settings). Returns the task object to patch in."""
     from celery import Celery
 
     from sincor2 import celery_app as prod
 
-    app = Celery("sincor2-wren10-probe", broker=UNREACHABLE,
-                 backend=UNREACHABLE)
+    app = Celery("sincor2-wren10-probe", broker=url,
+                 backend=url)
     keys = ("task_serializer", "accept_content", "result_serializer",
             "broker_connection_retry_on_startup",
             "broker_transport_options", "broker_connection_timeout",
             "task_publish_retry_policy",
-            "result_backend_transport_options")
+            "result_backend_transport_options",
+            "redis_socket_timeout", "redis_socket_connect_timeout")
     app.conf.update({k: prod.celery.conf[k] for k in keys
                      if prod.celery.conf.get(k) is not None})
 
@@ -372,3 +391,249 @@ def test_queue_failure_leaves_pending_then_requeue_succeeds(
                  ).read_text().splitlines()
     assert len(log_lines) == 1, "payment still recorded exactly once"
     assert len(email_ok["sent"]) == 1, "buyer email sent exactly once"
+
+
+# ---------------------------------------------------------------------------
+# Hanging broker (accepts TCP, never replies) -> bounded fail-over
+# ---------------------------------------------------------------------------
+
+def test_celery_conf_bounds_result_backend_socket_reads():
+    from sincor2 import celery_app
+
+    conf = celery_app.celery.conf
+    # celery's Redis result backend reads its client socket timeouts
+    # ONLY from these conf keys — result_backend_transport_options
+    # feeds retry_policy, never socket timeouts (celery 5.4
+    # backends/redis.py). The celery default redis_socket_timeout is
+    # 120s: against a broker that accepts TCP but never replies,
+    # send_task's backend.on_task_call subscribe read blocks on it
+    # (measured: apply_async still blocked at 15s; reviewer saw 306s).
+    assert conf["redis_socket_timeout"] is not None
+    assert conf["redis_socket_timeout"] <= 2
+    assert conf["redis_socket_connect_timeout"] is not None
+    assert conf["redis_socket_connect_timeout"] <= 2
+    # A failed on_task_call is tolerated (publish proceeds regardless),
+    # so the backend retry never buys anything in the send path — it
+    # only multiplies the stall. It must be zero.
+    backend_policy = conf["result_backend_transport_options"]["retry_policy"]
+    assert backend_policy["max_retries"] == 0
+
+
+class _DumbAcceptor:
+    """TCP listener that accepts connections and never replies — the
+    hanging-broker shape (wedged proxy / half-dead Redis)."""
+
+    def __init__(self):
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.setsockopt(
+            socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(50)
+        self.port = self._listener.getsockname()[1]
+        self._held = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self):
+        return f"redis://127.0.0.1:{self.port}/0"
+
+    def _loop(self):
+        while not self._stop.is_set():
+            try:
+                conn, _ = self._listener.accept()
+            except OSError:
+                return
+            self._held.append(conn)  # never send, never close
+
+    def close(self):
+        self._stop.set()
+        try:
+            self._listener.close()
+        except OSError:
+            pass
+        for conn in self._held:
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+
+def test_settle_hanging_broker_falls_back_fast(
+        rail_app, rail_env, email_ok, monkeypatch):
+    acceptor = _DumbAcceptor()
+    try:
+        _unreachable_broker_task(monkeypatch, url=acceptor.url)
+
+        enqueued = []
+
+        def fake_enqueue(kind, payload=None, **kw):
+            enqueued.append({"kind": kind, "payload": payload or {}})
+            return SimpleNamespace(id="taskqueue-job-wren10-hang")
+
+        monkeypatch.setattr(task_queue, "enqueue", fake_enqueue)
+
+        client = rail_app.test_client()
+        cid = _checkout(client)
+
+        # Run the settle in a thread with a hard join so a regression
+        # to an unbounded hang FAILS this test instead of hanging the
+        # whole suite.
+        box = {}
+
+        def _do_settle():
+            start = time.monotonic()
+            try:
+                box["res"] = _settle(rail_app.test_client(), cid)
+            except Exception as exc:  # noqa: BLE001 — reported below
+                box["error"] = exc
+            box["elapsed"] = time.monotonic() - start
+
+        worker = threading.Thread(target=_do_settle, daemon=True)
+        worker.start()
+        worker.join(15)
+        assert not worker.is_alive(), (
+            "settle is still blocked after 15s against a hanging "
+            "broker — the broker/backend wait bounds are not effective")
+        assert "error" not in box, box.get("error")
+
+        res = box["res"]
+        body = res.get_json()
+        assert res.status_code == 200, body
+        assert box["elapsed"] < 5, (
+            f"hanging-broker settle took {box['elapsed']:.1f}s")
+        assert body["ok"] is True
+        assert body["fulfillment"]["status"] == "delivered"
+        assert body["fulfillment"]["job_id"] == "taskqueue-job-wren10-hang"
+        assert len(enqueued) == 1, "exactly one fallback enqueue"
+        assert enqueued[0]["payload"]["intake_id"] == f"intake-rail-{cid}"
+    finally:
+        acceptor.close()
+
+
+# ---------------------------------------------------------------------------
+# Ambiguous queue outcomes: the kickoff executes at most once per payment
+# ---------------------------------------------------------------------------
+
+def _count_kickoffs(monkeypatch):
+    """Count REAL kickoff executions (every execution resolves the
+    pack's vertical agent exactly once, worker-side)."""
+    real_instantiate = rr._instantiate_pack_agent
+    calls = []
+
+    def counting(pack):
+        calls.append(pack)
+        return real_instantiate(pack)
+
+    monkeypatch.setattr(rr, "_instantiate_pack_agent", counting)
+    return calls
+
+
+def _intake_status(db_path, intake_id):
+    conn = sqlite3.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status FROM pack_intakes WHERE intake_id=?",
+            (intake_id,)).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def test_settle_celery_reply_lost_after_worker_ran_kickoff_once(
+        rail_app, rail_env, email_ok, monkeypatch):
+    """Ambiguous Celery outcome: the broker stored the message, a
+    worker RAN the kickoff, then the publish reply was lost as a
+    ConnectionError. The intake row already sits at agent_kickoff, so
+    the fallback must NOT enqueue a second execution."""
+    kickoffs = _count_kickoffs(monkeypatch)
+    real_task = rr.fulfill_pack_agent
+
+    class _AmbiguousTask:
+        def apply_async(self, args=None, kwargs=None, queue=None, **kw):
+            real_task(*list(args or []))  # the worker ran the kickoff
+            raise ConnectionError(
+                "publish reply lost after the broker stored the message")
+
+    monkeypatch.setattr(rr, "_celery_app", SimpleNamespace(name="probe"))
+    monkeypatch.setattr(rr, "fulfill_pack_agent", _AmbiguousTask())
+
+    enqueued = []
+
+    def fake_enqueue(kind, payload=None, **kw):
+        enqueued.append({"kind": kind, "payload": payload or {}})
+        return SimpleNamespace(id="must-never-be-used")
+
+    monkeypatch.setattr(task_queue, "enqueue", fake_enqueue)
+
+    client = rail_app.test_client()
+    cid = _checkout(client)
+    res = _settle(client, cid)
+    body = res.get_json()
+
+    assert res.status_code == 200, body
+    assert body["ok"] is True
+    assert body["fulfillment"]["status"] == "delivered"
+    assert body["fulfillment"]["job_id"] == f"already-ran:intake-rail-{cid}"
+    assert len(kickoffs) == 1, "kickoff must execute exactly once"
+    assert enqueued == [], "fallback must not enqueue a second execution"
+    db_path = rail_env["tmp"] / "revenue.db"
+    assert _intake_status(db_path, f"intake-rail-{cid}") == "agent_kickoff"
+    assert _db_counts(db_path) == (1, 1)
+    assert len(email_ok["sent"]) == 1
+
+
+def test_settle_eager_enqueue_raises_after_kickoff_ran_not_pending(
+        rail_app, rail_env, email_ok, monkeypatch):
+    """Eager task_queue shape: the handler RAN (intake reached
+    agent_kickoff) but the post-run store write failed, so enqueue
+    raised. The settle must recognize the executed kickoff — NOT leave
+    fulfillment falsely pending — and a re-settle must not run the
+    kickoff a second time."""
+    kickoffs = _count_kickoffs(monkeypatch)
+    monkeypatch.setattr(rr, "_celery_app", None)
+
+    def run_then_raise(kind, payload=None, **kw):
+        rr._pack_agent_queue_handler(payload or {}, "stub-job-wren10")
+        raise RuntimeError("job store write failed after the handler ran")
+
+    monkeypatch.setattr(task_queue, "enqueue", run_then_raise)
+
+    client = rail_app.test_client()
+    cid = _checkout(client)
+    res = _settle(client, cid)
+    body = res.get_json()
+
+    assert res.status_code == 200, body
+    assert body["ok"] is True
+    assert body["fulfillment"]["status"] == "delivered"
+    assert body["fulfillment"]["job_id"] == f"already-ran:intake-rail-{cid}"
+    assert len(kickoffs) == 1, "kickoff must execute exactly once"
+    event = rr._get_rail_event(f"rail-{cid}")
+    assert event["fulfillment_status"] == "delivered", event
+
+    # Re-settle: duplicate ack; the kickoff still ran exactly once and
+    # neither the payment nor the email is duplicated.
+    second = _settle(client, cid)
+    second_body = second.get_json()
+    assert second.status_code == 200, second_body
+    assert second_body["status"] == "already_fulfilled"
+    assert second_body["duplicate"] is True
+    assert len(kickoffs) == 1
+    db_path = rail_env["tmp"] / "revenue.db"
+    assert _db_counts(db_path) == (1, 1)
+    assert len(email_ok["sent"]) == 1
+
+    # A direct re-queue attempt (the pending-event retry path)
+    # short-circuits on the intake row without enqueueing anything.
+    def ok_enqueue(kind, payload=None, **kw):
+        return SimpleNamespace(id="must-never-be-used")
+
+    enqueued = _counting_enqueue(monkeypatch, real_enqueue=ok_enqueue)
+    ref = rr._queue_pack_agent_job(
+        intake_id=f"intake-rail-{cid}", pack_sku="credentialing_launch",
+        customer_email="buyer@example.com")
+    assert ref == f"already-ran:intake-rail-{cid}"
+    assert enqueued == [], "re-queue must not enqueue a second execution"
+    assert len(kickoffs) == 1
