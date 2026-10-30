@@ -348,3 +348,272 @@ def test_swarm_openai_style_valid_call_succeeds_identically(swarm_env):
     # Omitted optional argument still works.
     read = _swarm_call("discussion_read", {})
     assert "result" in read, read
+
+
+# ---------------------------------------------------------------------------
+# Repair wave — Builder B adversarial probes (B1–B5 + lint gaps)
+#
+# Builder B returned NOT CONFIRMED on the first 316 branch: the guard
+# worked for the exact shapes in the tests above but broke on variants —
+# non-finite floats, whitespace-padded "null", an un-schematized array
+# item object, fields the impl consumes but the schema never declared,
+# and property-less objects with zero recursion. Each test below mirrors
+# one of those probes.
+# ---------------------------------------------------------------------------
+
+# -- B1: non-finite / unrepresentable numbers -------------------------------
+
+def test_validator_rejects_nonfinite_bid_amounts():
+    # Python's json.loads accepts NaN/Infinity literals, so these values
+    # DO arrive from the wire; the guard must refuse them by name.
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(guard.SchemaValidationError) as excinfo:
+            guard.validate_arguments("t", _SCHEMA,
+                                     {"task_id": "a", "bid_axm": bad})
+        assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_rejects_unrepresentable_payment_magnitude():
+    # 1e308 is finite as a float, but a payment amount must survive the
+    # platform's 18-decimal fixed-point conversion (bid_axm * 1e18 in
+    # the bid planner) — 1e308 overflows to infinity there and crashed
+    # with a raw OverflowError. The guard rejects it by name instead.
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", _SCHEMA,
+                                 {"task_id": "a", "bid_axm": 1e308})
+    assert "bid_axm" in str(excinfo.value)
+
+
+def test_validator_nonpayment_number_only_requires_finite():
+    # The magnitude rule is a payment-representability rule, not a
+    # general range cap: a non-payment number field accepts any finite
+    # float and still rejects non-finite ones.
+    schema = {"type": "object",
+              "properties": {"reading": {"type": "number"}}}
+    guard.validate_arguments("t", schema, {"reading": 1e308})
+    with pytest.raises(guard.SchemaValidationError) as excinfo:
+        guard.validate_arguments("t", schema, {"reading": float("nan")})
+    assert "reading" in str(excinfo.value)
+
+
+def test_validator_integer_fields_reject_float_shapes_cleanly():
+    # Integer fields refuse non-finite and non-integral floats through
+    # the guard's named-field error — never a raw downstream exception.
+    for bad in (float("nan"), float("inf"), 1.5):
+        with pytest.raises(guard.SchemaValidationError) as excinfo:
+            guard.validate_arguments("t", _SCHEMA, {
+                "task_id": "a", "bid_axm": 1.0, "estimated_seconds": bad})
+        assert "estimated_seconds" in str(excinfo.value)
+
+
+def test_discovery_nonfinite_bid_rejected_at_guard(stub_upstream):
+    for bad in (float("nan"), float("inf"), 1e308):
+        resp = _call_rpc("submit_bid", {
+            "task_id": "tsk_1", "agent_id": "a1", "bid_axm": bad})
+        _assert_loud_rejection(resp, "bid_axm")
+    assert stub_upstream == []  # no confirmation, no execution
+
+
+# -- B2: whitespace-padded "null" -------------------------------------------
+
+def test_validator_rejects_whitespace_padded_null_strings():
+    # Consumers strip before use (the board store strips titles, the
+    # task lookup strips ids), so " null " becomes "null" downstream —
+    # the guard must judge the stripped value, not the raw one.
+    for bad in (" null ", "\tnull\n", "null ", " null"):
+        with pytest.raises(guard.SchemaValidationError) as excinfo:
+            guard.validate_arguments("t", _SCHEMA,
+                                     {"task_id": bad, "bid_axm": 1.0})
+        assert "task_id" in str(excinfo.value)
+    # A string merely CONTAINING "null" is a real value, not the hole.
+    guard.validate_arguments("t", _SCHEMA,
+                             {"task_id": "nullable-task", "bid_axm": 1.0})
+
+
+def test_discovery_padded_null_task_id_rejected(stub_upstream):
+    resp = _call_rpc("get_task", {"task_id": "\tnull\n"})
+    _assert_loud_rejection(resp, "task_id")
+    assert stub_upstream == []
+
+
+def test_swarm_padded_null_title_rejected_no_side_effect(swarm_env):
+    resp = _swarm_add_card(title=" null ")
+    assert "error" in resp and resp["error"]["code"] == -32602, resp
+    assert "title" in resp["error"]["message"], resp
+    read = _swarm_call("board_lanes_read", {})
+    lanes = json.loads(read["result"]["content"][0]["text"])
+    assert all(not cards for cards in lanes.values()), lanes
+
+
+# -- B3: stack_propose items carry a real item schema ------------------------
+
+def test_swarm_stack_propose_null_item_fields_rejected(swarm_env):
+    resp = _swarm_call("stack_propose", {
+        "items": [{"title": "null", "detail": "null", "owner": "null"}],
+        "proposed_by": "Muse"})
+    assert "error" in resp and resp["error"]["code"] == -32602, resp
+    assert "items" in resp["error"]["message"], resp
+
+
+def test_swarm_stack_propose_missing_item_field_rejected(swarm_env):
+    resp = _swarm_call("stack_propose", {
+        "items": [{"title": "T", "detail": "D"}],
+        "proposed_by": "Muse"})
+    assert "error" in resp and resp["error"]["code"] == -32602, resp
+    assert "owner" in resp["error"]["message"], resp
+
+
+def test_swarm_stack_propose_valid_items_succeed(swarm_env):
+    resp = _swarm_call("stack_propose", {
+        "items": [{"title": "Build", "detail": "the thing",
+                   "owner": "Muse"}],
+        "proposed_by": "Muse"})
+    assert "result" in resp, resp
+    stack = json.loads(resp["result"]["content"][0]["text"])
+    assert stack["items"][0]["title"] == "Build"
+
+
+# -- B4: register_agent declares every field its impl consumes ---------------
+
+@pytest.mark.parametrize("args,field", [
+    ({"chain_id": "null"}, "chain_id"),
+    ({"chain_id": ["evil"]}, "chain_id"),
+    ({"chain_id": 8453.5}, "chain_id"),
+    ({"agent_url": 12345}, "agent_url"),
+    ({"agent_url": " null "}, "agent_url"),
+])
+def test_discovery_register_agent_forwarded_fields_validated(
+        stub_upstream, args, field):
+    # _tool_register_agent forwards agent_url and chain_id upstream;
+    # both are declared in the published schema, so the guard sees them.
+    resp = _call_rpc("register_agent", args)
+    _assert_loud_rejection(resp, field)
+    assert stub_upstream == []
+
+
+def test_discovery_register_agent_declared_fields_accepted(stub_upstream):
+    resp = _call_rpc("register_agent", {
+        "name": "Agent A", "chain_id": 8453,
+        "agent_url": "https://agent.example.com/rpc"})
+    assert resp is not None and "result" in resp, resp
+    assert stub_upstream == []  # confirmation issued; nothing executed yet
+
+
+# -- B5: property-less objects still get leaf rules ---------------------------
+
+@pytest.mark.parametrize("card", [
+    {"name": "A", "skills": [{"id": "s1", "bid_axm": "null"}]},   # nested "null"
+    {"name": "A", "contact": None},                               # JSON null leaf
+    {"name": "A", "aliases": ["ok", " null "]},                   # padded "null" in a list
+    {"name": "A", "meta": {"deep": {"deeper": ["null"]}}},        # deep nesting
+])
+def test_discovery_register_agent_card_nested_nulls_rejected(
+        stub_upstream, card):
+    resp = _call_rpc("register_agent", {"agent_card": card})
+    _assert_loud_rejection(resp, "agent_card")
+    assert stub_upstream == []
+
+
+def test_discovery_register_agent_card_legit_structure_accepted(
+        stub_upstream):
+    # Arbitrary structure/types stay welcome — only null-shaped leaves
+    # are refused inside a property-less object.
+    card = {"name": "Agent A", "version": "1.0", "chain_id": 8453,
+            "active": True, "rating": 4.5,
+            "skills": [{"id": "s1", "name": "Skill", "price": 0.5}],
+            "tags": ["x", "y"], "limits": {"daily": 10}}
+    resp = _call_rpc("register_agent", {"agent_card": card})
+    assert resp is not None and "result" in resp, resp
+    assert stub_upstream == []
+
+
+# -- Lint: dotted names, tuple items, payment-name coverage, enum -----------
+
+def test_lint_flags_nested_payment_field_by_leaf_name():
+    # The payment test must see the LEAF name: "cfg.bid_axm" is a
+    # payment field even though the dotted string is not.
+    bad = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"cfg": {"type": "object", "properties": {
+            "bid_axm": {"type": "number"}}}},
+    }}]
+    violations = guard.find_schema_violations(bad)
+    assert any("bid_axm" in v for v in violations), violations
+
+    good = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"cfg": {"type": "object", "required": ["bid_axm"],
+                               "properties": {
+                                   "bid_axm": {"type": "number"}}}},
+    }}]
+    assert guard.find_schema_violations(good) == []
+
+
+def test_lint_flags_payment_field_inside_items_object():
+    bad = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"batch": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"amount": {"type": "number"}}}}},
+    }}]
+    violations = guard.find_schema_violations(bad)
+    assert any("amount" in v for v in violations), violations
+
+
+def test_lint_flags_tuple_form_items_nullable():
+    bad = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"pair": {"type": "array", "items": [
+            {"type": ["string", "null"]}]}},
+    }}]
+    violations = guard.find_schema_violations(bad)
+    assert any("pair" in v and "null" in v for v in violations), violations
+
+
+@pytest.mark.parametrize("field", ["stake_axm", "fee_usdc", "tip", "cost"])
+def test_lint_flags_extended_payment_names(field):
+    bad = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {field: {"type": "number"}},
+    }}]
+    violations = guard.find_schema_violations(bad)
+    assert any(field in v for v in violations), violations
+
+
+def test_lint_extended_names_do_not_flag_nonpayment_fields():
+    good = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"hostname": {"type": "string"},
+                       "cost_center": {"type": "string"},
+                       "tip_amount": {"type": "number"}},
+    }}]
+    assert guard.find_schema_violations(good) == []
+
+
+def test_lint_flags_enum_containing_null():
+    bad = [{"name": "t", "inputSchema": {
+        "type": "object",
+        "properties": {"mode": {"type": "string",
+                                "enum": ["auto", None]}},
+    }}]
+    violations = guard.find_schema_violations(bad)
+    assert any("mode" in v and "enum" in v for v in violations), violations
+
+
+# -- Validator: tuple-form items are validated positionally ------------------
+
+_TUPLE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pair": {"type": "array",
+                 "items": [{"type": "string"}, {"type": "integer"}]},
+    },
+}
+
+
+def test_validator_tuple_items_positional():
+    guard.validate_arguments("t", _TUPLE_SCHEMA, {"pair": ["ok", 5]})
+    for bad in (["ok", "5"], ["null", 5], ["ok", True]):
+        with pytest.raises(guard.SchemaValidationError) as excinfo:
+            guard.validate_arguments("t", _TUPLE_SCHEMA, {"pair": bad})
+        assert "pair" in str(excinfo.value)

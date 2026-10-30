@@ -137,6 +137,15 @@ def _tool_defs() -> List[Dict[str, Any]]:
                     items={
                         "type": "array",
                         "description": "non-empty list of {title, detail, owner}",
+                        "items": {
+                            "type": "object",
+                            "required": ["title", "detail", "owner"],
+                            "properties": {
+                                "title": {"type": "string"},
+                                "detail": {"type": "string"},
+                                "owner": {"type": "string"},
+                            },
+                        },
                     },
                     proposed_by={"type": "string"},
                 ),
