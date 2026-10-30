@@ -728,18 +728,62 @@ def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
     )
 
 
+class _PackJobQueueUnavailable(RuntimeError):
+    """The pack-agent job could not be queued anywhere: Celery is
+    absent (or its broker is down) AND the in-process task_queue
+    fallback also failed. The payment is already verified and recorded
+    at this point, so the caller leaves fulfillment 'pending' and
+    re-queueable instead of marking it failed."""
+
+
+def _enqueue_pack_agent_via_task_queue(*, intake_id: str, pack_sku: str,
+                                       customer_email: str,
+                                       reason: str) -> str:
+    """Last-resort queue for the pack-agent job: the in-process
+    task_queue (the Directive #2 broker-down fallback path). Raises
+    _PackJobQueueUnavailable if even this enqueue fails."""
+    from sincor2 import task_queue
+
+    try:
+        if task_queue.get_handler(PACK_AGENT_QUEUE_KIND) is None:
+            task_queue.register_handler(
+                PACK_AGENT_QUEUE_KIND, _pack_agent_queue_handler)
+        job = task_queue.enqueue(
+            PACK_AGENT_QUEUE_KIND,
+            {"intake_id": intake_id, "pack_sku": pack_sku,
+             "customer_email": customer_email},
+        )
+    except Exception as exc:
+        raise _PackJobQueueUnavailable(
+            f"task_queue fallback failed ({reason}): {exc}") from exc
+    logger.info(
+        "[FULFILLMENT] Queued pack agent job %s via task_queue "
+        "fallback (%s)", job.id, reason)
+    return str(job.id)
+
+
 def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
                           customer_email: str) -> str:
     """Queue the vertical-agent deployment job on the sincor.long queue.
 
-    Graceful half (Directive #2 item 5a): when the Celery broker is
+    Graceful halves (Directive #2 item 5a + WREN PR 10): when Celery is
+    not configured at all (_celery_app is None) OR the Celery broker is
     unavailable (connection error against the broker URL), fall back to
     the existing task_queue.enqueue path so the job still lands and the
-    settle succeeds. Non-connection queue failures propagate as real
-    fulfillment failures.
+    settle succeeds. A NON-connection apply_async failure with Celery
+    present is a REAL fulfillment failure — it propagates (Directive #2
+    pin). If the task_queue fallback itself fails, raise
+    _PackJobQueueUnavailable: the caller keeps the fulfillment pending
+    and re-queueable rather than failing a verified payment.
     """
     if _celery_app is None:
-        raise RuntimeError("celery unavailable — cannot queue pack agent job")
+        logger.warning(
+            "[FULFILLMENT] Celery not configured — queueing pack agent "
+            "job via task_queue fallback intake=%s pack=%s",
+            intake_id, pack_sku)
+        return _enqueue_pack_agent_via_task_queue(
+            intake_id=intake_id, pack_sku=pack_sku,
+            customer_email=customer_email, reason="celery unavailable")
     try:
         result = fulfill_pack_agent.apply_async(
             args=[intake_id, pack_sku, customer_email],
@@ -750,20 +794,10 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
             "[FULFILLMENT] Celery broker unavailable (%s) — falling back "
             "to task_queue.enqueue for pack agent job intake=%s pack=%s",
             exc, intake_id, pack_sku)
-        from sincor2 import task_queue
-
-        if task_queue.get_handler(PACK_AGENT_QUEUE_KIND) is None:
-            task_queue.register_handler(
-                PACK_AGENT_QUEUE_KIND, _pack_agent_queue_handler)
-        job = task_queue.enqueue(
-            PACK_AGENT_QUEUE_KIND,
-            {"intake_id": intake_id, "pack_sku": pack_sku,
-             "customer_email": customer_email},
-        )
-        logger.info(
-            "[FULFILLMENT] Queued pack agent job %s via task_queue "
-            "fallback", job.id)
-        return str(job.id)
+        return _enqueue_pack_agent_via_task_queue(
+            intake_id=intake_id, pack_sku=pack_sku,
+            customer_email=customer_email,
+            reason=f"broker unavailable: {exc}")
     logger.info(
         "[FULFILLMENT] Queued pack agent job %s on %s", result.id, PACK_AGENT_QUEUE)
     return result.id
@@ -792,11 +826,14 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
          pack queues the vertical-agent job on the ``sincor.long`` Celery
          queue,      4. mark the rail event ``delivered`` — only when every step above
          succeeded. Any failure marks the event ``failed`` and records an
-         alert. Two graceful halves (Directive #2 item 5): a pack-email
+         alert — EXCEPT a total queue failure (WREN PR 10): if the agent
+         job cannot be queued anywhere, the event stays ``pending`` and
+         re-queueable, because the payment is already verified and
+         recorded. Graceful halves (Directive #2 item 5): a pack-email
          failure never fails the settle (it is logged and persisted as a
          retryable ``pack_email_failed`` state on the event), and a
-         Celery-broker connection failure falls back to
-         ``task_queue.enqueue`` so the agent job still lands.
+         Celery-broker connection failure (or no Celery at all) falls
+         back to ``task_queue.enqueue`` so the agent job still lands.
     """
     from sincor2.payment_ledger import record_pack_intake
 
@@ -967,6 +1004,43 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                 customer_email=customer_email or payer_wallet,
             )
 
+    except _PackJobQueueUnavailable as exc:
+        # WREN PR 10: the job could not be queued anywhere (Celery
+        # absent/broker down AND the task_queue fallback failed). The
+        # payment is verified and recorded — never fail it. Leave the
+        # event 'pending' (its claim state) so a later re-settle
+        # re-queues the job; persist the reason + an alert so the stuck
+        # job is visible to operators.
+        logger.error(
+            "[FULFILLMENT] Pack agent job not queued for %s "
+            "(intake %s) — fulfillment left pending for re-queue: %s",
+            event_id, intake.intake_id, exc)
+        _rail_event_merge_details(event_id, {
+            "pack_job_status": "pending",
+            "pack_job_queue_error": str(exc),
+            "pack_job_retryable": True,
+        })
+        try:
+            from sincor2.payment_ledger import record_alert
+
+            record_alert(
+                _rail_db_path(),
+                event_id or "unknown",
+                "pack_job_queue_unavailable",
+                "Pack agent job could not be queued for %s: %s"
+                % (event_id, exc),
+                details={"pack_sku": pack_sku, "retryable": True,
+                         "rail": True},
+            )
+        except Exception as alert_exc:
+            logger.error(
+                "[FULFILLMENT] Could not record queue-unavailable "
+                "alert: %s", alert_exc)
+        return {"status": "pending", "type": "pack",
+                "error": "pack_job_queue_unavailable",
+                "intake_id": intake.intake_id,
+                "intake_url": access_url,
+                "retryable": True}
     except Exception as exc:
         logger.exception("[FULFILLMENT] Pack fulfillment failed for %s", event_id)
         return _fail_pack(event_id, order, str(exc))

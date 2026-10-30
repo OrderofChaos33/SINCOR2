@@ -47,6 +47,24 @@ celery.conf.update(
     task_default_delivery_mode=2,
     result_expires=86400,
     broker_connection_retry_on_startup=True,
+    # WREN PR 10: bound every broker/backend wait so an unreachable or
+    # hung broker can never stall the single gunicorn worker (180s
+    # timeout). Publish connects fail in ~2s with a single fast retry.
+    # The result-backend bound matters just as much: send_task calls
+    # backend.on_task_call BEFORE publishing, and the Redis backend's
+    # default reconnect policy (20 retries x 1s steps) stalls
+    # apply_async for ~19s against a dead broker before the publish is
+    # even attempted (measured) — cap it at one fast retry via the
+    # backend transport options' retry_policy.
+    broker_transport_options={"socket_timeout": 2,
+                              "socket_connect_timeout": 2},
+    broker_connection_timeout=2,
+    task_publish_retry_policy={"max_retries": 1, "interval_start": 0,
+                               "interval_max": 0.2},
+    result_backend_transport_options={
+        "retry_policy": {"max_retries": 1, "interval_start": 0,
+                         "interval_step": 0.1, "interval_max": 0.2},
+    },
     beat_schedule={
         "refresh-onchain-snapshot-hourly": {
             "task": "sincor2.onchain.tasks.refresh_onchain_snapshot",
