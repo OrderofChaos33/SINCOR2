@@ -90,6 +90,7 @@ def init_x402_db() -> None:
             amount_atomic TEXT NOT NULL,
             amount_display REAL NOT NULL,
             payer_wallet TEXT,
+            source_key TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
             tx_hash TEXT,
             access_token TEXT,
@@ -103,6 +104,9 @@ def init_x402_db() -> None:
     # P1-7/P1-8 migrations for DBs created before this patch.
     _ensure_column(conn, "x402_challenges", "token_expires_at", "TEXT")
     _ensure_column(conn, "x402_challenges", "token_consumed_at", "TEXT")
+    # WREN PR 4: minting source (wallet when known, else client IP) so
+    # open-unbound challenges can be capped per source.
+    _ensure_column(conn, "x402_challenges", "source_key", "TEXT")
     try:
         # P1-8: one on-chain payment may fulfill at most one challenge.
         # NULL tx_hash rows (pending challenges) never conflict in SQLite,
@@ -391,7 +395,14 @@ def _valid_wallet_format(wallet: str) -> bool:
     )
 
 
-def create_challenge(resource_id: str) -> dict[str, Any]:
+#: WREN PR 4: per-source cap on OPEN UNBOUND challenges. Checkout mints
+#: one DB row per call; without a cap a single source can grow the
+#: x402_challenges table (and the 402 surface) without bound. "Open
+#: unbound" = status 'pending', no payer bound yet, not yet expired.
+MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE = 20
+
+
+def create_challenge(resource_id: str, *, source_key: str = "") -> dict[str, Any]:
     """Mint an UNBOUND challenge draft (W-102 round 3).
 
     The draft records NO payer binding — a bare address string is no longer
@@ -400,6 +411,12 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
     challenge can be fulfilled through the public verify route
     (require_bound_challenge=True rejects unbound drafts as
     challenge_unbound).
+
+    ``source_key`` names the minting source (payer wallet when the caller
+    knows it, else the client IP). When given, minting is refused with
+    ``error="rate_limited"`` / ``http_status=429`` once the source already
+    holds MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE open unbound challenges.
+    Callers that pass no source (legacy internal mints) are uncapped.
     """
     resource = get_resource(resource_id)
     if not resource:
@@ -408,18 +425,34 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     challenge_id = f"x402-{secrets.token_hex(8)}"
     expires = now + timedelta(seconds=resource["ttl_seconds"])
+    source = (source_key or "").strip().lower()
 
     with _conn() as conn:
+        if source:
+            (open_unbound,) = conn.execute(
+                """SELECT COUNT(*) FROM x402_challenges
+                   WHERE source_key = ? AND status = 'pending'
+                     AND (payer_wallet = '' OR payer_wallet IS NULL)
+                     AND expires_at > ?""",
+                (source, now.isoformat()),
+            ).fetchone()
+            if open_unbound >= MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE:
+                logger.warning(
+                    "x402: challenge mint refused for source %s "
+                    "(%d open unbound)", source, open_unbound)
+                return {"ok": False, "error": "rate_limited",
+                        "http_status": 429}
         conn.execute(
             """INSERT INTO x402_challenges
                (challenge_id, resource_id, amount_atomic, amount_display, payer_wallet,
-                status, created_at, expires_at)
-               VALUES (?, ?, ?, ?, '', 'pending', ?, ?)""",
+                source_key, status, created_at, expires_at)
+               VALUES (?, ?, ?, ?, '', ?, 'pending', ?, ?)""",
             (
                 challenge_id,
                 resource_id,
                 resource["amount_atomic"],
                 resource["amount_display"],
+                source or None,
                 now.isoformat(),
                 expires.isoformat(),
             ),
@@ -456,6 +489,25 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
             "wallet you supplied."
         ),
     }
+
+
+def purge_expired_challenges() -> int:
+    """Delete expired, never-fulfilled challenge rows (WREN PR 4).
+
+    Only ``status='pending'`` rows past their ``expires_at`` are removed:
+    fulfilled rows are the audit/replay record for a completed payment
+    and are never purged here. Called from the daily-ops scheduler job
+    so the table cannot grow without bound. Returns rows deleted.
+    """
+    now = datetime.now(timezone.utc)
+    with _conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM x402_challenges "
+            "WHERE status = 'pending' AND expires_at <= ?",
+            (now.isoformat(),),
+        )
+        conn.commit()
+        return cur.rowcount
 
 
 def bind_challenge_payer(

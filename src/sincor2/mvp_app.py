@@ -609,6 +609,42 @@ except Exception:
     logger.exception('[RAIL-PAY] rail_pay_bp failed to mount — '
                      '/rail/pay/<id> pages are NOT served')
 
+# WREN PR 4: per-route rate limits on the money rail. The wraps are
+# applied HERE — after every rail blueprint is registered — because the
+# limiter decorator must replace the registered view function, and
+# importing the limiter into the route modules would be circular. Keys
+# are the limiter default (get_remote_address, i.e. the ProxyFix-derived
+# client address) — never free_ration.abuse_client_ip, which without a
+# pinned trusted proxy collapses every client into the edge peer's one
+# bucket. If a mount failed above, its endpoint is absent and skipped.
+for _endpoint, _limit in (
+    ('rail.rail_checkout', '30 per hour'),
+    ('rail.rail_settle', '60 per hour'),
+    ('rail_digital_delivery.download_digital_pack', '30 per hour'),
+):
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit(_limit)(_view)
+
+# The intake route (WREN PR 1) is built on a sibling branch and may land
+# before or after this one: wrap any registered /intake POST view at
+# 20/hour, and skip silently when none exists yet.
+_intake_endpoints = {
+    rule.endpoint
+    for rule in app.url_map.iter_rules()
+    if rule.rule.startswith('/intake') and 'POST' in (rule.methods or set())
+}
+for _endpoint in _intake_endpoints:
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit('20 per hour')(_view)
+
+
+@app.errorhandler(429)
+def _rate_limited_json(_error):
+    """Rate-limit refusals answer the shared JSON shape, never HTML."""
+    return jsonify({'error': 'rate_limited'}), 429
+
 
 @app.after_request
 def _expose_rail_mount_status(response):
