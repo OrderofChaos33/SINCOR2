@@ -349,3 +349,86 @@ def test_verify_ledger_cost_on_large_journal(tmp_path):
     assert v["ok"] is True
     # ~500 journal entries; measured cost is reported, bound is generous.
     assert elapsed < 2.0, f"verify_ledger took {elapsed:.3f}s on 500 entries"
+
+
+# ---------------------------------------------------------------------------
+# W-119 follow-up — stateless ("{}") pool file is a corrupt pool file
+# ---------------------------------------------------------------------------
+# _save() always writes reserve/funded/spent/allocations/history/
+# history_writes/saved_at in a single payload, so a file carrying NONE of
+# those keys was never written by the pool: it is a truncated/wiped ledger
+# (the "{}" shape), not a warm empty state. Before this follow-up it
+# parsed cleanly, the rehydrate guard never engaged, and a manual fund()
+# re-funded the full reserve over live claims — the W-119 double-promise
+# through the side door.
+
+def test_w119_stateless_file_with_live_task_blocks(
+        tmp_path, monkeypatch, caplog):
+    """{} pool file + live pool-backed task: blocked exactly like the
+    corrupt-JSON case — no fund, obligation surfaced, file preserved."""
+    pool_path = tmp_path / "pool.json"
+    pool_path.write_text("{}", encoding="utf-8")
+    _seed_tasks_file(monkeypatch, tmp_path, [_task("task-A", "open")])
+    with caplog.at_level(logging.ERROR, logger="sincor.a2a.pool"):
+        p = BountyPool(path=str(pool_path), reserve_axm=100.0)
+    st = p.status()
+    assert st["funded_axm"] == 0
+    assert st["available_axm"] == 0
+    assert st["rehydrate_blocked"] is True
+    assert any(o["task_id"] == "task-A"
+               for o in st["rehydrate_blocked_obligations"])
+    assert any(r.levelno >= logging.ERROR
+               for r in caplog.records), "expected an ERROR-level log"
+    assert pool_path.read_text(encoding="utf-8") == "{}"
+    with pytest.raises(PoolError, match="rehydrate"):
+        p.fund()
+
+
+def test_w119_stateless_file_no_live_tasks_allows_manual_fund(
+        tmp_path, monkeypatch):
+    """{} pool file + no live tasks: the corrupt-file asymmetry — no
+    auto-fund and the file is left untouched for forensics, but a manual
+    fund() is allowed (nothing is being double-promised)."""
+    pool_path = tmp_path / "pool.json"
+    pool_path.write_text("{}", encoding="utf-8")
+    _seed_tasks_file(monkeypatch, tmp_path, [])
+    p = BountyPool(path=str(pool_path), reserve_axm=100.0)
+    st = p.status()
+    assert st["funded_axm"] == 0
+    assert st["available_axm"] == 0
+    assert st["rehydrate_blocked"] is False
+    # Not silently overwritten by the boot: still the operator's evidence.
+    assert pool_path.read_text(encoding="utf-8") == "{}"
+    st = p.fund()
+    assert st["funded_axm"] == 100.0
+    assert st["available_axm"] == 100.0
+
+
+def test_w119_normally_saved_file_warm_boots_unblocked(tmp_path):
+    """A file the pool itself wrote (fund/allocate/spend, each saving)
+    always carries the full _save key set, so the stateless check can
+    never trip on it: warm boot, not blocked, state preserved exactly."""
+    p = _spent_task_pool(tmp_path)
+    before = p.status()
+    assert before["spent_axm"] == 60.0
+    p2 = _reload(tmp_path)
+    st = p2.status()
+    assert st["rehydrate_blocked"] is False
+    assert st == before
+    assert p2.verify_ledger()["ok"]
+
+
+def test_w119_missing_file_no_live_tasks_auto_funds_and_saves_full_state(
+        tmp_path, monkeypatch):
+    """Clean first boot (file MISSING) is untouched by the stateless
+    check: auto-fund exactly as before, and the file the boot writes
+    carries every _save key — the invariant the check relies on."""
+    _seed_tasks_file(monkeypatch, tmp_path, [])
+    pool_path = tmp_path / "pool.json"
+    assert not pool_path.exists()
+    p = BountyPool(path=str(pool_path), reserve_axm=100.0)
+    assert p.status()["funded_axm"] == 100.0
+    assert p.status()["rehydrate_blocked"] is False
+    raw = json.loads(pool_path.read_text(encoding="utf-8"))
+    assert {"reserve_wei", "funded_wei", "spent_wei", "allocations",
+            "history", "history_writes", "saved_at"} <= set(raw)

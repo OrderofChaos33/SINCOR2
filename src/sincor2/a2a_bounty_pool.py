@@ -71,6 +71,16 @@ ADMIN_KEY_ENV = "ADMIN_PASSWORD"
 # not done. Unknown/missing states count as live (fail-loud direction).
 _TERMINAL_TASK_STATES = {"settled", "expired", "rejected", "canceled"}
 
+# Every key _save() writes, in a single payload, on every save. A
+# persisted file carrying NONE of these keys was therefore never written
+# by the pool — e.g. a ledger truncated to "{}" — and holds no pool state
+# at all. _load() treats such a file as a failed (corrupt) load so the
+# W-119 rehydrate guard engages instead of trusting the empty state.
+_SAVE_STATE_KEYS = frozenset({
+    "reserve_wei", "funded_wei", "spent_wei", "allocations",
+    "history", "history_writes", "saved_at",
+})
+
 
 def _obligation_from_task(task: Dict[str, Any]) -> List[Dict[str, Any]]:
     """A live pool-backed task record -> one rehydrate obligation."""
@@ -164,8 +174,9 @@ class BountyPool:
         # reports inconclusive instead of a false pass.
         self._history_writes = 0
         self._history_maybe_trimmed = False
-        # Set by _load() when the persisted file exists but cannot be
-        # parsed (corrupt JSON / unreadable): the in-memory state is
+        # Set by _load() when the persisted file exists but yields no
+        # usable state (corrupt JSON / unreadable, or a stateless file
+        # carrying none of the _save() keys): the in-memory state is
         # empty, but that emptiness is NOT a clean boot.
         self._load_failed = False
         # W-119: set when the ledger file was missing or corrupt on boot
@@ -222,6 +233,18 @@ class BountyPool:
             return
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict) and not (_SAVE_STATE_KEYS & raw.keys()):
+                # Parses, but carries no pool state at all (e.g. "{}"):
+                # not a warm empty ledger — a wiped one. Route it through
+                # the corrupt-file path so __init__ runs the W-119
+                # rehydrate guard instead of trusting the empty state
+                # (a manual fund() would otherwise re-fund the full
+                # reserve over live claims).
+                self._load_failed = True
+                logger.warning(
+                    "bounty pool file %s contains no pool state; "
+                    "treating as corrupt (load failed)", self.path)
+                return
             self._funded_wei = int(raw.get("funded_wei") or 0)
             self._spent_wei = int(raw.get("spent_wei") or 0)
             allocs = raw.get("allocations") or {}
