@@ -9,9 +9,17 @@ pins, against the real production app (sincor2.mvp_app):
     call answers 429 JSON {"error": "rate_limited"} and a different IP
     is unaffected.
   - A spoofed X-Forwarded-For prefix does NOT reset the bucket: with
-    x_for=1 only the last (proxy-appended) hop keys the bucket.
+    ProxyFix ACTIVE (x_for=1) only the last (proxy-appended) hop keys
+    the bucket, and a different last hop keys a different bucket.
   - /rail/settle keeps working within limits — an idempotent re-settle
     of a fulfilled challenge still returns 200.
+  - REPAIR pins: settle limiting is keyed per (client, challenge_id),
+    so junk settles against OTHER challenges cannot strand a buyer
+    whose challenge TTL (900s) is shorter than the limiter window
+    (1h); settles against an already-fulfilled challenge (the
+    proven-duplicate ack path) are effectively unthrottled; first
+    settles against one unfulfilled challenge are still capped at
+    60/hour per (client, challenge).
   - The first GET /download/<unknown> is still the fail-closed 404,
     not a 429.
   - Challenge minting is capped per source (wallet when known, else
@@ -173,22 +181,46 @@ def test_checkout_31st_from_one_ip_is_429_json_other_ip_unaffected(client):
     assert res.status_code == 402, res.get_json()
 
 
-def test_xff_spoof_prefix_does_not_reset_checkout_bucket(client):
-    # Peer is the single trusted proxy hop; the client IP is the LAST
-    # X-Forwarded-For entry (the one the proxy appended). Rotating the
-    # spoofed prefix must not mint a fresh bucket.
-    peer = "198.51.100.7"
-    client_ip = "203.0.113.99"
-    for i in range(30):
+def test_xff_spoof_prefix_does_not_reset_checkout_bucket(client,
+                                                          mvp_app_obj):
+    # ProxyFix is wrapped around the WSGI app at import ONLY when
+    # TRUST_PROXY / RAILWAY_ENVIRONMENT is set (mvp_app top), which the
+    # test process does not set — without wrapping it here exactly as
+    # production does, remote_addr never varies with the XFF header and
+    # this test pins nothing. Empirically (werkzeug ProxyFix, x_for=1):
+    # remote_addr becomes the LAST X-Forwarded-For entry — the address
+    # Railway's single appending edge itself observed — so rotating
+    # client-supplied prefix entries cannot mint a fresh bucket, while
+    # a different last hop keys a different bucket.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    original_wsgi = mvp_app_obj.wsgi_app
+    if not isinstance(original_wsgi, ProxyFix):
+        mvp_app_obj.wsgi_app = ProxyFix(
+            original_wsgi, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    try:
+        peer = "198.51.100.7"
+        client_ip = "203.0.113.99"
+        for i in range(30):
+            res = _checkout(
+                client, ip=peer, wallet=_wallet(20_000 + i),
+                headers={"X-Forwarded-For": f"10.1.0.{i}, {client_ip}"})
+            assert res.status_code == 402, (i, res.get_json())
         res = _checkout(
-            client, ip=peer, wallet=_wallet(20_000 + i),
-            headers={"X-Forwarded-For": f"10.1.0.{i}, {client_ip}"})
-        assert res.status_code == 402, (i, res.get_json())
-    res = _checkout(
-        client, ip=peer, wallet=_wallet(30_000),
-        headers={"X-Forwarded-For": f"192.0.2.55, {client_ip}"})
-    assert res.status_code == 429, res.get_json()
-    assert res.get_json()["error"] == "rate_limited"
+            client, ip=peer, wallet=_wallet(30_000),
+            headers={"X-Forwarded-For": f"192.0.2.55, {client_ip}"})
+        assert res.status_code == 429, res.get_json()
+        assert res.get_json()["error"] == "rate_limited"
+        # The bucket keys on the LAST hop: a request whose last hop
+        # differs is a different client and is unaffected. (On an app
+        # WITHOUT ProxyFix this request would key on the constant peer
+        # instead and 429 — that is what makes this test non-vacuous.)
+        res = _checkout(
+            client, ip=peer, wallet=_wallet(30_001),
+            headers={"X-Forwarded-For": "10.9.9.9, 203.0.113.100"})
+        assert res.status_code == 402, res.get_json()
+    finally:
+        mvp_app_obj.wsgi_app = original_wsgi
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +250,104 @@ def test_settle_idempotent_retry_within_limits_returns_200(client, chain):
     # Idempotent retry inside the 60/hour settle budget: still 200.
     retry = client.post("/rail/settle", json=settle_body)
     assert retry.status_code == 200, retry.get_json()
+
+
+# ---------------------------------------------------------------------------
+# REPAIR: settle limiting is per (client, challenge) + fulfilled acks are
+# unthrottled. The challenge TTL is 900s but the limiter window is 1h, so
+# a per-address settle bucket shared across challenges lets 60 junk
+# settles strand a paid buyer whose first settle then 429s past expiry.
+# ---------------------------------------------------------------------------
+
+def _settle(client, body, *, ip=None):
+    kwargs = {}
+    if ip:
+        kwargs["environ_base"] = {"REMOTE_ADDR": ip}
+    return client.post("/rail/settle", json=body, **kwargs)
+
+
+def _checkout_and_bind(client, *, ip=None):
+    """Mint + ownership-bind a pack challenge for PAYER; return its id."""
+    res = _checkout(client, ip=ip, wallet=PAYER)
+    assert res.status_code == 402, res.get_json()
+    body = res.get_json()
+    challenge_id, resource_id = body["challenge_id"], body["resource_id"]
+    sig = _PAYER_ACCT.sign_message(encode_defunct(
+        text=x402.challenge_bind_message(
+            challenge_id, resource_id, PAYER))).signature.hex()
+    bound = client.post("/api/x402/challenge-bind", json={
+        "challenge_id": challenge_id, "payer_wallet": PAYER,
+        "signature": sig})
+    assert bound.get_json().get("ownership_proven") is True, bound.get_json()
+    return challenge_id
+
+
+def test_junk_settles_on_other_challenges_do_not_strand_buyer(client,
+                                                               chain):
+    ip = "203.0.113.30"
+    challenge_id = _checkout_and_bind(client, ip=ip)
+    # 60 junk settles from the SAME client address, all against OTHER
+    # challenge ids. Under the old per-address bucket these exhaust the
+    # buyer's settle budget entirely.
+    for i in range(60):
+        res = _settle(client, {
+            "challenge_id": f"x402-junk-{i}", "tx_hash": TX_HASH,
+            "payer_wallet": PAYER}, ip=ip)
+        assert res.status_code != 429, (i, res.status_code)
+    # The buyer's FIRST settle on their own challenge still succeeds.
+    res = _settle(client, {
+        "challenge_id": challenge_id, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": "buyer@example.com"}, ip=ip)
+    assert res.status_code == 200, res.get_json()
+    assert res.get_json().get("ok") is True, res.get_json()
+
+
+def test_fulfilled_challenge_duplicate_acks_are_never_throttled(client,
+                                                                 chain):
+    ip = "203.0.113.31"
+    challenge_id = _checkout_and_bind(client, ip=ip)
+    settle_body = {
+        "challenge_id": challenge_id, "tx_hash": TX_HASH,
+        "payer_wallet": PAYER, "buyer_email": "buyer@example.com",
+    }
+    first = _settle(client, settle_body, ip=ip)
+    assert first.status_code == 200, first.get_json()
+    # 60 further settles against the now-FULFILLED challenge: every one
+    # is the proven-duplicate ack path and must answer 200 — the ack is
+    # the paid buyer's only delivery-recovery path and must never be
+    # throttled into the 900s-TTL stranding window.
+    for i in range(60):
+        res = _settle(client, settle_body, ip=ip)
+        assert res.status_code == 200, (i, res.status_code, res.get_json())
+
+
+def test_first_settles_on_one_unfulfilled_challenge_still_capped(client,
+                                                                   chain):
+    ip = "203.0.113.32"
+    challenge_id = _checkout_and_bind(client, ip=ip)
+    # 60 first-settle attempts against this one unfulfilled challenge
+    # (no tx_hash → refused 400 by the handler, challenge stays
+    # unfulfilled, but the limiter counts pre-dispatch).
+    for i in range(60):
+        res = _settle(client, {"challenge_id": challenge_id}, ip=ip)
+        assert res.status_code == 400, (i, res.status_code)
+    # The 61st is the rate limiter speaking: the per-(client, challenge)
+    # limit still exists where it should.
+    res = _settle(client, {"challenge_id": challenge_id}, ip=ip)
+    assert res.status_code == 429, res.status_code
+    assert res.get_json()["error"] == "rate_limited"
+
+
+def test_settle_without_challenge_id_falls_back_to_address_bucket(client):
+    ip = "203.0.113.33"
+    # No challenge_id in the body → the plain per-address bucket applies
+    # (a body-less settle cannot ride a per-challenge allowance).
+    for i in range(60):
+        res = _settle(client, {}, ip=ip)
+        assert res.status_code == 400, (i, res.status_code)
+    res = _settle(client, {}, ip=ip)
+    assert res.status_code == 429, res.status_code
+    assert res.get_json()["error"] == "rate_limited"
 
 
 # ---------------------------------------------------------------------------

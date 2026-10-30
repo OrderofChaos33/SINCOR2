@@ -510,6 +510,25 @@ def purge_expired_challenges() -> int:
         return cur.rowcount
 
 
+def challenge_status(challenge_id: str) -> str | None:
+    """Read-only status lookup for one challenge (WREN PR 4 repair).
+
+    Returns the row's ``status`` ('pending', 'fulfilled', ...) or None
+    when no such challenge exists. The /rail/settle rate limiter's
+    dynamic limit uses this to leave proven-duplicate acks for
+    fulfilled challenges unthrottled; it never writes.
+    """
+    cid = (challenge_id or "").strip()
+    if not cid:
+        return None
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT status FROM x402_challenges WHERE challenge_id=?",
+            (cid,),
+        ).fetchone()
+    return str(row["status"]) if row else None
+
+
 def bind_challenge_payer(
     challenge_id: str, payer_wallet: str, signature: str
 ) -> dict[str, Any]:
