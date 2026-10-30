@@ -38,6 +38,7 @@ settle-before-serve.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -74,11 +75,38 @@ def _db_path() -> Path:
     return orders_db_path()
 
 
+#: The only migrations ``_ensure_column`` may perform (dev-watch 304,
+#: CVE-2026-118378 hedge): column name -> expected DDL type. PRAGMA and
+#: ALTER cannot bind identifiers as parameters, so identifiers are
+#: selected from this allowlist and the SQL executed below is a constant
+#: string per entry — a caller-supplied table/column/ddl value is never
+#: interpolated into a query string.
+_X402_ENSURE_COLUMN_SQL = {
+    "token_expires_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_expires_at TEXT",
+    ),
+    "token_consumed_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_consumed_at TEXT",
+    ),
+}
+
+
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
-    """Add a column if missing (migration for DBs created before this patch)."""
-    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    """Add a column if missing (migration for DBs created before this patch).
+
+    ``table``/``column``/``ddl`` must match the allowlist exactly; any
+    other value raises ValueError without touching the database.
+    """
+    entry = _X402_ENSURE_COLUMN_SQL.get(column)
+    if table != "x402_challenges" or entry is None or entry[0] != ddl:
+        raise ValueError(
+            f"migration not allowlisted: table={table!r} column={column!r} ddl={ddl!r}"
+        )
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(x402_challenges)").fetchall()}
     if column not in cols:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+        conn.execute(entry[1])
 
 
 def init_x402_db() -> None:
@@ -214,6 +242,44 @@ class MANDATES_API_WATCH:
     Tracked here so the primitive is evaluated, not silently skipped."""
 
 
+class EIP7702_DELEGATION_LIFECYCLE:
+    """Design constraint (dev-watch item 312, 2026-10-30): any EIP-7702
+    delegation SINCOR ever issues or accepts must follow this lifecycle.
+
+    Why: a signed 7702 authorization is a STANDING capability, not a
+    one-shot approval. Whoever holds the signed authorization can attach
+    it later, and the delegating account keeps executing the delegate's
+    code until the delegation is explicitly cleared (the sven.eth drain,
+    2026-10-14: one signature, reused as a standing capability).
+
+    Current state: there is NO 7702 surface anywhere in this codebase --
+    no delegation is issued, accepted, or executed today. This note is
+    the gate for the day that changes. Guarded by
+    tests/pytest/test_devwatch312_delegation_guard.py.
+
+    The rule, for any future 7702 delegation:
+
+    1. Short-lived and scoped: every authorization carries an explicit
+       expiry (block or timestamp) and names ONE specific implementation
+       address. No open-ended delegations, no wildcard implementation.
+    2. Revocable by a single clearing transaction: the delegating
+       account can revoke the delegation with one clearing transaction
+       that restores it to a plain account, and the clearing path is
+       tested before the delegation is ever used.
+    3. Inventoried: every active delegation is recorded in a delegation
+       inventory (account, implementation, expiry, purpose) at issuance
+       time. An active delegation that is not in the inventory is
+       treated as a compromise until cleared -- clear first, investigate
+       second.
+    4. Re-verified at use time: no money-path code may accept an action
+       from a 7702-delegated account on the strength of a previously
+       signed authorization. The current delegate address must be
+       re-verified onchain at use time, and the action refused if the
+       onchain delegation does not match the inventoried, unexpired
+       scope.
+    """
+
+
 def build_route_config(
     *,
     scheme: str = "exact",
@@ -262,6 +328,352 @@ def facilitator_route(
     return build_route_config(scheme=scheme, networks=resolved)
 
 
+# ---------------------------------------------------------------------------
+# Dev-watch 317 — Bazaar discovery extension completeness + settle-payload
+# attachment (SWARM seller log, 2026-09-28, updated 2026-10-02).
+#
+# SWARM settled twelve test purchases that never appeared in Coinbase's
+# Bazaar. Two seller-side causes: (1) its discovery extension had
+# ``info.input`` but NO ``schema`` — Coinbase's validator rejects that as
+# an invalid discovery configuration; (2) the Bazaar indexer reads
+# discovery data from ``PaymentPayload.resource`` and
+# ``PaymentPayload.extensions`` at settle time, and the official client
+# does not copy them there — an adapter forwarding only ``x402Version`` /
+# ``accepted`` / ``payload`` silently drops the indexing data.
+#
+# Our rules, enforced here so the shape cannot drift per-resource:
+#   * EVERY 402 payload built by build_payment_payload carries
+#     ``extensions.bazaar`` generated by the ONE helper
+#     build_bazaar_discovery_extension(): ``info.input`` describing the
+#     paid call AND a full ``schema`` whose
+#     ``properties.input.properties.body`` is the resource's real input
+#     schema (BAZAAR_INPUT_SCHEMAS — field names mirror what each serve
+#     handler in mvp_blueprints.billing._paid_skill_dispatch reads).
+#   * validate_bazaar_extension() checks the documented validator
+#     requirements locally (schema present, types sane).
+#   * build_facilitator_payload() — the payload handed to the
+#     facilitator/settle step when that integration lands — copies
+#     ``resource`` and ``extensions`` explicitly and FAILS CLOSED when
+#     either is missing or invalid, never silently dropping them.
+# Payload shape + local validation only: no listing attempt, no live
+# facilitator call (the CDP facilitator route decision is founder-gated).
+# ---------------------------------------------------------------------------
+
+#: JSON Schema primitive/composite types accepted in an input schema.
+_JSON_SCHEMA_TYPES: Final = frozenset(
+    {"string", "integer", "number", "boolean", "array", "object", "null"}
+)
+
+#: Per-resource input schemas for the paid call body. Only resources
+#: whose serve handler reads business input are listed; every other
+#: resource takes no business input beyond the payment itself and gets
+#: the freeform-object default in bazaar_input_schema().
+BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
+    "wallet-sanctions-screen": {
+        "type": "object",
+        "properties": {
+            "address": {
+                "type": "string",
+                "description": "Wallet address to screen (0x...); "
+                "'wallet' and 'wallet_address' are accepted aliases",
+            },
+            "wallet": {"type": "string"},
+            "wallet_address": {"type": "string"},
+        },
+    },
+    "kya-trust-score": {
+        "type": "object",
+        "properties": {
+            "agent_id": {"type": "string"},
+            "wallet": {
+                "type": "string",
+                "description": "Agent wallet address",
+            },
+        },
+    },
+    "web-search-read": {
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "description": "'search' (requires query) or 'read' "
+                "(requires url)",
+            },
+            "query": {"type": "string"},
+            "url": {"type": "string"},
+        },
+        "required": ["mode"],
+    },
+    "local-business-site-check": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string"},
+            "business_name": {"type": "string"},
+        },
+        "required": ["url"],
+    },
+    "market-data-read": {
+        "type": "object",
+        "properties": {
+            "pair": {
+                "type": "string",
+                "description": "Chainlink pair, e.g. ETH/USD",
+            },
+            "mode": {
+                "type": "string",
+                "description": "Read mode; default 'price'",
+            },
+        },
+        "required": ["pair"],
+    },
+    "polymarket-whale-signal": {
+        "type": "object",
+        "properties": {
+            "wallet": {"type": "string"},
+            "market_id": {"type": "string"},
+            "window_minutes": {"type": "integer"},
+        },
+    },
+    "toa-micro-decision": {
+        "type": "object",
+        "properties": {
+            "options": {"type": "array", "items": {"type": "object"}},
+            "context": {"type": "object"},
+            "decision_id": {"type": "string"},
+        },
+        "required": ["options"],
+    },
+}
+
+
+def bazaar_input_schema(resource_id: str) -> dict[str, Any]:
+    """The resource's paid-call body schema (deep copy; safe to embed)."""
+    schema = BAZAAR_INPUT_SCHEMAS.get(resource_id)
+    if schema is None:
+        return {"type": "object", "properties": {}}
+    return copy.deepcopy(schema)
+
+
+def _bazaar_example_value(name: str, prop: dict[str, Any]) -> Any:
+    """Type-valid placeholder for one input-schema property."""
+    if name in ("address", "wallet", "wallet_address", "agent_wallet"):
+        return "0x0000000000000000000000000000000000000000"
+    if name == "url":
+        return "https://example.com"
+    ptype = prop.get("type")
+    if ptype == "integer" or ptype == "number":
+        return 0
+    if ptype == "boolean":
+        return False
+    if ptype == "array":
+        return []
+    if ptype == "object":
+        return {}
+    return ""
+
+
+def build_bazaar_discovery_extension(
+    resource: dict[str, Any], resource_id: str
+) -> dict[str, Any]:
+    """Build the complete ``extensions`` block for a 402 payload.
+
+    The single generator for the Bazaar discovery extension: every paid
+    resource gets the identical shape — ``info.input`` describing the
+    paid call (with a type-valid example body) and a full ``schema``
+    (the JSON Schema the info block must validate against, embedding
+    the resource's real input schema at
+    ``properties.input.properties.body``). A resource can no longer ship
+    the SWARM shape (info.input with no schema) because no code path
+    builds the extension by hand.
+    """
+    body_schema = bazaar_input_schema(resource_id)
+    example_body = {
+        name: _bazaar_example_value(name, prop)
+        for name, prop in (body_schema.get("properties") or {}).items()
+        if isinstance(prop, dict)
+    }
+    return {
+        "bazaar": {
+            "info": {
+                "input": {
+                    "type": "http",
+                    "method": "POST",
+                    "bodyType": "json",
+                    "body": example_body,
+                },
+                "output": {
+                    "type": "json",
+                    "example": {"ok": True, "resource": resource_id},
+                },
+            },
+            "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["http"],
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": ["GET", "POST"],
+                            },
+                            "bodyType": {
+                                "type": "string",
+                                "enum": ["json", "form-data", "text"],
+                            },
+                            "body": body_schema,
+                            "queryParams": {"type": "object"},
+                            "headers": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string"},
+                            },
+                        },
+                        "required": ["type", "method"],
+                        "additionalProperties": False,
+                    },
+                    "output": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["json"],
+                            },
+                            "example": {"type": "object"},
+                        },
+                        "required": ["type"],
+                    },
+                },
+                "required": ["input"],
+            },
+        }
+    }
+
+
+def validate_bazaar_extension(extension: Any) -> list[str]:
+    """Local check of the documented Bazaar validator requirements.
+
+    Returns a list of problems (empty = valid). Structural and
+    dependency-free: the extension must carry ``info.input`` (type
+    http, a real method) AND a full ``schema`` (object schema requiring
+    ``input``, embedding an object body schema whose every property has
+    a sane JSON Schema type). This is the check that would have caught
+    the SWARM shape — info.input present, schema absent — before any
+    listing attempt.
+    """
+    if not isinstance(extension, dict) or not isinstance(
+        extension.get("bazaar"), dict
+    ):
+        return ["extensions.bazaar missing or not an object"]
+    bazaar = extension["bazaar"]
+    errors: list[str] = []
+    info = bazaar.get("info")
+    if not isinstance(info, dict):
+        errors.append("bazaar.info missing or not an object")
+        info = {}
+    info_input = info.get("input")
+    if not isinstance(info_input, dict):
+        errors.append("bazaar.info.input missing or not an object")
+    else:
+        if info_input.get("type") != "http":
+            errors.append("bazaar.info.input.type must be 'http'")
+        if info_input.get("method") not in (
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ):
+            errors.append("bazaar.info.input.method missing or unsupported")
+    schema = bazaar.get("schema")
+    if not isinstance(schema, dict):
+        errors.append("bazaar.schema missing or not an object")
+        return errors
+    if schema.get("type") != "object":
+        errors.append("bazaar.schema.type must be 'object'")
+    if "input" not in (schema.get("required") or []):
+        errors.append("bazaar.schema.required must include 'input'")
+    props = schema.get("properties")
+    input_schema = props.get("input") if isinstance(props, dict) else None
+    if not isinstance(input_schema, dict):
+        errors.append("bazaar.schema.properties.input missing")
+        return errors
+    body_schema = (input_schema.get("properties") or {}).get("body")
+    if not isinstance(body_schema, dict) or body_schema.get("type") != "object":
+        errors.append(
+            "bazaar.schema input body schema missing or not an object schema"
+        )
+        return errors
+    for name, prop in (body_schema.get("properties") or {}).items():
+        if not isinstance(prop, dict) or prop.get("type") not in _JSON_SCHEMA_TYPES:
+            errors.append(
+                f"bazaar input schema property {name!r} has insane type "
+                f"{(prop or {}).get('type')!r}"
+            )
+    return errors
+
+
+def build_facilitator_payload(
+    payment: dict[str, Any],
+    *,
+    payload_body: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Assemble the PaymentPayload handed to the facilitator/settle step.
+
+    Item 317: the Bazaar indexer reads ``resource`` and ``extensions``
+    from THIS payload at settle time, and a client/adapter that forwards
+    only ``x402Version`` / ``accepted`` / ``payload`` silently drops
+    them. This builder copies both explicitly from the 402 payment
+    payload and FAILS CLOSED (ValueError) when either is missing or the
+    extension is invalid — the drop becomes a loud local error, not a
+    silent unlisting. No facilitator call is made here; this is the
+    canonical adapter the founder-gated facilitator integration will
+    use when it lands.
+    """
+    if not isinstance(payment, dict):
+        raise ValueError("facilitator payload source must be a dict")
+    resource_ref = payment.get("resource")
+    if not resource_ref:
+        raise ValueError(
+            "facilitator payload missing resource (item 317: the "
+            "indexer reads PaymentPayload.resource at settle time)"
+        )
+    errors = validate_bazaar_extension(payment.get("extensions"))
+    if errors:
+        raise ValueError(
+            "facilitator payload extensions invalid (item 317): "
+            + "; ".join(errors)
+        )
+    # The accepted-requirements block is SELECTED from the 402 payment
+    # payload, never rebuilt here: route fields (scheme/network/...)
+    # originate only in build_route_config/build_payment_payload (the
+    # dev-watch 78 explicit-network invariant), and this adapter must
+    # not become a second route constructor.
+    accepted = {
+        key: payment[key]
+        for key in (
+            "scheme",
+            "network",
+            "networks",
+            "chainId",
+            "maxAmountRequired",
+            "payTo",
+            "asset",
+        )
+        if key in payment
+    }
+    return {
+        "x402Version": payment.get("x402Version", 1),
+        "accepted": accepted,
+        "resource": resource_ref,
+        "extensions": payment["extensions"],
+        "payload": dict(payload_body or {}),
+    }
+
+
 def build_payment_payload(
     resource: dict[str, Any],
     resource_id: str,
@@ -296,6 +708,9 @@ def build_payment_payload(
             "decimals": resource["token_decimals"],
             "skill_id": resource.get("skill_id", ""),
         },
+        # Dev-watch 317: complete Bazaar discovery extension on every
+        # 402 (info.input AND full schema), helper-generated only.
+        "extensions": build_bazaar_discovery_extension(resource, resource_id),
     }
 
 

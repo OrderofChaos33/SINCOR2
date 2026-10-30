@@ -1148,8 +1148,103 @@ def _finalize_once(*, event_id: str, event: Dict[str, Any],
     logger.info("[RAIL] finalized payment for event %s", event_id)
 
 
+# --- W-115: payer proof for duplicate / retry settle ------------------------
+# Hunt 32 CONFIRMED: the duplicate path below returned _existing_result —
+# token-gated download_url + intake_url included — to ANY caller who knew
+# the challenge_id (arbitrary tx_hash, no payer, no proof), and the retry
+# path let an unproven caller complete a gate-denied (stuck) order with the
+# victim's tx/wallet strings and an attacker-supplied delivery email. The
+# settle endpoint was an unauthenticated entitlement oracle.
+#
+# Fix (mirrors the merged W-113 payer-proof gate; reuses the W-103 replay
+# mechanism): a duplicate or retry settle must present the bound payer's
+# EIP-191 replay signature — personal_sign of
+# x402.build_replay_message(challenge_id, ts_ms), checked by
+# x402._replay_auth_ok against the rail event's RECORDED payer wallet.
+# The message binds the challenge_id and a millisecond timestamp inside
+# the 10-minute W-103 freshness window, with low-s canonicality enforced,
+# so a proof cannot be replayed onto another order, by another wallet, or
+# outside the window. Without valid proof a duplicate gets a status-only
+# ack (identifiers, NEVER a URL) and a retry is refused before any state
+# moves; the delivery email only ever goes to the buyer email recorded
+# at claim time.
+
+_REPLAY_HINT = (
+    "re-settle with replay_signature + replay_ts_ms — an EIP-191 "
+    "personal_sign of build_replay_message(challenge_id, ts_ms) by the "
+    "payer wallet")
+
+
+def _settle_payer_proof_ok(event: Dict[str, Any], challenge_id: str,
+                           replay_signature: str,
+                           replay_ts_ms: Any) -> bool:
+    """W-115 gate: True only when the caller proved control of the rail
+    event's recorded payer wallet via the W-103 replay signature. A bare
+    wallet string is public data, not proof; a blank recorded payer
+    (legacy row) fails closed."""
+    from sincor2 import x402_payments as x402
+
+    recorded = (event.get("payer_wallet") or "").strip()
+    if not recorded:
+        return False
+    return x402._replay_auth_ok(
+        recorded, challenge_id, replay_signature, replay_ts_ms)
+
+
+def _unproven_duplicate_ack(event: Dict[str, Any]) -> Dict[str, Any]:
+    """W-115 status-only ack for an already-fulfilled settle whose caller
+    presented no valid payer proof: status + order identifiers ONLY —
+    never download_url, never intake_url, and no email is ever sent on
+    this path. The proven payer re-settles with the W-103 replay
+    signature to receive the full result."""
+    return {
+        "ok": True,
+        "status": "already_fulfilled",
+        "duplicate": True,
+        "pack_sku": event.get("pack_sku"),
+        "challenge_id": event.get("challenge_id"),
+        "event_id": event.get("event_id"),
+        "payer_proof_required": True,
+        "replay_hint": _REPLAY_HINT,
+        "fulfillment": {
+            "status": event.get("fulfillment_status"),
+            "intake_id": event.get("intake_id"),
+        },
+    }
+
+
+def _buyer_email_on_file(event: Dict[str, Any]) -> str:
+    """The original buyer email recorded for a rail event: the address
+    persisted in the event details at claim time, else the customer_email
+    on the intake record created by the first fulfillment attempt. A
+    caller-supplied email on a retry NEVER overrides this — delivery
+    goes to the buyer of record only."""
+    event_id = event.get("event_id") or ""
+    recorded = str(
+        _rail_event_details(event_id).get("buyer_email") or "").strip()
+    if recorded:
+        return recorded
+    intake_id = event.get("intake_id") or (
+        f"intake-{event_id}" if event_id else "")
+    if intake_id:
+        try:
+            from sincor2.payment_ledger import get_pack_intake
+
+            intake = get_pack_intake(_rail_db_path(), intake_id)
+        except Exception:
+            intake = None
+        email = str(getattr(intake, "customer_email", "") or "").strip()
+        if "@" in email:
+            return email
+    return ""
+
+
 def _existing_result(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Build the idempotent ack for an already-fulfilled settle."""
+    """Build the idempotent ack for an already-fulfilled settle.
+
+    W-115: PROVEN payers only — settle_rail_order returns this solely
+    after _settle_payer_proof_ok passes; unproven duplicates get
+    _unproven_duplicate_ack (no URLs)."""
     from sincor2.payment_ledger import get_pack_intake
 
     intake = None
@@ -1208,6 +1303,24 @@ def _verify_fail(result: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _verify_challenge_guarded(x402: Any, challenge_id: str, tx_hash: str,
+                              **kwargs: Any) -> Dict[str, Any]:
+    """verify_challenge with exception totality (item 307 round 2).
+
+    A verifier that RAISES has settled nothing: convert the exception
+    to the rpc_failed failure dict the settle pipeline already maps to
+    HTTP 402, instead of letting it escape the route as a 500 HTML
+    page. The challenge stays pending, no event is marked verified,
+    and nothing is fulfilled.
+    """
+    try:
+        return x402.verify_challenge(challenge_id, tx_hash, **kwargs)
+    except Exception as exc:
+        logger.exception("[RAIL] verify_challenge raised for %s",
+                         challenge_id)
+        return {"ok": False, "error": "rpc_failed", "detail": str(exc)}
+
+
 def settle_rail_order(challenge_id: str, tx_hash: str, *,
                       payer_wallet: str = "",
                       buyer_email: str = "",
@@ -1257,6 +1370,13 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
     verified-flag write needs the W-103 replay signature, which is
     accepted here and forwarded to verify_challenge.
 
+    W-115: BOTH re-settle shapes are payer-gated. A duplicate returns the
+    full existing result (token-gated URLs) only with a valid W-103
+    replay signature from the event's recorded payer wallet; without it
+    the caller gets a status-only ack (no URLs, no email). A retry must
+    present the same proof before any state moves, and its delivery
+    email goes only to the buyer email recorded at claim time.
+
     Subscription challenges (rail-sub-* resources) are routed to
     rail_subscriptions.settle_renewal, which extends the wallet's
     subscription exactly one period instead of fulfilling a pack.
@@ -1275,13 +1395,28 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
     sub_settle_id = f"railsub-{challenge_id}"
     sub_settle = rs._get_sub_settle(sub_settle_id)
     verify_result: Optional[Dict[str, Any]] = None
+    # W-115: the delivery email for the fulfillment below. The first
+    # attempt uses the buyer's own email (authenticated by the on-chain
+    # verify + bound challenge and recorded at claim); a retry resolves
+    # it from the buyer of record — never from the retry caller.
+    delivery_email = buyer_email
 
     if event is not None:
         # Duplicate ack: the idempotency claim is the source of truth —
         # no chain call, no token re-issue, no double-provisioning.
+        # W-115: the FULL result (token-gated URLs) is revealed only to
+        # the proven payer; anyone else gets a status-only ack.
         if event.get("fulfillment_status") in _FULFILLED_STATUSES:
-            logger.info("[RAIL] Duplicate settle for %s — acknowledged", event_id)
-            return _existing_result(event)
+            if _settle_payer_proof_ok(event, challenge_id,
+                                      replay_signature, replay_ts_ms):
+                logger.info(
+                    "[RAIL] Duplicate settle for %s — payer proven, "
+                    "existing result returned", event_id)
+                return _existing_result(event)
+            logger.info(
+                "[RAIL] Duplicate settle for %s — acknowledged "
+                "(status-only, no payer proof)", event_id)
+            return _unproven_duplicate_ack(event)
         # Retry of a claimed-but-incomplete settle: the tx_hash and payer
         # are pinned to the claim (fail closed on mismatch).
         claimed_tx = (event.get("tx_hash") or "").lower()
@@ -1297,10 +1432,33 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
         if not pack:
             return {"ok": False, "error": "unknown_pack_sku",
                     "event_id": event_id}
+        # W-115: a retry moves money-path state (finalize -> gate ->
+        # fulfill), so the caller must prove control of the recorded
+        # payer wallet BEFORE anything moves. An unproven caller must
+        # not flip a gate-denied/stuck order to fulfilled, and no
+        # delivery email may be redirected: the recipient is the buyer
+        # email recorded at claim time.
+        if not _settle_payer_proof_ok(event, challenge_id,
+                                      replay_signature, replay_ts_ms):
+            logger.warning(
+                "[RAIL] Retry settle for %s refused: payer proof "
+                "required", event_id)
+            return {"ok": False, "error": "payer_proof_required",
+                    "event_id": event_id, "replay_hint": _REPLAY_HINT}
+        on_file_email = _buyer_email_on_file(event)
+        if on_file_email:
+            delivery_email = on_file_email
+        elif buyer_email:
+            # Proven payer, nothing on file (legacy claim): the proven
+            # payer IS the buyer — record their email as the buyer of
+            # record so later retries stay pinned to it.
+            _rail_event_merge_details(event_id,
+                                      {"buyer_email": buyer_email})
         if not event.get("verified"):
             # The first attempt died before verify completed — re-verify
             # (the challenge is still pending, so no replay auth needed).
-            verify = x402.verify_challenge(
+            verify = _verify_challenge_guarded(
+                x402,
                 challenge_id, event.get("tx_hash") or tx_hash,
                 payer_wallet=payer_wallet,
                 require_bound_challenge=True,
@@ -1333,8 +1491,8 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
         # settle to fail tx_hash_already_used. The legitimate buyer binds
         # their wallet during checkout via the existing EIP-191 bind flow
         # (bind_challenge_payer / POST /api/x402/challenge-bind).
-        verify = x402.verify_challenge(
-            challenge_id, tx_hash, payer_wallet=payer_wallet,
+        verify = _verify_challenge_guarded(
+            x402, challenge_id, tx_hash, payer_wallet=payer_wallet,
             require_bound_challenge=True,
             replay_signature=replay_signature, replay_ts_ms=replay_ts_ms)
         if not verify.get("ok"):
@@ -1354,6 +1512,12 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
                 amount_usdc=pack["price_cents"] / 100,
                 buyer_email=buyer_email)
             _update_rail_event(event_id, verified=1)
+            if buyer_email:
+                # W-115: record the buyer of record at claim time — a
+                # later retry delivers ONLY to this address, never to a
+                # retry caller-supplied email.
+                _rail_event_merge_details(event_id,
+                                          {"buyer_email": buyer_email})
             verify_result = verify
         elif plan_id:
             # Subscription pipeline: the verify above is the single
@@ -1412,10 +1576,12 @@ def settle_rail_order(challenge_id: str, tx_hash: str, *,
             return {"ok": False, "error": "money_gate_denied",
                     "event_id": event_id}
 
-        # Fulfill the pack.
+        # Fulfill the pack. W-115: on a retry, customer_email is the
+        # buyer of record resolved above (delivery_email), not whatever
+        # the retry caller supplied.
         order = {
             "event_id": event_id,
-            "customer_email": buyer_email,
+            "customer_email": delivery_email,
             "customer_name": buyer_name,
             "payer_wallet": (_get_rail_event(event_id) or {}).get("payer_wallet", ""),
             "pack_sku": pack_sku,
@@ -1604,10 +1770,16 @@ def rail_settle():
     build_replay_message(challenge_id, ts_ms) by the payer wallet, needed
     only when the challenge was fulfilled outside this settle (narrow
     crash window between the x402 fulfill and the rail verified-flag
-    write). business_name/phone/niche/territory/prompt are optional order
-    details for the webbuilder_site SKU; the remaining fields are the
-    per-SKU intake details collected on /rail/pay before payment.
-    """
+    write). W-115: the same replay proof is also the gate for re-settles
+    of an order this settle already claimed — a duplicate returns the
+    token-gated fulfillment links only to the proven payer (status-only
+    ack otherwise), and a retry of a claimed-but-incomplete order is
+    refused with payer_proof_required until the payer proves control of
+    the bound wallet; delivery email goes only to the buyer email
+    recorded at claim time. business_name/phone/niche/territory/prompt
+    are optional order details for the webbuilder_site SKU; the
+    remaining fields are the per-SKU intake details collected on
+    /rail/pay before payment.    """
     data = request.get_json(force=True, silent=True) or {}
     result = settle_rail_order(
         str(data.get("challenge_id") or ""),

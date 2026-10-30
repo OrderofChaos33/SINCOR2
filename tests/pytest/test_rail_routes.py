@@ -688,12 +688,21 @@ def test_failed_fulfillment_is_retryable(rail_app, rail_env, mock_comms,
     assert len(mock_comms["queued"]) == 0
 
     # broker recovers: re-settle reprocesses (x402 returns already_fulfilled
-    # internally) and does NOT re-finalize the payment
+    # internally) and does NOT re-finalize the payment.
+    # W-115 (hunt 32): a retry must carry the payer's W-103 replay proof —
+    # an unproven retry is refused with payer_proof_required (this call
+    # previously pinned the unauthenticated retry the hunt exploited).
     monkeypatch.setattr(
         rr.fulfill_pack_agent, "apply_async", mock_comms["fake_apply_async"])
+    import time as _time
+
+    _ts_ms = int(_time.time() * 1000)
+    _sig = "0x" + _PAYER_ACCT.sign_message(_encode_defunct(
+        text=x402.build_replay_message(cid, _ts_ms))).signature.hex()
     second = client.post("/rail/settle", json={
         "challenge_id": cid, "tx_hash": TX_HASH, "payer_wallet": PAYER,
-        "buyer_email": "buyer@example.com"})
+        "buyer_email": "buyer@example.com",
+        "replay_signature": _sig, "replay_ts_ms": _ts_ms})
     second_body = second.get_json()
     assert second_body["ok"] is True
     assert second_body["status"] == "fulfilled"

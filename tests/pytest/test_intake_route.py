@@ -623,10 +623,19 @@ def test_settle_returns_tokenized_intake_url(
     assert "Credentialing Launch" in page.get_data(as_text=True)
 
     # A duplicate settle ack returns the identical URL — the token is
-    # never rotated out from under the first email.
+    # never rotated out from under the first email. Union note (PR #594
+    # merged onto main af8e1d0f): since W-115 (PR #577) a duplicate
+    # settle returns the token-gated fulfillment links only to the
+    # PROVEN payer, so the retry carries the W-103 replay proof signed
+    # by the payer wallet; the assertion itself is unchanged.
+    ts_ms = int(time.time() * 1000)
+    replay_sig = "0x" + _PAYER_ACCT.sign_message(
+        _encode_defunct(text=x402.build_replay_message(cid, ts_ms))
+    ).signature.hex()
     res2 = client.post("/rail/settle", json={
         "challenge_id": cid, "tx_hash": TX_HASH,
-        "payer_wallet": PAYER, "buyer_email": BUYER_EMAIL})
+        "payer_wallet": PAYER, "buyer_email": BUYER_EMAIL,
+        "replay_signature": replay_sig, "replay_ts_ms": ts_ms})
     assert res2.status_code == 200
     assert res2.get_json()["fulfillment"]["intake_url"] == intake_url
 

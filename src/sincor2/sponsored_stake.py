@@ -326,7 +326,14 @@ def _admin_key_ok() -> bool:
         key = request.headers.get("X-Admin-Key", "")
     except Exception:
         return False
-    return bool(key) and hmac.compare_digest(str(key), str(expected))
+    if not key:
+        return False
+    try:
+        return hmac.compare_digest(str(key), str(expected))
+    except (TypeError, ValueError):
+        # Non-ASCII header value: hmac.compare_digest cannot compare
+        # it — fail closed (False), never raise (hunt-32 W-44).
+        return False
 
 
 def attach_sponsored_stake_routes(bp: Any) -> None:

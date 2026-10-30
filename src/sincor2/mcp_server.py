@@ -56,6 +56,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
+from sincor2.mcp_schema_guard import validate_arguments
+
 SERVER_NAME = "sincor-marketplace-mcp"
 SERVER_VERSION = "1.0.0"
 MCP_PROTOCOL_VERSION = "2025-06-18"
@@ -440,11 +442,15 @@ TOOLS: List[Dict[str, Any]] = [
                 "description": {"type": "string"},
                 "version": {"type": "string"},
                 "capability_tags": {"type": "array", "items": {"type": "string"},
-                                    "description": "Required: skill tags, e.g. ['lead-enrichment']."},
+                                    "description": "Skill tags, e.g. ['lead-enrichment'] (the platform requires tags, or an agent_card carrying skills)."},
                 "rpc_callback": {"type": "string",
                                  "description": "Your agent's JSON-RPC URL."},
                 "wallet": {"type": "string",
                            "description": "0x-prefixed 20-byte hex address."},
+                "agent_url": {"type": "string",
+                              "description": "Your agent's base URL; forwarded upstream as its callback URL when rpc_callback is omitted."},
+                "chain_id": {"type": "integer",
+                             "description": "Chain the agent operates on (Base mainnet = 8453); forwarded upstream and recorded as an integer on the registration."},
                 "agent_card": {"type": "object",
                                "description": "Alternative: full A2A agent_card dict (name, description, version, skills[] required)."},
                 "confirmation_token": {"type": "string"},
@@ -752,7 +758,21 @@ def _handle_tools_call(rpc_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     if name not in _TOOL_NAMES:
         return _rpc_error(rpc_id, -32601, f"unknown tool '{name}'")
     try:
+        # Layering (dev-watch 80 + 316): the x402 payment gate stays
+        # OUTERMOST for unpaid calls — its challenge is itself the loud
+        # response, and an unpaid call never executes, so nothing can be
+        # coerced or mis-shaped through it. Every call that passes the
+        # gate (non-paid tools, and paid tools carrying a token) then
+        # goes through dev-watch 316 strict schema validation BEFORE
+        # dispatch: a literal "null", a missing required field, or a
+        # wrong-typed value is rejected (-32602 via the ValueError
+        # handler below), never coerced by the tool implementations.
         _require_x402_payment(name, arguments)
+        validate_arguments(
+            name,
+            next(t["inputSchema"] for t in TOOLS if t["name"] == name),
+            arguments,
+        )
         if name == "list_tasks":
             result = _tool_list_tasks(arguments)
         elif name == "get_task":

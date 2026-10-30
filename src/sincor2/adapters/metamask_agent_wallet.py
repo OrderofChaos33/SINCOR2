@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -53,6 +54,68 @@ BASE_CHAIN_ID = BASE_CHAIN_ID
 
 class MetaMaskAgentNotReady(RuntimeError):
     """mm CLI missing, not authenticated, or not initialized."""
+
+
+_TX_HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
+
+
+def _is_tx_hash(value: Any) -> bool:
+    """True only for a well-formed EVM transaction hash string.
+
+    A candidate that fails the shape — wrong length, non-hex characters,
+    a U+FFFD replacement char left by tolerant stream decoding of
+    corrupted bytes, a lone surrogate from a ``\\uXXXX`` escape — can
+    never match the onchain hash, so it is not a usable order_id.
+    """
+    return isinstance(value, str) and _TX_HASH_RE.match(value) is not None
+
+
+def _extract_tx_hash(data: Any) -> str:
+    """Total tx-hash extraction from an mm CLI payload.
+
+    The CLI's exit code is the execution signal: ``_run`` returns only
+    after a 0 exit, and what it returns is raw ``json.loads(stdout)`` —
+    ANY JSON value, not necessarily a dict. Extraction therefore guards
+    every level with isinstance, so no parse outcome can throw (and be
+    swallowed by the caller's broad except into a failure result for a
+    trade that already executed).
+
+    The hash itself must be well-formed (``_is_tx_hash``): ``txHash``
+    wins when it matches the tx-hash shape, else ``hash`` when IT
+    matches, else "" — the pinned hash-less-success design. A truthy
+    non-string or malformed ``txHash`` must not shadow a valid ``hash``
+    (an ``or`` chain would pick the wrong value and discard both), and a
+    malformed string must not land in ``order_id``: a corrupted hash
+    recorded as a clean success can never be reconciled onchain.
+    """
+    payload = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(payload, dict):
+        return ""
+    tx_hash = payload.get("txHash")
+    if _is_tx_hash(tx_hash):
+        return tx_hash
+    fallback = payload.get("hash")
+    if _is_tx_hash(fallback):
+        return fallback
+    return ""
+
+
+def _doctor_flag(value: Any) -> bool:
+    """Strict interpretation of an ``mm doctor`` readiness flag.
+
+    Fail closed: a flag counts as true ONLY for boolean ``True`` or the
+    string ``"true"`` (any case, surrounding whitespace ignored). The
+    previous ``bool(value)`` coercion read the STRING ``"false"`` as
+    ready — ``bool("false")`` is True — so a doctor payload reporting
+    string flags would let a write method execute against a wallet that
+    is not actually authenticated/initialized. Everything else (False,
+    "false", "yes", 1, 0, None, missing) is NOT ready.
+    """
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return False
 
 
 @dataclass
@@ -99,7 +162,10 @@ class MetaMaskAgentWallet:
     # Low-level runner
     # ------------------------------------------------------------------
 
-    def _run(self, *args: str, wait: bool = True, allow_dry: bool = True) -> Dict[str, Any]:
+    def _run(self, *args: str, wait: bool = True, allow_dry: bool = True) -> Any:
+        # Returns the CLI's parsed stdout UNVALIDATED: on a 0 exit that is
+        # raw json.loads(stdout) — any JSON value, not necessarily a dict.
+        # Consumers must extract defensively (see _extract_tx_hash).
         self._ensure_mm()
         if kill_switch_tripped():
             raise KillSwitchTripped("bankroll / POLYCLAW kill switch is active")
@@ -114,6 +180,15 @@ class MetaMaskAgentWallet:
                 cmd,
                 capture_output=True,
                 text=True,
+                # Decode tolerantly: with text=True, decoding happens
+                # INSIDE subprocess.run, so non-UTF-8 stream bytes would
+                # raise UnicodeDecodeError instead of returning the
+                # CompletedProcess — hiding a 0 exit and converting an
+                # executed trade into a reported failure (the decode
+                # happens for stderr too, whose bytes are irrelevant on
+                # a 0 exit). errors="replace" guarantees a completed
+                # process always reaches the returncode check below.
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -147,7 +222,13 @@ class MetaMaskAgentWallet:
     def status(self) -> WalletStatus:
         """Return authentication + initialization status."""
         doc = self.doctor()
-        data = doc.get("data") or {}
+        data = doc.get("data") if isinstance(doc, dict) else None
+        if not isinstance(data, dict):
+            # Non-dict doctor payload (or non-dict "data"): the CLI did
+            # not report a usable status. Report not-ready instead of
+            # raising — readiness failure flows through require_ready()
+            # so the write methods can surface it as a failure result.
+            data = {}
         address = None
         trading_mode = None
         try:
@@ -161,8 +242,8 @@ class MetaMaskAgentWallet:
         except Exception:
             pass
         return WalletStatus(
-            authenticated=bool(data.get("authenticated")),
-            initialized=bool(data.get("initialized")),
+            authenticated=_doctor_flag(data.get("authenticated")),
+            initialized=_doctor_flag(data.get("initialized")),
             address=address,
             trading_mode=trading_mode,
             cli_version=str(data.get("cli") or ""),
@@ -227,13 +308,15 @@ class MetaMaskAgentWallet:
             return OrderResult(
                 True,
                 simulated=True,
-                side="TRANSFER",
                 size_usd=0.0,
-                raw={"to": to, "amount": amount, "token": token, "chain_id": chain_id},
             )
 
-        self.require_ready()
         try:
+            # Inside the try on purpose: readiness failure (including a
+            # non-dict doctor payload reported as not-ready by status())
+            # must surface as a failure OrderResult, never raise — the
+            # write methods are exception-total end-to-end.
+            self.require_ready()
             data = self._run(
                 "transfer",
                 f"--to={to}",
@@ -241,15 +324,12 @@ class MetaMaskAgentWallet:
                 f"--token={token}",
                 f"--chain-id={chain_id}",
             )
-            tx_hash = None
-            if isinstance(data.get("data"), dict):
-                tx_hash = data["data"].get("txHash") or data["data"].get("hash")
+            tx_hash = _extract_tx_hash(data)
+            logger.info("MetaMask TRANSFER executed: tx=%s", tx_hash or None)
             return OrderResult(
                 True,
                 simulated=False,
                 order_id=tx_hash,
-                side="TRANSFER",
-                raw=data,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask transfer failed")
@@ -282,15 +362,16 @@ class MetaMaskAgentWallet:
 
         if not (self.is_live() or force_live):
             logger.info("[DRY RUN] swap execute quote_id=%s", quote_id)
-            return OrderResult(True, simulated=True, side="SWAP", raw={"quote_id": quote_id})
+            return OrderResult(True, simulated=True)
 
-        self.require_ready()
         try:
+            # See transfer(): readiness failure returns a failure
+            # OrderResult through this except, never raises.
+            self.require_ready()
             data = self._run("swap", "execute", f"--quote-id={quote_id}", "--yes")
-            tx_hash = None
-            if isinstance(data.get("data"), dict):
-                tx_hash = data["data"].get("txHash") or data["data"].get("hash")
-            return OrderResult(True, simulated=False, order_id=tx_hash, side="SWAP", raw=data)
+            tx_hash = _extract_tx_hash(data)
+            logger.info("MetaMask SWAP executed: quote_id=%s tx=%s", quote_id, tx_hash or None)
+            return OrderResult(True, simulated=False, order_id=tx_hash)
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask swap execute failed")
             return OrderResult(False, simulated=False, error=str(exc))
