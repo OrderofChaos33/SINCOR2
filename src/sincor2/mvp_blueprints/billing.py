@@ -1968,6 +1968,28 @@ def crypto_checkout():
 
     payment_id = f"CRYPTO-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
+    # DW-308 REPAIR (Builder B): persist the expected payment server-side,
+    # keyed by payment_id. Verify must compare the on-chain Transfer value
+    # against THIS record — never against an amount the verify caller
+    # claims — and the record also binds the token: USDC checkouts bind
+    # the canonical Base USDC contract; ETH checkouts bind no ERC-20
+    # token (native value emits no Transfer event, so verify fails
+    # closed for them, as it has since the original DW-308 fix).
+    from sincor2.onchain.constants import USDC_DECIMALS, USDC_TOKEN
+
+    if currency == 'USDC':
+        token_address = USDC_TOKEN
+        expected_atomic = int(round(crypto_amount * (10 ** USDC_DECIMALS)))
+    else:  # ETH — native value, no token contract to bind
+        token_address = ''
+        expected_atomic = int(round(crypto_amount * (10 ** 18)))
+    try:
+        _persist_crypto_checkout(payment_id, currency, token_address,
+                                 expected_atomic, amount, wallet)
+    except Exception as e:
+        logger.error(f'[CRYPTO] Could not persist checkout {payment_id}: {e}')
+        return jsonify({'error': 'Could not create checkout. Please try again.'}), 503
+
     return jsonify({
         'payment_id': payment_id,
         'status': 'pending',
@@ -1982,41 +2004,86 @@ def crypto_checkout():
     }), 201
 
 
-# ERC-20 Transfer event topic: keccak256("Transfer(address,address,uint256)")
-_CRYPTO_TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+def _ensure_crypto_checkout_table(db):
+    db.execute(
+        '''CREATE TABLE IF NOT EXISTS crypto_checkouts
+           (payment_id TEXT PRIMARY KEY,
+            currency TEXT NOT NULL,
+            token_address TEXT NOT NULL DEFAULT '',
+            expected_atomic INTEGER NOT NULL,
+            amount_usd REAL NOT NULL,
+            wallet TEXT,
+            created_at TEXT NOT NULL)'''
+    )
 
 
-def _receipt_has_payment_transfer(receipt, recipient_address) -> bool:
-    """True iff *receipt* logs carry the expected payment Transfer event.
+def _persist_crypto_checkout(payment_id, currency, token_address,
+                             expected_atomic, amount_usd, wallet):
+    """Record the server-side expectation for a crypto checkout."""
+    db = get_db()
+    _ensure_crypto_checkout_table(db)
+    db.execute(
+        '''INSERT OR REPLACE INTO crypto_checkouts
+           (payment_id, currency, token_address, expected_atomic,
+            amount_usd, wallet, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)''',
+        (payment_id, currency, token_address, int(expected_atomic),
+         float(amount_usd), wallet, datetime.utcnow().isoformat()),
+    )
+    db.commit()
+
+
+def _crypto_checkout_record(payment_id):
+    """The persisted checkout expectation for *payment_id*, or None."""
+    db = get_db()
+    _ensure_crypto_checkout_table(db)
+    row = db.execute(
+        '''SELECT currency, token_address, expected_atomic, amount_usd
+           FROM crypto_checkouts WHERE payment_id=?''',
+        (payment_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        'currency': row[0],
+        'token_address': row[1],
+        'expected_atomic': int(row[2]),
+        'amount_usd': row[3],
+    }
+
+
+def _settled_transfer_total(receipt, token_address, recipient_address) -> int:
+    """Summed value (atomic units) of *receipt*'s qualifying payment
+    Transfer logs.
 
     DW-308: a mined receipt with status 0x1 is NOT settlement proof by
-    itself. Settlement requires an ERC-20 Transfer(address,address,
-    uint256) event in the receipt logs whose `to` is *recipient_address*
-    and whose value is > 0. The receipt's own `to` field names the token
-    contract for ERC-20 payments — the payment recipient appears ONLY in
-    the Transfer event — and a bare value-less call to the recipient
-    address produces a successful receipt with no Transfer event at all
-    while moving no tokens. Neither shape may settle an order.
+    itself — the payment recipient appears ONLY in the Transfer event
+    (the receipt's own `to` names the token contract for ERC-20
+    payments), and a bare value-less call to the recipient produces a
+    successful receipt with no Transfer event at all.
+
+    DW-308 REPAIR (Builder B): a Transfer event is not proof either,
+    unless it is the EXPECTED one. A log qualifies only when it was
+    emitted by *token_address* (the expected payment token contract —
+    a Transfer from any other contract settles nothing), pays
+    *recipient_address*, and is not flagged `removed` (reorged out).
+    Log parsing mirrors the in-repo reference,
+    ``platform_payments._parse_transfer_logs``; the caller compares the
+    SUM against the expected amount, so split payments across several
+    logs settle exactly like one full payment.
     """
-    recipient = (recipient_address or "").lower()
-    if not recipient:
-        return False
-    for log in receipt.get('logs') or []:
-        topics = log.get('topics') or []
-        if len(topics) < 3:
-            continue
-        if str(topics[0]).lower() != _CRYPTO_TRANSFER_TOPIC:
-            continue
-        to_addr = ("0x" + str(topics[2])[-40:]).lower()
-        if to_addr != recipient:
-            continue
-        try:
-            value = int(str(log.get('data') or '0x0'), 16)
-        except ValueError:
-            continue
-        if value > 0:
-            return True
-    return False
+    if not token_address or not recipient_address:
+        return 0
+    from sincor2.platform_payments import _parse_transfer_logs
+
+    live_logs = [log for log in receipt.get('logs') or []
+                 if not log.get('removed')]
+    try:
+        transfers = _parse_transfer_logs(
+            {**receipt, 'logs': live_logs}, token_address, recipient_address)
+    except (ValueError, TypeError, AttributeError):
+        return 0
+    return sum(t['amount_atomic'] for t in transfers)
 
 
 @bp.route('/api/crypto/verify-payment', methods=['POST'])
@@ -2088,16 +2155,49 @@ def crypto_verify_payment():
             logger.warning(f'[CRYPTO] tx failed on chain: {tx_hash}')
             return jsonify({'error': 'Transaction failed or was reverted on blockchain'}), 402
 
-        # DW-308: status 0x1 alone is not settlement. The expected
-        # Transfer event must be present in the receipt logs, paying
-        # our recipient address a positive value. A bare call to the
-        # recipient (status 0x1, no Transfer event) moves no tokens and
-        # must never fulfill; for ERC-20 payments the receipt's `to` is
-        # the token contract, so the recipient is verified here, in the
-        # event, not in the receipt header.
-        if not _receipt_has_payment_transfer(receipt, recipient_address):
+        # DW-308: status 0x1 alone is not settlement. The Transfer
+        # event must be present in the receipt logs, paying our
+        # recipient address; a bare call to the recipient (status 0x1,
+        # no Transfer event) moves no tokens and must never fulfill.
+        #
+        # DW-308 REPAIR (Builder B): the event must also be the EXPECTED
+        # payment, in full. The expectation is the amount + token that
+        # /api/crypto/checkout persisted server-side for this
+        # payment_id; with no checkout record (direct verify), the
+        # order's declared USD amount in canonical Base USDC is the
+        # expectation. The summed value of qualifying Transfer logs
+        # (expected token contract only, recipient-bound, `removed`
+        # logs excluded) must reach the expected amount within the
+        # reference tolerance (platform_payments.AMOUNT_TOLERANCE_BPS,
+        # 1.5% — the same slack verify_treasury_transfer allows). An
+        # underpayment is a 402 with zero orders and zero fulfillments.
+        record = _crypto_checkout_record(payment_id)
+        if record is not None:
+            expected_atomic = record['expected_atomic']
+            expected_token = record['token_address']
+            order_amount = record['amount_usd']
+        else:
+            from sincor2.onchain.constants import (
+                USDC_DECIMALS as _USDC_DECIMALS,
+                USDC_TOKEN as _USDC_TOKEN,
+            )
+            expected_token = _USDC_TOKEN
+            expected_atomic = int(round(amount * (10 ** _USDC_DECIMALS)))
+            order_amount = amount
+
+        paid_atomic = _settled_transfer_total(
+            receipt, expected_token, recipient_address)
+        if paid_atomic <= 0:
             logger.warning(f'[CRYPTO] no qualifying Transfer event to {recipient_address} in tx: {tx_hash}')
             return jsonify({'error': 'Transaction does not show a payment transfer to the correct address'}), 402
+
+        from sincor2.platform_payments import (
+            AMOUNT_TOLERANCE_BPS as _AMOUNT_TOLERANCE_BPS,
+        )
+        min_atomic = expected_atomic * (10000 - _AMOUNT_TOLERANCE_BPS) // 10000
+        if paid_atomic < min_atomic:
+            logger.warning(f'[CRYPTO] underpayment for {payment_id}: paid {paid_atomic}, expected {expected_atomic} (min {min_atomic}) in tx: {tx_hash}')
+            return jsonify({'error': 'Transaction amount is below the expected payment amount'}), 402
 
         # Check tx isn't already used (replay protection)
         db = get_db()
@@ -2126,7 +2226,7 @@ def crypto_verify_payment():
                     currency, payment_status, delivery_status, delivery_url, order_type,
                     created_at, updated_at, metadata)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (order_id, tx_hash, email, product_name, amount,
+                (order_id, tx_hash, email, product_name, order_amount,
                  'CRYPTO', 'completed', 'processing', f'/my-orders?email={email}', order_type,
                  datetime.utcnow().isoformat(), datetime.utcnow().isoformat(),
                  json.dumps({'tx_hash': tx_hash, 'payment_id': payment_id}))
@@ -2135,7 +2235,7 @@ def crypto_verify_payment():
         except sqlite3.IntegrityError:
             pass
 
-        trigger_fulfillment(order_id, email, product_name, amount, order_type, product_info)
+        trigger_fulfillment(order_id, email, product_name, order_amount, order_type, product_info)
 
     logger.info(f'[CRYPTO] Payment verified and fulfilled: {tx_hash} ? {order_id}')
     return jsonify({
