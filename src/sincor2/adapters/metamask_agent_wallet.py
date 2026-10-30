@@ -71,7 +71,12 @@ def _extract_tx_hash(data: Any) -> str:
     payload = data.get("data") if isinstance(data, dict) else None
     if not isinstance(payload, dict):
         return ""
-    tx_hash = payload.get("txHash") or payload.get("hash")
+    # Consult the fallback properly: a truthy non-string txHash must not
+    # shadow a valid string ``hash`` (an ``or`` chain would pick the
+    # wrong-typed value and the coercion below would discard both).
+    tx_hash = payload.get("txHash")
+    if not isinstance(tx_hash, str):
+        tx_hash = payload.get("hash")
     return tx_hash if isinstance(tx_hash, str) else ""
 
 
@@ -137,6 +142,15 @@ class MetaMaskAgentWallet:
                 cmd,
                 capture_output=True,
                 text=True,
+                # Decode tolerantly: with text=True, decoding happens
+                # INSIDE subprocess.run, so non-UTF-8 stream bytes would
+                # raise UnicodeDecodeError instead of returning the
+                # CompletedProcess — hiding a 0 exit and converting an
+                # executed trade into a reported failure (the decode
+                # happens for stderr too, whose bytes are irrelevant on
+                # a 0 exit). errors="replace" guarantees a completed
+                # process always reaches the returncode check below.
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -170,7 +184,13 @@ class MetaMaskAgentWallet:
     def status(self) -> WalletStatus:
         """Return authentication + initialization status."""
         doc = self.doctor()
-        data = doc.get("data") or {}
+        data = doc.get("data") if isinstance(doc, dict) else None
+        if not isinstance(data, dict):
+            # Non-dict doctor payload (or non-dict "data"): the CLI did
+            # not report a usable status. Report not-ready instead of
+            # raising — readiness failure flows through require_ready()
+            # so the write methods can surface it as a failure result.
+            data = {}
         address = None
         trading_mode = None
         try:
@@ -253,8 +273,12 @@ class MetaMaskAgentWallet:
                 size_usd=0.0,
             )
 
-        self.require_ready()
         try:
+            # Inside the try on purpose: readiness failure (including a
+            # non-dict doctor payload reported as not-ready by status())
+            # must surface as a failure OrderResult, never raise — the
+            # write methods are exception-total end-to-end.
+            self.require_ready()
             data = self._run(
                 "transfer",
                 f"--to={to}",
@@ -302,8 +326,10 @@ class MetaMaskAgentWallet:
             logger.info("[DRY RUN] swap execute quote_id=%s", quote_id)
             return OrderResult(True, simulated=True)
 
-        self.require_ready()
         try:
+            # See transfer(): readiness failure returns a failure
+            # OrderResult through this except, never raises.
+            self.require_ready()
             data = self._run("swap", "execute", f"--quote-id={quote_id}", "--yes")
             tx_hash = _extract_tx_hash(data)
             logger.info("MetaMask SWAP executed: quote_id=%s tx=%s", quote_id, tx_hash or None)
