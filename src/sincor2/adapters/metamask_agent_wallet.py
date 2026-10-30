@@ -55,6 +55,26 @@ class MetaMaskAgentNotReady(RuntimeError):
     """mm CLI missing, not authenticated, or not initialized."""
 
 
+def _extract_tx_hash(data: Any) -> str:
+    """Total tx-hash extraction from an mm CLI payload.
+
+    The CLI's exit code is the execution signal: ``_run`` returns only
+    after a 0 exit, and what it returns is raw ``json.loads(stdout)`` —
+    ANY JSON value, not necessarily a dict. Extraction therefore guards
+    every level with isinstance and coerces the hash to str-or-empty, so
+    no parse outcome can throw (and be swallowed by the caller's broad
+    except into a failure result for a trade that already executed) or
+    leak a wrong-typed ``order_id`` downstream. Hash-less success with an
+    empty order_id is the pinned design for every unparseable/hash-less
+    shape.
+    """
+    payload = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(payload, dict):
+        return ""
+    tx_hash = payload.get("txHash") or payload.get("hash")
+    return tx_hash if isinstance(tx_hash, str) else ""
+
+
 @dataclass
 class WalletStatus:
     authenticated: bool = False
@@ -99,7 +119,10 @@ class MetaMaskAgentWallet:
     # Low-level runner
     # ------------------------------------------------------------------
 
-    def _run(self, *args: str, wait: bool = True, allow_dry: bool = True) -> Dict[str, Any]:
+    def _run(self, *args: str, wait: bool = True, allow_dry: bool = True) -> Any:
+        # Returns the CLI's parsed stdout UNVALIDATED: on a 0 exit that is
+        # raw json.loads(stdout) — any JSON value, not necessarily a dict.
+        # Consumers must extract defensively (see _extract_tx_hash).
         self._ensure_mm()
         if kill_switch_tripped():
             raise KillSwitchTripped("bankroll / POLYCLAW kill switch is active")
@@ -239,14 +262,12 @@ class MetaMaskAgentWallet:
                 f"--token={token}",
                 f"--chain-id={chain_id}",
             )
-            tx_hash = None
-            if isinstance(data.get("data"), dict):
-                tx_hash = data["data"].get("txHash") or data["data"].get("hash")
-            logger.info("MetaMask TRANSFER executed: tx=%s", tx_hash)
+            tx_hash = _extract_tx_hash(data)
+            logger.info("MetaMask TRANSFER executed: tx=%s", tx_hash or None)
             return OrderResult(
                 True,
                 simulated=False,
-                order_id=tx_hash or "",
+                order_id=tx_hash,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask transfer failed")
@@ -284,11 +305,9 @@ class MetaMaskAgentWallet:
         self.require_ready()
         try:
             data = self._run("swap", "execute", f"--quote-id={quote_id}", "--yes")
-            tx_hash = None
-            if isinstance(data.get("data"), dict):
-                tx_hash = data["data"].get("txHash") or data["data"].get("hash")
-            logger.info("MetaMask SWAP executed: quote_id=%s tx=%s", quote_id, tx_hash)
-            return OrderResult(True, simulated=False, order_id=tx_hash or "")
+            tx_hash = _extract_tx_hash(data)
+            logger.info("MetaMask SWAP executed: quote_id=%s tx=%s", quote_id, tx_hash or None)
+            return OrderResult(True, simulated=False, order_id=tx_hash)
         except Exception as exc:  # noqa: BLE001
             logger.exception("MetaMask swap execute failed")
             return OrderResult(False, simulated=False, error=str(exc))
