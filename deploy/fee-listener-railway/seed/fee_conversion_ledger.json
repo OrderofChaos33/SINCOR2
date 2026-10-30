@@ -1,0 +1,31 @@
+{
+  "obligations": {
+    "feeconv-AXM-0xd802558ba5e024-761164267864312149-log195": {
+      "id": "feeconv-AXM-0xd802558ba5e024-761164267864312149-log195",
+      "token_in": "AXM",
+      "amount_wei": "761164267864312149",
+      "target": null,
+      "status": "pending",
+      "source": {
+        "tx_hash": "0xd802558ba5e02426eef5ff95ccbd521ed847f2bf6023278d8c1dcd24f113ce0c",
+        "from": "0x8d8f598c1739e518b871815dd1f20ea3c169c360",
+        "to": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
+        "token": "0x4c3Fb66f14FbAA2088c9ae91017ba770da53715a",
+        "block_number": 53054755,
+        "block_hash": "0xa25572767ae2f18e42cdc1de14695b34118eaaedeee2d7ad54f020545276e665",
+        "log_index": 195,
+        "inflow_value_wei": "15223285357286242987",
+        "fee_bps": 500,
+        "listener": "fee_event_listener",
+        "chain_id": 8453
+      },
+      "history": [
+        {
+          "status": "pending",
+          "at": "2026-10-25T13:22:14Z"
+        }
+      ],
+      "txs": []
+    }
+  }
+}

@@ -1,0 +1,8 @@
+[deploy]
+startCommand = "bash deploy/fee-listener-railway/start.sh"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 100
+
+# Fee-event listener service (Base mainnet AXM Transfer watcher).
+# Executor stays DISARMED. See deploy/fee-listener-railway/README.md
+# for the founder tap-by-tap (env values, volume, cutover).
