@@ -513,8 +513,17 @@ def api_sinc_burn_stats():
 # per-resource serve block's return flow is disturbed.
 # ---------------------------------------------------------------------------
 
+#: Verify failures that mean "the payment has NOT settled" — the x402
+#: answer is 402 (retry once settled), never a generic 400, and the 402
+#: carries the payment envelope (see _paid_surface_envelope). Item 307:
+#: a settlement that fails mid-flow — the tx reverted on-chain
+#: (tx_failed) or the finality gate refuses below 12 confirmations
+#: (awaiting_finality) — belongs to this family exactly like a still-
+#: pending transfer. x402_verify consults this same tuple for its
+#: status mapping, so the two can never drift apart.
 _PAID_SURFACE_VERIFY_402_ERRORS = ('tx_pending', 'insufficient_amount',
-                                   'no_treasury_transfer')
+                                   'no_treasury_transfer', 'tx_failed',
+                                   'awaiting_finality')
 
 
 def _merge_header_tokens(existing, *tokens):
@@ -882,7 +891,12 @@ def x402_verify():
         replay_ts_ms=replay_ts_ms,
     )
     if not result.get('ok'):
-        code = 402 if result.get('error') in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer') else 400
+        # Item 307 (settle-then-serve): every "payment has not settled"
+        # failure — pending, reverted, or below the finality gate — is
+        # answered 402 with the payment envelope, from the one canonical
+        # list the paid-surface headers also consult. Client/auth faults
+        # (unbound challenge, payer mismatch, replay failures) stay 400.
+        code = 402 if result.get('error') in _PAID_SURFACE_VERIFY_402_ERRORS else 400
         return jsonify(result), code
     try:
         result.update(finalize_challenge_payment(result))
