@@ -314,7 +314,13 @@ def platform_verify():
         elif error == 'ofac_screening_unavailable':
             status = 503
         elif error in ('tx_pending', 'insufficient_amount', 'no_treasury_transfer',
-                       'confirmations_unavailable', 'receipt_malformed'):
+                       'confirmations_unavailable', 'receipt_malformed',
+                       # Item 307 round 3: the real verifier RETURNS
+                       # rpc_failed for a failed receipt fetch (it
+                       # does not raise), so the returned-dict path
+                       # needs the entry too — the except-branch above
+                       # only covers a verifier that raises.
+                       'rpc_failed'):
             status = 402
         elif error in ('reorg_detected', 'tx_failed', 'tx_already_used',
                        'checkout_blocked', 'checkout_reverted',
@@ -535,10 +541,15 @@ def api_sinc_burn_stats():
 #: already answered 402 for rpc_failed; this tuple is what made
 #: /api/x402/verify drift to 400). x402_verify consults this same
 #: tuple for its status mapping, so the two can never drift apart.
+#: Item 307 round 3: the chain head unreachable while counting
+#: confirmations (confirmations_unavailable) is the third member of
+#: the could-not-complete family — Builder B reproduced it answering
+#: 400 here while both sibling surfaces answered 402.
 _PAID_SURFACE_VERIFY_402_ERRORS = ('tx_pending', 'insufficient_amount',
                                    'no_treasury_transfer', 'tx_failed',
                                    'awaiting_finality', 'rpc_failed',
-                                   'receipt_malformed')
+                                   'receipt_malformed',
+                                   'confirmations_unavailable')
 
 
 def _merge_header_tokens(existing, *tokens):

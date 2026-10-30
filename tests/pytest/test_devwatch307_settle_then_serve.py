@@ -699,3 +699,184 @@ class TestVerifyTreasuryTransferTotality:
         assert vr.get("ok") is False, vr
         assert vr.get("error") in (
             "receipt_malformed", "no_treasury_transfer"), vr
+
+
+# ---------------------------------------------------------------------------
+# (d) Round 3: the could-not-complete family through the REAL verifier.
+#
+# Builder B's re-check of 8c5a7c0e (NOT CONFIRMED) found two survivors
+# of the exact family round 2 targeted — both one-line mapping
+# omissions, both reachable only through the real
+# verify_treasury_transfer path (round 2's platform test mocked the
+# verifier RAISING; the real verifier converts RPC failures into
+# result dicts, it does not raise):
+#
+#   SHAPE 1 — eth_blockNumber fails -> the verifier returns
+#     {error: "confirmations_unavailable"}. /api/x402/verify answered
+#     400 while /rail/settle and /api/platform/verify answered 402:
+#     the string was missing from _PAID_SURFACE_VERIFY_402_ERRORS.
+#   SHAPE 2 — eth_getTransactionReceipt fails on a real W-113-bound
+#     platform checkout -> the verifier returns {error: "rpc_failed"}.
+#     /api/platform/verify answered 400: its own status mapping had
+#     no rpc_failed entry and fell through to the default.
+#
+# These tests stub ONLY the _rpc_call seam, per-method, and run the
+# real verifier end-to-end on all three surfaces — no monkeypatched
+# verifier anywhere in this section.
+# ---------------------------------------------------------------------------
+
+_USDC_297 = 297_000_000  # starter checkout / rail pack amount (USDC)
+
+
+def _head_down_rpc(chain):
+    """The real chain, except eth_blockNumber raises (head down)."""
+    def rpc(method, params, attempts=3):
+        if method == "eth_blockNumber":
+            raise RuntimeError("head down")
+        return chain.rpc(method, params, attempts)
+    return rpc
+
+
+def _receipt_down_rpc(chain):
+    """The real chain, except eth_getTransactionReceipt raises."""
+    def rpc(method, params, attempts=3):
+        if method == "eth_getTransactionReceipt":
+            raise RuntimeError("rpc down")
+        return chain.rpc(method, params, attempts)
+    return rpc
+
+
+def _platform_sign(acct, payment_id):
+    """EIP-191 signature over the platform bind message (W-113)."""
+    return acct.sign_message(_encode_defunct(
+        text=pp.platform_bind_message(
+            payment_id, acct.address))).signature.hex()
+
+
+def _insert_platform_checkout(payment_id, payer_wallet):
+    """Platform 'starter' checkout (USDC $297) bound to payer_wallet
+    at creation, mirroring the W-113 regression insert."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    with pp._conn() as conn:
+        conn.execute(
+            """INSERT INTO platform_checkouts
+               (payment_id, plan_id, product_name, token, amount_atomic,
+                amount_display, usd_reference, payer_wallet,
+                customer_email, status, tx_hash, created_at, expires_at,
+                metadata)
+               VALUES (?, 'starter', 'Starter', 'USDC', ?, 297.0, 297.0,
+                       ?, 'buyer@example.com', 'pending', NULL, ?, ?, ?)""",
+            (payment_id, str(_USDC_297), payer_wallet,
+             now.isoformat(), (now + timedelta(hours=1)).isoformat(),
+             '{"order_type": "subscription", "billing": "month"}'))
+        conn.commit()
+
+
+def _checkout_status(payment_id):
+    with pp._conn() as conn:
+        row = conn.execute(
+            "SELECT status FROM platform_checkouts WHERE payment_id=?",
+            (payment_id,)).fetchone()
+    return row["status"] if row else ""
+
+
+def _post_platform_verify(client, payment_id, tx_hash):
+    return client.post("/api/platform/verify", json={
+        "payment_id": payment_id, "tx_hash": tx_hash,
+        "payer_wallet": PAYER, "customer_email": "buyer@example.com",
+        "payer_signature": _platform_sign(_PAYER_ACCT, payment_id)})
+
+
+class TestCouldNotCompleteFamilyRealPath:
+    def test_x402_verify_confirmations_unavailable_is_402(
+            self, env, billing_client, monkeypatch):
+        """SHAPE 1: the receipt is real, but the chain head is
+        unreachable while counting confirmations -> the verifier
+        returns confirmations_unavailable -> /api/x402/verify must
+        answer 402 (pre-fix: 400), mint nothing, challenge pending."""
+        cid = x402.create_challenge(SKILL_RESOURCE)["challenge_id"]
+        _bind(cid, SKILL_RESOURCE)
+        amount = int(x402.get_resource(SKILL_RESOURCE)["amount_atomic"])
+        env["chain"].register(TX_OK, PAYER, amount, token="SINC")
+        monkeypatch.setattr(
+            pp, "_rpc_call", _head_down_rpc(env["chain"]))
+
+        res = billing_client.post("/api/x402/verify", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "confirmations_unavailable", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _challenge_status(cid) == "pending"
+
+    def test_rail_settle_confirmations_unavailable_is_402(
+            self, env, rail_client, monkeypatch):
+        """SHAPE 1, sibling surface: /rail/settle answers 402 for the
+        same head-down failure (agreement control)."""
+        res = rail_client.post("/rail/checkout", json={
+            "pack_sku": PACK_SKU, "payer_wallet": PAYER,
+            "buyer_email": "buyer@example.com"})
+        assert res.status_code == 402, res.get_json()
+        cid = res.get_json()["challenge_id"]
+        _bind(cid, PACK_RESOURCE)
+        amount = int(x402.get_resource(PACK_RESOURCE)["amount_atomic"])
+        env["chain"].register(TX_OK, PAYER, amount)
+        monkeypatch.setattr(
+            pp, "_rpc_call", _head_down_rpc(env["chain"]))
+
+        res = rail_client.post("/rail/settle", json={
+            "challenge_id": cid, "tx_hash": TX_OK,
+            "payer_wallet": PAYER, "buyer_email": "buyer@example.com"})
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "confirmations_unavailable", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _intake_count(env["tmp"]) == 0
+        assert _challenge_status(cid) == "pending"
+
+    def test_platform_verify_confirmations_unavailable_is_402(
+            self, env, billing_client, monkeypatch):
+        """SHAPE 1, third surface: a real W-113-bound platform
+        checkout whose head lookup fails mid-verify ->
+        /api/platform/verify answers 402 confirmations_unavailable
+        (agreement control) and the checkout stays pending."""
+        _insert_platform_checkout("pay_dw307_r3_head", PAYER)
+        env["chain"].register(TX_OK, PAYER, _USDC_297)
+        monkeypatch.setattr(
+            pp, "_rpc_call", _head_down_rpc(env["chain"]))
+
+        res = _post_platform_verify(
+            billing_client, "pay_dw307_r3_head", TX_OK)
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("error") == "confirmations_unavailable", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _checkout_status("pay_dw307_r3_head") == "pending"
+
+    def test_platform_verify_receipt_rpc_failure_is_402(
+            self, env, billing_client, monkeypatch):
+        """SHAPE 2: a real W-113-bound platform checkout (bound payer
+        + valid EIP-191 payer signature) whose receipt fetch fails at
+        the RPC layer. The real verifier does NOT raise — it returns
+        {error: "rpc_failed"} — and /api/platform/verify must answer
+        402 (pre-fix: 400), leaving the checkout pending with nothing
+        provisioned."""
+        _insert_platform_checkout("pay_dw307_r3_rpc", PAYER)
+        monkeypatch.setattr(
+            pp, "_rpc_call", _receipt_down_rpc(env["chain"]))
+
+        res = _post_platform_verify(
+            billing_client, "pay_dw307_r3_rpc", TX_OK)
+        body = res.get_json()
+        assert body is not None, res.get_data(as_text=True)[:200]
+        assert res.status_code == 402, (res.status_code, body)
+        assert body.get("ok") is False, body
+        assert body.get("error") == "rpc_failed", body
+        _assert_no_content(body, res.get_data(as_text=True))
+        assert _checkout_status("pay_dw307_r3_rpc") == "pending"
