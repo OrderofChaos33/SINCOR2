@@ -515,8 +515,9 @@ def challenge_status(challenge_id: str) -> str | None:
 
     Returns the row's ``status`` ('pending', 'fulfilled', ...) or None
     when no such challenge exists. The /rail/settle rate limiter's
-    dynamic limit uses this to leave proven-duplicate acks for
-    fulfilled challenges unthrottled; it never writes.
+    dynamic limit uses this to give proven-duplicate acks for
+    fulfilled challenges a bounded 600/hour exemption; it never
+    writes.
     """
     cid = (challenge_id or "").strip()
     if not cid:
