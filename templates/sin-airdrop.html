@@ -276,6 +276,11 @@
                     <p class="text-green-400 font-medium"> You're on the list!</p>
                     <p class="text-sm text-gray-400 mt-1">We'll notify you when the airdrop is ready.</p>
                 </div>
+
+                <!-- Error Message -->
+                <div x-show="registrationError" x-transition class="mt-6 bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center">
+                    <p class="text-red-400 font-medium" x-text="registrationError"></p>
+                </div>
             </div>
 
             <!-- Footer Links -->
@@ -305,6 +310,7 @@
                 },
                 walletAddress: '',
                 submitted: false,
+                registrationError: '',
                 
                 get canSubmit() {
                     // Require at least Telegram and valid wallet address
@@ -314,41 +320,33 @@
                 
                 async submitAirdrop() {
                     if (!this.canSubmit) return;
-                    
-                    // Store submission (you can connect this to a backend)
+
+                    this.registrationError = '';
                     const submission = {
                         wallet: this.walletAddress,
                         tasks: this.tasks,
                         timestamp: new Date().toISOString()
                     };
-                    
-                    // Send to backend API
+
+                    // Send to backend API. Success is shown ONLY when
+                    // the API confirms the registration (response.ok);
+                    // there is no local fallback copy.
                     try {
                         const response = await fetch('/api/airdrop/register', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(submission)
                         });
-                        
+
                         if (!response.ok) {
                             throw new Error('Registration failed');
                         }
-                        
-                        // Also store locally as backup
-                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
-                        submissions.push(submission);
-                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+
+                        this.submitted = true;
                     } catch (error) {
                         console.error('API error:', error);
-                        // Still save locally even if API fails
-                        let submissions = JSON.parse(localStorage.getItem('sin_airdrop_submissions') || '[]');
-                        submissions.push(submission);
-                        localStorage.setItem('sin_airdrop_submissions', JSON.stringify(submissions));
+                        this.registrationError = 'Registration failed — please check your connection and try again.';
                     }
-                    
-                    this.submitted = true;
-                    
-                    console.log('Airdrop registration:', submission);
                 }
             }
         }

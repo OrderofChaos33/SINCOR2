@@ -1953,10 +1953,62 @@ def sin_airdrop():
     return render_template('sin-airdrop.html')
 
 
+def _airdrop_db_path():
+    """SQLite store for airdrop registrations (persistent data dir)."""
+    from sincor2.data_paths import data_dir
+
+    return data_dir() / "airdrop_registrations.db"
+
+
+def _airdrop_conn():
+    import sqlite3
+
+    conn = sqlite3.connect(_airdrop_db_path())
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS airdrop_registrations (
+               wallet TEXT PRIMARY KEY,
+               created_at TEXT NOT NULL,
+               source TEXT,
+               utm_source TEXT,
+               utm_medium TEXT,
+               utm_campaign TEXT,
+               ip_hash TEXT
+           )""")
+    return conn
+
+
+def _airdrop_ip_hash() -> str | None:
+    """SHA-256 of the caller IP — the raw IP is never stored."""
+    import hashlib
+
+    raw = (request.remote_addr or "").strip()
+    if not raw:
+        return None
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _record_airdrop_registration(wallet, source, utm, ip_hash) -> bool:
+    """Insert one registration; True when newly inserted, False when
+    the wallet was already registered (idempotent — no second row)."""
+    conn = _airdrop_conn()
+    try:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO airdrop_registrations"
+            " (wallet, created_at, source, utm_source, utm_medium,"
+            " utm_campaign, ip_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (wallet, datetime.now(timezone.utc).isoformat(), source,
+             utm.get("source"), utm.get("medium"), utm.get("campaign"),
+             ip_hash))
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
 @bp.route('/api/airdrop/register', methods=['POST'])
 @limiter.limit("200 per minute")
 def register_airdrop():
-    """Register wallet for SIN token airdrop."""
+    """Register wallet for SIN token airdrop (persisted, idempotent)."""
     data = request.get_json(silent=True) or {}
     raw_wallet = data.get('wallet', '')
 
@@ -1964,12 +2016,57 @@ def register_airdrop():
     if not wallet:
         return jsonify({'error': 'Invalid or missing wallet address (must be 0x + 40 hex chars)'}), 400
 
+    wallet = wallet.lower()
+    source = sanitize_string(data.get('source', ''), max_length=100) or None
+    utm = {
+        'source': sanitize_string(
+            data.get('utm_source', ''), max_length=100) or None,
+        'medium': sanitize_string(
+            data.get('utm_medium', ''), max_length=100) or None,
+        'campaign': sanitize_string(
+            data.get('utm_campaign', ''), max_length=100) or None,
+    }
+    try:
+        inserted = _record_airdrop_registration(
+            wallet, source, utm, _airdrop_ip_hash())
+    except Exception:
+        # Never claim a registration that was not persisted.
+        logger.exception("[AIRDROP] Registration store unavailable")
+        return jsonify({'error': 'registration_unavailable'}), 503
+
+    if not inserted:
+        return jsonify({
+            'status': 'already_registered',
+            'message': 'Wallet already registered for SIN airdrop',
+            'wallet': wallet
+        }), 200
+
     logger.info(f"[AIRDROP] New registration: {wallet}")
     return jsonify({
         'status': 'success',
         'message': 'Successfully registered for SIN airdrop',
         'wallet': wallet
     }), 201
+
+
+@bp.route('/api/airdrop/stats', methods=['GET'])
+def airdrop_stats():
+    """Admin-only aggregate: total airdrop registrations (count only).
+
+    Gated twice, mirroring /api/waitlist/stats: mvp_app runs
+    _require_admin as a before_request guard over this path, and this
+    handler re-checks admin itself before reading the store.
+    """
+    denied = _require_admin(request)
+    if denied is not None:
+        return denied
+    conn = _airdrop_conn()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM airdrop_registrations").fetchone()[0]
+    finally:
+        conn.close()
+    return jsonify({'status': 'success', 'total_registrations': count}), 200
 
 
 
