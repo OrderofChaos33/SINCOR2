@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import requests
 
 logger = logging.getLogger("sincor2.outreach")
-BUY_URL = "https://getsincor.com/buy"
+BUY_URL = "https://getsincor.com/pricing"
 A2A_CARD = "https://getsincor.com/.well-known/agent-card.json"
 TREASURY = "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 _JUNK_EMAIL = ("example.com", "sentry.io", "wixpress.com", "cloudflare", "schema.org", "noreply", "no-reply")
@@ -144,52 +144,119 @@ class OutreachEngine:
         lid = lead.get("id", "agent")[:24]
         return f"{BUY_URL}?utm_source=agent&utm_medium=email&utm_campaign=outreach&lead={lid}"
 
-    def _build_email_html(self, lead: Dict) -> str:
+    def _build_email_html(self, lead: Dict, unsubscribe_url: str = "",
+                          postal: str = "") -> str:
         name = lead.get("name", "there")
         pay = self._checkout_url(lead)
+        unsub_html = (
+            f" or <a href=\"{unsubscribe_url}\">unsubscribe</a>" if unsubscribe_url else ""
+        )
+        postal_html = (
+            f"<p style=\"font-size:11px;color:#999;\">{postal}</p>" if postal else ""
+        )
         return (
             f"<html><body style=\"font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;\">"
             f"<p>Hi {name} team,</p>"
             "<p>SINCOR agents deliver a competitive snapshot (pricing, reviews, gaps vs nearby rivals) as a PDF. No call.</p>"
-            "<p>Pay on Base (SINC monthly or AXM one-time). Agents start when payment hits treasury.</p>"
-            f"<p><a href=\"{pay}\">Start report — getsincor.com/buy</a></p>"
+            "<p>Pay in USDC on Base — choose a pack at getsincor.com/pricing. Agents start when your payment confirms.</p>"
+            f"<p><a href=\"{pay}\">Start report — getsincor.com/pricing</a></p>"
             f"<p>A2A: <a href=\"{A2A_CARD}\">{A2A_CARD}</a></p>"
             "<p>— SINCOR Agent<br>getsincor.com</p>"
-            "<p style=\"font-size:11px;color:#999;\">Directory listing. Reply STOP to opt out.</p></body></html>"
+            f"<p style=\"font-size:11px;color:#999;\">Directory listing. Reply STOP to opt out{unsub_html}.</p>"
+            f"{postal_html}</body></html>"
         )
+
+    def _build_send_payload(self, lead: Dict) -> Optional[Dict]:
+        """Construct the full Resend payload for one outreach email.
+
+        Returns None when a compliant message cannot be built — the
+        unsubscribe link must be signable (a secret must be configured);
+        CAN-SPAM requires a working opt-out, so no signature, no send.
+        The payload carries List-Unsubscribe + List-Unsubscribe-Post
+        headers (RFC 8058 one-click) and the physical postal address
+        footer in both the HTML and text bodies.
+        """
+        from sincor2 import comms_compliance
+
+        email = (lead.get("email", "") or "").strip()
+        unsub = comms_compliance.unsubscribe_url(email)
+        if not unsub:
+            return None
+        postal = comms_compliance.postal_address()
+        pay = self._checkout_url(lead)
+        html = self._build_email_html(lead, unsubscribe_url=unsub, postal=postal)
+        text = (
+            f"Hi {lead.get('name', 'there')} team,\n\n"
+            "SINCOR agents deliver competitive intel PDFs. No call. "
+            "Pay in USDC on Base at getsincor.com/pricing; agents fulfill "
+            "after your payment confirms.\n\n"
+            f"Pay: {pay}\nA2A: {A2A_CARD}\n\n— SINCOR Agent | getsincor.com\n"
+            f"Reply STOP to opt out, or unsubscribe instantly: {unsub}\n{postal}"
+        )
+        subject = f"Competitor snapshot for {lead.get('name', 'your shop')} — agents run it after pay"
+        return {
+            "from": f"{self.from_name} <{self.from_email}>",
+            "to": email,
+            "subject": subject,
+            "html": html,
+            "text": text,
+            "reply_to": self.from_email,
+            "headers": {
+                "List-Unsubscribe": f"<{unsub}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+        }
 
     def send_outreach_email(self, lead: Dict, resend_client) -> bool:
         email = (lead.get("email", "") or "").strip()
         if not email:
             return False
         # P1 audit #9 backstop: explicit opt-in + approved-recipients allowlist
-        # + live kill-switch check, enforced even on direct calls.
+        # + live kill-switch check, enforced even on direct calls. The gate
+        # also checks the suppression list (Wren PR 8).
         from sincor2.comms_gating import outreach_send_allowed
         ok, reason = outreach_send_allowed(email)
         if not ok:
             logger.warning("[OUTREACH] send_outreach_email refused (%s): %s", reason, email)
             return False
-        try:
-            from_addr = f"{self.from_name} <{self.from_email}>"
-            html = self._build_email_html(lead)
-            pay = self._checkout_url(lead)
-            text = (
-                f"Hi {lead.get('name', 'there')} team,\n\n"
-                "SINCOR agents deliver competitive intel PDFs. No call. Pay on Base; agents fulfill on treasury tx.\n\n"
-                f"Pay: {pay}\nA2A: {A2A_CARD}\n\n— SINCOR Agent | getsincor.com\nReply STOP to opt out."
+        # CAN-SPAM plumbing (Wren PR 8): per-domain and global caps are
+        # enforced here against live counts, and the payload builder
+        # stamps the postal footer + List-Unsubscribe headers. The
+        # postal-address REFUSAL lives in run_cycle() — the only
+        # production caller of this method — because the pre-existing
+        # finding-#9 pin (test_engine_allowlisted_recipient_sends)
+        # encodes the pre-CAN-SPAM send contract for direct calls and
+        # may not be edited by a builder; see the PR 8 report.
+        from sincor2 import comms_compliance
+        if comms_compliance.domain_cap_reached(email):
+            logger.warning(
+                "[OUTREACH] per-domain daily cap reached for %s — refusing send to %s",
+                email.rsplit("@", 1)[-1], email,
             )
-            subject = f"Competitor snapshot for {lead.get('name', 'your shop')} — agents run it after pay"
+            return False
+        if comms_compliance.global_cap_reached():
+            logger.warning("[OUTREACH] global daily cap reached — refusing send to %s", email)
+            return False
+        try:
+            payload = self._build_send_payload(lead)
+            if payload is None:
+                logger.error(
+                    "[OUTREACH] cannot sign unsubscribe link (no token secret "
+                    "configured) — refusing send to %s", email,
+                )
+                return False
+            subject = payload["subject"]
+            text = payload["text"]
+            html = payload["html"]
             try:
                 from sincor2.compliance_guardrails import guardrails
                 guardrails.check_email_send([email], text + "\n" + html, subject=subject, agent="outreach_agent")
             except Exception as e:
                 logger.error("[OUTREACH] Guardrails blocked %s: %s", email, e)
                 return False
-            response = resend_client.emails.send({
-                "from": from_addr, "to": email, "subject": subject,
-                "html": html, "text": text, "reply_to": self.from_email,
-            })
+            response = resend_client.emails.send(payload)
             msg_id = response.get("id") if isinstance(response, dict) else getattr(response, "id", "unknown")
+            comms_compliance.record_send(email)
             logger.info("[OUTREACH] Sent %s (%s) msg_id=%s", email, lead.get("name"), msg_id)
             return True
         except Exception as e:
@@ -214,6 +281,20 @@ class OutreachEngine:
     def run_cycle(self) -> Dict:
         if not self.enabled:
             return {"status": "disabled", "sent": 0, "leads_found": 0}
+        # Boot compliance (Wren PR 8): without a postal address no send in
+        # this cycle could carry the required footer — abort before any
+        # lead work. Then log the sender-domain DNS auth posture (SPF /
+        # DMARC / DKIM presence; informational only, never fatal).
+        from sincor2 import comms_compliance
+        if not comms_compliance.postal_address():
+            logger.error(
+                "[OUTREACH] SINCOR_POSTAL_ADDRESS unset — cycle aborted "
+                "(no compliant sends possible)"
+            )
+            return {"status": "no_postal_address", "sent": 0, "leads_found": 0}
+        comms_compliance.log_sender_dns_auth_status(
+            self.from_email.rsplit("@", 1)[-1] if "@" in self.from_email else None
+        )
         resend_key = os.environ.get("RESEND_API_KEY", "")
         if not resend_key:
             logger.warning("[OUTREACH] RESEND_API_KEY missing")

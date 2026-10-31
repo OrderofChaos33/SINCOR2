@@ -1,3 +1,10 @@
+# EXAMPLE ONLY — copy values into Railway deliberately, one at a time.
+# ALL send / publish / trading flags default OFF below. Enabling any one
+# of them arms a live outbound lane: set OUTREACH_APPROVED_RECIPIENTS and
+# SINCOR_POSTAL_ADDRESS first, and enable exactly one flag at a time.
+# (Renamed from config/railway_add_these.env, which shipped these flags ON
+# and was one paste away from arming every lane at once.)
+
 # Railway → web service → Variables
 # Volume: mount /data
 
@@ -6,17 +13,17 @@ WEBBUILDER_DATA_DIR=/data/webbuilder
 ORDERS_DB_PATH=/data/orders.db
 
 # Master — agents only, no HITL sales
-AUTONOMOUS_AGENTS=true
-OUTREACH_ENABLED=true
+AUTONOMOUS_AGENTS=false
+OUTREACH_ENABLED=false
 OUTREACH_INTERVAL_HOURS=2
 OUTREACH_DAILY_LIMIT=40
 OUTREACH_FROM_NAME=SINCOR Agent
 OUTREACH_FROM_EMAIL=support@getsincor.com
-CONTENT_AGENT_ENABLED=true
-RECURSIVE_OPTIMIZER_ENABLED=true
-LAUNCH_OPS_ENABLED=true
-DAILY_OPS_ENABLED=true
-SADAS_ENABLED=true
+CONTENT_AGENT_ENABLED=false
+RECURSIVE_OPTIMIZER_ENABLED=false
+LAUNCH_OPS_ENABLED=false
+DAILY_OPS_ENABLED=false
+SADAS_ENABLED=false
 
 # Safety — on-chain writes stay local unless you set keys
 AGENT_BURN_AUTO=false
@@ -32,10 +39,10 @@ AXM_REPORT_PRICE=500
 ADMIN_USERNAME=
 ADMIN_PASSWORD=
 
-POLYCLAW_ENABLED=true
+POLYCLAW_ENABLED=false
 POLYCLAW_AUTO_EXECUTE=false
 POLYCLAW_CAPITAL=300
-TREASURY_CONVERSION_ENABLED=true
+TREASURY_CONVERSION_ENABLED=false
 TREASURY_TARGET_ASSET=USDC
 
 COMPLIANCE_MONITOR_ENABLED=true
@@ -47,7 +54,7 @@ LAUNCH_REVIEW_ALERT_EMAIL=eenergy@protonmail.com
 LAUNCH_REVIEW_REMINDER_ENABLED=false
 LAUNCH_REVIEW_REMINDER_AFTER_CYCLE=false
 DAILY_OPS_INTERVAL_HOURS=24
-SUBSCRIPTION_REMINDER_ENABLED=true
+SUBSCRIPTION_REMINDER_ENABLED=false
 
 RESEND_API_KEY=
 SUPPORT_EMAIL=support@getsincor.com
@@ -62,5 +69,12 @@ GITHUB_CLIENT_SECRET=
 OAUTH_REDIRECT_BASE_URL=https://getsincor.com
 TRUST_PROXY=true
 
-PARTNER_OUTREACH_ENABLED=true
+PARTNER_OUTREACH_ENABLED=false
 WALLETCONNECT_PROJECT_ID=
+
+# Outbound compliance (Wren PR 8) — required before any outreach send:
+OUTREACH_APPROVED_RECIPIENTS=
+SINCOR_COMMS_KILL_SWITCH=
+SINCOR_POSTAL_ADDRESS=
+UNSUBSCRIBE_TOKEN_SECRET=
+OUTREACH_PER_DOMAIN_DAILY_LIMIT=3

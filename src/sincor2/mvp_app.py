@@ -1296,6 +1296,15 @@ def _admin_intakes_admin_gate():
         return _require_admin(request)
     return None
 
+
+# One-click unsubscribe (Wren PR 8): public by design — the HMAC-signed
+# token IS the credential, the same way /download links work. A valid
+# token suppresses the address it names; anything else 404s (fail
+# closed, no validity oracle). No admin gate applies here.
+from sincor2.blueprints.unsubscribe import unsubscribe_bp as _unsubscribe_bp
+
+app.register_blueprint(_unsubscribe_bp)
+
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)
 
