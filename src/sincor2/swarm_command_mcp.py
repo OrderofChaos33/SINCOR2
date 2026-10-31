@@ -12,6 +12,28 @@ Configuration:
     SWARM_BOARD_PATH         board JSON file (default data/swarm_board.json)
     SWARM_MCP_PORT           local dev port for __main__ (default 8899)
     SWARM_MCP_CORS_ORIGINS   comma-separated; exact-match or "*"
+    SWARM_MCP_ALLOWED_HOSTS  comma-separated extra Host values allowed on
+                             POST /mcp (host or host:port)
+    SWARM_MCP_ALLOWED_ORIGINS comma-separated extra Origin values allowed
+                             on POST /mcp (exact origin, e.g.
+                             https://manus.example)
+
+DNS-rebinding protection (dev-watch item 305, CVE-2026-61546):
+    This is the only HTTP MCP listener in the repo (the discovery server,
+    ``sincor2.mcp_server``, is stdio-only). Every ``POST /mcp`` is checked
+    for Host and Origin allowlisting BEFORE authentication is evaluated
+    for dispatch and before any JSON-RPC method — including
+    ``tools/list`` — is served. By default only loopback Host/Origin
+    values (127.0.0.1, localhost, ::1, any port) are allowed; a request
+    carrying no Host/Origin (a non-browser, server-to-server MCP client)
+    is not a browser rebinding vector and is left to bearer auth.
+    This protection is NEVER disabled globally. A tunnel/proxy exception
+    is scoped to the tunneled host/origin only, by naming that exact
+    host in SWARM_MCP_ALLOWED_HOSTS and/or that exact origin in
+    SWARM_MCP_ALLOWED_ORIGINS (or SWARM_MCP_CORS_ORIGINS) — a "*" CORS
+    value reflects CORS headers only and does NOT allowlist a foreign
+    Origin for tool dispatch.
+
     SWARM_MCP_AUDIENCE       audience (``aud``) audience-bound tokens must
                              name exactly (default: the server name,
                              ``swarm-command``)
@@ -63,6 +85,7 @@ import json
 import os
 import time
 from typing import Any, Dict, Iterable, List, Tuple
+from urllib.parse import urlparse
 
 from sincor2.mcp_schema_guard import SchemaValidationError, validate_arguments
 from sincor2.swarm_command_board import BoardStore, LANES
@@ -536,6 +559,102 @@ def _cors_origin_for(request_origin: str) -> str | None:
     return None
 
 
+# -- DNS-rebinding protection: Host / Origin allowlists (item 305) ---------
+#
+# MCP TransportSecuritySettings equivalent for this stdlib server:
+# DNS-rebinding protection is conceptually always ON here — there is
+# deliberately no setting that turns these checks off.
+
+LOOPBACK_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _allowed_hosts() -> List[str]:
+    raw = os.environ.get("SWARM_MCP_ALLOWED_HOSTS", "")
+    return [h.strip().lower() for h in raw.split(",") if h.strip()]
+
+
+def _allowed_origins() -> List[str]:
+    """Exact origins allowlisted for dispatch (never "*").
+
+    Sources: SWARM_MCP_ALLOWED_ORIGINS plus the exact-match entries of
+    SWARM_MCP_CORS_ORIGINS. A "*" CORS entry is a CORS-reflection setting
+    only; it must not become a global rebinding exception.
+    """
+    raw = os.environ.get("SWARM_MCP_ALLOWED_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    origins.extend(o for o in _cors_origins() if o != "*")
+    return origins
+
+
+def _hostname_of(value: str) -> str:
+    """Hostname (lowercase, no port/brackets) from a Host or origin-ish value."""
+    v = (value or "").strip().lower()
+    if not v:
+        return ""
+    if "://" in v:
+        return (urlparse(v).hostname or "").lower()
+    if v.startswith("["):  # [::1]:8899
+        end = v.find("]")
+        return v[1:end] if end > 0 else v.strip("[]")
+    return v.split(":", 1)[0].rstrip(".")
+
+
+def _normalised_host_header(host_header: str) -> str:
+    v = (host_header or "").strip().lower()
+    if "://" in v:
+        v = v.split("://", 1)[1]
+    return v.rstrip(".")
+
+
+def _host_allowed(host_header: str) -> bool:
+    """True when a POST /mcp Host header may be served.
+
+    Absent Host: allowed — real HTTP/1.1 clients (and every rebinding
+    browser request) always send Host; absence only occurs in direct
+    WSGI/non-browser invocation, which bearer auth still gates.
+    Present Host: loopback, an exact SWARM_MCP_ALLOWED_HOSTS entry
+    (host or host:port), or the hostname of an allowlisted origin.
+    """
+    if not (host_header or "").strip():
+        return True
+    hostname = _hostname_of(host_header)
+    if hostname in LOOPBACK_HOSTNAMES:
+        return True
+    normalised = _normalised_host_header(host_header)
+    for entry in _allowed_hosts():
+        if normalised == _normalised_host_header(entry) or hostname == _hostname_of(entry):
+            return True
+    for origin in _allowed_origins():
+        if hostname and hostname == _hostname_of(origin):
+            return True
+    return False
+
+
+def _origin_allowed(origin: str) -> bool:
+    """True when a POST /mcp Origin header may be served.
+
+    Absent Origin: allowed (non-browser MCP clients send none).
+    Present Origin: exact allowlisted origin, a loopback origin, or an
+    origin whose hostname is an allowlisted (tunneled) host. Everything
+    else — including the opaque ``null`` origin — is foreign.
+    """
+    if not (origin or "").strip():
+        return True
+    normalised = origin.strip().rstrip("/").lower()
+    if normalised == "null":
+        return False
+    for allowed in _allowed_origins():
+        if normalised == allowed.strip().rstrip("/").lower():
+            return True
+    hostname = _hostname_of(origin)
+    if hostname in LOOPBACK_HOSTNAMES:
+        return True
+    for entry in _allowed_hosts():
+        if hostname and hostname == _hostname_of(entry):
+            return True
+    return False
+
+
 def _json_response(status: str, payload: Any, extra: List[Tuple[str, str]] = ()):
     body = json.dumps(payload).encode("utf-8")
     headers = [("Content-Type", _JSON), ("Content-Length", str(len(body)))]
@@ -614,6 +733,24 @@ def app(environ, start_response):
 
     if not (method == "POST" and path == "/mcp"):
         status, headers, body = _json_response("404 Not Found", {"error": "not found"}, cors_headers)
+        start_response(status, headers)
+        return body
+
+    # -- /mcp POST: DNS-rebinding Host/Origin allowlist (item 305) -----------
+    # Enforced before content-type, body, auth and ANY JSON-RPC dispatch,
+    # so a foreign Host/Origin is refused before tools/list (or any other
+    # method) is served — even to a caller holding a valid bearer token.
+    # No CORS headers are reflected on a refusal.
+    if not _host_allowed(environ.get("HTTP_HOST", "")):
+        status, headers, body = _json_response(
+            "403 Forbidden", {"error": "forbidden host"}, []
+        )
+        start_response(status, headers)
+        return body
+    if not _origin_allowed(request_origin):
+        status, headers, body = _json_response(
+            "403 Forbidden", {"error": "forbidden origin"}, []
+        )
         start_response(status, headers)
         return body
 
