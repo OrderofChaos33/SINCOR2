@@ -27,10 +27,10 @@ Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
             POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
 The AgentCard advertises the SINCOR skill catalogue as individual skills
-(17 entries in SINCOR_SKILLS at import — 16 cross-cutting skills plus the
+(18 entries in SINCOR_SKILLS at import — 17 cross-cutting skills plus the
 P24 creator-token issuance skill — and further registry-backed vertical
 skills appended at platform bootstrap: 14 against the current
-marketplace/agent_cards.json registry, 31 total advertised; description-less
+marketplace/agent_cards.json registry, 32 total advertised; description-less
 fixture records are quarantined and never advertised.  The count grows as
 vertical packs are registered).
 External agents select the skill they need and submit a task with their
@@ -1115,6 +1115,60 @@ SINCOR_SKILLS: List[AgentSkill] = [
         reputation_floor=0,
         free_quota=0,
     ),
+    # ── Micro-reads: deterministic single-read skills ─────────────────────
+    # The A2A face of the x402 wallet-sanctions-screen resource: one EVM
+    # wallet address in, one OFAC SDN verdict out, screened by
+    # sincor2.sanctions_screen against the same vendored/refreshed OFAC
+    # snapshot the paid x402 route uses. Priced as a micro-read: 0.1 AXM,
+    # 10x below the cheapest agent-task skill (1 AXM) — the card prices
+    # skills in AXM, so no separate USDC price is advertised here (the
+    # x402 resource keeps its own USDC pricing). free_quota=0 like the
+    # other deterministic skills; the Wave 1 universal daily ration
+    # (freeDailyRation, added by AgentSkill.to_dict) applies as usual.
+    AgentSkill(
+        id="wallet-sanctions-screen",
+        name="Wallet Sanctions Screen",
+        description=(
+            "Screen one EVM wallet address against the OFAC SDN sanctions "
+            "snapshot and return a flagged or clean verdict with the matched "
+            "entry metadata and full snapshot provenance (publication date, "
+            "entry count). Fail-closed honesty: a snapshot older than 48h "
+            "returns an unknown verdict, never clean. Use it as a "
+            "pre-transaction sanctions check on an unknown wallet."
+        ),
+        tags=["compliance", "ofac", "sanctions", "wallet", "screening", "kya"],
+        examples=[
+            "Screen wallet 0x000000000000000000000000000000000000dEaD for OFAC sanctions before paying it.",
+            "Is this wallet address on the OFAC SDN list?",
+        ],
+        axm_price_wei=int(1 * 10**17),  # 0.1 AXM micro-read price
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["address"],
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "EVM wallet address to screen (0x + 40 hex chars)",
+                },
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string"},
+                "status": {"type": "string"},
+                "screened": {"type": "boolean"},
+                "stale": {"type": "boolean"},
+                "address": {"type": "string"},
+                "snapshot_publication_date": {"type": "string"},
+                "snapshot_entry_count": {"type": "integer"},
+            },
+        },
+        estimated_latency_seconds=5,
+        reputation_floor=0,
+        free_quota=0,
+    ),
 ]
 
 
@@ -1139,14 +1193,23 @@ def skill_implementation_ref(skill_id: str) -> Optional[str]:
     Resolution order:
       1. P24 creator-token issuance -> sincor2.defi.p24.skill (the skill's
          advertised contract lives next to its caller).
-      2. AgencyKernel task-type map (sincor2.vertical_dispatch
+      2. Wallet sanctions screen -> sincor2.sanctions_screen (the
+         deterministic OFAC handler that also serves the x402 resource
+         of the same id).
+      3. AgencyKernel task-type map (sincor2.vertical_dispatch
          _KERNEL_SKILL_MAP) -> the kernel task type.
-      3. Vertical-dispatch task-type map (sincor2.vertical_dispatch
+      4. Vertical-dispatch task-type map (sincor2.vertical_dispatch
          _SKILL_TASK_TYPE_MAP) -> the dispatch task type.
     """
     sid = str(skill_id or "").strip()
     if not sid:
         return None
+    try:
+        from sincor2 import sanctions_screen as _sanctions
+        if sid == _sanctions.RESOURCE_ID:
+            return "sincor2.sanctions_screen:screen_wallet"
+    except Exception:
+        pass
     try:
         from sincor2.defi.p24 import skill as _p24_skill
         if sid == _p24_skill.SKILL_ID:
@@ -1857,7 +1920,7 @@ class _FreeQuotaTracker:
             return 0
         return max(0, skill.free_quota - self._store.get(identity_key, skill.id))
 
-    # -- Wave 1: universal DAILY ration (new layer, all 17 skills) --------
+    # -- Wave 1: universal DAILY ration (new layer, all 18 skills) --------
     # The lifetime top-5 quota above is untouched. The daily ration lives
     # in sincor2.free_ration (shared with the x402 surface), keyed on
     # identity + skill + UTC date, resetting at UTC midnight, with a
