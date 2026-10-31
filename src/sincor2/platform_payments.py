@@ -1791,6 +1791,17 @@ def _recover_platform_bind_signer(message: str, signature: str) -> str:
         raise ValueError("bad signature") from exc
 
 
+# Accepted risk (Wren PR 11, 2026-10-30): the bind signature covers
+# (payment_id, wallet) only — deliberately NOT tx_hash. That is safe
+# because the signature never authorizes a specific payment: the
+# proven wallet is passed into verify_treasury_transfer, which
+# requires the presented tx's on-chain payer to BE that wallet, so a
+# valid signature cannot spend another wallet's transfer (pinned by
+# tests/pytest/test_w113_tx_payer_binding.py). Binding tx_hash was
+# rejected on UX grounds: the tx does not exist until after the buyer
+# pays, so it would force a second signature round-trip at checkout.
+
+
 def _payer_proof_gate(
     payment_id: str,
     row: dict[str, Any],
