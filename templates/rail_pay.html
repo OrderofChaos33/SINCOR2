@@ -25,6 +25,8 @@
   #msg.err { color: #ff9d9d; }
   #msg.ok { color: #8fe3a8; }
   .step { margin-top: 18px; padding-top: 16px; border-top: 1px solid #1e2637; }
+  #afterPay ol { margin: 6px 0 0; padding-left: 20px; font-size: 14px;
+                 color: #cfd6e4; line-height: 1.6; }
   .step h2 { font-size: 14px; margin: 0 0 8px; color: #9aa4b8;
              text-transform: uppercase; letter-spacing: .06em; }
   .done { color: #8fe3a8; }
@@ -170,6 +172,17 @@
       <a id="intakeLink" href="#" class="secondary" hidden>Complete your intake &rarr;</a>
     </div>
   </div>
+
+  {% if bootstrap.resource_id in ["rail-pack-credentialing_launch", "rail-pack-chroma_compliance", "rail-pack-sadas_execution"] %}
+  <div class="step" id="afterPay">
+    <h2>What happens after you pay</h2>
+    <ol>
+      <li>You complete the intake form for your pack.</li>
+      <li>The owner reviews your intake.</li>
+      <li>You receive a human-reviewed deliverable prepared from your intake.</li>
+    </ol>
+  </div>
+  {% endif %}
 
   <div id="msg" role="status"></div>
 </div>

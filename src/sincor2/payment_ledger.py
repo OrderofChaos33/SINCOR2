@@ -39,7 +39,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
@@ -1781,6 +1781,66 @@ def update_pack_intake_status(
         return advanced
     finally:
         conn.close()
+
+
+def list_pack_intakes(
+    store_or_db: PaymentLedgerStore | str | Path,
+    *,
+    status: Optional[str] = None,
+) -> list[PackIntake]:
+    """List pack intake records, newest first, optionally by status."""
+    db_path = _pack_intake_db_path(store_or_db)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        conn.row_factory = sqlite3.Row
+        if status is None:
+            rows = conn.execute(
+                "SELECT * FROM pack_intakes ORDER BY created_at DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM pack_intakes WHERE status=?"
+                " ORDER BY created_at DESC",
+                (status,),
+            ).fetchall()
+        return [_pack_intake_from_row(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def _parse_iso_utc(value: str) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp; naive values are read as UTC."""
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def list_stale_completed_pack_intakes(
+    store_or_db: PaymentLedgerStore | str | Path,
+    *,
+    min_age_hours: float = 24.0,
+    now: Optional[datetime] = None,
+) -> list[PackIntake]:
+    """``intake_complete`` records at least ``min_age_hours`` old.
+
+    An intake_complete record is a buyer who did their part and is now
+    waiting on a human; the ones past the age threshold are the ones an
+    operator must not lose sight of. Oldest first.
+    """
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=min_age_hours)
+    stale: list[PackIntake] = []
+    for intake in list_pack_intakes(store_or_db, status="intake_complete"):
+        created = _parse_iso_utc(intake.created_at)
+        if created is not None and created <= cutoff:
+            stale.append(intake)
+    stale.sort(key=lambda i: i.created_at)
+    return stale
 
 
 def allowed_transitions() -> dict[str, list[str]]:
