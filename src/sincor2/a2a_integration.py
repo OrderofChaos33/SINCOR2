@@ -755,7 +755,7 @@ SINCOR_SKILLS: List[AgentSkill] = [
         tags=["analytics", "forecasting", "data-science", "monte-carlo"],
         examples=[
             "Model ARR growth under three expansion scenarios for Q3 2026.",
-            "Forecast SINC token price trajectory given the $0.15 floor and volume.",
+            "Forecast quarterly revenue and trading volume under three growth scenarios.",
         ],
         axm_price_wei=int(4.0 * 10**18),
         sinc_price=4,

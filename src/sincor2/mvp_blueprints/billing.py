@@ -582,7 +582,11 @@ def _paid_surface_envelope(body):
     returns None and the caller simply skips R2 for that response.
     """
     payment = body.get('payment')
-    if isinstance(payment, dict) and body.get('challenge_id'):
+    if isinstance(payment, dict):
+        # Every `payment` value on a paid-surface 402 body is a
+        # build_payment_payload envelope (challenge bodies carry a
+        # challenge_id; the wallet-less discovery offer deliberately
+        # does not — it is still the body's own envelope).
         return payment
     if body.get('error') not in _PAID_SURFACE_VERIFY_402_ERRORS:
         return None
@@ -662,7 +666,9 @@ def _paid_surface_headers(response):
             response.headers.get('Vary'), 'Origin')
     # R2: mirror the envelope into the x402-v2 `accepts` body key and the
     # PAYMENT-REQUIRED header (base64 JSON) so header readers and body
-    # readers authorize identical terms.
+    # readers authorize identical terms. The envelope's Bazaar discovery
+    # extension is additionally mirrored to a top-level `extensions` body
+    # key (the x402 discovery shape; sibling of `accepts`).
     if response.is_json:
         body = response.get_json(silent=True)
         if isinstance(body, dict):
@@ -671,9 +677,24 @@ def _paid_surface_headers(response):
                 import base64
 
                 accepts = [envelope]
+                new_body = None
                 if body.get('accepts') != accepts:
                     new_body = dict(body)
                     new_body['accepts'] = accepts
+                # Discovery Step 0: the x402 discovery shape also puts
+                # `extensions` at the TOP LEVEL of the 402 body (sibling
+                # of `accepts`). The envelope already carries the
+                # complete Bazaar extension (dev-watch 317) nested
+                # inside it; mirror that exact object top-level so a
+                # discovery reader scanning the body finds
+                # extensions.bazaar without unwrapping `payment`.
+                # Mirror only — no extension is built or altered here.
+                ext = envelope.get('extensions')
+                if isinstance(ext, dict) and body.get('extensions') != ext:
+                    if new_body is None:
+                        new_body = dict(body)
+                    new_body['extensions'] = ext
+                if new_body is not None:
                     raw = json.dumps(new_body).encode('utf-8')
                     response.set_data(raw)
                     response.headers['Content-Length'] = str(len(raw))
