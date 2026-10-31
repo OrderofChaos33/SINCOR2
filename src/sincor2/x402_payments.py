@@ -90,6 +90,13 @@ _X402_ENSURE_COLUMN_SQL = {
         "TEXT",
         "ALTER TABLE x402_challenges ADD COLUMN token_consumed_at TEXT",
     ),
+    # WREN PR 4 (merged #596): minting source (wallet when known, else
+    # client IP). Without this entry init_x402_db() raises ValueError on
+    # every _conn() call, degrading X402_AVAILABLE=False.
+    "source_key": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN source_key TEXT",
+    ),
 }
 
 
