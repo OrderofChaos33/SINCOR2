@@ -621,6 +621,126 @@ except Exception:
     logger.exception('[RAIL-PAY] rail_pay_bp failed to mount — '
                      '/rail/pay/<id> pages are NOT served')
 
+# WREN PR 4: per-route rate limits on the money rail. The wraps are
+# applied HERE — after every rail blueprint is registered — because the
+# limiter decorator must replace the registered view function, and
+# importing the limiter into the route modules would be circular. Keys
+# are the limiter default (get_remote_address, i.e. the ProxyFix-derived
+# client address) — never free_ration.abuse_client_ip, which without a
+# pinned trusted proxy collapses every client into the edge peer's one
+# bucket. If a mount failed above, its endpoint is absent and skipped.
+#
+# Trusted-edge assumption (explicit): production runs behind Railway's
+# single appending edge proxy, and ProxyFix above is enabled with
+# x_for=1 (only when TRUST_PROXY / RAILWAY_ENVIRONMENT is set). With
+# exactly one trusted hop, get_remote_address is the LAST
+# X-Forwarded-For entry — the address the edge itself observed — and
+# client-supplied prefix entries are ignored for keying, so rotating
+# them cannot mint a fresh bucket. If the proxy chain ever grows
+# beyond one appending hop this keying must be revisited; the app-wide
+# trusted-proxy treatment is a separate standing item, not handled here.
+for _endpoint, _limit in (
+    ('rail.rail_checkout', '30 per hour'),
+    ('rail_digital_delivery.download_digital_pack', '30 per hour'),
+):
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit(_limit)(_view)
+
+
+def _settle_request_challenge_id() -> str:
+    """challenge_id from the in-flight /rail/settle JSON body.
+
+    Mirrors the settle view's extraction exactly: rail_settle reads
+    request.get_json(force=True, silent=True) and never touches form
+    data, so this helper force-parses too and has NO form fallback. A
+    mimetype-gated parse keys the same body into the plain-address
+    bucket whenever the Content-Type is not JSON — exhaust the
+    per-challenge bucket, resend as text/plain, and the cap is diluted
+    2x (B delta re-check F2). Absent, malformed, or non-string ids
+    return '' — the caller falls back to the plain address bucket.
+    Never raises.
+    """
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not isinstance(data, dict):
+            return ""
+        cid = data.get("challenge_id")
+        if not isinstance(cid, str):
+            return ""
+        return cid.strip()
+    except Exception:
+        return ""
+
+
+def _settle_limit_key() -> str:
+    """Per-(client, challenge) settle bucket (WREN PR 4 repair).
+
+    Junk settles against OTHER challenge ids must not burn a given
+    challenge's settle budget: the challenge TTL is 900s but the
+    limiter window is 1h, so a shared per-address bucket lets 60 junk
+    settles strand a paid buyer past expiry. A body with no
+    challenge_id falls back to the plain address bucket.
+    """
+    addr = get_remote_address() or ""
+    cid = _settle_request_challenge_id()
+    return f"{addr}:{cid}" if cid else addr
+
+
+def _settle_limit() -> str:
+    """60/hour per (client, challenge); 600/hour once fulfilled.
+
+    A settle against an already-fulfilled challenge is the W-115
+    proven-duplicate ack — a paid buyer re-asking for their delivery.
+    Recovering a delivery takes dozens of retries at most, so fulfilled
+    challenges get a bounded but generous ceiling (600/hour per
+    (client, challenge)): far beyond any real retry pattern, yet finite
+    on trees where the ack path is not yet proof-gated (PR #577) — an
+    unbounded exemption there would let anyone who learns a fulfilled
+    challenge_id harvest its ack at full rate (B delta re-check F1).
+    Once #577 lands in the same tree this bound is belt-and-braces.
+    The status lookup is read-only; ANY failure applies the normal
+    limit (fail toward limiting, never toward crashing).
+    """
+    cid = _settle_request_challenge_id()
+    if cid:
+        try:
+            from sincor2.x402_payments import challenge_status
+            if challenge_status(cid) == "fulfilled":
+                return "600 per hour"
+        except Exception:
+            logger.warning(
+                "[RAIL] settle-limit status lookup failed for %s; "
+                "applying the normal limit", cid)
+    return "60 per hour"
+
+
+# /rail/settle gets its own wrap: per-(client, challenge) keying plus
+# the dynamic fulfilled-challenge limit above.
+_view = app.view_functions.get('rail.rail_settle')
+if _view is not None:
+    app.view_functions['rail.rail_settle'] = limiter.limit(
+        _settle_limit, key_func=_settle_limit_key)(_view)
+
+# The intake route (WREN PR 1) is built on a sibling branch and may land
+# before or after this one: wrap any registered /intake POST view at
+# 20/hour, and skip silently when none exists yet.
+_intake_endpoints = {
+    rule.endpoint
+    for rule in app.url_map.iter_rules()
+    if rule.rule.startswith('/intake') and 'POST' in (rule.methods or set())
+}
+for _endpoint in _intake_endpoints:
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit('20 per hour')(_view)
+
+
+@app.errorhandler(429)
+def _rate_limited_json(_error):
+    """Rate-limit refusals answer the shared JSON shape, never HTML."""
+    return jsonify({'error': 'rate_limited'}), 429
+
 
 @app.after_request
 def _expose_rail_mount_status(response):

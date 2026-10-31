@@ -1721,7 +1721,15 @@ def rail_checkout():
             pack_sku, expected_usdc, resource["amount_usdc"])
         return jsonify({"ok": False, "error": "pack_price_mismatch"}), 500
 
-    challenge = x402.create_challenge(resource_id)
+    # WREN PR 4: name the minting source (wallet when the buyer gave
+    # one, else the client address) so create_challenge can cap open
+    # unbound challenges per source; render its refusal as the shared
+    # 429 rate_limited shape.
+    challenge = x402.create_challenge(
+        resource_id,
+        source_key=payer_wallet or (request.remote_addr or ""))
+    if challenge.get("error") == "rate_limited":
+        return jsonify({"ok": False, "error": "rate_limited"}), 429
     http_status = int(challenge.get("http_status") or 402)
     body = {
         "ok": challenge.get("ok", False),
