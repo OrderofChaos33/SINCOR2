@@ -1186,6 +1186,48 @@ def _x402_paid_resource_leader(resource_id, token, access_granted):
     return jsonify(body), status
 
 
+#: x402 transport keys: fields the payment layer itself put in the
+#: buyer's request (the token, the payer binding). They are never
+#: domain input to a skill handler.
+_TRANSPORT_KEYS = frozenset({'access_token', 'payer_wallet'})
+
+
+def _strip_transport_keys(payload, strip_wallet=False):
+    """Copy of ``payload`` without the x402 transport keys.
+
+    Removes ``access_token`` and ``payer_wallet`` case-insensitively
+    (a replayed serve re-sends them in whatever case the buyer's
+    client kept), plus ``wallet`` when ``strip_wallet`` is set.
+    Non-dict payloads pass through unchanged — the handlers reject
+    those themselves.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    drop = _TRANSPORT_KEYS | ({'wallet'} if strip_wallet else frozenset())
+    return {k: v for k, v in payload.items()
+            if not (isinstance(k, str) and k.lower() in drop)}
+
+
+def _skill_request_payload(strip_wallet):
+    """The buyer's payload for a paid skill serve, transport-stripped.
+
+    The payload arrives as a JSON body or, failing that, as query
+    args; both shapes go through the same stripping (Wren PR 9 —
+    previously only args payloads lost ``access_token``, exact-case,
+    and JSON bodies lost nothing, so a replay carrying ``wallet`` or
+    a case-variant transport key 400'd on the strict-allowlist
+    handlers AFTER the token was presented). ``strip_wallet`` is set
+    only for the strict-allowlist resources where ``wallet`` is not
+    a domain field; for wallet-sanctions-screen, kya-trust-score and
+    polymarket-whale-signal the wallet IS the domain input (screen
+    target / agent wallet / tracked-wallet filter) and is preserved.
+    """
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = request.args.to_dict(flat=True)
+    return _strip_transport_keys(payload, strip_wallet=strip_wallet)
+
+
 def _paid_skill_dispatch(resource_id):
     """Run the paid handler for ``resource_id`` -> (status, body).
 
@@ -1201,10 +1243,7 @@ def _paid_skill_dispatch(resource_id):
         # the token only when this returns a 200 (P1-1). Stateless:
         # every call re-runs through the module's provider seam.
         from sincor2.web_search_read import serve_web_search_read
-        wsr_payload = request.get_json(silent=True)
-        if wsr_payload is None:
-            wsr_payload = request.args.to_dict(flat=True)
-            wsr_payload.pop('access_token', None)
+        wsr_payload = _skill_request_payload(strip_wallet=True)
         status, body = serve_web_search_read(wsr_payload)
         return status, body
     if resource_id == 'local-business-site-check':
@@ -1214,10 +1253,7 @@ def _paid_skill_dispatch(resource_id):
         # Stateless: every call re-fetches through the module's
         # fetch seam.
         from sincor2.site_check import serve_site_check
-        sc_payload = request.get_json(silent=True)
-        if sc_payload is None:
-            sc_payload = request.args.to_dict(flat=True)
-            sc_payload.pop('access_token', None)
+        sc_payload = _skill_request_payload(strip_wallet=True)
         status, body = serve_site_check(sc_payload)
         return status, body
     if resource_id == 'market-data-read':
@@ -1226,10 +1262,7 @@ def _paid_skill_dispatch(resource_id):
         # caller consumes the token only on a 200 (P1-1). Stateless:
         # every call re-reads the Chainlink feed seam.
         from sincor2.market_data_read import serve_market_data_read
-        md_payload = request.get_json(silent=True)
-        if md_payload is None:
-            md_payload = request.args.to_dict(flat=True)
-            md_payload.pop('access_token', None)
+        md_payload = _skill_request_payload(strip_wallet=True)
         status, body = serve_market_data_read(md_payload)
         return status, body
     if resource_id == 'polymarket-whale-signal':
@@ -1238,10 +1271,7 @@ def _paid_skill_dispatch(resource_id):
         # caller consumes the token only on a 200 (P1-1) — an empty
         # registry's 503 never consumes it (P1-3b).
         from sincor2.whale_signal import serve_whale_signal
-        signal_payload = request.get_json(silent=True)
-        if signal_payload is None:
-            signal_payload = request.args.to_dict(flat=True)
-            signal_payload.pop('access_token', None)
+        signal_payload = _skill_request_payload(strip_wallet=False)
         status, body = serve_whale_signal(signal_payload)
         return status, body
     if resource_id == 'kya-trust-score':
@@ -1249,10 +1279,7 @@ def _paid_skill_dispatch(resource_id):
         # from the request payload; the caller consumes the token
         # only on a 200 (P1-1).
         from sincor2.kya_trust_score import serve_kya_trust_score
-        score_payload = request.get_json(silent=True)
-        if score_payload is None:
-            score_payload = request.args.to_dict(flat=True)
-            score_payload.pop('access_token', None)
+        score_payload = _skill_request_payload(strip_wallet=False)
         status, body = serve_kya_trust_score(score_payload)
         return status, body
     if resource_id == 'wallet-sanctions-screen':
@@ -1261,10 +1288,7 @@ def _paid_skill_dispatch(resource_id):
         # only on a 200 (P1-1) — a stale snapshot's 503 never
         # consumes it (P1-3a).
         from sincor2.sanctions_screen import serve_sanctions_screen
-        screen_payload = request.get_json(silent=True)
-        if screen_payload is None:
-            screen_payload = request.args.to_dict(flat=True)
-            screen_payload.pop('access_token', None)
+        screen_payload = _skill_request_payload(strip_wallet=False)
         status, body = serve_sanctions_screen(screen_payload)
         return status, body
     if resource_id == 'hook_status':
@@ -1280,10 +1304,7 @@ def _paid_skill_dispatch(resource_id):
         # validated by the handler; the caller consumes the token
         # only on a 200 (P1-1).
         from sincor2.toa_micro_decision import serve_toa_micro_decision
-        toa_payload = request.get_json(silent=True)
-        if toa_payload is None:
-            toa_payload = request.args.to_dict(flat=True)
-            toa_payload.pop('access_token', None)
+        toa_payload = _skill_request_payload(strip_wallet=True)
         status, body = serve_toa_micro_decision(toa_payload)
         return status, body
     payload = request.get_json(silent=True)
