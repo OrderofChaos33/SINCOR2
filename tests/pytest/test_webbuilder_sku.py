@@ -283,8 +283,8 @@ def test_full_loop_webbuilder_checkout_settle_fulfillment_delivered(
     assert fulfillment["status"] == "delivered"
     intake_id = fulfillment["intake_id"]
     assert intake_id == f"intake-rail-{cid}"
-    assert fulfillment["intake_url"] == (
-        f"https://getsincor.com/intake/{intake_id}")
+    assert fulfillment["intake_url"].startswith(
+        f"https://getsincor.com/intake/{intake_id}?token=")
 
     db_path = rail_env["tmp"] / "revenue.db"
 
@@ -298,6 +298,11 @@ def test_full_loop_webbuilder_checkout_settle_fulfillment_delivered(
 
     intake = pl.get_pack_intake(db_path, intake_id)
     assert intake is not None
+    # Wren PR 1 stale-pin correction: the intake URL must carry the
+    # row's secret delivery token (the bare URL was the defect).
+    assert fulfillment["intake_url"] == (
+        f"https://getsincor.com/intake/{intake_id}"
+        f"?token={intake.details['intake_token']}")
     assert intake.customer_email == "buyer@example.com"
     assert intake.pack_sku == "webbuilder_site"
     assert intake.event_id == f"rail-{cid}"

@@ -577,6 +577,7 @@ RAIL_MOUNT_STATUS = {
     'rail_routes': False,
     'rail_delivery': False,
     'rail_pay': False,
+    'rail_intake': False,
 }
 try:
     from sincor2.rail_routes import init_rail_routes
@@ -596,6 +597,17 @@ try:
 except Exception:
     logger.exception('[RAIL-DELIVERY] init_rail_delivery_routes failed — '
                      'token-gated /download/<id> is NOT mounted')
+
+# Token-gated pack intake pages (Wren PR 1) — mounted next to the rail
+# delivery routes; this is the route the B2B / WebBuilder buyer email's
+# intake link points at.
+try:
+    from sincor2.blueprints.intake import init_intake_routes
+    init_intake_routes(app)
+    RAIL_MOUNT_STATUS['rail_intake'] = True
+except Exception:
+    logger.exception('[RAIL-INTAKE] init_intake_routes failed — '
+                     'token-gated /intake/<id> is NOT mounted')
 
 # Human payment pages: GET /rail/pay/<resource_id> + GET /rail/onramp.
 # This blueprint was previously registered only in the legacy

@@ -1686,28 +1686,99 @@ def get_pack_intake(
         conn.close()
 
 
+# Pack intake lifecycle, in order. update_pack_intake_status refuses to
+# move a record BACKWARDS along this chain (a late agent_kickoff write
+# must not undo a buyer's completed intake); forward jumps are legal.
+_PACK_INTAKE_STATUS_ORDER = {
+    "created": 0,
+    "agent_kickoff": 1,
+    "intake_complete": 2,
+    "in_progress": 3,
+    "delivered": 4,
+}
+
+
 def update_pack_intake_status(
     store_or_db: PaymentLedgerStore | str | Path,
     intake_id: str,
     status: str,
     details: Optional[dict[str, Any]] = None,
-) -> None:
-    """Transition a pack intake's status (e.g. created -> agent_kickoff)."""
+) -> bool:
+    """Transition a pack intake's status (e.g. created -> agent_kickoff).
+
+    ``details`` is MERGED into the record's existing details
+    (read-merge-write), never a wholesale replace: fulfillment writes
+    pack_name / module / payer_wallet / intake_token onto the row first,
+    and later writers (agent kickoff, the buyer's intake submission)
+    each own only their own keys. A replace here silently wiped the
+    intake token and payer binding (Wren PR 1 bug b).
+
+    Status may only move forward along _PACK_INTAKE_STATUS_ORDER; a
+    backwards request still merges its details but leaves the status at
+    its furthest-advanced value. Unknown current/target statuses are
+    not ranked and pass through unchanged (legacy rows stay writable).
+
+    The select + merge + update runs under BEGIN IMMEDIATE (the same
+    pattern as the ledger's CAS writes): concurrent writers serialize
+    on the write lock instead of each merging against the same stale
+    snapshot, where the last commit silently dropped the others' keys.
+
+    A row whose stored details are not valid JSON is treated as an
+    empty details dict and the write proceeds — the pre-merge
+    replace-write healed such rows by overwriting them, and the merge
+    must not brick them by raising.
+
+    Returns True iff THIS call advanced the record's status onto
+    ``status`` (the stored status differed and the guard let it move).
+    The decision is made inside the same write transaction as the
+    update, so exactly one concurrent caller can observe True for a
+    given transition — callers that act once per transition (the
+    intake route's owner notification) key off this return value.
+    Returns False for a missing row, an already-at/past-target status,
+    or a backwards no-op.
+    """
     db_path = _pack_intake_db_path(store_or_db)
     conn = sqlite3.connect(str(db_path), timeout=30.0)
     try:
         conn.executescript(_PACK_INTAKE_SCHEMA)
+        conn.execute("BEGIN IMMEDIATE")
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT status, details FROM pack_intakes WHERE intake_id=?",
+            (intake_id,),
+        ).fetchone()
+        if row is None:
+            conn.commit()
+            return False
+        current_status = row["status"]
+        new_status = status
+        current_rank = _PACK_INTAKE_STATUS_ORDER.get(current_status)
+        new_rank = _PACK_INTAKE_STATUS_ORDER.get(status)
+        if (current_rank is not None and new_rank is not None
+                and new_rank < current_rank):
+            new_status = current_status
+        advanced = new_status != current_status
         if details is None:
-            conn.execute(
-                "UPDATE pack_intakes SET status=? WHERE intake_id=?",
-                (status, intake_id),
-            )
+            if advanced:
+                conn.execute(
+                    "UPDATE pack_intakes SET status=? WHERE intake_id=?",
+                    (new_status, intake_id),
+                )
         else:
+            try:
+                merged = json.loads(row["details"] or "{}")
+                if not isinstance(merged, dict):
+                    merged = {}
+            except (TypeError, ValueError):
+                merged = {}
+            merged.update(details)
             conn.execute(
-                "UPDATE pack_intakes SET status=?, details=? WHERE intake_id=?",
-                (status, json.dumps(details), intake_id),
+                "UPDATE pack_intakes SET status=?, details=? "
+                "WHERE intake_id=?",
+                (new_status, json.dumps(merged), intake_id),
             )
         conn.commit()
+        return advanced
     finally:
         conn.close()
 

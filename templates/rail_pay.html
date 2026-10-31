@@ -33,7 +33,7 @@
                     background: #0b0e14; color: #cfd6e4; border: 1px solid #2c364c;
                     border-radius: 8px; }
   .capture label { display: block; font-size: 13px; color: #9aa4b8; margin-top: 10px; }
-  .capture input { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 4px;
+  .capture input, .capture select { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 4px;
                    font-size: 14px; background: #0b0e14; color: #cfd6e4;
                    border: 1px solid #2c364c; border-radius: 8px; }
   #fulfillmentLinks a { display: block; margin-top: 10px; padding: 13px; text-align: center;
@@ -75,20 +75,82 @@
     </div>
 
     <div class="step capture" id="buyerDetailsStep">
-      <h2>Buyer details (optional)</h2>
+      <h2 id="buyerDetailsHeading">Buyer details (optional)</h2>
       <div class="sub">Used for delivery and attribution only &mdash; email gets your download / intake link.</div>
+      <div class="sub" id="detailsRequiredNote" hidden>For this pack these details are
+        required before paying &mdash; they open your intake so work can start right away.</div>
       <label>Email
         <input id="buyerEmail" name="buyer_email" type="email" autocomplete="email" placeholder="you@example.com">
       </label>
-      <label>Business name
-        <input id="businessName" name="business_name" type="text" autocomplete="organization" placeholder="Acme Dental">
-      </label>
-      <label>Niche
-        <input id="buyerNiche" name="niche" type="text" placeholder="dental">
-      </label>
-      <label>Phone
-        <input id="buyerPhone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567">
-      </label>
+      <div id="sharedPackFields" hidden>
+        <label>Business name
+          <input id="businessName" name="business_name" type="text" autocomplete="organization" placeholder="Acme Dental">
+        </label>
+        <label>Contact name
+          <input id="contactName" name="contact_name" type="text" autocomplete="name" placeholder="Your name">
+        </label>
+        <label>Website (or &lsquo;none&rsquo;)
+          <input id="buyerWebsite" name="website_or_none" type="text" placeholder="https://&hellip; or none">
+        </label>
+      </div>
+      <div id="webbuilderFields" hidden>
+        <label>Phone
+          <input id="buyerPhone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567">
+        </label>
+        <label>Niche
+          <input id="buyerNiche" name="niche" type="text" placeholder="dental">
+        </label>
+        <label>Territory
+          <input id="buyerTerritory" name="territory" type="text" placeholder="Clinton, IA">
+        </label>
+        <label>What should the site say and do?
+          <input id="buyerPrompt" name="prompt" type="text" placeholder="Online booking, services, reviews">
+        </label>
+      </div>
+      <div id="credentialingFields" hidden>
+        <label>Practice type
+          <input id="practiceType" name="practice_type" type="text" placeholder="dental practice">
+        </label>
+        <label>State
+          <input id="practiceState" name="state" type="text" placeholder="IA">
+        </label>
+        <label>Specialties
+          <input id="specialties" name="specialties" type="text" placeholder="general dentistry, implants">
+        </label>
+        <label>Current payers
+          <input id="currentPayerList" name="current_payer_list" type="text" placeholder="Delta Dental, Cigna">
+        </label>
+      </div>
+      <div id="chromaFields" hidden>
+        <label>Repository or product URL
+          <input id="repoUrl" name="repo_or_product_url" type="text" placeholder="https://github.com/you/product">
+        </label>
+        <label>SBOM format needed
+          <select id="sbomFormat" name="sbom_format_needed">
+            <option value="">Select&hellip;</option>
+            <option value="CycloneDX">CycloneDX</option>
+            <option value="SPDX">SPDX</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </label>
+        <label>Compliance target
+          <input id="complianceTarget" name="compliance_target" type="text" placeholder="SOC 2">
+        </label>
+      </div>
+      <div id="sadasFields" hidden>
+        <label>Goal
+          <input id="sadasGoal" name="goal" type="text">
+        </label>
+        <label>Systems in scope
+          <input id="systemsInScope" name="systems_in_scope" type="text">
+        </label>
+        <label>Success metric
+          <input id="successMetric" name="success_metric" type="text">
+        </label>
+        <label>Timeline
+          <input id="sadasTimeline" name="timeline" type="text">
+        </label>
+      </div>
     </div>
 
     <div class="step">
@@ -190,9 +252,98 @@
       return sub;
     }
     if (resourceId.indexOf("rail-pack-") === 0) {
-      return { pack_sku: resourceId.slice("rail-pack-".length) };
+      var body = { pack_sku: resourceId.slice("rail-pack-".length) };
+      // Pre-payment intake details ride along when the buyer has
+      // already filled them (the challenge is minted on page load,
+      // before the form — the settle body below is the authoritative
+      // carrier; this keeps a post-connect re-mint consistent).
+      var details = detailValues();
+      for (var k in details) body[k] = details[k];
+      if (wallet) body.payer_wallet = wallet;
+      return body;
     }
     return { pack_sku: resourceId };
+  }
+
+  // ---- pre-payment intake details (Wren PR 1) --------------------------
+  // Non-digital packs collect their intake details BEFORE paying: the
+  // Pay button stays disabled until every required field for the SKU
+  // is filled, and the values ride the settle into the intake record.
+  // Field name -> input element id; the shared four apply to every
+  // pack, each SKU adds its own set. Mirrors the server-side allowlist
+  // in sincor2/blueprints/intake.py.
+  var SHARED_DETAIL_IDS = {
+    business_name: "businessName", contact_name: "contactName",
+    contact_email: "buyerEmail", website_or_none: "buyerWebsite"
+  };
+  var SKU_DETAIL_IDS = {
+    credentialing_launch: {
+      practice_type: "practiceType", state: "practiceState",
+      specialties: "specialties", current_payer_list: "currentPayerList"
+    },
+    chroma_compliance: {
+      repo_or_product_url: "repoUrl", sbom_format_needed: "sbomFormat",
+      compliance_target: "complianceTarget"
+    },
+    sadas_execution: {
+      goal: "sadasGoal", systems_in_scope: "systemsInScope",
+      success_metric: "successMetric", timeline: "sadasTimeline"
+    },
+    webbuilder_site: {
+      phone: "buyerPhone", niche: "buyerNiche",
+      territory: "buyerTerritory", prompt: "buyerPrompt"
+    }
+  };
+  var SKU_DETAIL_GROUPS = {
+    credentialing_launch: "credentialingFields",
+    chroma_compliance: "chromaFields",
+    sadas_execution: "sadasFields",
+    webbuilder_site: "webbuilderFields"
+  };
+
+  function packSku() {
+    return resourceId.indexOf("rail-pack-") === 0
+      ? resourceId.slice("rail-pack-".length) : null;
+  }
+
+  function detailFieldMap() {
+    var sku = packSku();
+    if (!sku || !SKU_DETAIL_IDS[sku]) return null;
+    var map = {};
+    var field;
+    for (field in SHARED_DETAIL_IDS) map[field] = SHARED_DETAIL_IDS[field];
+    for (field in SKU_DETAIL_IDS[sku]) map[field] = SKU_DETAIL_IDS[sku][field];
+    return map;
+  }
+
+  function detailValues() {
+    var map = detailFieldMap();
+    var out = {};
+    if (!map) return out;
+    for (var field in map) {
+      var el = $(map[field]);
+      if (el) out[field] = el.value.trim();
+    }
+    return out;
+  }
+
+  function detailsComplete() {
+    if (!detailFieldMap()) return true;
+    var values = detailValues();
+    for (var field in values) {
+      if (!values[field]) return false;
+    }
+    return true;
+  }
+
+  function revealDetailFields() {
+    var sku = packSku();
+    if (!sku || !SKU_DETAIL_IDS[sku]) return;
+    $("sharedPackFields").hidden = false;
+    var group = $(SKU_DETAIL_GROUPS[sku]);
+    if (group) group.hidden = false;
+    $("detailsRequiredNote").hidden = false;
+    $("buyerDetailsHeading").textContent = "Buyer details (required)";
   }
 
   function isValidAddress(a) {
@@ -362,7 +513,7 @@
     return !!(challenge && challenge.bind && challenge.bind.bind_url) && !bound;
   }
   function refreshButtons() {
-    var canPay = !!wallet && !needsBind() && !busy;
+    var canPay = !!wallet && !needsBind() && !busy && detailsComplete();
     $("btnPay").disabled = !canPay;
     $("btnBind").disabled = !(wallet && needsBind() && !busy);
   }
@@ -402,7 +553,7 @@
       setMsg("Transaction sent (" + trunc(txHash) + "). Waiting for confirmation\u2026");
       await waitForReceipt(eth, txHash);
       setMsg("Payment confirmed onchain. Finalizing with SINCOR\u2026");
-      var settle = await postJSON("/rail/settle", {
+      var settleBody = {
         challenge_id: challenge.challenge_id,
         tx_hash: txHash,
         payer_wallet: wallet,
@@ -410,7 +561,13 @@
         business_name: $("businessName").value.trim(),
         niche: $("buyerNiche").value.trim(),
         phone: $("buyerPhone").value.trim()
-      });
+      };
+      // The full pre-payment intake detail set rides the settle into
+      // the intake record (detailValues covers the shared four plus
+      // this SKU's fields; empty for non-pack resources).
+      var dv = detailValues();
+      for (var dk in dv) settleBody[dk] = dv[dk];
+      var settle = await postJSON("/rail/settle", settleBody);
       if (settle && settle.ok) {
         setMsg("Payment complete.", "ok");
         $("btnPay").disabled = true;
@@ -467,6 +624,15 @@
       setMsg("Card purchase unavailable: " + (e && e.message || e), "err");
     }
   });
+
+  // ---- detail fields: reveal per-SKU groups + live Pay gating --------
+  revealDetailFields();
+  var detailInputs = document.querySelectorAll(
+    "#buyerDetailsStep input, #buyerDetailsStep select");
+  for (var di = 0; di < detailInputs.length; di++) {
+    detailInputs[di].addEventListener("input", refreshButtons);
+    detailInputs[di].addEventListener("change", refreshButtons);
+  }
 
   loadCheckout();
 })();
