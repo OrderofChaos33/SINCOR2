@@ -29,11 +29,19 @@ consumes the token only on a 200, so the 503 never burns it. The
 snapshot is refreshed by ``python -m sincor2.refresh_ofac_sdn``
 (boot/daily): a refreshed copy under ``SINCOR_DATA_DIR`` wins over
 the vendored bundled file when present.
+
+Escalation tap (additive, opt-in): when ``SINCOR_ESCALATION_SINK``
+names an EscalationEnvelope store directory, a non-clean verdict
+(match or stale-unknown) is also mirrored into the Phase 1
+escalation pipeline (``_emit_escalation_envelope``). With the flag
+unset the screen behaves exactly as before, and a broken sink can
+never change or block a verdict.
 """
 
 from __future__ import annotations
 
 import datetime
+import logging
 import os
 import re
 import time
@@ -47,6 +55,13 @@ from sincor2.defi.compliance_automation import (
 from sincor2.defi.ofac_sdn import SNAPSHOT_FILENAME, load_snapshot
 
 RESOURCE_ID = "wallet-sanctions-screen"
+
+_log = logging.getLogger(__name__)
+
+#: Env flag for the Phase 1 escalation tap (see
+#: ``_emit_escalation_envelope``). The value is the directory holding
+#: the EscalationEnvelope store. Unset/empty = tap fully off.
+ESCALATION_SINK_ENV = "SINCOR_ESCALATION_SINK"
 
 _EVM_RE = re.compile(r"^0[xX][a-fA-F0-9]{40}$")
 
@@ -117,6 +132,106 @@ def _provenance(snapshot: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _emit_escalation_envelope(result: Dict[str, Any]) -> None:
+    """Additive reporting tap into the Phase 1 escalation pipeline.
+
+    Mirrors a non-clean verdict — an OFAC match (``flagged``) or a
+    stale-snapshot ``unknown`` — into an EscalationEnvelope store so
+    the verdict lands in the unified [Approve | Override | Escalate]
+    operator queue (``sincor2.escalation``). Strictly opt-in and
+    strictly best-effort:
+
+    - Active only when ``SINCOR_ESCALATION_SINK`` names an envelope
+      store directory. Unset/empty = the screen behaves exactly as it
+      did before this tap existed; the escalation layer is not even
+      imported.
+    - Any failure (unwritable sink, corrupt store, core-layer error)
+      is logged and swallowed. Emission NEVER changes the verdict,
+      never raises into the caller, and never blocks the screen: the
+      fail-closed verdicts are the compliance gate, and this is a
+      reporting tap on the gate, not part of it.
+    - Risk honesty: the OFAC matcher is exact set membership — it
+      produces no confidence score, so the violation confidence is
+      None (never fabricated). The screen prices no value transfer,
+      so exposure is None: the screened action's parameters carry no
+      amount to report.
+    """
+    verdict = result.get("verdict")
+    if verdict == "flagged":
+        match = result.get("match") or {}
+        rule = "ofac-match"
+        recommended_action = "deny"
+        severity = "high"
+        detail = (
+            "address on OFAC SDN list "
+            f"(uid {match.get('uid', '')}; "
+            f"programs {', '.join(match.get('programs') or [])})"
+        )
+        summary = (
+            f"Sanctions screen: OFAC SDN match for {result.get('address')}"
+        )
+    elif verdict == "unknown" and result.get("stale"):
+        rule = "snapshot-stale"
+        recommended_action = "escalate"
+        severity = "medium"
+        detail = str(result.get("detail") or "OFAC snapshot stale")
+        summary = (
+            "Sanctions screen: snapshot stale, verdict unknown for "
+            f"{result.get('address')}"
+        )
+    else:
+        return
+    sink = os.environ.get(ESCALATION_SINK_ENV, "").strip()
+    if not sink:
+        return
+    try:
+        from sincor2.escalation import EscalationStore
+
+        store = EscalationStore(sink)
+        store.create_package(
+            source_surface="sanctions-screen",
+            actor="sincor2.sanctions_screen",
+            source_agent_id="sincor2.sanctions_screen",
+            action_category="legal_compliance",
+            summary=summary,
+            severity=severity,
+            context={
+                "rule_hit": {
+                    "policy_id": "sanctions-screen",
+                    "rule": rule,
+                    "detail": detail,
+                }
+            },
+            violations=[
+                {
+                    "policy_id": "sanctions-screen",
+                    "detail": detail,
+                    "confidence": None,
+                }
+            ],
+            exposure=None,
+            recommended_action=recommended_action,
+            input_parameters={
+                "address": result.get("address"),
+                "resource": RESOURCE_ID,
+            },
+            dry_run_state={
+                "verdict": verdict,
+                "screened": result.get("screened"),
+                "stale": result.get("stale"),
+                "match": result.get("match"),
+                "snapshot_age_seconds": result.get("snapshot_age_seconds"),
+                "snapshot_fetched_at": result.get("snapshot_fetched_at"),
+                "snapshot_publication_date": result.get(
+                    "snapshot_publication_date"),
+            },
+        )
+    except Exception:
+        _log.warning(
+            "sanctions-screen escalation emission failed (verdict %s); "
+            "verdict unaffected", verdict, exc_info=True)
+
+
 def screen_wallet(
     address: Any,
     *,
@@ -149,7 +264,7 @@ def screen_wallet(
     }
     if age > LIST_FRESHNESS_FAIL_SECONDS:
         # Fail-closed honesty: a stale list proves nothing either way.
-        return {
+        result = {
             **base,
             "verdict": "unknown",
             "status": "unknown",
@@ -161,6 +276,8 @@ def screen_wallet(
                 "clean or flagged from stale data"
             ),
         }
+        _emit_escalation_envelope(result)
+        return result
     match = _address_index(snapshot).get(addr.lower())
     freshness_note = ""
     if age > LIST_FRESHNESS_ALERT_SECONDS:
@@ -169,7 +286,7 @@ def screen_wallet(
             "(48h fail-closed window)"
         )
     if match is not None:
-        return {
+        result = {
             **base,
             "verdict": "flagged",
             "status": "flagged",
@@ -179,6 +296,8 @@ def screen_wallet(
             "detail": "address on OFAC SDN list" + (
                 f"; {freshness_note}" if freshness_note else ""),
         }
+        _emit_escalation_envelope(result)
+        return result
     return {
         **base,
         "verdict": "clean",
