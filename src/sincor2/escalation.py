@@ -67,8 +67,24 @@ event, in order, with a monotonic sequence number. The audit log is
 includes ``prev_hash``; the genesis record's ``prev_hash`` is 64
 zeros), making the log a tamper-evident, append-only audit asset —
 any edit to a historical record breaks :func:`verify_chain`. Decision
-records carry the deciding actor + role (the attestation); real
-cryptographic key signing is Phase 2, deliberately not faked here.
+records carry the deciding actor + role (the attestation).
+
+**Phase 2 signing (directive pillar 2.1).** When an
+:class:`AuditSigner` is configured on the store, every newly appended
+audit record also gains a ``signature`` block — an Ed25519 signature,
+by the interceptor/signing node, over the record's canonical bytes
+*including* its ``record_hash`` (sign-the-hash-chain-head semantics:
+the signature binds the content and its position in the chain).
+Records also carry ``policy_id`` + ``policy_version`` from the
+audited package. Signing is opt-in: with no signer configured the
+store's behavior is byte-for-byte the Phase 1 behavior, unsigned
+history keeps verifying on hash links alone, and a mixed chain
+(unsigned history + signed tail) verifies. Private keys are loaded
+only from a file path named by the ``SINCOR_ESCALATION_SIGNING_KEY_FILE``
+env var — never from code, config JSON, or the store directory.
+Merkle epoch anchoring of these records (pillar 2.4) lives in
+:mod:`sincor2.merkle_anchor`.
+
 A corrupt state file raises :class:`StoreCorruptError` (fail closed)
 instead of silently starting empty over someone's pending decisions.
 
@@ -88,6 +104,27 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
+
+# Ed25519 signing (Phase 2, pillar 2.1) uses the `cryptography`
+# package. The import is guarded so the Phase 1 unsigned path never
+# depends on it: without the package, AuditSigner construction raises
+# and signed records fail verification (fail closed) — the unsigned
+# store keeps working exactly as before.
+try:
+    from cryptography.exceptions import InvalidSignature as _InvalidSignature
+    from cryptography.hazmat.primitives import serialization as _serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey as _Ed25519PrivateKey,
+        Ed25519PublicKey as _Ed25519PublicKey,
+    )
+
+    _CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only without the dep
+    _InvalidSignature = Exception  # type: ignore[assignment]
+    _serialization = None
+    _Ed25519PrivateKey = None
+    _Ed25519PublicKey = None
+    _CRYPTOGRAPHY_AVAILABLE = False
 
 __all__ = [
     "ALLOW",
@@ -109,7 +146,13 @@ __all__ = [
     "ACTION_CHOICES",
     "RECOMMENDED_ACTIONS",
     "GENESIS_PREV_HASH",
+    "SIGNATURE_ALG",
+    "SIGNING_KEY_ENV_VAR",
+    "DEFAULT_SIGNER_ID",
     "verify_chain",
+    "AuditSigner",
+    "generate_signing_key",
+    "load_signer_from_env",
     "EscalationError",
     "IllegalTransitionError",
     "PackageNotFoundError",
@@ -198,6 +241,18 @@ RECOMMENDED_ACTIONS = frozenset({"approve", "override", "escalate", "deny"})
 
 #: prev_hash of the first (genesis) audit record: 64 zero hex chars.
 GENESIS_PREV_HASH = "0" * 64
+
+#: Signature algorithm stamped into audit-record ``signature`` blocks.
+SIGNATURE_ALG = "Ed25519"
+
+#: Env var naming the FILE PATH of the signer's PEM private key. The
+#: key itself is only ever read from that file — never from a literal
+#: in code, config JSON, or chat (Phase 2 spec, hard rule).
+SIGNING_KEY_ENV_VAR = "SINCOR_ESCALATION_SIGNING_KEY_FILE"
+
+#: Default identity string for the signing (interceptor) node when an
+#: operator does not choose one.
+DEFAULT_SIGNER_ID = "sincor-interceptor"
 
 #: Context keys that force escalation even for an internal category.
 _CONTEXT_ESCALATION_FLAGS = ("irreversible", "external_effect")
@@ -378,9 +433,10 @@ class PolicyEngine:
 class Decision:
     """A decision record (attestation), as stored on the envelope.
 
-    Carries the deciding actor + role — the v1 attestation. (Real
-    cryptographic key signing is Phase 2; actor+role+hash-chained
-    audit is the v1 integrity story, and it is not dressed up as more.)
+    Carries the deciding actor + role — the envelope-level attestation.
+    (Cryptographic key signing is an audit-log property, added in
+    Phase 2: see :class:`AuditSigner`. The attestation here is not
+    dressed up as more than it is.)
     """
 
     by: str
@@ -603,13 +659,186 @@ def _compute_record_hash(record_without_hash: dict) -> str:
     return hashlib.sha256(_canonical_record_bytes(record_without_hash)).hexdigest()
 
 
-def verify_chain(records: list) -> bool:
+# ---------------------------------------------------------------------------
+# Phase 2 audit-record signing (Ed25519, directive pillar 2.1)
+# ---------------------------------------------------------------------------
+
+
+def _require_cryptography() -> None:
+    if not _CRYPTOGRAPHY_AVAILABLE:
+        raise EscalationError(
+            "the `cryptography` package is required for Ed25519 audit "
+            "signing and is not importable in this environment"
+        )
+
+
+class AuditSigner:
+    """An Ed25519 signing identity for audit records (an interceptor node).
+
+    Wraps a private key that is generated in-process (tests, ephemeral
+    nodes) or loaded from a PEM key file (operators — see
+    :func:`generate_signing_key` and :func:`load_signer_from_env`).
+    The key material never leaves this object: signing exposes only
+    the public key and the signature.
+    """
+
+    def __init__(self, private_key: Any, signer_id: str):
+        _require_cryptography()
+        if not isinstance(private_key, _Ed25519PrivateKey):
+            raise TypeError("AuditSigner requires an Ed25519 private key")
+        if not isinstance(signer_id, str) or not signer_id.strip():
+            raise ValueError("signer_id must be a non-empty identity string")
+        self._private_key = private_key
+        self.signer_id = signer_id
+        self._signer_pubkey = (
+            private_key.public_key()
+            .public_bytes(
+                _serialization.Encoding.Raw,
+                _serialization.PublicFormat.Raw,
+            )
+            .hex()
+        )
+
+    @property
+    def signer_pubkey(self) -> str:
+        """Hex-encoded Ed25519 public key for this signer."""
+        return self._signer_pubkey
+
+    @classmethod
+    def generate(cls, signer_id: str = DEFAULT_SIGNER_ID) -> "AuditSigner":
+        """A fresh in-process keypair (tests / ephemeral nodes)."""
+        _require_cryptography()
+        return cls(_Ed25519PrivateKey.generate(), signer_id)
+
+    @classmethod
+    def from_key_file(cls, path: str, signer_id: str = DEFAULT_SIGNER_ID) -> "AuditSigner":
+        """Load a PEM (PKCS8, unencrypted) Ed25519 private key from a file."""
+        _require_cryptography()
+        with open(path, "rb") as fh:
+            pem_data = fh.read()
+        private_key = _serialization.load_pem_private_key(pem_data, password=None)
+        return cls(private_key, signer_id)
+
+    def sign_record(self, record: dict) -> dict:
+        """Signature block for an audit record that already has its hash.
+
+        Signs the record's canonical bytes *including* ``record_hash``
+        and excluding any ``signature`` block, so the signature binds
+        the content and the record's position in the hash chain.
+        """
+        payload = {k: v for k, v in record.items() if k != "signature"}
+        signature = self._private_key.sign(_canonical_record_bytes(payload))
+        return {
+            "alg": SIGNATURE_ALG,
+            "signer_id": self.signer_id,
+            "signer_pubkey": self._signer_pubkey,
+            "signature": signature.hex(),
+        }
+
+
+def generate_signing_key(path: str) -> str:
+    """Generate an Ed25519 signing key file for operator setup.
+
+    Writes a PEM (PKCS8, unencrypted — file permissions are the
+    operator's control) private key to ``path`` with owner-only
+    permissions, creating parent directories as needed. Refuses to
+    overwrite an existing file (FileExistsError) so a live identity
+    can never be silently replaced. Returns the hex public key.
+    """
+    _require_cryptography()
+    if os.path.exists(path):
+        raise FileExistsError(
+            f"signing key already exists at {path}; refusing to overwrite"
+        )
+    private_key = _Ed25519PrivateKey.generate()
+    pem = private_key.private_bytes(
+        _serialization.Encoding.PEM,
+        _serialization.PrivateFormat.PKCS8,
+        _serialization.NoEncryption(),
+    )
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    # O_EXCL closes the check-then-write race: if the file appears
+    # between the exists() check and here, we fail instead of
+    # overwriting someone's key.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(fd, pem)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return (
+        private_key.public_key()
+        .public_bytes(
+            _serialization.Encoding.Raw,
+            _serialization.PublicFormat.Raw,
+        )
+        .hex()
+    )
+
+
+def load_signer_from_env(
+    signer_id: str = DEFAULT_SIGNER_ID,
+    env_var: str = SIGNING_KEY_ENV_VAR,
+) -> Optional["AuditSigner"]:
+    """Build an AuditSigner from the key file named by the env var.
+
+    Returns None when the env var is unset (signing stays off — the
+    Phase 1 default). This is the only env-driven key path: the
+    variable carries a file path, never key material.
+    """
+    path = os.environ.get(env_var)
+    if not path:
+        return None
+    return AuditSigner.from_key_file(path, signer_id)
+
+
+def _verify_record_signature(record: dict) -> bool:
+    """True iff the record's ``signature`` block verifies.
+
+    The signed payload is the record's canonical bytes including its
+    ``record_hash`` and excluding the ``signature`` block itself (the
+    exact bytes :meth:`AuditSigner.sign_record` signed). Any malformed
+    block, wrong algorithm, or bad signature returns False — this
+    never raises.
+    """
+    sig = record.get("signature")
+    if not isinstance(sig, dict) or sig.get("alg") != SIGNATURE_ALG:
+        return False
+    if not _CRYPTOGRAPHY_AVAILABLE:
+        return False
+    try:
+        public_key = _Ed25519PublicKey.from_public_bytes(
+            bytes.fromhex(str(sig["signer_pubkey"]))
+        )
+        payload = {k: v for k, v in record.items() if k != "signature"}
+        public_key.verify(
+            bytes.fromhex(str(sig["signature"])),
+            _canonical_record_bytes(payload),
+        )
+        return True
+    except Exception:
+        return False
+
+
+def verify_chain(records: list, expected_signer_pubkey: Optional[str] = None) -> bool:
     """Verify a hash-chained audit log (a full log or a seq-ordered slice).
 
     Checks, for every record: ``prev_hash`` links to the previous
     record's ``record_hash`` (genesis = 64 zeros for a full log),
-    ``record_hash`` recomputes from the canonical content, and ``seq``
-    is consecutive. Any tampering — edit, reorder, deletion — fails.
+    ``record_hash`` recomputes from the canonical content (excluding
+    ``record_hash`` itself and any ``signature`` block, which is added
+    after hashing), and ``seq`` is consecutive. Any tampering — edit,
+    reorder, deletion — fails.
+
+    Phase 2 signature rules: a record carrying a ``signature`` block
+    must verify against its embedded public key, and — when
+    ``expected_signer_pubkey`` is given — that embedded key must equal
+    it (a record signed by the wrong key is invalid). A bad or
+    malformed signature fails the chain; verification problems return
+    False, never raise. Records without a signature block (all Phase 1
+    history, and the unsigned head of a mixed chain) verify on hash
+    links alone, so history is never retroactively invalidated.
     """
     if not records:
         return True
@@ -618,11 +847,24 @@ def verify_chain(records: list) -> bool:
     for offset, record in enumerate(records):
         if record.get("prev_hash") != prev_hash:
             return False
-        body = {k: v for k, v in record.items() if k != "record_hash"}
+        body = {
+            k: v
+            for k, v in record.items()
+            if k not in ("record_hash", "signature")
+        }
         if _compute_record_hash(body) != record.get("record_hash"):
             return False
         if first_seq is not None and record.get("seq") != first_seq + offset:
             return False
+        if "signature" in record:
+            sig = record["signature"]
+            if expected_signer_pubkey is not None and (
+                not isinstance(sig, dict)
+                or sig.get("signer_pubkey") != expected_signer_pubkey
+            ):
+                return False
+            if not _verify_record_signature(record):
+                return False
         prev_hash = record["record_hash"]
     return True
 
@@ -679,12 +921,20 @@ class EscalationStore:
     - ``escalation_audit.jsonl`` — one JSON record per event, append
       only, ``seq`` strictly increasing, hash-chained (``prev_hash`` /
       ``record_hash``; see :func:`verify_chain`). Never rewritten.
+
+    Pass ``signer`` (an :class:`AuditSigner`, e.g. from
+    :func:`load_signer_from_env`) to sign every newly appended audit
+    record. The default ``signer=None`` is byte-for-byte the Phase 1
+    behavior: no signature blocks are written, and verification checks
+    hash links (plus any signatures already present in the log,
+    against their embedded keys).
     """
 
     STATE_FILENAME = "escalation_state.json"
     AUDIT_FILENAME = "escalation_audit.jsonl"
 
-    def __init__(self, base_dir: str):
+    def __init__(self, base_dir: str, signer: Optional[AuditSigner] = None):
+        self._signer = signer
         self.base_dir = str(base_dir)
         os.makedirs(self.base_dir, exist_ok=True)
         self.state_path = os.path.join(self.base_dir, self.STATE_FILENAME)
@@ -755,6 +1005,8 @@ class EscalationStore:
         to_state: Optional[str] = None,
         note: Optional[str] = None,
         detail: Optional[str] = None,
+        policy_id: Optional[str] = None,
+        policy_version: Optional[str] = None,
     ) -> dict:
         self._audit_seq += 1
         record = {
@@ -770,7 +1022,20 @@ class EscalationStore:
             "detail": detail,
             "prev_hash": self._last_hash,
         }
+        # Directive 2.1 field completion: when the audited event
+        # carries them, the record names the exact policy + version
+        # that governed it (from the package's triggered rule and the
+        # envelope schema version).
+        if policy_id is not None:
+            record["policy_id"] = policy_id
+        if policy_version is not None:
+            record["policy_version"] = policy_version
         record["record_hash"] = _compute_record_hash(record)
+        if self._signer is not None:
+            # Phase 2 signing: the signature is computed over the
+            # record including its record_hash, then attached; the
+            # hash itself never covers the signature block.
+            record["signature"] = self._signer.sign_record(record)
         self._last_hash = record["record_hash"]
         with open(self.audit_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, sort_keys=True) + "\n")
@@ -790,9 +1055,20 @@ class EscalationStore:
                     records.append(json.loads(line))
         return records
 
-    def verify_audit_chain(self) -> bool:
-        """Verify this store's full audit log hash chain."""
-        return verify_chain(self.read_audit_log())
+    def verify_audit_chain(
+        self, expected_signer_pubkey: Optional[str] = None
+    ) -> bool:
+        """Verify this store's full audit log (hash chain + signatures).
+
+        Signed records must verify against their embedded public keys.
+        When this store has a signer configured, its public key is the
+        expected signer unless ``expected_signer_pubkey`` overrides
+        it — a log signed by a different key then fails verification.
+        """
+        expected = expected_signer_pubkey
+        if expected is None and self._signer is not None:
+            expected = self._signer.signer_pubkey
+        return verify_chain(self.read_audit_log(), expected_signer_pubkey=expected)
 
     # -- decision API ------------------------------------------------------
 
@@ -946,6 +1222,8 @@ class EscalationStore:
                 from_state=None,
                 to_state=PENDING,
                 detail=f"surface={source_surface}",
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._append_audit(
                 package_id=package.id,
@@ -955,6 +1233,8 @@ class EscalationStore:
                 from_state=PENDING,
                 to_state=PENDING,
                 detail=classified_detail,
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._save_state()
         return self._copy(package)
@@ -1068,6 +1348,8 @@ class EscalationStore:
                 to_state=package.state,
                 note=note,
                 detail=f"outcome={outcome}",
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._save_state()
             return self._copy(package)
