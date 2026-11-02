@@ -16,12 +16,14 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from .eip712 import (
     EMPTY_EPOCH_ROOT,
+    BidSummaryMismatchError,
     demo_signing_secret,
     sign_digest,
     to_hex,
     typed_data_digest,
     typed_data_payload,
     validate_bid_before_signing,
+    validate_bid_summary,
     verify_digest,
 )
 from .compliance_filter import ComplianceAttestationFilter
@@ -246,6 +248,33 @@ class ContractNetEngine:
         if digest != expected:
             bid.valid = False
             bid.reject_reason = "digest_mismatch"
+            return
+        # W-116 (verify-side binding): the typed_data payload carried with
+        # the bid must be exactly the payload the bid's scalar fields
+        # describe — same nine message fields, same domain as this
+        # engine's config. The sign side already gates its own payloads
+        # this way (item 301); without the same check here, a signature
+        # minted for different terms (another price, chain, or verifying
+        # contract) would verify against scalars it never committed to.
+        try:
+            validate_bid_summary(
+                bid.typed_data,
+                config=self.config,
+                expected_message={
+                    "auctionId": bid.auction_id,
+                    "taskId": bid.task_id,
+                    "agent": bid.agent_wallet,
+                    "price": bid.price,
+                    "estimatedTokens": bid.estimated_tokens,
+                    "nonce": bid.nonce,
+                    "deadline": bid.deadline,
+                    "epochId": bid.epoch_id,
+                    "epochRoot": bid.epoch_merkle_root or EMPTY_EPOCH_ROOT,
+                },
+            )
+        except BidSummaryMismatchError:
+            bid.valid = False
+            bid.reject_reason = "typed_data_mismatch"
             return
         if not verify_digest(
             digest,

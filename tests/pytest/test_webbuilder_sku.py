@@ -194,6 +194,20 @@ def _settle(client, challenge_id, **extra):
     return client.post("/rail/settle", json=body)
 
 
+def _replay_proof_fields(challenge_id):
+    """W-115 (hunt 32): retry settles must carry the payer's W-103
+    replay proof — an unproven retry is refused with
+    payer_proof_required (see
+    test_hunt32_w115_settle_payer_proof.py)."""
+    import time
+
+    ts_ms = int(time.time() * 1000)
+    sig = "0x" + _PAYER_ACCT.sign_message(_encode_defunct(
+        text=x402.build_replay_message(challenge_id, ts_ms))
+    ).signature.hex()
+    return {"replay_signature": sig, "replay_ts_ms": ts_ms}
+
+
 def _wb_project():
     from sincor2 import webbuilder_studio as wb
     projects = wb.list_projects()
@@ -269,8 +283,8 @@ def test_full_loop_webbuilder_checkout_settle_fulfillment_delivered(
     assert fulfillment["status"] == "delivered"
     intake_id = fulfillment["intake_id"]
     assert intake_id == f"intake-rail-{cid}"
-    assert fulfillment["intake_url"] == (
-        f"https://getsincor.com/intake/{intake_id}")
+    assert fulfillment["intake_url"].startswith(
+        f"https://getsincor.com/intake/{intake_id}?token=")
 
     db_path = rail_env["tmp"] / "revenue.db"
 
@@ -284,6 +298,11 @@ def test_full_loop_webbuilder_checkout_settle_fulfillment_delivered(
 
     intake = pl.get_pack_intake(db_path, intake_id)
     assert intake is not None
+    # Wren PR 1 stale-pin correction: the intake URL must carry the
+    # row's secret delivery token (the bare URL was the defect).
+    assert fulfillment["intake_url"] == (
+        f"https://getsincor.com/intake/{intake_id}"
+        f"?token={intake.details['intake_token']}")
     assert intake.customer_email == "buyer@example.com"
     assert intake.pack_sku == "webbuilder_site"
     assert intake.event_id == f"rail-{cid}"
@@ -410,8 +429,11 @@ def test_webbuilder_fulfillment_failure_marks_failed_and_alerts(
     # re-settling completes without a second payment record. (Restore only
     # the studio patch — monkeypatch.undo() would also drop the RPC stub,
     # the env isolation, and the comms mocks.)
+    # W-115: the retry carries the payer's replay proof — an unproven
+    # retry no longer completes a claimed order (previously pinned the
+    # unauthenticated retry).
     monkeypatch.setattr(wb, "create_project", orig_create_project)
-    retry = _settle(client, cid)
+    retry = _settle(client, cid, **_replay_proof_fields(cid))
     retry_body = retry.get_json()
     assert retry_body["ok"] is True
     assert retry_body["status"] == "fulfilled"
@@ -494,9 +516,11 @@ def test_retry_after_partial_build_resumes_single_project(
 
     # restore CRM and retry: must resume, not rebuild (restore only the CRM
     # patch — monkeypatch.undo() would drop the RPC stub, env isolation,
-    # and comms mocks)
+    # and comms mocks).
+    # W-115: the retry carries the payer's replay proof — an unproven
+    # retry no longer completes a claimed order.
     monkeypatch.setattr(crm, "record_contact", orig_record_contact)
-    retry = _settle(client, cid)
+    retry = _settle(client, cid, **_replay_proof_fields(cid))
     retry_body = retry.get_json()
     assert retry.status_code == 200
     assert retry_body["ok"] is True

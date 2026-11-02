@@ -15,7 +15,7 @@ ADDED: Rate Limiting for DDoS protection
 import os
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, make_response
+from flask import Flask, render_template, request, jsonify, send_file, make_response, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sincor2.runtime_secrets import resolve_flask_secret
 
@@ -1424,6 +1424,86 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
+
+
+# ---------------------------------------------------------------------------
+# Command Center admin gate (hunt-32 W-44 — Builder B bypass closure).
+#
+# create_app() mounts command_center_bp, whose routes declare no auth of
+# their own. Production (sincor2.mvp_app) runs _require_admin as a
+# before_request guard over every /api/command-center/* path, with the
+# standing rule: do not mount this blueprint on any app without an
+# equivalent guard in front of these paths. This factory mounted it
+# bare, so the killswitch POST, the grade-task POST, and the
+# roster/status GETs were anonymous here (Builder B PoC: an
+# unauthenticated kill flipped the token-budget controller to killed).
+#
+# The check below mirrors mvp_app._require_admin semantics against the
+# same credential sources (ADMIN_USERNAME / ADMIN_PASSWORD env), in the
+# same shape as the waitlist handler's _is_admin_request mirror:
+#   * admin session: session["is_admin"] set and session
+#     ["admin_username"] matching ADMIN_USERNAME, or
+#   * a Bearer JWT (or access_token cookie) whose sub is the admin
+#     username AND whose role claim is 'admin' (sub alone is never
+#     sufficient — hunt-32 W-44), or
+#   * the X-Admin-Key header matching ADMIN_PASSWORD (header ONLY —
+#     never the request body, query string, form, or cookies).
+# Fail-closed: any missing, mismatched, or un-comparable credential
+# (e.g. a non-ASCII key, which hmac.compare_digest cannot compare)
+# returns False and the gate answers 401.
+# ---------------------------------------------------------------------------
+
+def _legacy_admin_request_ok() -> bool:
+    import hmac
+
+    admin_username = (os.environ.get("ADMIN_USERNAME") or "").strip()
+    admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+    def _ct_eq(a: str, b: str) -> bool:
+        try:
+            return hmac.compare_digest(a, b)
+        except (TypeError, ValueError):
+            return False
+
+    if session.get("is_admin") and admin_username:
+        if _ct_eq(
+            str(session.get("admin_username") or "").lower(),
+            admin_username.lower(),
+        ):
+            return True
+
+    token = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):].strip()
+    elif request.cookies:
+        token = request.cookies.get("access_token")
+    if token and admin_username:
+        try:
+            from flask_jwt_extended import decode_token
+
+            decoded = decode_token(token)
+            if decoded.get("role") == "admin" and _ct_eq(
+                str(decoded.get("sub") or "").lower(), admin_username.lower()
+            ):
+                return True
+        except Exception:
+            pass
+
+    key = request.headers.get("X-Admin-Key", "")
+    if key and admin_password:
+        if _ct_eq(str(key), admin_password):
+            return True
+
+    return False
+
+
+@app.before_request
+def _command_center_api_admin_gate():
+    if request.path.startswith("/api/command-center/"):
+        if not _legacy_admin_request_ok():
+            return jsonify({'error': 'Unauthorized'}), 401
+    return None
 
 
 def create_app():

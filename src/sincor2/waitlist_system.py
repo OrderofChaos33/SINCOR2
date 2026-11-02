@@ -8,6 +8,7 @@ import hashlib
 import secrets
 import smtplib
 import os
+import urllib.parse
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -229,6 +230,23 @@ class WaitlistManager:
             
             return position + 1
     
+    def _connect_readonly(self):
+        """Open the waitlist DB read-only at the driver level (dev-watch 304).
+
+        The connection is opened through a ``mode=ro`` URI and switched
+        to ``PRAGMA query_only`` — enforcement lives in SQLite itself,
+        not in an app-layer flag, so no query issued on this connection
+        can write, however it is constructed.
+        """
+        uri = (
+            "file:"
+            + urllib.parse.quote(os.path.abspath(self.db_path))
+            + "?mode=ro"
+        )
+        conn = sqlite3.connect(uri, uri=True)
+        conn.execute("PRAGMA query_only = ON")
+        return conn
+
     def get_signup_stats(self):
         """Aggregate signup counts computed directly from the waitlist table.
 
@@ -238,7 +256,7 @@ class WaitlistManager:
         table itself, never the product_analytics rollup (whose counters
         can drift from the table they summarize).
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect_readonly() as conn:
             total, verified, latest = conn.execute('''
                 SELECT COUNT(*),
                        COALESCE(SUM(is_verified), 0),
@@ -296,13 +314,16 @@ class WaitlistManager:
                 LIMIT ?
             ''', (product_name, batch_size)).fetchall()
             
-            # Mark as notified
+            # Mark as notified — one bound UPDATE per hash (dev-watch
+            # 304): no query string is ever built from a value, not even
+            # a generated placeholder list.
             email_hashes = [self.hash_email(user[0]) for user in users]
-            placeholders = ','.join('?' * len(email_hashes))
-            conn.execute(f'''
-                UPDATE waitlist SET notification_sent = TRUE 
-                WHERE email_hash IN ({placeholders})
-            ''', email_hashes)
+            for email_hash in email_hashes:
+                conn.execute(
+                    'UPDATE waitlist SET notification_sent = TRUE '
+                    'WHERE email_hash = ?',
+                    (email_hash,),
+                )
             
             conn.commit()
             

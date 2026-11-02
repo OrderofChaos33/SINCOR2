@@ -56,10 +56,30 @@ after #3795 the body is {"error": <reason>} and the @x402/express
 settlement catch-all answers {"error": "settlement_failed"}. This client
 reads the refusal reason from the BODY (the guaranteed channel) and
 surfaces it as a typed PaymentRefusedError.
+
+FACILITATOR ERROR SHAPES (dev-watch items 309 + 310 / x402 Go #3937,
+#3778): some facilitators answer verification failures with a bare HTTP
+500, dropping the typed error (#3937), and answer settlement_pending
+with a 500, dropping the broadcast hash (#3778). This client therefore
+classifies EVERY paid-leg failure by the error REASON parsed from the
+response BODY — never by HTTP status alone
+(:func:`classify_paid_leg_failure`): each failure class maps to exactly
+one client action (:class:`FailureAction`) — deterministically-invalid
+payments (bad signature, insufficient balance) ABORT and are never
+retried as if transient; an expired authorization is CORRECT_AND_RETRY
+(discard the stale bytes, re-sign a fresh validity window over the same
+nonce, resend exactly once); settlement failures, pending settlements,
+and anything unrecognized HOLD for reconciliation. A bare 500 is
+UNKNOWN, never "invalid". A non-2xx body is never discarded: when it
+carries a settlement_pending reason with a broadcast hash, the hash is
+recovered and reconciled onchain via the injected
+``settlement_reconciler`` BEFORE any retry decision, and no second
+payment is ever submitted for a pending settlement.
 """
 
 from __future__ import annotations
 
+import enum
 import json
 import secrets
 import socket
@@ -67,7 +87,7 @@ import threading
 import time
 import urllib.request
 import urllib.error
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional
 
 # Base mainnet USDC (EIP-3009 transferWithAuthorization)
@@ -204,6 +224,55 @@ class SettlementFailedError(PaymentRefusedError):
     """Paid-leg 402 with body error ``settlement_failed`` (settle catch-all)."""
 
 
+class ExpiredAuthorizationError(PaymentRefusedError):
+    """Facilitator rejected the authorization as EXPIRED (items 309/310).
+
+    The one deterministically-invalid class whose correction is sound:
+    the token contract refuses transferWithAuthorization after
+    validBefore, so the rejected bytes can never settle. The client
+    discards them, re-signs a FRESH validity window — one that STRICTLY
+    EXTENDS the rejected window while staying inside the 1h absurdity
+    bound — over the SAME nonce / amount / recipient, and resends
+    exactly once (CORRECT_AND_RETRY). When no in-bound window can
+    strictly extend the rejected one, the failure is uncorrectable and
+    this error is raised with no resend.
+    """
+
+
+class SettlementPendingError(PaymentRefusedError):
+    """Facilitator reports the settlement PENDING, with its broadcast hash.
+
+    Raised for a ``settlement_pending`` reason on ANY paid-leg status
+    (the x402 Go facilitator answers it with a 500 — item 310). Carries
+    the recovered broadcast ``tx_hash`` and the result of the injected
+    onchain ``settlement_reconciler`` (None when no reconciler is wired
+    or no hash was present). The client NEVER submits a second payment
+    for a pending settlement: the action is HOLD.
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        message: str,
+        *,
+        tx_hash: Optional[str] = None,
+        reconciliation: Any = None,
+    ) -> None:
+        super().__init__(reason, message)
+        self.tx_hash = tx_hash
+        self.reconciliation = reconciliation
+
+
+class UnknownFacilitatorFailure(AmbiguousPayment):
+    """Paid-leg failure with no parseable reason (e.g. a bare 500).
+
+    Item 309: an unknown failure is UNKNOWN — it is never classified as
+    deterministically invalid (it is NOT a PaymentRefusedError subclass
+    instance for a known reason) and never retried as if transient. The
+    payment may have settled; the action is HOLD for reconciliation.
+    """
+
+
 # URLError reasons that prove the TCP connection was never established,
 # hence no request bytes (and no payment) could have left this machine.
 # Anything else (timeouts, resets, TLS errors, mid-stream failures) is
@@ -307,6 +376,192 @@ def classify_retry_refusal(raw_body: bytes) -> AmbiguousPayment:
             "after signed payment;",
             f"after signed payment (reason: {reason});",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Paid-leg failure classification (dev-watch items 309 + 310)
+# ---------------------------------------------------------------------------
+
+
+class FailureAction(str, enum.Enum):
+    """The exactly-one client action a paid-leg failure class maps to."""
+
+    CORRECT_AND_RETRY = "correct_and_retry"
+    ABORT = "abort"
+    HOLD = "hold"
+
+
+#: Failure classes (FacilitatorFailure.klass values).
+FAILURE_INVALID_SIGNATURE = "invalid_signature"
+FAILURE_INSUFFICIENT_FUNDS = "insufficient_funds"
+FAILURE_EXPIRED_AUTHORIZATION = "expired_authorization"
+FAILURE_SETTLEMENT_FAILED = "settlement_failed"
+FAILURE_SETTLEMENT_PENDING = "settlement_pending"
+FAILURE_UNKNOWN = "unknown"
+
+_EXPIRED_REASONS = frozenset(
+    {
+        "authorization_expired",
+        "expired_authorization",
+        "expired",
+        "payment_expired",
+        "valid_before_expired",
+        "authorization_expiry",
+    }
+)
+_SETTLEMENT_PENDING_REASONS = frozenset(
+    {
+        "settlement_pending",
+        "settle_pending",
+        "settlement_in_progress",
+        "settlement_queued",
+    }
+)
+
+#: Body keys under which a facilitator may carry the broadcast hash of a
+#: pending settlement (item 310: the hash must be recovered, never dropped).
+_TX_HASH_KEYS = (
+    "txHash",
+    "tx_hash",
+    "transactionHash",
+    "transaction_hash",
+    "settlementTxHash",
+    "hash",
+)
+
+
+def _extract_tx_hash(parsed: dict[str, Any]) -> Optional[str]:
+    """Recover a 0x-prefixed 32-byte broadcast hash from a response body.
+
+    Checks the top level and a nested ``settlement`` object. Returns the
+    lowercased hash, or None when no candidate is a well-formed hash —
+    a malformed value is never trusted as a reconciliation target.
+    """
+    candidates: list[Any] = [parsed.get(k) for k in _TX_HASH_KEYS]
+    nested = parsed.get("settlement")
+    if isinstance(nested, dict):
+        candidates.extend(nested.get(k) for k in _TX_HASH_KEYS)
+    for cand in candidates:
+        if isinstance(cand, str):
+            h = cand.strip().lower()
+            if (
+                len(h) == 66
+                and h.startswith("0x")
+                and all(c in "0123456789abcdef" for c in h[2:])
+            ):
+                return h
+    return None
+
+
+@dataclass(frozen=True)
+class FacilitatorFailure:
+    """One classified paid-leg failure: class + exactly one action."""
+
+    status: int
+    reason: str  # normalized body reason ("" when absent/unparseable)
+    klass: str  # one of the FAILURE_* constants
+    action: FailureAction
+    tx_hash: Optional[str] = None  # recovered broadcast hash, if carried
+
+
+def classify_paid_leg_failure(status: int, raw_body: bytes) -> FacilitatorFailure:
+    """Classify a paid-leg failure by its BODY REASON, never status alone.
+
+    Item 309 (x402 Go #3937): a facilitator may answer a verification
+    failure with a bare HTTP 500, dropping the typed error into the body
+    or out of it entirely. The reason is therefore parsed from the body
+    regardless of status: a 500 carrying ``invalid_signature`` IS an
+    invalid signature (ABORT), and a bare 500 with no parseable reason is
+    UNKNOWN (HOLD) — never "invalid", never transient.
+
+    Item 310 (x402 Go #3778): the body is never discarded — a
+    ``settlement_pending`` reason and its broadcast hash are recovered
+    from ANY non-2xx body so the caller can reconcile the hash onchain
+    before any retry.
+    """
+    parsed: dict[str, Any] = {}
+    try:
+        candidate = json.loads(raw_body or b"{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        candidate = {}
+    if isinstance(candidate, dict):
+        parsed = candidate
+    reason = ""
+    err_field: Any = parsed.get("error")
+    if isinstance(err_field, dict):
+        reason = _normalize_refusal_reason(
+            err_field.get("code") or err_field.get("reason") or err_field.get("message")
+        )
+    elif err_field:
+        reason = _normalize_refusal_reason(err_field)
+    if not reason:
+        reason = _normalize_refusal_reason(parsed.get("reason") or parsed.get("code"))
+    tx_hash = _extract_tx_hash(parsed)
+
+    if reason in _REFUSAL_REASON_MAP and _REFUSAL_REASON_MAP[reason] is InvalidSignatureError:
+        klass, action = FAILURE_INVALID_SIGNATURE, FailureAction.ABORT
+    elif reason in _REFUSAL_REASON_MAP and _REFUSAL_REASON_MAP[reason] is InsufficientFundsError:
+        klass, action = FAILURE_INSUFFICIENT_FUNDS, FailureAction.ABORT
+    elif reason in _EXPIRED_REASONS:
+        klass, action = FAILURE_EXPIRED_AUTHORIZATION, FailureAction.CORRECT_AND_RETRY
+    elif reason in _REFUSAL_REASON_MAP and _REFUSAL_REASON_MAP[reason] is SettlementFailedError:
+        klass, action = FAILURE_SETTLEMENT_FAILED, FailureAction.HOLD
+    elif reason in _SETTLEMENT_PENDING_REASONS:
+        klass, action = FAILURE_SETTLEMENT_PENDING, FailureAction.HOLD
+    else:
+        klass, action = FAILURE_UNKNOWN, FailureAction.HOLD
+    return FacilitatorFailure(
+        status=status, reason=reason, klass=klass, action=action, tx_hash=tx_hash
+    )
+
+
+def failure_action_for_error(exc: BaseException) -> FailureAction:
+    """Map a raised buyer error to the matrix action for its class.
+
+    Deterministically-invalid refusals (bad signature, insufficient
+    funds) ABORT — retrying them as if transient is the item-309 bug.
+    Expired authorizations CORRECT_AND_RETRY. Everything else ambiguous
+    (settlement failed/pending, unrecognized refusals, plain
+    AmbiguousPayment) HOLDs for reconciliation.
+    """
+    if isinstance(exc, (InvalidSignatureError, InsufficientFundsError)):
+        return FailureAction.ABORT
+    if isinstance(exc, ExpiredAuthorizationError):
+        return FailureAction.CORRECT_AND_RETRY
+    if isinstance(exc, AmbiguousPayment):
+        return FailureAction.HOLD
+    raise TypeError(f"not a payment failure error: {type(exc).__name__}")
+
+
+def _error_for_failure(failure: FacilitatorFailure) -> AmbiguousPayment:
+    """Build the typed error for a classified non-402 paid-leg failure."""
+    detail = (
+        f"paid-leg facilitator failure: HTTP {failure.status}, "
+        f"reason {failure.reason or 'unknown'} (class {failure.klass}, "
+        f"action {failure.action.value})"
+    )
+    if failure.tx_hash:
+        # A failure body may carry a broadcast hash even without a
+        # settlement_pending reason (item 310's dropped-hash shape):
+        # surface it on the error so the reconciliation lead survives
+        # instead of being dropped with the classification.
+        detail += (
+            f"; failure body carried broadcast tx {failure.tx_hash} — "
+            "reconcile it onchain before any retry"
+        )
+    if failure.klass == FAILURE_INVALID_SIGNATURE:
+        return InvalidSignatureError(failure.reason, detail)
+    if failure.klass == FAILURE_INSUFFICIENT_FUNDS:
+        return InsufficientFundsError(failure.reason, detail)
+    if failure.klass == FAILURE_SETTLEMENT_FAILED:
+        return SettlementFailedError(failure.reason, detail)
+    if failure.klass == FAILURE_EXPIRED_AUTHORIZATION:
+        return ExpiredAuthorizationError(failure.reason, detail)
+    return UnknownFacilitatorFailure(
+        f"ambiguous retry status {failure.status}; {detail}; refusing to "
+        "retry blindly — the failure reason is unknown, which is never "
+        "treated as invalid; reconcile payment status first"
     )
 
 
@@ -557,6 +812,7 @@ class X402Buyer:
         timeout_seconds: int = 30,
         expected_price_usd: float | None = None,
         price_tolerance_bps: int = DEFAULT_PRICE_TOLERANCE_BPS,
+        settlement_reconciler: Optional[Callable[[str], Any]] = None,
     ) -> None:
         if not wallet_address or not wallet_address.startswith("0x"):
             raise ValueError("wallet_address must be a 0x address")
@@ -577,6 +833,12 @@ class X402Buyer:
         # docstring design constraint.
         self.expected_price_usd = expected_price_usd
         self.price_tolerance_bps = price_tolerance_bps
+        # Item 310: onchain reconciler for a pending settlement's
+        # broadcast hash — takes the tx hash, returns its chain state.
+        # Injected (never constructed here) so tests and callers own the
+        # RPC surface. Consulted BEFORE any retry decision; this client
+        # never submits a second payment for a pending settlement.
+        self._settlement_reconciler = settlement_reconciler
         # W-75: payment-attempt journal.  Maps a resource URL to the
         # (requirements, signed authorization) of the last attempt whose
         # outcome was ambiguous (or transport-failed after signing).  A
@@ -819,6 +1081,33 @@ class X402Buyer:
         with self._journal_lock:
             self._inflight.pop(url, None)
 
+    # -- pending-settlement reconciliation (item 310) ----------------------
+
+    def _pending_error(self, failure: FacilitatorFailure) -> SettlementPendingError:
+        """Build the HOLD error for a pending settlement, reconciling first.
+
+        When the failure body carried a broadcast hash and a reconciler
+        is wired, the hash is checked onchain NOW — before the caller
+        makes any retry decision. A reconciler failure is recorded on
+        the error, never converted into a retry: the settlement stays
+        pending and no second payment is submitted either way.
+        """
+        reconciliation: Any = None
+        if failure.tx_hash is not None and self._settlement_reconciler is not None:
+            try:
+                reconciliation = self._settlement_reconciler(failure.tx_hash)
+            except Exception as exc:  # reconciler down: still HOLD
+                reconciliation = {"error": f"{type(exc).__name__}: {exc}"}
+        return SettlementPendingError(
+            failure.reason or "settlement_pending",
+            "facilitator reports the settlement PENDING "
+            f"(broadcast tx: {failure.tx_hash or 'not provided'}); "
+            "refusing to submit a second payment — reconcile the "
+            "broadcast hash onchain before any retry",
+            tx_hash=failure.tx_hash,
+            reconciliation=reconciliation,
+        )
+
     # -- HTTP ---------------------------------------------------------
 
     def _do_request(
@@ -936,63 +1225,114 @@ class X402Buyer:
             signed = self.sign_authorization(req)
             self._record_inflight(url, req, signed)
 
-        payment_header = json.dumps(
-            {
-                "x402Version": 1,
-                "scheme": "exact",
-                "network": req.network,
-                "payload": {
-                    "signature": signed.signature,
-                    "authorization": signed.authorization,
-                },
-            }
-        )
         # --- paid leg: the signed authorization now exists. A transport
         # error here is AMBIGUOUS unless the transport proves nothing was
         # sent: the payment may have settled server-side before the error.
         # A caller-driven retry reuses the in-flight authorization (W-75),
         # never a fresh nonce. Never auto-retry; the caller must reconcile
-        # first.
-        try:
-            status2, _, raw2 = self._do_request(
-                url,
-                method,
-                body,
-                {"X-PAYMENT": payment_header, "PAYMENT-SIGNATURE": payment_header},
+        # first. The single exception is item 309's CORRECT_AND_RETRY for
+        # an EXPIRED authorization (see the loop below).
+        corrected = False
+        while True:
+            payment_header = json.dumps(
+                {
+                    "x402Version": 1,
+                    "scheme": "exact",
+                    "network": req.network,
+                    "payload": {
+                        "signature": signed.signature,
+                        "authorization": signed.authorization,
+                    },
+                }
             )
-        except PaymentTransportError:
-            # Transport proved no bytes left this machine: safe to retry.
-            raise
-        except Exception as exc:
-            raise AmbiguousPayment(
-                "paid request transport error after the signed payment was "
-                "sent (or at an unknown point in the send sequence); the "
-                "payment MAY have settled server-side. DO NOT retry blindly "
-                "— reconcile payment status before any retry "
-                f"({type(exc).__name__}: {exc})"
-            ) from exc
+            try:
+                status2, _, raw2 = self._do_request(
+                    url,
+                    method,
+                    body,
+                    {"X-PAYMENT": payment_header, "PAYMENT-SIGNATURE": payment_header},
+                )
+            except PaymentTransportError:
+                # Transport proved no bytes left this machine: safe to retry.
+                raise
+            except Exception as exc:
+                raise AmbiguousPayment(
+                    "paid request transport error after the signed payment was "
+                    "sent (or at an unknown point in the send sequence); the "
+                    "payment MAY have settled server-side. DO NOT retry blindly "
+                    "— reconcile payment status before any retry "
+                    f"({type(exc).__name__}: {exc})"
+                ) from exc
 
-        if status2 == 200:
-            # Paid leg settled: the logical payment is complete — drop the
-            # journal entry so a later, genuinely new payment signs fresh.
-            self._clear_inflight(url)
-            return {
-                "ok": True,
-                "paid": True,
-                "amount_usd": req.amount_usd,
-                "data": json.loads(raw2 or b"{}"),
-            }
-        if status2 == 402:
-            # Server still wants payment after our signed retry: do NOT loop.
-            # Classify the refusal from the 402 BODY (x402 PR #3795 carries
-            # the reason there) into a typed PaymentRefusedError so callers
-            # can distinguish unfunded-wallet from bad-signature from
-            # settlement failure. Every variant IS an AmbiguousPayment: the
-            # payment may have settled, so blind retry stays forbidden.
-            raise classify_retry_refusal(raw2)
-        raise AmbiguousPayment(
-            f"ambiguous retry status {status2}; refusing to retry blindly"
-        )
+            if status2 == 200:
+                # Paid leg settled: the logical payment is complete — drop the
+                # journal entry so a later, genuinely new payment signs fresh.
+                self._clear_inflight(url)
+                return {
+                    "ok": True,
+                    "paid": True,
+                    "amount_usd": req.amount_usd,
+                    "data": json.loads(raw2 or b"{}"),
+                }
+
+            # Items 309 + 310: classify by the BODY REASON, never by the
+            # status alone, and never discard the body — a 500 may carry
+            # the typed error (#3937) or a pending settlement's broadcast
+            # hash (#3778).
+            failure = classify_paid_leg_failure(status2, raw2)
+
+            if (
+                failure.action is FailureAction.CORRECT_AND_RETRY
+                and not corrected
+            ):
+                # Expired authorization: the rejected bytes can NEVER
+                # settle (the token contract refuses them after
+                # validBefore), so discarding them cannot double-pay.
+                # Re-sign over the SAME nonce / amount / recipient with
+                # a validity window that strictly EXTENDS the rejected
+                # one and resend exactly once. The extension must stay
+                # inside the 1h absurdity bound (now + 3599): when the
+                # rejected window already reaches that bound, NO in-bound
+                # window strictly extends it, so the failure is
+                # uncorrectable — raise the expired-authorization error
+                # WITHOUT signing or sending anything, rather than
+                # resending a window that merely equals (or is shorter
+                # than) the rejected one. Any second failure — of any
+                # class — raises below; nothing loops.
+                corrected = True
+                now = int(time.time())
+                rejected_vb = int(signed.authorization.get("validBefore") or 0)
+                corrected_vb = max(rejected_vb, now) + 600
+                if corrected_vb > now + 3599:
+                    raise _error_for_failure(failure)
+                # W-75 record-then-clear: sign the corrected
+                # authorization FIRST and only then replace the journal
+                # entry. If signing raises, the journaled record of the
+                # already-transmitted authorization survives untouched,
+                # so a caller retry must reuse it instead of minting a
+                # brand-new spendable authorization.
+                signed = self.sign_authorization(
+                    replace(req, valid_before=corrected_vb)
+                )
+                self._record_inflight(url, req, signed)
+                continue
+
+            if failure.klass == FAILURE_SETTLEMENT_PENDING:
+                # Item 310: reconcile the broadcast hash onchain (inside
+                # _pending_error) and HOLD. No second payment, ever.
+                raise self._pending_error(failure)
+
+            if status2 == 402:
+                # Server still wants payment after our signed retry: do NOT
+                # loop. Classify the refusal from the 402 BODY (x402 PR
+                # #3795 carries the reason there) into a typed
+                # PaymentRefusedError so callers can distinguish
+                # unfunded-wallet from bad-signature from settlement
+                # failure. Every variant IS an AmbiguousPayment: the
+                # payment may have settled, so blind retry stays forbidden.
+                raise classify_retry_refusal(raw2)
+
+            raise _error_for_failure(failure)
 
     # -- preflight ------------------------------------------------------
 

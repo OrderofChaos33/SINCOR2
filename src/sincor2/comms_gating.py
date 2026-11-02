@@ -17,6 +17,12 @@ fail-closed approach in one place and adds the allowlist + kill-switch layers
 the P1 audit requires. Schedulers, engines, and publishers consult this module
 instead of reading env vars directly, so the gates are enforced uniformly.
 
+Wren PR 8 adds a fourth layer inside outreach_send_allowed(): the
+suppression list (sincor2.comms_compliance) — an address that has
+unsubscribed is refused even when allowlisted, and a suppression-store
+error fails closed. Arming outreach with an empty allowlist also logs
+CRITICAL (see _log_if_armed_without_allowlist).
+
 Env vars:
   OUTREACH_ENABLED              "1"/"true"/"yes" (case-insensitive) to arm outreach
   CONTENT_AGENT_ENABLED         "1"/"true"/"yes" to arm content publishing
@@ -65,7 +71,28 @@ def outreach_opted_in() -> bool:
         return False
     if (os.environ.get("AUTONOMOUS_AGENTS", "") or "").strip().lower() == "false":
         return False
+    _log_if_armed_without_allowlist()
     return True
+
+
+def _log_if_armed_without_allowlist() -> None:
+    """Explicit guard (Wren PR 8): armed outreach + empty allowlist = CRITICAL.
+
+    outreach_send_allowed() already refuses in this state
+    ("no_approved_recipients"); this makes the misconfiguration loud at
+    CRITICAL level so an operator who flips OUTREACH_ENABLED without
+    approving any recipient sees it in the logs immediately, instead of
+    sends silently no-oping.
+    """
+    if not _truthy(os.environ.get("OUTREACH_ENABLED", "")):
+        return
+    if (os.environ.get("AUTONOMOUS_AGENTS", "") or "").strip().lower() == "false":
+        return
+    if not approved_recipients():
+        logger.critical(
+            "[COMMS] OUTREACH_ENABLED is on but OUTREACH_APPROVED_RECIPIENTS is "
+            "empty — outreach stays DISABLED until at least one recipient is approved"
+        )
 
 
 def content_opted_in() -> bool:
@@ -91,9 +118,21 @@ def outreach_send_allowed(recipient: str) -> Tuple[bool, str]:
         return False, "outreach_not_opted_in"
     allowlist = approved_recipients()
     if not allowlist:
+        _log_if_armed_without_allowlist()
         return False, "no_approved_recipients"
     if (recipient or "").strip().lower() not in allowlist:
         return False, "recipient_not_allowlisted"
+    # Suppression list (Wren PR 8): an unsubscribed address is never sent
+    # to, even when allowlisted. A broken suppression store fails CLOSED —
+    # sending blind is worse than not sending.
+    try:
+        from sincor2.comms_compliance import is_suppressed
+
+        if is_suppressed(recipient):
+            return False, "recipient_suppressed"
+    except Exception:
+        logger.exception("[COMMS] Suppression check failed — failing closed")
+        return False, "suppression_check_failed"
     return True, "ok"
 
 

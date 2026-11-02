@@ -12,17 +12,82 @@ Configuration:
     SWARM_BOARD_PATH         board JSON file (default data/swarm_board.json)
     SWARM_MCP_PORT           local dev port for __main__ (default 8899)
     SWARM_MCP_CORS_ORIGINS   comma-separated; exact-match or "*"
+    SWARM_MCP_ALLOWED_HOSTS  comma-separated extra Host values allowed on
+                             POST /mcp (host or host:port)
+    SWARM_MCP_ALLOWED_ORIGINS comma-separated extra Origin values allowed
+                             on POST /mcp (exact origin, e.g.
+                             https://manus.example)
+
+DNS-rebinding protection (dev-watch item 305, CVE-2026-61546):
+    This is the only HTTP MCP listener in the repo (the discovery server,
+    ``sincor2.mcp_server``, is stdio-only). Every ``POST /mcp`` is checked
+    for Host and Origin allowlisting BEFORE authentication is evaluated
+    for dispatch and before any JSON-RPC method — including
+    ``tools/list`` — is served. By default only loopback Host/Origin
+    values (127.0.0.1, localhost, ::1, any port) are allowed; a request
+    carrying no Host/Origin (a non-browser, server-to-server MCP client)
+    is not a browser rebinding vector and is left to bearer auth.
+    This protection is NEVER disabled globally. A tunnel/proxy exception
+    is scoped to the tunneled host/origin only, by naming that exact
+    host in SWARM_MCP_ALLOWED_HOSTS and/or that exact origin in
+    SWARM_MCP_ALLOWED_ORIGINS (or SWARM_MCP_CORS_ORIGINS) — a "*" CORS
+    value reflects CORS headers only and does NOT allowlist a foreign
+    Origin for tool dispatch.
+
+    SWARM_MCP_AUDIENCE       audience (``aud``) audience-bound tokens must
+                             name exactly (default: the server name,
+                             ``swarm-command``)
+    SWARM_MCP_TOKEN_ISSUER   issuer (``iss``) audience-bound tokens must
+                             name exactly (default ``sincor-swarm-issuer``)
+    SWARM_MCP_TOKEN_SIGNING_SECRET
+                             HMAC key audience-bound tokens are signed
+                             with (default: SWARM_MCP_BEARER_TOKEN)
+    SWARM_MCP_REQUIRE_AUDIENCE_TOKEN
+                             "1"/"true" = reject the plain static bearer
+                             token too; only audience-bound tokens pass
+
+Audience validation (dev-watch item 303, CVE-2026-116684 /
+GHSA-w4fh-qvv9-3v23): the MCP Python SDK's bearer auth accepted a valid
+token issued for a *different* service when one authorization server
+served several resources and the token's audience was not checked; the
+patched SDK (mcp 1.30.0 / 2.2.0) adds ``validate_token_resource``, OFF
+unless explicitly set. This server does not use the MCP SDK at all (it
+is stdlib-only, like ``sincor2.mcp_server``), so the equivalent rule is
+implemented here, in the auth layer this server actually has, and it is
+ON unconditionally — there is no config switch that disables it:
+
+  * a *plain* bearer token is accepted only on exact (constant-time)
+    match with SWARM_MCP_BEARER_TOKEN — a credential configured directly
+    on this one service, audience-bound by deployment;
+  * a *structured* token (three dot-separated segments whose header is
+    a JSON object naming an ``alg`` — an HS256 JWT) is NEVER compared
+    against the static token. It is validated on every request:
+    signature (HMAC-SHA256, constant-time), algorithm (HS256 only —
+    ``none``/anything else is refused), issuer (exact), expiry (``exp``
+    required, ``nbf`` honoured), scope (must carry
+    REQUIRED_TOKEN_SCOPE), and audience: ``aud`` must name this service
+    EXACTLY (a sole string equal to the service audience, or a
+    one-element list containing exactly it). A valid token minted for
+    a sibling service is therefore refused with 401, even when it is
+    signed with the same shared secret by the same issuer.
+  * with SWARM_MCP_REQUIRE_AUDIENCE_TOKEN on, only structured
+    audience-bound tokens pass; the plain static token is refused.
 
 Run locally:  python -m sincor2.swarm_command_mcp
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
 import json
 import os
+import time
 from typing import Any, Dict, Iterable, List, Tuple
+from urllib.parse import urlparse
 
+from sincor2.mcp_schema_guard import SchemaValidationError, validate_arguments
 from sincor2.swarm_command_board import BoardStore, LANES
 
 SERVER_NAME = "swarm-command"
@@ -45,6 +110,24 @@ _JSON = "application/json"
 MAX_REQUEST_BODY_BYTES = 1_048_576  # 1 MiB
 MAX_TOOL_INPUT_ELEMENTS = 1_000
 MAX_TOOL_INPUT_DEPTH = 32
+
+# -- audience validation (dev-watch item 303: CVE-2026-116684) -----------
+#
+# Explicitly ENABLED — the exact opt-in the patched MCP Python SDK
+# requires (``validate_token_resource=True`` + ``resource_server_url``),
+# except here it is a constant, not a setting that can be left/set off.
+AUDIENCE_VALIDATION_ENABLED = True
+VALIDATE_TOKEN_RESOURCE = True  # SDK AuthSettings name for the same flag
+#: The audience this service answers to. A token whose ``aud`` does not
+#: name this value exactly is refused (see validate_audience_token).
+SERVICE_AUDIENCE = SERVER_NAME  # "swarm-command"
+#: resource_server_url equivalent: the audience value itself (this
+#: stdlib server has no public URL configured, so the audience is the
+#: service name — the string the issuer stamps into tokens for us).
+RESOURCE_SERVER_URL = SERVICE_AUDIENCE
+DEFAULT_TOKEN_ISSUER = "sincor-swarm-issuer"
+REQUIRED_TOKEN_SCOPE = "mcp:access"
+TOKEN_ALGORITHM = "HS256"
 
 # -- tool catalogue -------------------------------------------------------
 # Each entry: name -> (required args, schema, handler-name on the dispatcher)
@@ -136,6 +219,15 @@ def _tool_defs() -> List[Dict[str, Any]]:
                     items={
                         "type": "array",
                         "description": "non-empty list of {title, detail, owner}",
+                        "items": {
+                            "type": "object",
+                            "required": ["title", "detail", "owner"],
+                            "properties": {
+                                "title": {"type": "string"},
+                                "detail": {"type": "string"},
+                                "owner": {"type": "string"},
+                            },
+                        },
                     },
                     proposed_by={"type": "string"},
                 ),
@@ -256,6 +348,201 @@ def _configured_token() -> str:
     return os.environ.get("SWARM_MCP_BEARER_TOKEN", "")
 
 
+# -- audience-bound tokens (item 303) --------------------------------------
+
+
+class AudienceTokenError(ValueError):
+    """A structured audience-bound token failed validation."""
+
+
+def _service_audience() -> str:
+    return os.environ.get("SWARM_MCP_AUDIENCE", "").strip() or SERVICE_AUDIENCE
+
+
+def _token_issuer() -> str:
+    return os.environ.get("SWARM_MCP_TOKEN_ISSUER", "").strip() or DEFAULT_TOKEN_ISSUER
+
+
+def _token_signing_secret() -> str:
+    return os.environ.get("SWARM_MCP_TOKEN_SIGNING_SECRET", "") or _configured_token()
+
+
+def _require_audience_token() -> bool:
+    raw = os.environ.get("SWARM_MCP_REQUIRE_AUDIENCE_TOKEN", "")
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(segment: str) -> bytes:
+    if not isinstance(segment, str) or not segment:
+        raise AudienceTokenError("empty token segment")
+    try:
+        data = segment.encode("ascii")
+    except UnicodeEncodeError:
+        raise AudienceTokenError("token segment is not ascii") from None
+    data += b"=" * (-len(data) % 4)
+    try:
+        return base64.urlsafe_b64decode(data)
+    except (ValueError, TypeError):
+        raise AudienceTokenError("token segment is not base64url") from None
+
+
+def _decode_json_segment(segment: str) -> Dict[str, Any]:
+    try:
+        value = json.loads(_b64url_decode(segment).decode("utf-8"))
+    except AudienceTokenError:
+        raise
+    except (ValueError, UnicodeDecodeError):
+        raise AudienceTokenError("token segment is not JSON") from None
+    if not isinstance(value, dict):
+        raise AudienceTokenError("token segment is not a JSON object")
+    return value
+
+
+def _looks_like_audience_token(token: str) -> bool:
+    """True for a structured (JWT-shaped) token: 3 segments, JSON header
+    naming an ``alg``. Such a token is validated ONLY as an audience
+    token — it never falls through to the plain static-token compare."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return False
+    try:
+        header = _decode_json_segment(parts[0])
+    except AudienceTokenError:
+        return False
+    return "alg" in header
+
+
+def issue_audience_token(
+    *,
+    secret: str = "",
+    audience: str = "",
+    issuer: str = "",
+    subject: str = "operator",
+    scopes: Iterable[str] = (REQUIRED_TOKEN_SCOPE,),
+    expires_in_s: int = 3600,
+    now: float | None = None,
+) -> str:
+    """Mint an HS256 audience-bound token for this service.
+
+    Operator/issuer-side helper: possession of the signing secret is
+    what authorizes minting, exactly as possession of the static bearer
+    token authorizes its use. Defaults bind the token to this service's
+    audience, the configured issuer, and the required scope.
+    """
+    key = secret or _token_signing_secret()
+    if not key:
+        raise AudienceTokenError("no signing secret configured")
+    issued = int(time.time() if now is None else now)
+    header = {"alg": TOKEN_ALGORITHM, "typ": "JWT"}
+    payload = {
+        "iss": issuer or _token_issuer(),
+        "aud": audience or _service_audience(),
+        "sub": subject,
+        "scope": " ".join(scopes),
+        "iat": issued,
+        "exp": issued + int(expires_in_s),
+    }
+    signing_input = "%s.%s" % (
+        _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8")),
+        _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
+    )
+    signature = hmac.new(
+        key.encode("utf-8"), signing_input.encode("ascii"), hashlib.sha256
+    ).digest()
+    return "%s.%s" % (signing_input, _b64url_encode(signature))
+
+
+def validate_audience_token(token: str, *, now: float | None = None) -> Dict[str, Any]:
+    """Validate one structured token on every check the scheme supports.
+
+    Signature, algorithm, issuer, expiry, scope, and — the CVE-2026-116684
+    rule — audience: ``aud`` must name this service EXACTLY (a string
+    equal to the service audience, or a one-element list holding exactly
+    that string; a multi-service audience is not an exact naming).
+    Returns the claims on success; raises AudienceTokenError otherwise.
+    """
+    if not AUDIENCE_VALIDATION_ENABLED:  # pragma: no cover — constant-on guard
+        raise AudienceTokenError("audience validation is disabled")
+    secret = _token_signing_secret()
+    if not secret:
+        raise AudienceTokenError("no signing secret configured")
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise AudienceTokenError("token is not a three-segment JWT")
+    header = _decode_json_segment(parts[0])
+    if header.get("alg") != TOKEN_ALGORITHM:
+        raise AudienceTokenError("unsupported token alg %r" % (header.get("alg"),))
+    if "typ" in header and header.get("typ") != "JWT":
+        raise AudienceTokenError("unsupported token typ %r" % (header.get("typ"),))
+    signing_input = ("%s.%s" % (parts[0], parts[1])).encode("ascii")
+    expected_sig = hmac.new(
+        secret.encode("utf-8"), signing_input, hashlib.sha256
+    ).digest()
+    try:
+        supplied_sig = _b64url_decode(parts[2])
+    except AudienceTokenError:
+        raise AudienceTokenError("token signature is not base64url") from None
+    if not hmac.compare_digest(supplied_sig, expected_sig):
+        raise AudienceTokenError("token signature mismatch")
+    claims = _decode_json_segment(parts[1])
+    if claims.get("iss") != _token_issuer():
+        raise AudienceTokenError("token issuer mismatch")
+    expected_aud = _service_audience()
+    aud = claims.get("aud")
+    if isinstance(aud, (list, tuple)):
+        aud_ok = len(aud) == 1 and aud[0] == expected_aud
+    else:
+        aud_ok = aud == expected_aud
+    if not aud_ok:
+        raise AudienceTokenError(
+            "token audience %r does not name this service (%r) exactly"
+            % (aud, expected_aud)
+        )
+    moment = time.time() if now is None else now
+    exp = claims.get("exp")
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+        raise AudienceTokenError("token has no numeric expiry")
+    if moment >= float(exp):
+        raise AudienceTokenError("token expired")
+    nbf = claims.get("nbf")
+    if isinstance(nbf, (int, float)) and not isinstance(nbf, bool):
+        if moment < float(nbf):
+            raise AudienceTokenError("token not yet valid")
+    scope_claim = claims.get("scope", claims.get("scp", ""))
+    if isinstance(scope_claim, str):
+        scopes = scope_claim.split()
+    elif isinstance(scope_claim, (list, tuple)):
+        scopes = [str(s) for s in scope_claim]
+    else:
+        scopes = []
+    if REQUIRED_TOKEN_SCOPE not in scopes:
+        raise AudienceTokenError("token lacks required scope %r" % REQUIRED_TOKEN_SCOPE)
+    return claims
+
+
+def _bearer_authorized(supplied: str, expected_static: str) -> bool:
+    """The per-request auth decision for POST /mcp.
+
+    Structured tokens: audience validation only (no static fallback).
+    Plain tokens: exact static match, unless require-mode is on.
+    """
+    if not supplied:
+        return False
+    if _looks_like_audience_token(supplied):
+        try:
+            validate_audience_token(supplied)
+        except AudienceTokenError:
+            return False
+        return True
+    if _require_audience_token():
+        return False
+    return bool(expected_static) and hmac.compare_digest(supplied, expected_static)
+
+
 def _cors_origins() -> List[str]:
     raw = os.environ.get("SWARM_MCP_CORS_ORIGINS", "")
     return [o.strip() for o in raw.split(",") if o.strip()]
@@ -270,6 +557,102 @@ def _cors_origin_for(request_origin: str) -> str | None:
     if request_origin and request_origin in origins:
         return request_origin
     return None
+
+
+# -- DNS-rebinding protection: Host / Origin allowlists (item 305) ---------
+#
+# MCP TransportSecuritySettings equivalent for this stdlib server:
+# DNS-rebinding protection is conceptually always ON here — there is
+# deliberately no setting that turns these checks off.
+
+LOOPBACK_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def _allowed_hosts() -> List[str]:
+    raw = os.environ.get("SWARM_MCP_ALLOWED_HOSTS", "")
+    return [h.strip().lower() for h in raw.split(",") if h.strip()]
+
+
+def _allowed_origins() -> List[str]:
+    """Exact origins allowlisted for dispatch (never "*").
+
+    Sources: SWARM_MCP_ALLOWED_ORIGINS plus the exact-match entries of
+    SWARM_MCP_CORS_ORIGINS. A "*" CORS entry is a CORS-reflection setting
+    only; it must not become a global rebinding exception.
+    """
+    raw = os.environ.get("SWARM_MCP_ALLOWED_ORIGINS", "")
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    origins.extend(o for o in _cors_origins() if o != "*")
+    return origins
+
+
+def _hostname_of(value: str) -> str:
+    """Hostname (lowercase, no port/brackets) from a Host or origin-ish value."""
+    v = (value or "").strip().lower()
+    if not v:
+        return ""
+    if "://" in v:
+        return (urlparse(v).hostname or "").lower()
+    if v.startswith("["):  # [::1]:8899
+        end = v.find("]")
+        return v[1:end] if end > 0 else v.strip("[]")
+    return v.split(":", 1)[0].rstrip(".")
+
+
+def _normalised_host_header(host_header: str) -> str:
+    v = (host_header or "").strip().lower()
+    if "://" in v:
+        v = v.split("://", 1)[1]
+    return v.rstrip(".")
+
+
+def _host_allowed(host_header: str) -> bool:
+    """True when a POST /mcp Host header may be served.
+
+    Absent Host: allowed — real HTTP/1.1 clients (and every rebinding
+    browser request) always send Host; absence only occurs in direct
+    WSGI/non-browser invocation, which bearer auth still gates.
+    Present Host: loopback, an exact SWARM_MCP_ALLOWED_HOSTS entry
+    (host or host:port), or the hostname of an allowlisted origin.
+    """
+    if not (host_header or "").strip():
+        return True
+    hostname = _hostname_of(host_header)
+    if hostname in LOOPBACK_HOSTNAMES:
+        return True
+    normalised = _normalised_host_header(host_header)
+    for entry in _allowed_hosts():
+        if normalised == _normalised_host_header(entry) or hostname == _hostname_of(entry):
+            return True
+    for origin in _allowed_origins():
+        if hostname and hostname == _hostname_of(origin):
+            return True
+    return False
+
+
+def _origin_allowed(origin: str) -> bool:
+    """True when a POST /mcp Origin header may be served.
+
+    Absent Origin: allowed (non-browser MCP clients send none).
+    Present Origin: exact allowlisted origin, a loopback origin, or an
+    origin whose hostname is an allowlisted (tunneled) host. Everything
+    else — including the opaque ``null`` origin — is foreign.
+    """
+    if not (origin or "").strip():
+        return True
+    normalised = origin.strip().rstrip("/").lower()
+    if normalised == "null":
+        return False
+    for allowed in _allowed_origins():
+        if normalised == allowed.strip().rstrip("/").lower():
+            return True
+    hostname = _hostname_of(origin)
+    if hostname in LOOPBACK_HOSTNAMES:
+        return True
+    for entry in _allowed_hosts():
+        if hostname and hostname == _hostname_of(entry):
+            return True
+    return False
 
 
 def _json_response(status: str, payload: Any, extra: List[Tuple[str, str]] = ()):
@@ -353,6 +736,24 @@ def app(environ, start_response):
         start_response(status, headers)
         return body
 
+    # -- /mcp POST: DNS-rebinding Host/Origin allowlist (item 305) -----------
+    # Enforced before content-type, body, auth and ANY JSON-RPC dispatch,
+    # so a foreign Host/Origin is refused before tools/list (or any other
+    # method) is served — even to a caller holding a valid bearer token.
+    # No CORS headers are reflected on a refusal.
+    if not _host_allowed(environ.get("HTTP_HOST", "")):
+        status, headers, body = _json_response(
+            "403 Forbidden", {"error": "forbidden host"}, []
+        )
+        start_response(status, headers)
+        return body
+    if not _origin_allowed(request_origin):
+        status, headers, body = _json_response(
+            "403 Forbidden", {"error": "forbidden origin"}, []
+        )
+        start_response(status, headers)
+        return body
+
     # -- /mcp POST: content type --------------------------------------------
     ctype = environ.get("CONTENT_TYPE", "")
     if "application/json" not in ctype:
@@ -384,8 +785,10 @@ def app(environ, start_response):
         return body
 
     # -- /mcp POST: auth -----------------------------------------------------
+    # Fail-closed 503 when nothing is configured (neither a static token
+    # nor a signing secret for audience-bound tokens).
     expected = _configured_token()
-    if not expected:
+    if not expected and not os.environ.get("SWARM_MCP_TOKEN_SIGNING_SECRET", ""):
         status, headers, body = _json_response(
             "503 Service Unavailable", {"error": "not configured"}, cors_headers
         )
@@ -393,7 +796,7 @@ def app(environ, start_response):
         return body
     auth = environ.get("HTTP_AUTHORIZATION", "")
     scheme, _, supplied = auth.partition(" ")
-    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied, expected):
+    if scheme.lower() != "bearer" or not _bearer_authorized(supplied, expected):
         status, headers, body = _json_response(
             "401 Unauthorized", {"error": "unauthorized"}, cors_headers
         )
@@ -479,9 +882,22 @@ def app(environ, start_response):
                 raise _JsonRpcParamsError("arguments must be an object")
             _validate_tool_input_size(args)
             store = _store()
-            known = {t["name"] for t in _tool_defs()}
+            defs = _tool_defs()
+            known = {t["name"] for t in defs}
             if tool_name not in known:
                 raise _JsonRpcParamsError("unknown tool %r" % (tool_name,))
+            # Dev-watch 316: strict schema validation BEFORE dispatch —
+            # a literal "null", a missing required field, or a wrong-typed
+            # value is rejected (-32602), never silently stored/coerced.
+            try:
+                validate_arguments(
+                    tool_name,
+                    next(t["inputSchema"] for t in defs
+                         if t["name"] == tool_name),
+                    args,
+                )
+            except SchemaValidationError as exc:
+                raise _JsonRpcParamsError(str(exc))
             result = _dispatch_tool(tool_name, args, store)
             content = [{"type": "text", "text": json.dumps(result)}]
             status, headers, body = _json_response(

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Complete your intake — {{ pack_name }} — SINCOR</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #0b0e14; color: #e8ecf1; margin: 0; padding: 24px; }
+  .card { max-width: 560px; margin: 0 auto; background: #121722; border: 1px solid #232b3d;
+          border-radius: 12px; padding: 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #9aa4b8; font-size: 14px; margin-bottom: 20px; }
+  .status { display: inline-block; font-size: 13px; font-weight: 600; color: #8fe3a8;
+            border: 1px solid #1d7a3d; border-radius: 999px; padding: 4px 12px;
+            margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #9aa4b8; margin-top: 12px; }
+  input, select, textarea { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 4px;
+                   font-size: 14px; background: #0b0e14; color: #cfd6e4;
+                   border: 1px solid #2c364c; border-radius: 8px; }
+  button { display: block; width: 100%; margin-top: 20px; padding: 13px;
+           font-size: 15px; font-weight: 600; border: 0; border-radius: 8px;
+           background: #2f6df6; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  #msg { margin-top: 16px; font-size: 14px; min-height: 20px; white-space: pre-wrap; }
+  #msg.err { color: #ff9d9d; }
+  #msg.ok { color: #8fe3a8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>{{ pack_name }} — intake</h1>
+  <div class="sub">Tell us about your business so we can start work on your pack.
+    Your answers go only to the SINCOR team.</div>
+  <div class="status">Status: {{ status_label }}</div>
+
+  {% if fields[0].locked %}
+  <div class="sub">Work on your pack is already in progress, so these answers are
+    locked. Reply to your confirmation email if something needs to change.</div>
+  {% endif %}
+
+  <form id="intakeForm" method="post"
+        action="/intake/{{ intake_id }}?token={{ token }}">
+    {% for field in fields %}
+    <label>{{ field.label }}
+      {% if field.choices %}
+      <select name="{{ field.name }}" {% if field.locked %}disabled{% endif %} required>
+        <option value="">Select…</option>
+        {% for choice in field.choices %}
+        <option value="{{ choice }}" {% if field.value == choice %}selected{% endif %}>{{ choice }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input name="{{ field.name }}" type="text" value="{{ field.value }}"
+             maxlength="500" {% if field.locked %}disabled{% endif %} required>
+      {% endif %}
+    </label>
+    {% endfor %}
+    {% if not fields[0].locked %}
+    <button id="btnSubmit" type="submit">Submit intake</button>
+    {% endif %}
+  </form>
+
+  <div id="msg" role="status"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var form = document.getElementById("intakeForm");
+  var msg = document.getElementById("msg");
+  if (!form) return;
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    msg.textContent = "";
+    msg.className = "";
+    var data = {};
+    new FormData(form).forEach(function (value, key) { data[key] = value; });
+    try {
+      var r = await fetch(form.action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+      var body = null;
+      try { body = await r.json(); } catch (e) { /* non-JSON */ }
+      if (r.ok && body && body.ok) {
+        msg.textContent = "Intake received — thank you. Our team has been " +
+          "notified and will start work on your pack.";
+        msg.className = "ok";
+        var btn = document.getElementById("btnSubmit");
+        if (btn) btn.disabled = true;
+      } else {
+        var fields = (body && body.fields) ? body.fields.join(", ") : "";
+        throw new Error(((body && body.error) || ("HTTP " + r.status)) +
+          (fields ? " (" + fields + ")" : ""));
+      }
+    } catch (e) {
+      msg.textContent = "Could not submit your intake: " + (e && e.message || e) +
+        ". Your answers are still in the form — please try again.";
+      msg.className = "err";
+    }
+  });
+})();
+</script>
+</body>
+</html>

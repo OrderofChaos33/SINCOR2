@@ -577,6 +577,7 @@ RAIL_MOUNT_STATUS = {
     'rail_routes': False,
     'rail_delivery': False,
     'rail_pay': False,
+    'rail_intake': False,
 }
 try:
     from sincor2.rail_routes import init_rail_routes
@@ -597,6 +598,17 @@ except Exception:
     logger.exception('[RAIL-DELIVERY] init_rail_delivery_routes failed — '
                      'token-gated /download/<id> is NOT mounted')
 
+# Token-gated pack intake pages (Wren PR 1) — mounted next to the rail
+# delivery routes; this is the route the B2B / WebBuilder buyer email's
+# intake link points at.
+try:
+    from sincor2.blueprints.intake import init_intake_routes
+    init_intake_routes(app)
+    RAIL_MOUNT_STATUS['rail_intake'] = True
+except Exception:
+    logger.exception('[RAIL-INTAKE] init_intake_routes failed — '
+                     'token-gated /intake/<id> is NOT mounted')
+
 # Human payment pages: GET /rail/pay/<resource_id> + GET /rail/onramp.
 # This blueprint was previously registered only in the legacy
 # sincor2.app module, so the production app never served the pay pages
@@ -608,6 +620,126 @@ try:
 except Exception:
     logger.exception('[RAIL-PAY] rail_pay_bp failed to mount — '
                      '/rail/pay/<id> pages are NOT served')
+
+# WREN PR 4: per-route rate limits on the money rail. The wraps are
+# applied HERE — after every rail blueprint is registered — because the
+# limiter decorator must replace the registered view function, and
+# importing the limiter into the route modules would be circular. Keys
+# are the limiter default (get_remote_address, i.e. the ProxyFix-derived
+# client address) — never free_ration.abuse_client_ip, which without a
+# pinned trusted proxy collapses every client into the edge peer's one
+# bucket. If a mount failed above, its endpoint is absent and skipped.
+#
+# Trusted-edge assumption (explicit): production runs behind Railway's
+# single appending edge proxy, and ProxyFix above is enabled with
+# x_for=1 (only when TRUST_PROXY / RAILWAY_ENVIRONMENT is set). With
+# exactly one trusted hop, get_remote_address is the LAST
+# X-Forwarded-For entry — the address the edge itself observed — and
+# client-supplied prefix entries are ignored for keying, so rotating
+# them cannot mint a fresh bucket. If the proxy chain ever grows
+# beyond one appending hop this keying must be revisited; the app-wide
+# trusted-proxy treatment is a separate standing item, not handled here.
+for _endpoint, _limit in (
+    ('rail.rail_checkout', '30 per hour'),
+    ('rail_digital_delivery.download_digital_pack', '30 per hour'),
+):
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit(_limit)(_view)
+
+
+def _settle_request_challenge_id() -> str:
+    """challenge_id from the in-flight /rail/settle JSON body.
+
+    Mirrors the settle view's extraction exactly: rail_settle reads
+    request.get_json(force=True, silent=True) and never touches form
+    data, so this helper force-parses too and has NO form fallback. A
+    mimetype-gated parse keys the same body into the plain-address
+    bucket whenever the Content-Type is not JSON — exhaust the
+    per-challenge bucket, resend as text/plain, and the cap is diluted
+    2x (B delta re-check F2). Absent, malformed, or non-string ids
+    return '' — the caller falls back to the plain address bucket.
+    Never raises.
+    """
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not isinstance(data, dict):
+            return ""
+        cid = data.get("challenge_id")
+        if not isinstance(cid, str):
+            return ""
+        return cid.strip()
+    except Exception:
+        return ""
+
+
+def _settle_limit_key() -> str:
+    """Per-(client, challenge) settle bucket (WREN PR 4 repair).
+
+    Junk settles against OTHER challenge ids must not burn a given
+    challenge's settle budget: the challenge TTL is 900s but the
+    limiter window is 1h, so a shared per-address bucket lets 60 junk
+    settles strand a paid buyer past expiry. A body with no
+    challenge_id falls back to the plain address bucket.
+    """
+    addr = get_remote_address() or ""
+    cid = _settle_request_challenge_id()
+    return f"{addr}:{cid}" if cid else addr
+
+
+def _settle_limit() -> str:
+    """60/hour per (client, challenge); 600/hour once fulfilled.
+
+    A settle against an already-fulfilled challenge is the W-115
+    proven-duplicate ack — a paid buyer re-asking for their delivery.
+    Recovering a delivery takes dozens of retries at most, so fulfilled
+    challenges get a bounded but generous ceiling (600/hour per
+    (client, challenge)): far beyond any real retry pattern, yet finite
+    on trees where the ack path is not yet proof-gated (PR #577) — an
+    unbounded exemption there would let anyone who learns a fulfilled
+    challenge_id harvest its ack at full rate (B delta re-check F1).
+    Once #577 lands in the same tree this bound is belt-and-braces.
+    The status lookup is read-only; ANY failure applies the normal
+    limit (fail toward limiting, never toward crashing).
+    """
+    cid = _settle_request_challenge_id()
+    if cid:
+        try:
+            from sincor2.x402_payments import challenge_status
+            if challenge_status(cid) == "fulfilled":
+                return "600 per hour"
+        except Exception:
+            logger.warning(
+                "[RAIL] settle-limit status lookup failed for %s; "
+                "applying the normal limit", cid)
+    return "60 per hour"
+
+
+# /rail/settle gets its own wrap: per-(client, challenge) keying plus
+# the dynamic fulfilled-challenge limit above.
+_view = app.view_functions.get('rail.rail_settle')
+if _view is not None:
+    app.view_functions['rail.rail_settle'] = limiter.limit(
+        _settle_limit, key_func=_settle_limit_key)(_view)
+
+# The intake route (WREN PR 1) is built on a sibling branch and may land
+# before or after this one: wrap any registered /intake POST view at
+# 20/hour, and skip silently when none exists yet.
+_intake_endpoints = {
+    rule.endpoint
+    for rule in app.url_map.iter_rules()
+    if rule.rule.startswith('/intake') and 'POST' in (rule.methods or set())
+}
+for _endpoint in _intake_endpoints:
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit('20 per hour')(_view)
+
+
+@app.errorhandler(429)
+def _rate_limited_json(_error):
+    """Rate-limit refusals answer the shared JSON shape, never HTML."""
+    return jsonify({'error': 'rate_limited'}), 429
 
 
 @app.after_request
@@ -992,6 +1124,15 @@ def _check_admin_token(req):
         return False
     try:
         decoded = decode_token(token)
+        # BOTH the admin identity AND the admin role claim are required
+        # (hunt-32 W-44): sub alone used to suffice, which admitted any
+        # token minted for the admin identity without a role — e.g. a
+        # customer OAuth cookie token or a role='user' token. Every real
+        # admin login mints role='admin' (mvp_blueprints/auth.py,
+        # auth_system.py, _admin_cookie_response). Mirrors
+        # auth_system.admin_required semantics.
+        if decoded.get('role') != 'admin':
+            return False
         return _ct_eq(str(decoded.get('sub') or '').lower(), _admin_username().lower())
     except Exception:
         return False
@@ -1002,11 +1143,22 @@ def _check_admin_key(req) -> bool:
     expected = _admin_password()
     if not expected:
         return False
+    # Header ONLY (hunt-32 W-44): the admin key is never accepted from
+    # the request body, query string, form, or cookies — the
+    # secret-in-body fallback admitted anyone who could place the key
+    # in a JSON payload (it flipped the Command Center killswitch).
+    # Same posture as sponsored_stake._admin_key_ok and the waitlist
+    # handler's _is_admin_request.
     key = req.headers.get('X-Admin-Key', '')
     if not key:
-        data = req.get_json(silent=True) or {}
-        key = str(data.get('admin_key', ''))
-    return bool(key) and hmac.compare_digest(str(key), str(expected))
+        return False
+    try:
+        return hmac.compare_digest(str(key), str(expected))
+    except (TypeError, ValueError):
+        # hmac.compare_digest raises TypeError on non-ASCII str input;
+        # an un-comparable header value fails CLOSED (401), never a 500
+        # (hunt-32 W-44, Builder B minor).
+        return False
 
 
 def _is_admin_session() -> bool:
@@ -1123,7 +1275,35 @@ def _waitlist_api_error_handler(error):
 def _waitlist_stats_admin_gate():
     if request.path.startswith("/api/waitlist/stats"):
         return _require_admin(request)
+    if request.path.startswith("/api/airdrop/stats"):
+        return _require_admin(request)
     return None
+
+# Admin intake visibility (WREN PR 6): GET /api/admin/intakes lists pack
+# intakes stuck at intake_complete for 24h+ so a buyer who finished
+# their intake never sits unnoticed. Same double gate as the waitlist
+# stats route above: _require_admin runs as a before_request guard over
+# the path, and the handler re-checks admin itself (the blueprint's own
+# credential check mirrors the waitlist blueprint's).
+from sincor2.blueprints.admin_intakes import admin_intakes_bp as _admin_intakes_bp
+
+app.register_blueprint(_admin_intakes_bp)
+
+
+@app.before_request
+def _admin_intakes_admin_gate():
+    if request.path.startswith("/api/admin/intakes"):
+        return _require_admin(request)
+    return None
+
+
+# One-click unsubscribe (Wren PR 8): public by design — the HMAC-signed
+# token IS the credential, the same way /download links work. A valid
+# token suppresses the address it names; anything else 404s (fail
+# closed, no validity oracle). No admin gate applies here.
+from sincor2.blueprints.unsubscribe import unsubscribe_bp as _unsubscribe_bp
+
+app.register_blueprint(_unsubscribe_bp)
 
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)

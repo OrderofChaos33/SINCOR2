@@ -55,7 +55,7 @@ def test_agent_card_json_regardless_of_accept(mvp_client, headers):
     payload = resp.get_json()
     assert payload is not None
     assert payload.get("name")
-    assert len(payload.get("skills") or []) == 17
+    assert len(payload.get("skills") or []) == 18
 
 
 def test_agent_card_html_explainer_still_at_agent_card(mvp_client):

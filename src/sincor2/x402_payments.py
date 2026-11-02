@@ -38,6 +38,7 @@ settle-before-serve.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -74,11 +75,51 @@ def _db_path() -> Path:
     return orders_db_path()
 
 
+#: The only migrations ``_ensure_column`` may perform (dev-watch 304,
+#: CVE-2026-118378 hedge): column name -> expected DDL type. PRAGMA and
+#: ALTER cannot bind identifiers as parameters, so identifiers are
+#: selected from this allowlist and the SQL executed below is a constant
+#: string per entry — a caller-supplied table/column/ddl value is never
+#: interpolated into a query string.
+_X402_ENSURE_COLUMN_SQL = {
+    "token_expires_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_expires_at TEXT",
+    ),
+    "token_consumed_at": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN token_consumed_at TEXT",
+    ),
+    # WREN PR 4 (merged #596): minting source (wallet when known, else
+    # client IP). Without this entry init_x402_db() raises ValueError on
+    # every _conn() call, degrading X402_AVAILABLE=False.
+    "source_key": (
+        "TEXT",
+        "ALTER TABLE x402_challenges ADD COLUMN source_key TEXT",
+    ),
+}
+
+
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
-    """Add a column if missing (migration for DBs created before this patch)."""
-    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
-    if column not in cols:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+    """Add a column if missing (migration for DBs created before this patch).
+
+    Existence is checked first: if the column is already present there is
+    nothing to migrate, so return without gating (W-120 residual — an
+    allowlist check here would brick every ``_conn()`` call for any DB
+    whose schema already carries a column the allowlist doesn't know).
+    Only an actual ALTER is gated: for a missing column,
+    ``table``/``column``/``ddl`` must match the allowlist exactly; any
+    other value raises ValueError without touching the database.
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(x402_challenges)").fetchall()}
+    if column in cols:
+        return
+    entry = _X402_ENSURE_COLUMN_SQL.get(column)
+    if table != "x402_challenges" or entry is None or entry[0] != ddl:
+        raise ValueError(
+            f"migration not allowlisted: table={table!r} column={column!r} ddl={ddl!r}"
+        )
+    conn.execute(entry[1])
 
 
 def init_x402_db() -> None:
@@ -90,6 +131,7 @@ def init_x402_db() -> None:
             amount_atomic TEXT NOT NULL,
             amount_display REAL NOT NULL,
             payer_wallet TEXT,
+            source_key TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
             tx_hash TEXT,
             access_token TEXT,
@@ -103,6 +145,9 @@ def init_x402_db() -> None:
     # P1-7/P1-8 migrations for DBs created before this patch.
     _ensure_column(conn, "x402_challenges", "token_expires_at", "TEXT")
     _ensure_column(conn, "x402_challenges", "token_consumed_at", "TEXT")
+    # WREN PR 4: minting source (wallet when known, else client IP) so
+    # open-unbound challenges can be capped per source.
+    _ensure_column(conn, "x402_challenges", "source_key", "TEXT")
     try:
         # P1-8: one on-chain payment may fulfill at most one challenge.
         # NULL tx_hash rows (pending challenges) never conflict in SQLite,
@@ -214,6 +259,44 @@ class MANDATES_API_WATCH:
     Tracked here so the primitive is evaluated, not silently skipped."""
 
 
+class EIP7702_DELEGATION_LIFECYCLE:
+    """Design constraint (dev-watch item 312, 2026-10-30): any EIP-7702
+    delegation SINCOR ever issues or accepts must follow this lifecycle.
+
+    Why: a signed 7702 authorization is a STANDING capability, not a
+    one-shot approval. Whoever holds the signed authorization can attach
+    it later, and the delegating account keeps executing the delegate's
+    code until the delegation is explicitly cleared (the sven.eth drain,
+    2026-10-14: one signature, reused as a standing capability).
+
+    Current state: there is NO 7702 surface anywhere in this codebase --
+    no delegation is issued, accepted, or executed today. This note is
+    the gate for the day that changes. Guarded by
+    tests/pytest/test_devwatch312_delegation_guard.py.
+
+    The rule, for any future 7702 delegation:
+
+    1. Short-lived and scoped: every authorization carries an explicit
+       expiry (block or timestamp) and names ONE specific implementation
+       address. No open-ended delegations, no wildcard implementation.
+    2. Revocable by a single clearing transaction: the delegating
+       account can revoke the delegation with one clearing transaction
+       that restores it to a plain account, and the clearing path is
+       tested before the delegation is ever used.
+    3. Inventoried: every active delegation is recorded in a delegation
+       inventory (account, implementation, expiry, purpose) at issuance
+       time. An active delegation that is not in the inventory is
+       treated as a compromise until cleared -- clear first, investigate
+       second.
+    4. Re-verified at use time: no money-path code may accept an action
+       from a 7702-delegated account on the strength of a previously
+       signed authorization. The current delegate address must be
+       re-verified onchain at use time, and the action refused if the
+       onchain delegation does not match the inventoried, unexpired
+       scope.
+    """
+
+
 def build_route_config(
     *,
     scheme: str = "exact",
@@ -262,6 +345,352 @@ def facilitator_route(
     return build_route_config(scheme=scheme, networks=resolved)
 
 
+# ---------------------------------------------------------------------------
+# Dev-watch 317 — Bazaar discovery extension completeness + settle-payload
+# attachment (SWARM seller log, 2026-09-28, updated 2026-10-02).
+#
+# SWARM settled twelve test purchases that never appeared in Coinbase's
+# Bazaar. Two seller-side causes: (1) its discovery extension had
+# ``info.input`` but NO ``schema`` — Coinbase's validator rejects that as
+# an invalid discovery configuration; (2) the Bazaar indexer reads
+# discovery data from ``PaymentPayload.resource`` and
+# ``PaymentPayload.extensions`` at settle time, and the official client
+# does not copy them there — an adapter forwarding only ``x402Version`` /
+# ``accepted`` / ``payload`` silently drops the indexing data.
+#
+# Our rules, enforced here so the shape cannot drift per-resource:
+#   * EVERY 402 payload built by build_payment_payload carries
+#     ``extensions.bazaar`` generated by the ONE helper
+#     build_bazaar_discovery_extension(): ``info.input`` describing the
+#     paid call AND a full ``schema`` whose
+#     ``properties.input.properties.body`` is the resource's real input
+#     schema (BAZAAR_INPUT_SCHEMAS — field names mirror what each serve
+#     handler in mvp_blueprints.billing._paid_skill_dispatch reads).
+#   * validate_bazaar_extension() checks the documented validator
+#     requirements locally (schema present, types sane).
+#   * build_facilitator_payload() — the payload handed to the
+#     facilitator/settle step when that integration lands — copies
+#     ``resource`` and ``extensions`` explicitly and FAILS CLOSED when
+#     either is missing or invalid, never silently dropping them.
+# Payload shape + local validation only: no listing attempt, no live
+# facilitator call (the CDP facilitator route decision is founder-gated).
+# ---------------------------------------------------------------------------
+
+#: JSON Schema primitive/composite types accepted in an input schema.
+_JSON_SCHEMA_TYPES: Final = frozenset(
+    {"string", "integer", "number", "boolean", "array", "object", "null"}
+)
+
+#: Per-resource input schemas for the paid call body. Only resources
+#: whose serve handler reads business input are listed; every other
+#: resource takes no business input beyond the payment itself and gets
+#: the freeform-object default in bazaar_input_schema().
+BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
+    "wallet-sanctions-screen": {
+        "type": "object",
+        "properties": {
+            "address": {
+                "type": "string",
+                "description": "Wallet address to screen (0x...); "
+                "'wallet' and 'wallet_address' are accepted aliases",
+            },
+            "wallet": {"type": "string"},
+            "wallet_address": {"type": "string"},
+        },
+    },
+    "kya-trust-score": {
+        "type": "object",
+        "properties": {
+            "agent_id": {"type": "string"},
+            "wallet": {
+                "type": "string",
+                "description": "Agent wallet address",
+            },
+        },
+    },
+    "web-search-read": {
+        "type": "object",
+        "properties": {
+            "mode": {
+                "type": "string",
+                "description": "'search' (requires query) or 'read' "
+                "(requires url)",
+            },
+            "query": {"type": "string"},
+            "url": {"type": "string"},
+        },
+        "required": ["mode"],
+    },
+    "local-business-site-check": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string"},
+            "business_name": {"type": "string"},
+        },
+        "required": ["url"],
+    },
+    "market-data-read": {
+        "type": "object",
+        "properties": {
+            "pair": {
+                "type": "string",
+                "description": "Chainlink pair, e.g. ETH/USD",
+            },
+            "mode": {
+                "type": "string",
+                "description": "Read mode; default 'price'",
+            },
+        },
+        "required": ["pair"],
+    },
+    "polymarket-whale-signal": {
+        "type": "object",
+        "properties": {
+            "wallet": {"type": "string"},
+            "market_id": {"type": "string"},
+            "window_minutes": {"type": "integer"},
+        },
+    },
+    "toa-micro-decision": {
+        "type": "object",
+        "properties": {
+            "options": {"type": "array", "items": {"type": "object"}},
+            "context": {"type": "object"},
+            "decision_id": {"type": "string"},
+        },
+        "required": ["options"],
+    },
+}
+
+
+def bazaar_input_schema(resource_id: str) -> dict[str, Any]:
+    """The resource's paid-call body schema (deep copy; safe to embed)."""
+    schema = BAZAAR_INPUT_SCHEMAS.get(resource_id)
+    if schema is None:
+        return {"type": "object", "properties": {}}
+    return copy.deepcopy(schema)
+
+
+def _bazaar_example_value(name: str, prop: dict[str, Any]) -> Any:
+    """Type-valid placeholder for one input-schema property."""
+    if name in ("address", "wallet", "wallet_address", "agent_wallet"):
+        return "0x0000000000000000000000000000000000000000"
+    if name == "url":
+        return "https://example.com"
+    ptype = prop.get("type")
+    if ptype == "integer" or ptype == "number":
+        return 0
+    if ptype == "boolean":
+        return False
+    if ptype == "array":
+        return []
+    if ptype == "object":
+        return {}
+    return ""
+
+
+def build_bazaar_discovery_extension(
+    resource: dict[str, Any], resource_id: str
+) -> dict[str, Any]:
+    """Build the complete ``extensions`` block for a 402 payload.
+
+    The single generator for the Bazaar discovery extension: every paid
+    resource gets the identical shape — ``info.input`` describing the
+    paid call (with a type-valid example body) and a full ``schema``
+    (the JSON Schema the info block must validate against, embedding
+    the resource's real input schema at
+    ``properties.input.properties.body``). A resource can no longer ship
+    the SWARM shape (info.input with no schema) because no code path
+    builds the extension by hand.
+    """
+    body_schema = bazaar_input_schema(resource_id)
+    example_body = {
+        name: _bazaar_example_value(name, prop)
+        for name, prop in (body_schema.get("properties") or {}).items()
+        if isinstance(prop, dict)
+    }
+    return {
+        "bazaar": {
+            "info": {
+                "input": {
+                    "type": "http",
+                    "method": "POST",
+                    "bodyType": "json",
+                    "body": example_body,
+                },
+                "output": {
+                    "type": "json",
+                    "example": {"ok": True, "resource": resource_id},
+                },
+            },
+            "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                    "input": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["http"],
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": ["GET", "POST"],
+                            },
+                            "bodyType": {
+                                "type": "string",
+                                "enum": ["json", "form-data", "text"],
+                            },
+                            "body": body_schema,
+                            "queryParams": {"type": "object"},
+                            "headers": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string"},
+                            },
+                        },
+                        "required": ["type", "method"],
+                        "additionalProperties": False,
+                    },
+                    "output": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["json"],
+                            },
+                            "example": {"type": "object"},
+                        },
+                        "required": ["type"],
+                    },
+                },
+                "required": ["input"],
+            },
+        }
+    }
+
+
+def validate_bazaar_extension(extension: Any) -> list[str]:
+    """Local check of the documented Bazaar validator requirements.
+
+    Returns a list of problems (empty = valid). Structural and
+    dependency-free: the extension must carry ``info.input`` (type
+    http, a real method) AND a full ``schema`` (object schema requiring
+    ``input``, embedding an object body schema whose every property has
+    a sane JSON Schema type). This is the check that would have caught
+    the SWARM shape — info.input present, schema absent — before any
+    listing attempt.
+    """
+    if not isinstance(extension, dict) or not isinstance(
+        extension.get("bazaar"), dict
+    ):
+        return ["extensions.bazaar missing or not an object"]
+    bazaar = extension["bazaar"]
+    errors: list[str] = []
+    info = bazaar.get("info")
+    if not isinstance(info, dict):
+        errors.append("bazaar.info missing or not an object")
+        info = {}
+    info_input = info.get("input")
+    if not isinstance(info_input, dict):
+        errors.append("bazaar.info.input missing or not an object")
+    else:
+        if info_input.get("type") != "http":
+            errors.append("bazaar.info.input.type must be 'http'")
+        if info_input.get("method") not in (
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+        ):
+            errors.append("bazaar.info.input.method missing or unsupported")
+    schema = bazaar.get("schema")
+    if not isinstance(schema, dict):
+        errors.append("bazaar.schema missing or not an object")
+        return errors
+    if schema.get("type") != "object":
+        errors.append("bazaar.schema.type must be 'object'")
+    if "input" not in (schema.get("required") or []):
+        errors.append("bazaar.schema.required must include 'input'")
+    props = schema.get("properties")
+    input_schema = props.get("input") if isinstance(props, dict) else None
+    if not isinstance(input_schema, dict):
+        errors.append("bazaar.schema.properties.input missing")
+        return errors
+    body_schema = (input_schema.get("properties") or {}).get("body")
+    if not isinstance(body_schema, dict) or body_schema.get("type") != "object":
+        errors.append(
+            "bazaar.schema input body schema missing or not an object schema"
+        )
+        return errors
+    for name, prop in (body_schema.get("properties") or {}).items():
+        if not isinstance(prop, dict) or prop.get("type") not in _JSON_SCHEMA_TYPES:
+            errors.append(
+                f"bazaar input schema property {name!r} has insane type "
+                f"{(prop or {}).get('type')!r}"
+            )
+    return errors
+
+
+def build_facilitator_payload(
+    payment: dict[str, Any],
+    *,
+    payload_body: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Assemble the PaymentPayload handed to the facilitator/settle step.
+
+    Item 317: the Bazaar indexer reads ``resource`` and ``extensions``
+    from THIS payload at settle time, and a client/adapter that forwards
+    only ``x402Version`` / ``accepted`` / ``payload`` silently drops
+    them. This builder copies both explicitly from the 402 payment
+    payload and FAILS CLOSED (ValueError) when either is missing or the
+    extension is invalid — the drop becomes a loud local error, not a
+    silent unlisting. No facilitator call is made here; this is the
+    canonical adapter the founder-gated facilitator integration will
+    use when it lands.
+    """
+    if not isinstance(payment, dict):
+        raise ValueError("facilitator payload source must be a dict")
+    resource_ref = payment.get("resource")
+    if not resource_ref:
+        raise ValueError(
+            "facilitator payload missing resource (item 317: the "
+            "indexer reads PaymentPayload.resource at settle time)"
+        )
+    errors = validate_bazaar_extension(payment.get("extensions"))
+    if errors:
+        raise ValueError(
+            "facilitator payload extensions invalid (item 317): "
+            + "; ".join(errors)
+        )
+    # The accepted-requirements block is SELECTED from the 402 payment
+    # payload, never rebuilt here: route fields (scheme/network/...)
+    # originate only in build_route_config/build_payment_payload (the
+    # dev-watch 78 explicit-network invariant), and this adapter must
+    # not become a second route constructor.
+    accepted = {
+        key: payment[key]
+        for key in (
+            "scheme",
+            "network",
+            "networks",
+            "chainId",
+            "maxAmountRequired",
+            "payTo",
+            "asset",
+        )
+        if key in payment
+    }
+    return {
+        "x402Version": payment.get("x402Version", 1),
+        "accepted": accepted,
+        "resource": resource_ref,
+        "extensions": payment["extensions"],
+        "payload": dict(payload_body or {}),
+    }
+
+
 def build_payment_payload(
     resource: dict[str, Any],
     resource_id: str,
@@ -296,6 +725,9 @@ def build_payment_payload(
             "decimals": resource["token_decimals"],
             "skill_id": resource.get("skill_id", ""),
         },
+        # Dev-watch 317: complete Bazaar discovery extension on every
+        # 402 (info.input AND full schema), helper-generated only.
+        "extensions": build_bazaar_discovery_extension(resource, resource_id),
     }
 
 
@@ -391,7 +823,14 @@ def _valid_wallet_format(wallet: str) -> bool:
     )
 
 
-def create_challenge(resource_id: str) -> dict[str, Any]:
+#: WREN PR 4: per-source cap on OPEN UNBOUND challenges. Checkout mints
+#: one DB row per call; without a cap a single source can grow the
+#: x402_challenges table (and the 402 surface) without bound. "Open
+#: unbound" = status 'pending', no payer bound yet, not yet expired.
+MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE = 20
+
+
+def create_challenge(resource_id: str, *, source_key: str = "") -> dict[str, Any]:
     """Mint an UNBOUND challenge draft (W-102 round 3).
 
     The draft records NO payer binding — a bare address string is no longer
@@ -400,6 +839,12 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
     challenge can be fulfilled through the public verify route
     (require_bound_challenge=True rejects unbound drafts as
     challenge_unbound).
+
+    ``source_key`` names the minting source (payer wallet when the caller
+    knows it, else the client IP). When given, minting is refused with
+    ``error="rate_limited"`` / ``http_status=429`` once the source already
+    holds MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE open unbound challenges.
+    Callers that pass no source (legacy internal mints) are uncapped.
     """
     resource = get_resource(resource_id)
     if not resource:
@@ -408,18 +853,34 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     challenge_id = f"x402-{secrets.token_hex(8)}"
     expires = now + timedelta(seconds=resource["ttl_seconds"])
+    source = (source_key or "").strip().lower()
 
     with _conn() as conn:
+        if source:
+            (open_unbound,) = conn.execute(
+                """SELECT COUNT(*) FROM x402_challenges
+                   WHERE source_key = ? AND status = 'pending'
+                     AND (payer_wallet = '' OR payer_wallet IS NULL)
+                     AND expires_at > ?""",
+                (source, now.isoformat()),
+            ).fetchone()
+            if open_unbound >= MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE:
+                logger.warning(
+                    "x402: challenge mint refused for source %s "
+                    "(%d open unbound)", source, open_unbound)
+                return {"ok": False, "error": "rate_limited",
+                        "http_status": 429}
         conn.execute(
             """INSERT INTO x402_challenges
                (challenge_id, resource_id, amount_atomic, amount_display, payer_wallet,
-                status, created_at, expires_at)
-               VALUES (?, ?, ?, ?, '', 'pending', ?, ?)""",
+                source_key, status, created_at, expires_at)
+               VALUES (?, ?, ?, ?, '', ?, 'pending', ?, ?)""",
             (
                 challenge_id,
                 resource_id,
                 resource["amount_atomic"],
                 resource["amount_display"],
+                source or None,
                 now.isoformat(),
                 expires.isoformat(),
             ),
@@ -456,6 +917,45 @@ def create_challenge(resource_id: str) -> dict[str, Any]:
             "wallet you supplied."
         ),
     }
+
+
+def purge_expired_challenges() -> int:
+    """Delete expired, never-fulfilled challenge rows (WREN PR 4).
+
+    Only ``status='pending'`` rows past their ``expires_at`` are removed:
+    fulfilled rows are the audit/replay record for a completed payment
+    and are never purged here. Called from the daily-ops scheduler job
+    so the table cannot grow without bound. Returns rows deleted.
+    """
+    now = datetime.now(timezone.utc)
+    with _conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM x402_challenges "
+            "WHERE status = 'pending' AND expires_at <= ?",
+            (now.isoformat(),),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def challenge_status(challenge_id: str) -> str | None:
+    """Read-only status lookup for one challenge (WREN PR 4 repair).
+
+    Returns the row's ``status`` ('pending', 'fulfilled', ...) or None
+    when no such challenge exists. The /rail/settle rate limiter's
+    dynamic limit uses this to give proven-duplicate acks for
+    fulfilled challenges a bounded 600/hour exemption; it never
+    writes.
+    """
+    cid = (challenge_id or "").strip()
+    if not cid:
+        return None
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT status FROM x402_challenges WHERE challenge_id=?",
+            (cid,),
+        ).fetchone()
+    return str(row["status"]) if row else None
 
 
 def bind_challenge_payer(

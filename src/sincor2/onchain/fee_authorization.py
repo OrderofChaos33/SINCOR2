@@ -24,6 +24,29 @@ can produce it trivially (cast wallet sign / personal_sign) and the record
 is hashed canonically either way.  A Safe-as-approver would need an
 EIP-1271 isValidSignature extension; that is documented future work, not
 built here.
+
+Dev-watch 311 constraints (ZeroDev Bastion session-wallet audit,
+2026-10-30): this interface is SINCOR2's nearest session-key analog — a
+signed approval creating bounded spend authority — and it is built
+against Bastion's three failure shapes.  (a) Single use: a record is
+spent exactly once; the nonce inside the signed canonical record is
+journaled by ``authorized_dry_run``, so replaying the same approval
+(same digest) authorizes nothing further, and re-minting under a fresh
+nonce is a different digest the original signatures do not cover.
+(b) No re-init refill: one record authorizes one run; authorizing the
+same obligation again requires a fresh quorum-signed record and
+supersedes the earlier manifest — budget never stacks.  The grant-row
+analog, ``sincor2.sponsored_stake``, enforces the same rule per agent
+row: one ACTIVE sponsorship at a time, a second front while active is
+refused, and a settled row's claim is unreachable (recoup/clawback move
+zero against it).  (c) Binding: chain ids, token/target allowlists,
+treasury, and the per-run budget cap are fields of the signed canonical
+record, and ``check_plan_scope`` re-verifies the concrete plan against
+them — an approval minted for one chain or target is invalid for any
+other; there is no wildcard chain id.  No ERC-7579/4337 session-key
+spend system exists in this repository (the sinax
+``ERC7579EpochSessionValidator`` is attestation-only).  Proof tests:
+``tests/pytest/test_devwatch311_session_constraints.py``.
 """
 
 from __future__ import annotations

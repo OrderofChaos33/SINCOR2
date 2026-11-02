@@ -39,7 +39,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
@@ -1686,28 +1686,99 @@ def get_pack_intake(
         conn.close()
 
 
+# Pack intake lifecycle, in order. update_pack_intake_status refuses to
+# move a record BACKWARDS along this chain (a late agent_kickoff write
+# must not undo a buyer's completed intake); forward jumps are legal.
+_PACK_INTAKE_STATUS_ORDER = {
+    "created": 0,
+    "agent_kickoff": 1,
+    "intake_complete": 2,
+    "in_progress": 3,
+    "delivered": 4,
+}
+
+
 def update_pack_intake_status(
     store_or_db: PaymentLedgerStore | str | Path,
     intake_id: str,
     status: str,
     details: Optional[dict[str, Any]] = None,
-) -> None:
-    """Transition a pack intake's status (e.g. created -> agent_kickoff)."""
+) -> bool:
+    """Transition a pack intake's status (e.g. created -> agent_kickoff).
+
+    ``details`` is MERGED into the record's existing details
+    (read-merge-write), never a wholesale replace: fulfillment writes
+    pack_name / module / payer_wallet / intake_token onto the row first,
+    and later writers (agent kickoff, the buyer's intake submission)
+    each own only their own keys. A replace here silently wiped the
+    intake token and payer binding (Wren PR 1 bug b).
+
+    Status may only move forward along _PACK_INTAKE_STATUS_ORDER; a
+    backwards request still merges its details but leaves the status at
+    its furthest-advanced value. Unknown current/target statuses are
+    not ranked and pass through unchanged (legacy rows stay writable).
+
+    The select + merge + update runs under BEGIN IMMEDIATE (the same
+    pattern as the ledger's CAS writes): concurrent writers serialize
+    on the write lock instead of each merging against the same stale
+    snapshot, where the last commit silently dropped the others' keys.
+
+    A row whose stored details are not valid JSON is treated as an
+    empty details dict and the write proceeds — the pre-merge
+    replace-write healed such rows by overwriting them, and the merge
+    must not brick them by raising.
+
+    Returns True iff THIS call advanced the record's status onto
+    ``status`` (the stored status differed and the guard let it move).
+    The decision is made inside the same write transaction as the
+    update, so exactly one concurrent caller can observe True for a
+    given transition — callers that act once per transition (the
+    intake route's owner notification) key off this return value.
+    Returns False for a missing row, an already-at/past-target status,
+    or a backwards no-op.
+    """
     db_path = _pack_intake_db_path(store_or_db)
     conn = sqlite3.connect(str(db_path), timeout=30.0)
     try:
         conn.executescript(_PACK_INTAKE_SCHEMA)
+        conn.execute("BEGIN IMMEDIATE")
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT status, details FROM pack_intakes WHERE intake_id=?",
+            (intake_id,),
+        ).fetchone()
+        if row is None:
+            conn.commit()
+            return False
+        current_status = row["status"]
+        new_status = status
+        current_rank = _PACK_INTAKE_STATUS_ORDER.get(current_status)
+        new_rank = _PACK_INTAKE_STATUS_ORDER.get(status)
+        if (current_rank is not None and new_rank is not None
+                and new_rank < current_rank):
+            new_status = current_status
+        advanced = new_status != current_status
         if details is None:
-            conn.execute(
-                "UPDATE pack_intakes SET status=? WHERE intake_id=?",
-                (status, intake_id),
-            )
+            if advanced:
+                conn.execute(
+                    "UPDATE pack_intakes SET status=? WHERE intake_id=?",
+                    (new_status, intake_id),
+                )
         else:
+            try:
+                merged = json.loads(row["details"] or "{}")
+                if not isinstance(merged, dict):
+                    merged = {}
+            except (TypeError, ValueError):
+                merged = {}
+            merged.update(details)
             conn.execute(
-                "UPDATE pack_intakes SET status=?, details=? WHERE intake_id=?",
-                (status, json.dumps(details), intake_id),
+                "UPDATE pack_intakes SET status=?, details=? "
+                "WHERE intake_id=?",
+                (new_status, json.dumps(merged), intake_id),
             )
         conn.commit()
+        return advanced
     finally:
         conn.close()
 
@@ -1755,6 +1826,66 @@ def transition_pack_intake_status_if(
         return cur.rowcount == 1
     finally:
         conn.close()
+
+
+def list_pack_intakes(
+    store_or_db: PaymentLedgerStore | str | Path,
+    *,
+    status: Optional[str] = None,
+) -> list[PackIntake]:
+    """List pack intake records, newest first, optionally by status."""
+    db_path = _pack_intake_db_path(store_or_db)
+    conn = sqlite3.connect(str(db_path), timeout=30.0)
+    try:
+        conn.executescript(_PACK_INTAKE_SCHEMA)
+        conn.row_factory = sqlite3.Row
+        if status is None:
+            rows = conn.execute(
+                "SELECT * FROM pack_intakes ORDER BY created_at DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM pack_intakes WHERE status=?"
+                " ORDER BY created_at DESC",
+                (status,),
+            ).fetchall()
+        return [_pack_intake_from_row(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def _parse_iso_utc(value: str) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp; naive values are read as UTC."""
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def list_stale_completed_pack_intakes(
+    store_or_db: PaymentLedgerStore | str | Path,
+    *,
+    min_age_hours: float = 24.0,
+    now: Optional[datetime] = None,
+) -> list[PackIntake]:
+    """``intake_complete`` records at least ``min_age_hours`` old.
+
+    An intake_complete record is a buyer who did their part and is now
+    waiting on a human; the ones past the age threshold are the ones an
+    operator must not lose sight of. Oldest first.
+    """
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=min_age_hours)
+    stale: list[PackIntake] = []
+    for intake in list_pack_intakes(store_or_db, status="intake_complete"):
+        created = _parse_iso_utc(intake.created_at)
+        if created is not None and created <= cutoff:
+            stale.append(intake)
+    stale.sort(key=lambda i: i.created_at)
+    return stale
 
 
 def allowed_transitions() -> dict[str, list[str]]:

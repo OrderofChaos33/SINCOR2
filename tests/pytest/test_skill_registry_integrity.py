@@ -23,20 +23,20 @@ from sincor2.a2a_integration import (
     skill_implementation_ref,
 )
 
-# The 17 catalogue entries DEFINED in a2a_integration.py, captured at this
+# The 18 catalogue entries DEFINED in a2a_integration.py, captured at this
 # module's import time.  Import happens at collection — before any test's
 # app fixture boots the platform (whose bootstrap permanently extends the
 # global SINCOR_SKILLS list).  Tests that need the pristine base catalogue
 # filter on these ids, so they stay green regardless of suite order.
 _BASE_IDS_AT_IMPORT = [s.id for s in SINCOR_SKILLS]
-assert len(_BASE_IDS_AT_IMPORT) == 17, (
+assert len(_BASE_IDS_AT_IMPORT) == 18, (
     "a2a_integration.SINCOR_SKILLS changed at import — update the count "
     "guards in this file and the module docstring")
 
 
 @pytest.fixture()
 def base_skills():
-    """The 17 catalogue entries defined in the module (pre-bootstrap).
+    """The 18 catalogue entries defined in the module (pre-bootstrap).
 
     platform_bootstrap appends vertical pack skills at runtime; those are
     covered by the vertical-resolution tests below, not here.
@@ -118,10 +118,10 @@ def test_catalogue_count_matches_docstring():
 
     src = open(integ.__file__, encoding="utf-8").read()
     literals = re.findall(r"^    AgentSkill\($", src, re.M)
-    assert len(literals) == 17, (
+    assert len(literals) == 18, (
         "SINCOR_SKILLS literal count changed — update the module docstring "
         "count too")
-    assert len(_BASE_IDS_AT_IMPORT) == 17
+    assert len(_BASE_IDS_AT_IMPORT) == 18
 
 
 # ---------------------------------------------------------------------------

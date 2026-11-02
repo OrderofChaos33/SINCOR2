@@ -332,6 +332,17 @@ def _wrap_job(job_id: str, func: Callable[[], None]) -> Callable[[], None]:
 # ---------------------------------------------------------------------------
 
 def _daily_ops_job() -> None:
+    # WREN PR 4: purge expired, never-fulfilled x402 challenges in this
+    # existing daily cycle (no new job). Guarded so a purge failure can
+    # never take daily ops down with it.
+    try:
+        from sincor2.x402_payments import purge_expired_challenges
+        purged = purge_expired_challenges()
+        if purged:
+            logger.info("[DAILY_OPS] purged %d expired x402 challenges",
+                        purged)
+    except Exception:
+        logger.exception("[DAILY_OPS] expired-challenge purge failed")
     from sincor2.daily_ops import run_daily
     include_buyers = (
         os.environ.get("DAILY_OPS_BUYERS_WEEKLY", "true").lower() == "true"

@@ -2879,9 +2879,15 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     @bp.get("/v1/a2a/pool")
     def v1_pool_status():
-        """Public pool status: reserve / funded / allocated / available."""
+        """Public pool status: reserve / funded / allocated / available,
+        plus aggregate ledger verification (W-101 wiring: verify_ledger()
+        previously had no production caller, so ledger drift sat
+        undetected at runtime)."""
         from sincor2.a2a_bounty_pool import bounty_pool
-        return jsonify(bounty_pool().status()), 200
+        pool = bounty_pool()
+        data = pool.status()
+        data["ledger_verification"] = pool.verify_ledger()
+        return jsonify(data), 200
 
     @bp.post("/v1/a2a/pool/fund")
     def v1_pool_fund():

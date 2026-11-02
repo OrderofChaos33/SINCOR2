@@ -22,7 +22,10 @@ Admin surface (see attach_market_routes in a2a_inbound_market.py)
   allocation record; the task's bounty is then pool-backed)
 * ``POST /v1/a2a/pool/release``   return an allocation to the pool unspent
 * ``GET  /v1/a2a/pool``           public status (reserve/funded/allocated/
-  available + allocation records) — intentionally unauthenticated
+  available + allocation records) — intentionally unauthenticated.
+  Carries ``ledger_verification`` (verify_ledger() aggregate: ok flag +
+  discrepancy list; no secrets, no per-agent data) and the W-119
+  ``rehydrate_blocked`` flag with its live obligations.
 
 Admin credential (G2.13 — single unified surface)
 -------------------------------------------------
@@ -59,6 +62,54 @@ PATH_ENV = "SINCOR_BOUNTY_POOL_PATH"
 # via the X-Admin-Key header. SINCOR_BOUNTY_POOL_ADMIN_KEY is retired and
 # no longer read. Never accept admin credentials in request bodies.
 ADMIN_KEY_ENV = "ADMIN_PASSWORD"
+
+# Task states in which a pool-backed task's allocation is provably
+# consumed (spent on settlement, released on expiry/rejection/delete).
+# Every other state still holds a live claim on the pool: open, auction,
+# assigned, proof_submitted, held — and "failed", because settlement
+# spends ONLY on receipt.ok, so a failed task is adjudication-pending,
+# not done. Unknown/missing states count as live (fail-loud direction).
+_TERMINAL_TASK_STATES = {"settled", "expired", "rejected", "canceled"}
+
+# Every key _save() writes, in a single payload, on every save. A
+# persisted file carrying NONE of these keys was therefore never written
+# by the pool — e.g. a ledger truncated to "{}" — and holds no pool state
+# at all. _load() treats such a file as a failed (corrupt) load so the
+# W-119 rehydrate guard engages instead of trusting the empty state.
+_SAVE_STATE_KEYS = frozenset({
+    "reserve_wei", "funded_wei", "spent_wei", "allocations",
+    "history", "history_writes", "saved_at",
+})
+
+
+def _obligation_from_task(task: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """A live pool-backed task record -> one rehydrate obligation."""
+    if not task.get("pool_backed"):
+        return []
+    state = str(task.get("state") or task.get("status") or "")
+    if state in _TERMINAL_TASK_STATES:
+        return []
+    try:
+        bounty = float(task.get("bounty_axm") or 0)
+    except (TypeError, ValueError):
+        bounty = 0.0
+    return [{"task_id": str(task.get("task_id") or task.get("id") or ""),
+             "bounty_axm": bounty, "state": state}]
+
+
+def _board_tasks_path() -> Optional[Path]:
+    """Marketplace board file: SINCOR_A2A_TASKS_PATH override, else
+    data_dir()/a2a_inbound_tasks.json. Mirrors
+    a2a_inbound._tasks_persist_path without importing that module (the
+    pool must stay import-cycle-free)."""
+    override = os.environ.get("SINCOR_A2A_TASKS_PATH", "").strip()
+    if override:
+        return Path(override)
+    try:
+        from sincor2.data_paths import data_dir
+        return data_dir() / "a2a_inbound_tasks.json"
+    except Exception:
+        return None
 
 
 class PoolError(Exception):
@@ -123,21 +174,58 @@ class BountyPool:
         # reports inconclusive instead of a false pass.
         self._history_writes = 0
         self._history_maybe_trimmed = False
+        # Set by _load() when the persisted file exists but yields no
+        # usable state (corrupt JSON / unreadable, or a stateless file
+        # carrying none of the _save() keys): the in-memory state is
+        # empty, but that emptiness is NOT a clean boot.
+        self._load_failed = False
+        # W-119: set when the ledger file was missing or corrupt on boot
+        # while live pool-backed tasks still hold claims. While set, the
+        # pool refuses to auto-fund AND refuses manual fund(): re-funding
+        # the full reserve would promise the same AXM twice. Recovery is
+        # by restart after the live tasks resolve (settlement/expiry
+        # release or spend their backing, fail-safe) or after the ledger
+        # file is restored from backup — a fresh boot then re-checks.
+        self._rehydrate_blocked = False
+        self._rehydrate_obligations: List[Dict[str, Any]] = []
         self._load()
-        if not self.path.is_file() and self.reserve_wei > 0:
-            # Fresh disk (first boot, or a redeploy wiped the ephemeral
-            # ledger): the operator configured a reserve via
-            # SINCOR_LAUNCH_BOUNTY_AXM, so rehydrate it instead of silently
-            # refusing allocations until someone re-funds by hand. A warm
-            # ledger file is always trusted as-is.
-            self._funded_wei = self.reserve_wei
-            self._record("fund", self.reserve_wei,
-                         {"auto_rehydrate": True,
-                          "reason": "fresh disk; reserve configured"})
-            self._save()
-            logger.warning(
-                "bounty pool ledger missing on boot; auto-funded %s AXM "
-                "from configured reserve", _wei_to_axm(self.reserve_wei))
+        file_missing = not self.path.is_file()
+        if self.reserve_wei > 0 and (file_missing or self._load_failed):
+            obligations, inconclusive = self._live_pool_obligations()
+            if obligations or inconclusive:
+                self._rehydrate_blocked = True
+                self._rehydrate_obligations = obligations
+                logger.error(
+                    "bounty pool ledger %s on boot with live pool-backed "
+                    "tasks still holding claims; REFUSING to re-fund the "
+                    "reserve (would double-promise %s AXM). Resolve the "
+                    "live tasks or restore the ledger file, then restart. "
+                    "Obligations: %s%s",
+                    "missing" if file_missing else "corrupt",
+                    _wei_to_axm(sum(
+                        int(round(float(o.get("bounty_axm") or 0) * 1e18))
+                        for o in obligations)),
+                    obligations,
+                    f" (check inconclusive: {inconclusive})"
+                    if inconclusive else "")
+                # Deliberately no _save(): a corrupt file is evidence for
+                # the operator, and creating a warm empty file would make
+                # the next boot trust the wiped state as-is.
+            elif file_missing:
+                # Fresh disk (first boot, or a redeploy wiped the ephemeral
+                # ledger) with NO live obligations: the operator configured
+                # a reserve via SINCOR_LAUNCH_BOUNTY_AXM, so rehydrate it
+                # instead of silently refusing allocations until someone
+                # re-funds by hand. A warm ledger file is always trusted
+                # as-is; a corrupt file is never auto-funded (see above).
+                self._funded_wei = self.reserve_wei
+                self._record("fund", self.reserve_wei,
+                             {"auto_rehydrate": True,
+                              "reason": "fresh disk; reserve configured"})
+                self._save()
+                logger.warning(
+                    "bounty pool ledger missing on boot; auto-funded %s AXM "
+                    "from configured reserve", _wei_to_axm(self.reserve_wei))
 
     # -- persistence ------------------------------------------------------
     def _load(self) -> None:
@@ -145,6 +233,18 @@ class BountyPool:
             return
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict) and not (_SAVE_STATE_KEYS & raw.keys()):
+                # Parses, but carries no pool state at all (e.g. "{}"):
+                # not a warm empty ledger — a wiped one. Route it through
+                # the corrupt-file path so __init__ runs the W-119
+                # rehydrate guard instead of trusting the empty state
+                # (a manual fund() would otherwise re-fund the full
+                # reserve over live claims).
+                self._load_failed = True
+                logger.warning(
+                    "bounty pool file %s contains no pool state; "
+                    "treating as corrupt (load failed)", self.path)
+                return
             self._funded_wei = int(raw.get("funded_wei") or 0)
             self._spent_wei = int(raw.get("spent_wei") or 0)
             allocs = raw.get("allocations") or {}
@@ -169,7 +269,48 @@ class BountyPool:
                 except (TypeError, ValueError):
                     self._history_maybe_trimmed = bool(self._history)
         except (json.JSONDecodeError, OSError, ValueError) as exc:
+            self._load_failed = True
             logger.warning("bounty pool load failed (%s); starting empty", exc)
+
+    def _live_pool_obligations(self):
+        """Live pool-backed tasks visible in durable task sources.
+
+        Returns (obligations, inconclusive). ``obligations`` is a list of
+        {task_id, bounty_axm, state}. ``inconclusive`` is a string when a
+        source could not be read at all — fail-closed: the caller must
+        not auto-fund on an unproven empty answer.
+
+        Sources (both read, either can block):
+        1. The marketplace board file — the actual home of pool_backed
+           task records (create_task persists pool_backed there).
+        2. The pluggable task store (lazy import, no import cycle) as a
+           second source, in case pool-backed records land there.
+        Runs ONLY on the missing/corrupt-file boot path, never on a warm
+        boot, so it adds no cost or side effects to normal operation.
+        """
+        obligations: List[Dict[str, Any]] = []
+        tasks_path = _board_tasks_path()
+        if tasks_path is None:
+            return obligations, "board tasks path could not be determined"
+        try:
+            if tasks_path.is_file():
+                raw = json.loads(tasks_path.read_text(encoding="utf-8"))
+                tasks = raw.get("tasks") if isinstance(raw, dict) else raw
+                items = (tasks.values() if isinstance(tasks, dict)
+                         else (tasks or []))
+                for task in items:
+                    if isinstance(task, dict):
+                        obligations.extend(_obligation_from_task(task))
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            return obligations, f"board tasks file {tasks_path} unreadable ({exc})"
+        try:
+            from sincor2.a2a_task_store import get_task_store
+            for task in get_task_store().list_all():
+                if isinstance(task, dict):
+                    obligations.extend(_obligation_from_task(task))
+        except Exception as exc:  # store backend failure must not read as "no tasks"
+            return obligations, f"task store unreadable ({exc})"
+        return obligations, None
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -205,6 +346,13 @@ class BountyPool:
         derived identity ``available = funded - allocated`` cannot see
         (it holds for corrupted books by construction).
 
+        W-118 extension: the replay ALSO covers the spent counter — the
+        exact field allocate() gates on via
+        ``available = funded - spent - allocated``. Journal spend totals
+        must match both the _spent_wei counter and the sum of spent-state
+        allocation records; a drift mutant zeroing spent_wei previously
+        passed verify green while inflating available.
+
         Returns {"ok": bool, "discrepancies": [...], "inconclusive": str|None}.
         ``inconclusive`` is set (instead of a false pass) when the
         in-memory journal does not cover the pool's full lifetime, e.g.
@@ -223,6 +371,7 @@ class BountyPool:
             else:
                 journal_funded = 0
                 journal_allocated = 0
+                journal_spent = 0
                 for e in self._history:
                     action = e.get("action")
                     try:
@@ -233,8 +382,11 @@ class BountyPool:
                         journal_funded += amt
                     elif action == "allocate":
                         journal_allocated += amt
-                    elif action in ("release", "spend"):
+                    elif action == "release":
                         journal_allocated -= amt
+                    elif action == "spend":
+                        journal_allocated -= amt
+                        journal_spent += amt
                     else:
                         inconclusive = (
                             f"unknown journal action {action!r}; "
@@ -250,6 +402,18 @@ class BountyPool:
                         discrepancies.append(
                             f"allocated: journal={journal_allocated} "
                             f"records={record_allocated}")
+                    if journal_spent != self._spent_wei:
+                        discrepancies.append(
+                            f"spent: journal={journal_spent} "
+                            f"counter={self._spent_wei}")
+                    record_spent = sum(
+                        int(a.get("amount_wei") or 0)
+                        for a in self._allocations.values()
+                        if a.get("state") == "spent")
+                    if record_spent != self._spent_wei:
+                        discrepancies.append(
+                            f"spent: spent_records={record_spent} "
+                            f"counter={self._spent_wei}")
             return {"ok": not discrepancies and inconclusive is None,
                     "discrepancies": discrepancies,
                     "inconclusive": inconclusive}
@@ -273,6 +437,14 @@ class BountyPool:
         has not set a reserve (``SINCOR_LAUNCH_BOUNTY_AXM`` defaults to 0).
         """
         with self._lock:
+            if self._rehydrate_blocked:
+                raise PoolError(
+                    "bounty pool rehydrate blocked: the pool ledger file "
+                    "was missing or corrupt on boot while live pool-backed "
+                    "tasks still hold claims; refusing to re-fund the full "
+                    "reserve until those tasks resolve or the ledger file "
+                    "is restored, then restart. Live obligations: "
+                    f"{self._rehydrate_obligations}")
             if self.reserve_wei <= 0:
                 raise PoolNotConfigured(
                     f"launch bounty pool not configured: set {RESERVE_ENV} "
@@ -398,6 +570,13 @@ class BountyPool:
             "allocations": [self._public_alloc(a)
                             for a in sorted(self._allocations.values(),
                                             key=lambda x: x.get("created_at") or 0)],
+            # W-119: True when boot found a missing/corrupt ledger file
+            # with live pool-backed tasks still holding claims; while
+            # True the pool refuses to (re-)fund. Surfaced by
+            # GET /v1/a2a/pool alongside the ledger verification.
+            "rehydrate_blocked": self._rehydrate_blocked,
+            "rehydrate_blocked_obligations": [
+                dict(o) for o in self._rehydrate_obligations],
             # Currency note: offchain AXM-denominated reservation ledger;
             # it does not move funds on any chain.
             "ledger": "offchain-axm",

@@ -22,7 +22,8 @@ def _is_admin_request() -> bool:
       ``session["admin_username"]`` matching ADMIN_USERNAME
       (mvp_app._is_admin_session), or
     * a Bearer JWT (or ``access_token`` cookie) whose ``sub`` is the
-      admin username (mvp_app._check_admin_token), or
+      admin username AND whose ``role`` claim is ``'admin'``
+      (mvp_app._check_admin_token), or
     * the ``X-Admin-Key`` header matching ADMIN_PASSWORD
       (mvp_app._check_admin_key).
 
@@ -48,7 +49,9 @@ def _is_admin_request() -> bool:
             from flask_jwt_extended import decode_token
 
             decoded = decode_token(token)
-            if hmac.compare_digest(
+            # Identity AND role (hunt-32 W-44): sub alone is never
+            # sufficient — every real admin login mints role='admin'.
+            if decoded.get("role") == "admin" and hmac.compare_digest(
                 str(decoded.get("sub") or "").lower(), admin_username.lower()
             ):
                 return True
@@ -58,8 +61,13 @@ def _is_admin_request() -> bool:
     admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
     key = request.headers.get("X-Admin-Key", "")
     if key and admin_password:
-        if hmac.compare_digest(str(key), admin_password):
-            return True
+        try:
+            if hmac.compare_digest(str(key), admin_password):
+                return True
+        except (TypeError, ValueError):
+            # Non-ASCII header value: un-comparable in constant time —
+            # fail closed instead of surfacing a 500 (hunt-32 W-44).
+            pass
 
     return False
 
