@@ -103,17 +103,23 @@ _X402_ENSURE_COLUMN_SQL = {
 def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
     """Add a column if missing (migration for DBs created before this patch).
 
+    Existence is checked first: if the column is already present there is
+    nothing to migrate, so return without gating (W-120 residual — an
+    allowlist check here would brick every ``_conn()`` call for any DB
+    whose schema already carries a column the allowlist doesn't know).
+    Only an actual ALTER is gated: for a missing column,
     ``table``/``column``/``ddl`` must match the allowlist exactly; any
     other value raises ValueError without touching the database.
     """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(x402_challenges)").fetchall()}
+    if column in cols:
+        return
     entry = _X402_ENSURE_COLUMN_SQL.get(column)
     if table != "x402_challenges" or entry is None or entry[0] != ddl:
         raise ValueError(
             f"migration not allowlisted: table={table!r} column={column!r} ddl={ddl!r}"
         )
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(x402_challenges)").fetchall()}
-    if column not in cols:
-        conn.execute(entry[1])
+    conn.execute(entry[1])
 
 
 def init_x402_db() -> None:
