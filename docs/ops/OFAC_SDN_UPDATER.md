@@ -25,7 +25,10 @@ daily); the exact hour is flexible.
    ≥ 10,000. **Any failure → the snapshot is untouched** (exit 1, JSON
    error on stdout).
 3. Compares `publication_date` with the vendored snapshot. Unchanged →
-   no-op (idempotent).
+   entries are kept as-is and only `fetched_at` is re-stamped to the
+   successful verification time (status `unchanged`, `restamped: true`),
+   so the 48h freshness guards track the last verification, not the
+   last list change (W-35). A failed fetch or parse never re-stamps.
 4. On a new publication: writes the new snapshot atomically
    (temp file + fsync + `os.replace`) — a crash can never leave a
    half-written list.
