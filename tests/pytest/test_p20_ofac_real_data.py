@@ -183,10 +183,27 @@ def _patch_fetch(monkeypatch, payload: bytes):
 
 def test_updater_idempotent_on_same_publication_date(workdir, monkeypatch):
     _patch_fetch(monkeypatch, _fake_sdn_xml(_vendored_publication_date()))
-    before = os.path.getmtime(workdir)
-    result = ofac_sdn_updater.update_snapshot(out_path=workdir)
+    before_snap = load_snapshot(workdir)
+    # Age the file so the re-stamp rewrite is observable via mtime.
+    aged = time.time() - 3600
+    os.utime(workdir, (aged, aged))
+    verify_time = (datetime.fromisoformat(before_snap["fetched_at"])
+                   + timedelta(days=3)).isoformat()
+    result = ofac_sdn_updater.update_snapshot(out_path=workdir,
+                                              now=verify_time)
     assert result["status"] == "unchanged"
-    assert os.path.getmtime(workdir) == before  # untouched
+    # W-35 (founder ruling 2026-11-02): a successful verification with an
+    # unchanged publication date re-stamps fetched_at — the entries and
+    # publication date stay identical, but the file IS rewritten, so the
+    # 48h freshness guards measure the last verification, not the last
+    # list change.
+    assert result["restamped"] is True
+    assert result["fetched_at"] == verify_time
+    assert os.path.getmtime(workdir) > aged  # rewritten (re-stamped)
+    after_snap = load_snapshot(workdir)
+    assert after_snap["entries"] == before_snap["entries"]
+    assert after_snap["publication_date"] == before_snap["publication_date"]
+    assert after_snap["fetched_at"] == verify_time
 
 
 def test_updater_installs_new_publication(workdir, monkeypatch):
