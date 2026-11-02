@@ -2,7 +2,9 @@
 
 Fetches the official SDN XML, verifies it, and atomically replaces the
 vendored lean snapshot (:mod:`sincor2.defi.ofac_sdn`). Idempotent: when the
-publication date is unchanged, the snapshot is left untouched.
+publication date is unchanged, the entries are kept as-is and only
+``fetched_at`` is re-stamped to the successful verification time, so the
+freshness guards track the last verification rather than the last change.
 
 Verification (all must pass before anything is written):
   1. HTTP 200 with a non-trivial body (>= MIN_BYTES).
@@ -84,7 +86,8 @@ def update_snapshot(out_path: str = None,
     """Fetch, verify, and atomically install the latest SDN snapshot.
 
     Returns a status dict. Raises UpdateError (snapshot untouched) on any
-    failure. Idempotent: unchanged publication date => no rewrite.
+    failure. Unchanged publication date => entries kept, ``fetched_at``
+    re-stamped to this verification (status "unchanged", restamped True).
     """
     path = out_path or snapshot_path()
     fetched_at = now or datetime.datetime.now(
@@ -98,7 +101,20 @@ def update_snapshot(out_path: str = None,
         current = None
     if current is not None and (current.get("publication_date")
                                 == snapshot["publication_date"]):
+        # Publication unchanged: the fetched bytes verified as the same
+        # list we already hold. Re-stamp fetched_at (W-35) so freshness
+        # guards measure the last successful *verification*, not the
+        # last list *change* — OFAC often goes >48h without
+        # republishing, and a stale fetched_at fails the sanctions path
+        # closed despite a healthy updater. Only reachable after
+        # verify_and_parse succeeded on the real fetched bytes; the
+        # current snapshot is written back untouched except fetched_at.
+        restamped = dict(current)
+        restamped["fetched_at"] = fetched_at
+        write_snapshot_atomic(restamped, path)
         return {"status": "unchanged",
+                "restamped": True,
+                "fetched_at": fetched_at,
                 "publication_date": snapshot["publication_date"],
                 "path": path}
     write_snapshot_atomic(snapshot, path)
