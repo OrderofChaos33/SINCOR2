@@ -325,6 +325,152 @@ def test_full_loop_with_restart_mid_auction_conserves_pool(persist_env):
     assert st["available_axm"] == 90.0 and st["allocated_axm"] == 0.0
 
 
+# ---------------------------------------------------------------------------
+# Builder B rejection regressions (e3bc2e84): mirror-lag double-spend,
+# wall-clock board freshness, snapshot concurrency. The defect tests
+# fail on the rejected code and pass on the fix (pin-checked); the
+# companion tests pin the safe direction of the new semantics.
+# ---------------------------------------------------------------------------
+
+def test_pool_mirror_failure_fails_closed_no_double_spend(
+        persist_env, monkeypatch):
+    """Defect 1: a spend whose checkpoint mirror fails must not commit
+    silently. The operation raises, the instance is poisoned, and a
+    later boot with the JSON wiped fails closed over the degraded
+    marker instead of resurrecting the allocation for a second spend."""
+    import sincor2.workflow_state as ws
+
+    pool = reset_bounty_pool(path=str(persist_env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    alloc = pool.allocate("task-a", 40.0)
+
+    real_save = ws.save_state_snapshot
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("checkpoint store unavailable (forced)")
+
+    monkeypatch.setattr(ws, "save_state_snapshot", _boom)
+    with pytest.raises(PoolError, match="mirror"):
+        pool.spend(alloc["allocation_id"])
+    # The poisoned instance refuses further money movement.
+    with pytest.raises(PoolError, match="degraded"):
+        pool.allocate("task-b", 1.0)
+    monkeypatch.setattr(ws, "save_state_snapshot", real_save)
+
+    # The degraded marker is durable and survives the JSON wipe.
+    marker = persist_env["checkpoints"].with_name(
+        persist_env["checkpoints"].name + ".pool-degraded")
+    assert marker.is_file()
+    persist_env["pool"].unlink()
+    with pytest.raises(PoolError, match="degraded"):
+        BountyPool(path=str(persist_env["pool"]), reserve_axm=100.0)
+
+
+def test_pool_mirror_recovery_after_marker_and_json_intact(persist_env):
+    """Companion to the fail-closed path: when the JSON survives, it
+    stays authoritative even if a degraded marker exists, and normal
+    operation (including checkpoint restore after a later clean wipe)
+    is unaffected."""
+    pool = reset_bounty_pool(path=str(persist_env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    a = pool.allocate("task-a", 40.0)
+    pool.spend(a["allocation_id"])
+    # Simulate a leftover marker from some earlier incident; the JSON
+    # is present, so boot uses it (present-JSON-wins is preserved).
+    marker = persist_env["checkpoints"].with_name(
+        persist_env["checkpoints"].name + ".pool-degraded")
+    marker.write_text("{}", encoding="utf-8")
+    pool2 = BountyPool(path=str(persist_env["pool"]), reserve_axm=100.0)
+    st = _assert_conserved(pool2)
+    assert st["spent_axm"] == 40.0
+    # A clean save on the new instance clears the stale marker.
+    pool2.allocate("task-b", 5.0)
+    assert not marker.exists()
+
+
+def _forge_board_checkpoint(persist_env, state):
+    from sincor2.workflow_state import (
+        BOARD_CHECKPOINT_NAME,
+        BOARD_RUN_ID,
+        WorkflowStateStore,
+        save_state_snapshot,
+    )
+    store = WorkflowStateStore.open(str(persist_env["checkpoints"]))
+    try:
+        save_state_snapshot(store, BOARD_RUN_ID, BOARD_CHECKPOINT_NAME, state)
+    finally:
+        store.close()
+
+
+def test_board_future_dated_checkpoint_cannot_resurrect(persist_env):
+    """Defect 2 (C1): a validly hash-bound checkpoint holding stale
+    board content with a far-future saved_at must NOT override the
+    present JSON. Freshness is monotonic checkpoint version pairing,
+    never payload wall-clock."""
+    import copy
+
+    reset_bounty_pool(path=str(persist_env["pool"]), reserve_axm=100.0).fund()
+    fabric = get_fabric()
+    t1 = create_task("lead-enrichment", bounty_axm=2.0)
+    stale_tasks = copy.deepcopy(list(fabric.tasks.values()))
+    with fabric.lock:
+        fabric.tasks[t1["task_id"]]["state"] = "settled"
+    t2 = create_task("lead-enrichment", bounty_axm=3.0)
+    _save_tasks(fabric)
+
+    _forge_board_checkpoint(persist_env, {
+        "tasks": stale_tasks, "bids": [], "commits": {}, "proofs": [],
+        "saved_at": _now_ms() + 10 ** 9,
+    })
+    fabric2 = _restart_board()
+    assert fabric2.tasks[t1["task_id"]]["state"] == "settled"
+    assert t2["task_id"] in fabric2.tasks
+
+
+def test_board_checkpoint_tie_prefers_json(persist_env):
+    """Defect 2 (C3): a checkpoint whose saved_at exactly ties the
+    JSON's must not win over the present JSON either."""
+    import copy
+
+    reset_bounty_pool(path=str(persist_env["pool"]), reserve_axm=100.0).fund()
+    fabric = get_fabric()
+    t1 = create_task("lead-enrichment", bounty_axm=2.0)
+    stale_tasks = copy.deepcopy(list(fabric.tasks.values()))
+    with fabric.lock:
+        fabric.tasks[t1["task_id"]]["state"] = "settled"
+    _save_tasks(fabric)
+
+    raw = json.loads(persist_env["tasks"].read_text(encoding="utf-8"))
+    _forge_board_checkpoint(persist_env, {
+        "tasks": stale_tasks, "bids": [], "commits": {}, "proofs": [],
+        "saved_at": raw["saved_at"],
+    })
+    fabric2 = _restart_board()
+    assert fabric2.tasks[t1["task_id"]]["state"] == "settled"
+
+
+def test_board_mirror_lag_keeps_json_authoritative(persist_env, monkeypatch):
+    """Defect 2 companion: when a save's mirror is lost, the JSON from
+    that save carries no checkpoint version, so boot prefers the JSON
+    over the stale checkpoint instead of resurrecting old state."""
+    import sincor2.a2a_inbound as inbound
+
+    reset_bounty_pool(path=str(persist_env["pool"]), reserve_axm=100.0).fund()
+    fabric = get_fabric()
+    t1 = create_task("lead-enrichment", bounty_axm=2.0)
+
+    real_mirror = inbound._mirror_board_to_checkpoint
+    monkeypatch.setattr(inbound, "_mirror_board_to_checkpoint",
+                        lambda state: None)
+    with fabric.lock:
+        fabric.tasks[t1["task_id"]]["state"] = "settled"
+    inbound._save_tasks(fabric)
+    monkeypatch.setattr(inbound, "_mirror_board_to_checkpoint", real_mirror)
+
+    fabric2 = _restart_board()
+    assert fabric2.tasks[t1["task_id"]]["state"] == "settled"
+
+
 def test_checkpoint_snapshot_is_hash_bound(persist_env):
     """Tampering with the checkpointed board state inside the DB must
     fail verification on boot — never a silent restore of forged state."""

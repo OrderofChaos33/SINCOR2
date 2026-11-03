@@ -49,6 +49,15 @@ wins (W-118/W-119 semantics are unchanged); a corrupt checkpoint on the
 missing-file path fails the boot loudly instead of booting empty. The
 checkpoint DB location is ``SINCOR_MARKETPLACE_CHECKPOINT_PATH`` or,
 by default, ``marketplace_checkpoints.db`` beside the ledger file.
+
+The mirror is part of the save's durability, NOT best-effort: a save
+whose mirror fails raises PoolError, poisons the in-memory pool (every
+further money operation refuses until restart), and leaves a durable
+degraded marker beside the checkpoint DB. A boot that finds the ledger
+JSON missing while that marker exists fails closed instead of
+restoring a checkpoint it knows may be one save behind — the
+crash-window resurrection that would let one allocation be spent
+twice. The marker is cleared by the next successful mirror.
 """
 from __future__ import annotations
 
@@ -199,6 +208,12 @@ class BountyPool:
         # Set by _load() when the JSON ledger was missing on boot and the
         # exact state came back from the workflow checkpoint store.
         self._checkpoint_restored = False
+        # Set when a checkpoint mirror fails mid-save: the on-disk
+        # checkpoint may now lag the JSON ledger, so this instance must
+        # not move more money (a restart re-boots from the JSON, which
+        # is current, or fails closed if the JSON is gone — see the
+        # degraded marker in _mirror_to_checkpoint).
+        self._persistence_degraded = False
         self._load()
         file_missing = not self.path.is_file()
         if self.reserve_wei > 0 and (file_missing or self._load_failed):
@@ -320,6 +335,23 @@ class BountyPool:
 
     def _load(self) -> None:
         if not self.path.is_file():
+            # A degraded marker means a previous save's checkpoint
+            # mirror FAILED after its JSON write: the checkpoint may be
+            # one save behind the state the operator already acted on.
+            # With the JSON also gone there is no trustworthy source —
+            # fail closed (operator reconciles) rather than resurrect
+            # spent allocations for a second spend.
+            marker = self._degraded_marker_path()
+            if marker.is_file():
+                raise PoolError(
+                    f"bounty pool persistence degraded marker {marker} "
+                    "present and ledger file "
+                    f"{self.path} missing: a previous save's checkpoint "
+                    "mirror failed, so the checkpoint store may lag the "
+                    "last committed state; refusing to boot from a "
+                    "possibly stale checkpoint (double-spend risk). "
+                    "Restore the ledger JSON from backup or reconcile "
+                    "manually, then remove the marker and restart.")
             # A missing ledger with a verified checkpoint snapshot is a
             # wiped disk, not a first boot: restore exactly. Without a
             # snapshot, fall through to the historical W-119 logic in
@@ -404,13 +436,47 @@ class BountyPool:
         os.replace(tmp, self.path)
         self._mirror_to_checkpoint(payload)
 
+    def _degraded_marker_path(self) -> Path:
+        """Sidecar marker recording that a checkpoint mirror failed.
+
+        Lives beside the checkpoint DB (independent of the checkpoint
+        machinery itself, so it can be written even when that machinery
+        is what failed) and survives deletion of the ledger JSON.
+        """
+        return Path(str(self._checkpoint_db_path()) + ".pool-degraded")
+
+    def _write_degraded_marker(self, exc: Exception) -> None:
+        marker = self._degraded_marker_path()
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text(json.dumps({
+                "at": _now_ms(),
+                "reason": f"checkpoint mirror failed: {exc}",
+                "funded_wei": str(self._funded_wei),
+                "spent_wei": str(self._spent_wei),
+                "ledger_path": str(self.path),
+            }), encoding="utf-8")
+        except Exception as marker_exc:
+            logger.error(
+                "bounty pool degraded marker %s could not be written "
+                "(%s); the in-memory pool is poisoned regardless",
+                marker, marker_exc)
+
     def _mirror_to_checkpoint(self, payload: Dict[str, Any]) -> None:
         """Mirror a just-saved ledger payload into the workflow
-        checkpoint store (hash-bound snapshot). Best-effort: the JSON
-        ledger above is already durable, so a mirror failure is logged
-        at ERROR but never bricks the money operation that called
-        _save(); the boot path treats a stale-but-verified checkpoint
-        as the floor it can restore, never as a reason to block."""
+        checkpoint store (hash-bound snapshot).
+
+        The mirror is part of the save's durability contract, NOT
+        best-effort. If it fails, the checkpoint may lag the JSON
+        ledger by this save; restoring from it after a JSON wipe would
+        resurrect spent allocations (a double-spend). So a failure:
+        (1) writes the degraded marker (the boot path fails closed if
+        it finds the marker with the JSON missing), (2) poisons this
+        instance so no further money moves on a diverged ledger, and
+        (3) raises PoolError so the calling operation reports failure
+        instead of silently committing. The next successful mirror
+        clears the marker and the poison.
+        """
         try:
             from sincor2.workflow_state import (
                 POOL_CHECKPOINT_NAME,
@@ -425,9 +491,31 @@ class BountyPool:
             finally:
                 store.close()
         except Exception as exc:
-            logger.error(
-                "bounty pool checkpoint mirror failed (%s); JSON ledger "
-                "at %s remains authoritative", exc, self.path)
+            self._persistence_degraded = True
+            self._write_degraded_marker(exc)
+            raise PoolError(
+                f"bounty pool checkpoint mirror failed ({exc}); the "
+                "save is NOT durably committed and this pool instance "
+                "is poisoned until restart (ledger JSON at "
+                f"{self.path} holds the newest state)") from exc
+        if self._persistence_degraded:
+            self._persistence_degraded = False
+            logger.warning(
+                "bounty pool checkpoint mirror recovered; degraded "
+                "state cleared")
+        try:
+            self._degraded_marker_path().unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    def _raise_if_degraded(self) -> None:
+        if self._persistence_degraded:
+            raise PoolError(
+                "bounty pool persistence is degraded: a previous "
+                "save's checkpoint mirror failed, so this instance's "
+                "durability is unproven; refusing money operations "
+                "until restart (the ledger JSON holds the newest "
+                "state)")
 
     def _record(self, action: str, amount_wei: int, detail: Dict[str, Any]) -> None:
         entry = {"action": action, "amount_wei": str(amount_wei),
@@ -536,6 +624,7 @@ class BountyPool:
         has not set a reserve (``SINCOR_LAUNCH_BOUNTY_AXM`` defaults to 0).
         """
         with self._lock:
+            self._raise_if_degraded()
             if self._rehydrate_blocked:
                 raise PoolError(
                     "bounty pool rehydrate blocked: the pool ledger file "
@@ -575,6 +664,7 @@ class BountyPool:
         if amount_wei <= 0:
             raise PoolError("amount_axm must be positive")
         with self._lock:
+            self._raise_if_degraded()
             available = self._available_wei()
             if amount_wei > available:
                 raise InsufficientPoolFunds(
@@ -602,6 +692,7 @@ class BountyPool:
         """Return an allocation to the pool unspent."""
         allocation_id = str(allocation_id or "").strip()
         with self._lock:
+            self._raise_if_degraded()
             alloc = self._allocations.get(allocation_id)
             if alloc is None:
                 raise KeyError("unknown allocation")
@@ -628,6 +719,7 @@ class BountyPool:
         """
         allocation_id = str(allocation_id or "").strip()
         with self._lock:
+            self._raise_if_degraded()
             alloc = self._allocations.get(allocation_id)
             if alloc is None:
                 raise KeyError("unknown allocation")

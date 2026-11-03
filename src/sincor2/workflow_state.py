@@ -92,12 +92,21 @@ __all__ = [
     "WorkflowStateStore",
     "default_reducer",
     "load_state_snapshot",
+    "load_state_snapshot_checkpoint",
     "marketplace_checkpoint_path",
     "save_state_snapshot",
 ]
 
 #: prev_hash of the first (genesis) event in a run's log: 64 zero hex chars.
 GENESIS_PREV_HASH = "0" * 64
+
+#: Bounded retries for cross-connection write races (event seq and
+#: checkpoint version allocation). Each attempt re-reads under a fresh
+#: transaction; busy_timeout makes contenders queue rather than error,
+#: so a handful of attempts suffices in practice — the bound exists so
+#: a pathological lock-holder surfaces as WorkflowStateError instead of
+#: an infinite loop or a raw sqlite error.
+_SNAPSHOT_MAX_ATTEMPTS = 100
 
 _EVENT_PATCH = "state_patch"
 
@@ -341,6 +350,11 @@ class SQLiteStateBackend(StateBackend):
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
+        # Cross-connection writers (production opens a fresh store per
+        # save) must wait for each other's write transactions instead of
+        # failing instantly with "database is locked"; the store-level
+        # retry loops handle the remaining uniqueness races.
+        self._conn.execute("PRAGMA busy_timeout = 30000")
         with self._lock, self._conn:
             self._conn.executescript(_SCHEMA)
 
@@ -453,6 +467,89 @@ class SQLiteStateBackend(StateBackend):
                     f"{checkpoint['run_id']!r}/{checkpoint['name']!r}"
                     f" v{checkpoint['version']}") from exc
 
+    # -- atomic snapshots ----------------------------------------------
+    def insert_snapshot(self, run_id, workflow, metadata_json, name,
+                        state, created_at):
+        """Atomically persist one state snapshot: ensure the run row
+        exists, append the ``state_saved`` event, and insert the
+        checkpoint bound to THAT event's seq — all in a single write
+        transaction, so no interleaving (same instance, another
+        instance, or a crash between the two writes) can bind the
+        checkpoint to another writer's event or lose the pairing.
+
+        Cross-connection races on the (run, seq) / (run, name, version)
+        keys surface as IntegrityError after the busy-timeout wait; the
+        whole transaction is rolled back by the connection context
+        manager and retried with fresh reads. Raw sqlite errors never
+        escape: exhaustion raises WorkflowStateError.
+
+        Returns (event, checkpoint_row) in the shapes the store uses.
+        """
+        payload = {"name": name, "state_sha256": _state_digest(state)}
+        last_error = None
+        with self._lock:
+            for attempt in range(_SNAPSHOT_MAX_ATTEMPTS):
+                try:
+                    with self._conn:
+                        self._conn.execute(
+                            "INSERT OR IGNORE INTO ws_runs (run_id,"
+                            " workflow, metadata, created_at)"
+                            " VALUES (?, ?, ?, ?)",
+                            (run_id, workflow, metadata_json, created_at))
+                        row = self._conn.execute(
+                            "SELECT * FROM ws_events WHERE run_id = ?"
+                            " ORDER BY seq DESC LIMIT 1", (run_id,)
+                        ).fetchone()
+                        last = _event_from_row(row) if row else None
+                        seq = (last["seq"] + 1) if last else 1
+                        event = {
+                            "run_id": run_id,
+                            "seq": seq,
+                            "event_type": "state_saved",
+                            "payload": payload,
+                            "prev_hash": (last["event_hash"] if last
+                                          else GENESIS_PREV_HASH),
+                            "created_at": created_at,
+                        }
+                        event["event_hash"] = _event_hash(event)
+                        self._conn.execute(
+                            "INSERT INTO ws_events (run_id, seq,"
+                            " event_type, payload, prev_hash, event_hash,"
+                            " created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (event["run_id"], event["seq"],
+                             event["event_type"],
+                             json.dumps(event["payload"], sort_keys=True),
+                             event["prev_hash"], event["event_hash"],
+                             event["created_at"]))
+                        crow = self._conn.execute(
+                            "SELECT * FROM ws_checkpoints WHERE run_id = ?"
+                            " AND name = ? ORDER BY version DESC LIMIT 1",
+                            (run_id, name)).fetchone()
+                        version = (crow["version"] + 1) if crow else 1
+                        checkpoint = {
+                            "run_id": run_id,
+                            "name": name,
+                            "version": version,
+                            "state": dict(state),
+                            "event_seq": seq,
+                            "created_at": created_at,
+                        }
+                        self._conn.execute(
+                            "INSERT INTO ws_checkpoints (run_id, name,"
+                            " version, state, event_seq, created_at)"
+                            " VALUES (?, ?, ?, ?, ?, ?)",
+                            (run_id, name, version,
+                             json.dumps(state, sort_keys=True),
+                             seq, created_at))
+                    return event, checkpoint
+                except (sqlite3.IntegrityError,
+                        sqlite3.OperationalError) as exc:
+                    last_error = exc
+                    time.sleep(min(0.05, 0.002 * (attempt + 1)))
+        raise WorkflowStateError(
+            f"snapshot insert for run {run_id!r} name {name!r} kept "
+            f"losing write races ({last_error}); nothing was written")
+
     # -- leases -------------------------------------------------------
     def get_lease(self, run_id):
         with self._lock:
@@ -558,24 +655,42 @@ class WorkflowStateStore:
     # -- events -------------------------------------------------------
     def append_event(self, run_id: str, event_type: str,
                      payload: Optional[dict] = None) -> dict:
-        """Append a hash-chained event to the run's log."""
+        """Append a hash-chained event to the run's log.
+
+        Seq allocation is read-last-then-insert; with several store
+        instances on one backend file another writer can claim the seq
+        first. That surfaces as a uniqueness error from the backend and
+        is retried with a fresh read (the chain stays intact: the retry
+        chains onto the winner's event). Raw backend errors never
+        escape — exhaustion raises :class:`WorkflowStateError`.
+        """
         payload = dict(payload or {})
         with self._lock:
             self._require_run(run_id)
-            last = self._backend.last_event(run_id)
-            seq = (last["seq"] + 1) if last else 1
-            prev_hash = last["event_hash"] if last else GENESIS_PREV_HASH
-            event = {
-                "run_id": run_id,
-                "seq": seq,
-                "event_type": event_type,
-                "payload": payload,
-                "prev_hash": prev_hash,
-                "created_at": self._clock(),
-            }
-            event["event_hash"] = _event_hash(event)
-            self._backend.insert_event(event)
-            return event
+            last_error = None
+            for attempt in range(_SNAPSHOT_MAX_ATTEMPTS):
+                last = self._backend.last_event(run_id)
+                seq = (last["seq"] + 1) if last else 1
+                prev_hash = last["event_hash"] if last else GENESIS_PREV_HASH
+                event = {
+                    "run_id": run_id,
+                    "seq": seq,
+                    "event_type": event_type,
+                    "payload": payload,
+                    "prev_hash": prev_hash,
+                    "created_at": self._clock(),
+                }
+                event["event_hash"] = _event_hash(event)
+                try:
+                    self._backend.insert_event(event)
+                    return event
+                except (sqlite3.IntegrityError,
+                        sqlite3.OperationalError) as exc:
+                    last_error = exc
+                    time.sleep(min(0.05, 0.002 * (attempt + 1)))
+            raise WorkflowStateError(
+                f"append_event for run {run_id!r} kept losing write "
+                f"races ({last_error}); nothing was written")
 
     def events(self, run_id: str, after_seq: int = 0) -> list:
         self._require_run(run_id)
@@ -610,12 +725,20 @@ class WorkflowStateStore:
 
     # -- checkpoints --------------------------------------------------
     def create_checkpoint(self, run_id: str, name: str, state: dict,
-                          expected_version: Optional[int] = None
+                          expected_version: Optional[int] = None,
+                          event_seq: Optional[int] = None
                           ) -> Checkpoint:
         """Snapshot ``state`` under ``name``. Version is latest+1 for the
         (run, name) pair. If ``expected_version`` is given it must equal
         the current latest version (0 when none exists), else
-        :class:`VersionConflict` is raised and nothing is written."""
+        :class:`VersionConflict` is raised and nothing is written.
+
+        ``event_seq`` pins the checkpoint to a specific event (the one
+        its own writer appended). When omitted, the checkpoint binds to
+        whatever the run's last event is at insert time — fine for a
+        single writer, wrong under concurrency, where another writer's
+        event can land in between (snapshot writers must pass it; see
+        :meth:`save_snapshot`)."""
         if not isinstance(state, dict):
             raise ValueError("checkpoint state must be a dict")
         try:
@@ -631,13 +754,17 @@ class WorkflowStateStore:
                 raise VersionConflict(
                     f"checkpoint {name!r} for run {run_id!r}: expected "
                     f"version {expected_version}, found {current}")
-            last = self._backend.last_event(run_id)
+            if event_seq is not None:
+                bound_seq = event_seq
+            else:
+                last = self._backend.last_event(run_id)
+                bound_seq = last["seq"] if last else 0
             row = {
                 "run_id": run_id,
                 "name": name,
                 "version": current + 1,
                 "state": dict(state),
-                "event_seq": last["seq"] if last else 0,
+                "event_seq": bound_seq,
                 "created_at": self._clock(),
             }
             self._backend.insert_checkpoint(row)
@@ -784,6 +911,62 @@ class WorkflowStateStore:
         """True when a run with this id has been created."""
         return self._backend.run_exists(run_id)
 
+    # -- whole-state snapshots ------------------------------------------
+    def save_snapshot(self, run_id: str, name: str, state: dict
+                      ) -> Checkpoint:
+        """Atomically checkpoint ``state`` under (run_id, name), bound
+        to the hash chain: the ``state_saved`` event and the checkpoint
+        that references it are written as one unit, and the checkpoint
+        is bound to THIS save's event seq — never to whatever event
+        another writer appended in between.
+
+        Safe under concurrent writers, including several store
+        instances sharing one backend file and racing first saves on a
+        fresh database. When the backend offers an atomic
+        ``insert_snapshot`` primitive it is used; otherwise the
+        append + checkpoint pair is retried as a unit on version
+        conflicts, with the checkpoint pinned to its own event.
+        """
+        if not isinstance(state, dict):
+            raise ValueError("snapshot state must be a dict")
+        try:
+            json.dumps(state)  # must be JSON-serializable
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "snapshot state must be JSON-serializable") from exc
+        inserter = getattr(self._backend, "insert_snapshot", None)
+        if inserter is not None:
+            _event, row = inserter(
+                run_id, "marketplace-state",
+                json.dumps({"checkpoint_name": name}, sort_keys=True),
+                name, dict(state), self._clock())
+            return Checkpoint(**row)
+        # Generic-backend fallback: ensure the run (tolerating a racing
+        # creator), then append + checkpoint with retry. Each attempt
+        # appends a fresh event and pins the checkpoint to it, so a
+        # version conflict never leaves a mis-bound checkpoint.
+        with self._lock:
+            if not self.run_exists(run_id):
+                try:
+                    self.create_run(
+                        run_id, workflow="marketplace-state",
+                        metadata={"checkpoint_name": name})
+                except WorkflowStateError:
+                    if not self.run_exists(run_id):
+                        raise
+            for _attempt in range(_SNAPSHOT_MAX_ATTEMPTS):
+                event = self.append_event(
+                    run_id, "state_saved",
+                    {"name": name, "state_sha256": _state_digest(state)})
+                try:
+                    return self.create_checkpoint(
+                        run_id, name, state, event_seq=event["seq"])
+                except VersionConflict:
+                    continue
+            raise WorkflowStateError(
+                f"snapshot for run {run_id!r} name {name!r} kept losing "
+                "version races; no checkpoint was written")
+
 
 # ---------------------------------------------------------------------------
 # Whole-state snapshots for the marketplace stores (board + bounty pool)
@@ -840,28 +1023,25 @@ def save_state_snapshot(store: WorkflowStateStore, run_id: str,
                         name: str, state: dict) -> Checkpoint:
     """Checkpoint ``state`` under (run_id, name), bound to the hash chain.
 
-    A ``state_saved`` event carrying the state's sha256 digest is
-    appended first; the checkpoint records that event's seq, so
+    A ``state_saved`` event carrying the state's sha256 digest and the
+    checkpoint that references it are written atomically (see
+    :meth:`WorkflowStateStore.save_snapshot`), so
     :func:`load_state_snapshot` can prove the checkpoint it loads is the
-    one the chained log last vouched for.
+    one the chained log vouched for — even under concurrent writers.
     """
-    if not store.run_exists(run_id):
-        store.create_run(run_id, workflow="marketplace-state",
-                         metadata={"checkpoint_name": name})
-    store.append_event(run_id, "state_saved",
-                       {"name": name, "state_sha256": _state_digest(state)})
-    return store.create_checkpoint(run_id, name, state)
+    return store.save_snapshot(run_id, name, state)
 
 
-def load_state_snapshot(store: WorkflowStateStore, run_id: str,
-                        name: str) -> Optional[dict]:
-    """Load the latest snapshot state for (run_id, name).
+def load_state_snapshot_checkpoint(store: WorkflowStateStore, run_id: str,
+                                   name: str) -> Optional[Checkpoint]:
+    """Verified latest snapshot checkpoint for (run_id, name).
 
-    Returns None when no snapshot exists. Raises
-    :class:`WorkflowStateError` when the event chain fails verification
-    or the checkpoint is not the state the chain last vouched for —
-    callers on a boot path must fail closed, never boot empty over a
-    tampered checkpoint.
+    Same verification as :func:`load_state_snapshot` (hash chain intact,
+    checkpoint bound to its own ``state_saved`` event by digest), but
+    returns the :class:`Checkpoint` so callers that must reason about
+    freshness can use its monotonic ``version``. Returns None when no
+    snapshot exists; raises :class:`WorkflowStateError` on any
+    verification failure — boot paths must fail closed.
     """
     if not store.run_exists(run_id):
         return None
@@ -884,4 +1064,18 @@ def load_state_snapshot(store: WorkflowStateStore, run_id: str,
         raise WorkflowStateError(
             f"checkpoint {name!r} for run {run_id!r} is not bound to the "
             "verified event chain (state digest mismatch)")
-    return checkpoint.state
+    return checkpoint
+
+
+def load_state_snapshot(store: WorkflowStateStore, run_id: str,
+                        name: str) -> Optional[dict]:
+    """Load the latest snapshot state for (run_id, name).
+
+    Returns None when no snapshot exists. Raises
+    :class:`WorkflowStateError` when the event chain fails verification
+    or the checkpoint is not the state the chain vouched for —
+    callers on a boot path must fail closed, never boot empty over a
+    tampered checkpoint.
+    """
+    checkpoint = load_state_snapshot_checkpoint(store, run_id, name)
+    return checkpoint.state if checkpoint is not None else None
