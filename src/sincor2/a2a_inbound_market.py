@@ -671,32 +671,68 @@ def open_escrow_exposure_axm(agent_id: str) -> float:
         return _open_exposure_locked(fabric, agent_id)
 
 
+def _kya_effective_score(score: Any, multiplier: Any) -> float:
+    """Apply a KYA allocation multiplier without reversing bid order.
+
+    Production bid scores can be negative, so a plain multiplication
+    would move a throttled negative score toward zero and promote the
+    throttled bidder. Scale the score's magnitude instead: positive
+    scores are multiplied by ``m`` and negative scores are divided by
+    ``m``. For every valid ``0 < m <= 1``, the result is <= the raw
+    score and the transform is strictly increasing in the raw score
+    (slopes ``m`` and ``1 / m`` on the two sides of zero, joined at 0).
+    Invalid multipliers fail open to the raw score.
+    """
+    raw = float(score)
+    try:
+        mult = float(multiplier)
+    except (TypeError, ValueError):
+        return raw
+    if not (0.0 < mult <= 1.0):
+        return raw
+    return raw * mult if raw >= 0 else raw / mult
+
+
 def _kya_telemetry_adjustments(
-        agent_ids: Any) -> Dict[str, Dict[str, Any]]:
+        agent_ids: Any, fabric: Any = None) -> Dict[str, Dict[str, Any]]:
     """KYA telemetry verdicts for winner-selection ranking.
 
     Returns ``{agent_id: verdict}`` for the candidates that HAVE
-    recorded telemetry. Fail-open: any telemetry failure yields {}
-    (raw-score ranking — byte-for-byte the pre-wiring behaviour).
-    Verdicts that actually throttle (multiplier < 1.0) are logged
-    with their evidence so the adjustment is observable in ops logs
-    as well as in the ``telemetry_throttle`` audit fields stamped on
-    the task at assignment.
+    recorded telemetry. Marketplace candidates are resolved through
+    their registered wallet — the binding enforced for bid auth — and
+    looked up only in telemetry's ``wallet:`` namespace. The
+    unauthenticated ``id:`` namespace is never consulted here.
+
+    Fail-open: any telemetry failure yields {} (raw-score ranking —
+    byte-for-byte the pre-wiring behaviour). Verdicts that actually
+    throttle (multiplier < 1.0) are logged with their evidence so the
+    adjustment is observable in ops logs as well as in the
+    ``telemetry_throttle`` audit fields stamped on the task at
+    assignment.
     """
     try:
         from sincor2 import kya_telemetry
 
+        if fabric is None:
+            fabric = get_fabric()
+        agents = getattr(fabric, "agents", {}) or {}
         adjustments: Dict[str, Dict[str, Any]] = {}
         for agent_id in agent_ids:
-            verdict = kya_telemetry.throttle_verdict(agent_id)
+            agent = agents.get(agent_id) or {}
+            registered_wallet = str(agent.get("wallet") or "").strip().lower()
+            if not registered_wallet:
+                continue
+            telemetry_key = "wallet:" + registered_wallet
+            verdict = kya_telemetry.throttle_verdict(telemetry_key)
             if verdict is None:
                 continue
             adjustments[agent_id] = verdict
             if verdict["allocation_multiplier"] < 1.0:
                 logger.info(
-                    "kya telemetry throttle: agent %s multiplier %.4f "
+                    "kya telemetry throttle: agent %s (%s) multiplier %.4f "
                     "(attempts=%d errors=%d timeouts=%d)",
-                    agent_id, verdict["allocation_multiplier"],
+                    agent_id, telemetry_key,
+                    verdict["allocation_multiplier"],
                     verdict["evidence"]["attempts"],
                     verdict["evidence"]["errors"],
                     verdict["evidence"]["timeouts"],
@@ -782,22 +818,25 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                                task_id, err)
         else:
             # KYA telemetry throttle (recommendation #2 wiring): rank
-            # on each candidate's score scaled by its live-reliability
-            # multiplier. Fail-open and neutral by default — candidates
-            # with no recorded telemetry (or any telemetry failure)
-            # rank on their raw score exactly as before, and a
-            # throttled candidate is scaled, never excluded. Raw bid
-            # scores are never rewritten; the adjustment lives only in
-            # this ranking plus the audit fields stamped at assignment.
+            # on each candidate's magnitude-scaled score, using the
+            # live-reliability multiplier for its registered wallet.
+            # Fail-open and neutral by default — candidates with no
+            # recorded telemetry (or any telemetry failure) rank on
+            # their raw score exactly as before, and a throttled
+            # candidate is scaled, never excluded. Magnitude scaling
+            # keeps the adjustment rank-monotonic for negative as
+            # well as positive production scores. Raw bid scores are
+            # never rewritten; the adjustment lives only in this
+            # ranking plus the audit fields stamped at assignment.
             telemetry_adj = _kya_telemetry_adjustments(
-                {str(b.get("agent_id")) for b in cands})
+                {str(b.get("agent_id")) for b in cands}, fabric=fabric)
 
             def _effective_score(b: Dict[str, Any]) -> float:
                 verdict = telemetry_adj.get(str(b.get("agent_id")))
                 if not verdict:
                     return float(b["score"])
-                return float(b["score"]) * float(
-                    verdict["allocation_multiplier"])
+                return _kya_effective_score(
+                    b["score"], verdict["allocation_multiplier"])
 
             ranked = sorted(cands, key=lambda b: (-_effective_score(b), int(b["received_at"]), b["bid_id"]))
             # Hunt-15 W-78: the concentration cap binds at WIN time, never at

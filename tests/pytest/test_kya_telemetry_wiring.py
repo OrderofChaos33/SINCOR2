@@ -7,11 +7,14 @@ Covers the two production seams wired in this branch:
   skill execution — writes one telemetry row per execution, keyed by
   the caller's reputation identity (verified wallet / caller id),
   with success / error / timeout outcomes.
-- APPLY: ``a2a_inbound_market.close_auction`` winner selection ranks
-  candidates on ``score * telemetry_multiplier``. A high-error agent
-  is scaled per policy (never excluded), a clean agent is untouched,
-  and an agent with no telemetry ranks on raw score with the task
-  record byte-for-byte unchanged (no audit stamp).
+- APPLY: ``a2a_inbound_market.close_auction`` winner selection
+  resolves each candidate's registered wallet, looks up telemetry
+  only in the ``wallet:`` namespace, and ranks candidates on a
+  magnitude-scaled score (positive scores multiplied by the
+  telemetry multiplier; negative scores divided by it). A high-error
+  agent is scaled per policy (never excluded), a clean agent is
+  untouched, and an agent with no telemetry ranks on raw score with
+  the task record byte-for-byte unchanged (no audit stamp).
 
 Both seams are fail-open: a telemetry-store failure must not change
 any execution or auction outcome. The telemetry store is redirected
@@ -23,6 +26,7 @@ the explicit failure-injection tests.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 
 import pytest
@@ -52,18 +56,46 @@ def env(tmp_path, monkeypatch):
     kt._default_store = None
 
 
+def _wallet_for(agent_id):
+    """Deterministic registered wallet used by the auction fixtures."""
+    digest = hashlib.sha256(str(agent_id).encode("utf-8")).hexdigest()
+    return "0x" + digest[:40]
+
+
+def _telemetry_key_for_agent(agent_id):
+    """RECORD/APPLY identity for a fixture agent: its registered wallet."""
+    agent = get_fabric().agents.get(agent_id) or {}
+    wallet = str(agent.get("wallet") or _wallet_for(agent_id)).strip().lower()
+    return "wallet:" + wallet
+
+
 def _seed(agent_id, *, successes=0, errors=0, timeouts=0):
+    # Harness correction for the identity-namespace defect: APPLY no
+    # longer looks up raw bid agent IDs, so direct store seeding must
+    # use the same wallet namespace RECORD writes. This changes only
+    # the fixture key, not any assertion below.
+    telemetry_key = _telemetry_key_for_agent(agent_id)
     store = kt.get_default_store()
     for _ in range(successes):
-        store.record(agent_id, "success", skill_id="wiring-test")
+        store.record(telemetry_key, "success", skill_id="wiring-test")
     for _ in range(errors):
-        store.record(agent_id, "error", skill_id="wiring-test")
+        store.record(telemetry_key, "error", skill_id="wiring-test")
     for _ in range(timeouts):
-        store.record(agent_id, "timeout", skill_id="wiring-test")
+        store.record(telemetry_key, "timeout", skill_id="wiring-test")
 
 
-def _mk_agent(agent_id, stake_axm=1000):
-    get_fabric().agents[agent_id] = {"agent_id": agent_id, "reputation": 1.0}
+def _mk_agent(agent_id, stake_axm=1000, wallet=None):
+    fabric = get_fabric()
+    existing = fabric.agents.get(agent_id) or {}
+    registered_wallet = str(
+        wallet or existing.get("wallet") or _wallet_for(agent_id)
+    ).strip().lower()
+    fabric.agents[agent_id] = {
+        **existing,
+        "agent_id": agent_id,
+        "reputation": existing.get("reputation", 1.0),
+        "wallet": registered_wallet,
+    }
     if stake_axm:
         stake_ledger().deposit(agent_id, int(stake_axm * ONE_AXM))
 
@@ -151,6 +183,26 @@ def test_telemetry_failure_leaves_close_auction_unchanged(env, monkeypatch):
     assert "telemetry_throttle" not in snap
 
 
+def test_negative_score_throttle_cannot_promote_bad_agent(env):
+    # Adversarial repro: plain multiplication would move the throttled
+    # -10 score to -1.0 and let badneg beat the clean -2 bid.
+    _seed("badneg", successes=5, errors=20)
+    _auction("t1", [("badneg", 1.0, -10.0), ("clean", 1.0, -2.0)])
+    snap = close_auction("t1")
+    assert snap["assigned_to"] == "clean"
+    assert snap["winner_score"] == -2.0
+
+
+def test_negative_score_throttle_reverses_raw_order(env):
+    # Unthrottled, -1 beats -2. At multiplier 0.1 the magnitude-scaled
+    # score is -10, so throttling must reverse that raw-score order.
+    _seed("badneg", successes=5, errors=20)
+    _auction("t1", [("badneg", 1.0, -1.0), ("clean", 1.0, -2.0)])
+    snap = close_auction("t1")
+    assert snap["assigned_to"] == "clean"
+    assert snap["winner_score"] == -2.0
+
+
 # ---------------------------------------------------------------------------
 # RECORD seam — _finalize_a2a_task
 # ---------------------------------------------------------------------------
@@ -168,6 +220,17 @@ def _a2a_task(caller_id="caller-1", metadata=None,
         updated_at=ai._now(),
         metadata=metadata or {},
     )
+
+
+def _record_finalized_failures(count, *, caller_id, verified_wallet=None):
+    """Record failures through the real A2A finalization seam."""
+    metadata = {}
+    if verified_wallet:
+        metadata["verified_wallet"] = verified_wallet
+    for _ in range(count):
+        task = _a2a_task(caller_id=caller_id, metadata=metadata)
+        result = ai._finalize_a2a_task(task, None, "swarm exploded")
+        assert result["state"] == "failed"
 
 
 def test_finalize_records_success_under_verified_wallet(env):
@@ -213,6 +276,50 @@ def test_telemetry_store_failure_does_not_change_finalization(
     result = ai._finalize_a2a_task(err_task, None, "boom")
     assert result["state"] == "failed"
     assert result["error"] == "boom"
+
+
+# ---------------------------------------------------------------------------
+# RECORD → APPLY identity contract
+# ---------------------------------------------------------------------------
+
+def test_verified_wallet_failures_throttle_registered_agent(env):
+    wallet = "0x1111111111111111111111111111111111111111"
+    _record_finalized_failures(
+        25, caller_id="alice-execution-caller", verified_wallet=wallet)
+    assert len(kt.get_default_store().events("wallet:" + wallet)) == 25
+
+    _mk_agent("alice", wallet=wallet)
+    _auction("t1", [("alice", 1.0, 100.0), ("rookie", 1.0, 5.0)])
+    snap = close_auction("t1")
+
+    # Alice still wins because 100 scaled by 0.1 is 10 > 5, and the
+    # stamp proves APPLY resolved her registered wallet rather than
+    # consulting the raw bid ID or caller-ID namespaces.
+    assert snap["assigned_to"] == "alice"
+    stamp = snap["telemetry_throttle"]
+    assert stamp["agent_id"] == "alice"
+    assert stamp["multiplier"] == 0.1
+    assert stamp["status"] == "evaluated"
+    assert stamp["raw_score"] == 100.0
+    assert stamp["effective_score"] == 10.0
+    assert stamp["evidence"] == {
+        "attempts": 25, "errors": 25, "timeouts": 0}
+
+
+def test_unverified_caller_id_failures_do_not_throttle_wallet_agent(env):
+    _record_finalized_failures(25, caller_id="mallory")
+    assert len(kt.get_default_store().events("id:mallory")) == 25
+
+    wallet = "0x2222222222222222222222222222222222222222"
+    _mk_agent("id:mallory", wallet=wallet)
+    _auction("t1", [("id:mallory", 1.0, 100.0), ("clean", 1.0, 50.0)])
+    snap = close_auction("t1")
+
+    # The registered agent's APPLY key is wallet:<its wallet>, never
+    # the colliding unauthenticated id:mallory telemetry bucket.
+    assert snap["assigned_to"] == "id:mallory"
+    assert snap["winner_score"] == 100.0
+    assert "telemetry_throttle" not in snap
 
 
 # ---------------------------------------------------------------------------
