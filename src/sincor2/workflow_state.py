@@ -63,18 +63,25 @@ from __future__ import annotations
 import abc
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 __all__ = [
     "GENESIS_PREV_HASH",
+    "BOARD_CHECKPOINT_NAME",
+    "BOARD_RUN_ID",
     "Checkpoint",
     "Lease",
     "LeaseHeld",
     "LeaseNotHeld",
+    "MARKETPLACE_CHECKPOINT_PATH_ENV",
+    "POOL_CHECKPOINT_NAME",
+    "POOL_RUN_ID",
     "ResumeResult",
     "RunNotFound",
     "CheckpointNotFound",
@@ -84,6 +91,9 @@ __all__ = [
     "WorkflowStateError",
     "WorkflowStateStore",
     "default_reducer",
+    "load_state_snapshot",
+    "marketplace_checkpoint_path",
+    "save_state_snapshot",
 ]
 
 #: prev_hash of the first (genesis) event in a run's log: 64 zero hex chars.
@@ -769,3 +779,109 @@ class WorkflowStateStore:
         self._require_run(run_id)
         row = self._backend.get_step(run_id, idempotency_key)
         return row["result"] if row else None
+
+    def run_exists(self, run_id: str) -> bool:
+        """True when a run with this id has been created."""
+        return self._backend.run_exists(run_id)
+
+
+# ---------------------------------------------------------------------------
+# Whole-state snapshots for the marketplace stores (board + bounty pool)
+# ---------------------------------------------------------------------------
+#
+# The marketplace board (sincor2.a2a_inbound) and the bounty pool
+# (sincor2.a2a_bounty_pool) keep JSON ledger files as their warm-boot
+# source. Those files are single points of failure: a redeploy that wipes
+# the data dir, or a torn write, loses the board and the pool ledger even
+# though every mutation was "saved". The helpers below mirror each save
+# into a WorkflowStateStore as a checkpoint snapshot bound to the run's
+# hash-chained event log, so a store whose JSON file is missing on boot
+# can restore its exact last-saved state from the checkpoint — and a
+# corrupt or tampered checkpoint fails verification loudly instead of
+# silently booting empty.
+
+#: Env var overriding the checkpoint DB location for BOTH marketplace
+#: stores (tests point it at a temp dir; production can point it at the
+#: persistent volume independent of the legacy JSON paths).
+MARKETPLACE_CHECKPOINT_PATH_ENV = "SINCOR_MARKETPLACE_CHECKPOINT_PATH"
+MARKETPLACE_CHECKPOINT_FILENAME = "marketplace_checkpoints.db"
+
+#: Run ids / checkpoint names for the two marketplace stores.
+BOARD_RUN_ID = "marketplace-board"
+BOARD_CHECKPOINT_NAME = "board"
+POOL_RUN_ID = "bounty-pool"
+POOL_CHECKPOINT_NAME = "pool-ledger"
+
+
+def marketplace_checkpoint_path(anchor_path: Any = None) -> str:
+    """Resolve the shared marketplace checkpoint DB path.
+
+    ``SINCOR_MARKETPLACE_CHECKPOINT_PATH`` wins. Otherwise the DB sits
+    next to ``anchor_path`` (the store's own JSON ledger file), falling
+    back to the persistent data dir.
+    """
+    override = os.environ.get(MARKETPLACE_CHECKPOINT_PATH_ENV, "").strip()
+    if override:
+        return override
+    if anchor_path:
+        return str(Path(anchor_path).parent / MARKETPLACE_CHECKPOINT_FILENAME)
+    try:
+        from sincor2.data_paths import data_dir
+        return str(data_dir() / MARKETPLACE_CHECKPOINT_FILENAME)
+    except Exception:
+        return MARKETPLACE_CHECKPOINT_FILENAME
+
+
+def _state_digest(state: dict) -> str:
+    return hashlib.sha256(_canonical_bytes(state)).hexdigest()
+
+
+def save_state_snapshot(store: WorkflowStateStore, run_id: str,
+                        name: str, state: dict) -> Checkpoint:
+    """Checkpoint ``state`` under (run_id, name), bound to the hash chain.
+
+    A ``state_saved`` event carrying the state's sha256 digest is
+    appended first; the checkpoint records that event's seq, so
+    :func:`load_state_snapshot` can prove the checkpoint it loads is the
+    one the chained log last vouched for.
+    """
+    if not store.run_exists(run_id):
+        store.create_run(run_id, workflow="marketplace-state",
+                         metadata={"checkpoint_name": name})
+    store.append_event(run_id, "state_saved",
+                       {"name": name, "state_sha256": _state_digest(state)})
+    return store.create_checkpoint(run_id, name, state)
+
+
+def load_state_snapshot(store: WorkflowStateStore, run_id: str,
+                        name: str) -> Optional[dict]:
+    """Load the latest snapshot state for (run_id, name).
+
+    Returns None when no snapshot exists. Raises
+    :class:`WorkflowStateError` when the event chain fails verification
+    or the checkpoint is not the state the chain last vouched for —
+    callers on a boot path must fail closed, never boot empty over a
+    tampered checkpoint.
+    """
+    if not store.run_exists(run_id):
+        return None
+    if not store.verify_chain(run_id):
+        raise WorkflowStateError(
+            f"checkpoint event chain failed verification for run {run_id!r}")
+    try:
+        checkpoint = store.load_checkpoint(run_id, name)
+    except CheckpointNotFound:
+        return None
+    binding = None
+    for event in store.events(run_id):
+        if event["seq"] == checkpoint.event_seq:
+            binding = event
+            break
+    if (binding is None or binding.get("event_type") != "state_saved"
+            or binding.get("payload", {}).get("name") != name
+            or binding.get("payload", {}).get("state_sha256")
+            != _state_digest(checkpoint.state)):
+        raise WorkflowStateError(
+            f"checkpoint {name!r} for run {run_id!r} is not bound to the "
+            "verified event chain (state digest mismatch)")
+    return checkpoint.state

@@ -401,46 +401,154 @@ def _tasks_persist_enabled() -> bool:
     return env not in {"test", "testing"}
 
 
+def _board_checkpoint_db_path():
+    """Workflow checkpoint DB for the board: SINCOR_MARKETPLACE_
+    CHECKPOINT_PATH, else beside the tasks JSON file."""
+    from sincor2.workflow_state import marketplace_checkpoint_path
+    return Path(marketplace_checkpoint_path(_tasks_persist_path()))
+
+
+def _mirror_board_to_checkpoint(state: Dict[str, Any]) -> None:
+    """Mirror a board snapshot into the workflow checkpoint store
+    (hash-bound). Best-effort, mirroring _save_tasks' contract: the JSON
+    file is written first and stays a valid boot source, so a mirror
+    failure is logged, never fatal."""
+    try:
+        from sincor2.workflow_state import (
+            BOARD_CHECKPOINT_NAME,
+            BOARD_RUN_ID,
+            WorkflowStateStore,
+            save_state_snapshot,
+        )
+        store = WorkflowStateStore.open(str(_board_checkpoint_db_path()))
+        try:
+            save_state_snapshot(store, BOARD_RUN_ID,
+                                BOARD_CHECKPOINT_NAME, state)
+        finally:
+            store.close()
+    except Exception as err:
+        logger.warning("[A2A] board checkpoint mirror failed: %s", err)
+
+
+def _load_board_checkpoint() -> Optional[Dict[str, Any]]:
+    """Latest verified board snapshot from the checkpoint store, or
+    None when no snapshot exists. Raises RuntimeError when a checkpoint
+    DB exists but is corrupt or fails verification — boot must fail
+    closed rather than start with an empty board over checkpointed
+    state."""
+    db_path = _board_checkpoint_db_path()
+    if not db_path.is_file():
+        return None
+    try:
+        from sincor2.workflow_state import (
+            BOARD_CHECKPOINT_NAME,
+            BOARD_RUN_ID,
+            WorkflowStateStore,
+            load_state_snapshot,
+        )
+        store = WorkflowStateStore.open(str(db_path))
+        try:
+            return load_state_snapshot(store, BOARD_RUN_ID,
+                                       BOARD_CHECKPOINT_NAME)
+        finally:
+            store.close()
+    except Exception as err:
+        raise RuntimeError(
+            f"[A2A] board checkpoint store {db_path} is corrupt or "
+            f"failed verification: {err}") from err
+
+
+def _restore_board_state(fabric: Fabric, state: Dict[str, Any]) -> None:
+    """Apply a board snapshot (tasks + bids + commits + proofs)."""
+    tasks = state.get("tasks") or []
+    items = tasks.values() if isinstance(tasks, dict) else tasks
+    for task in items or []:
+        if isinstance(task, dict) and task.get("task_id"):
+            fabric.tasks[task["task_id"]] = task
+    for bid in state.get("bids") or []:
+        if isinstance(bid, dict) and bid.get("bid_id"):
+            fabric.bids[bid["bid_id"]] = bid
+    commits = state.get("commits") or {}
+    if isinstance(commits, dict):
+        for key, record in commits.items():
+            if isinstance(record, dict):
+                fabric.commits[key] = record
+    for proof in state.get("proofs") or []:
+        if isinstance(proof, dict) and proof.get("proof_id"):
+            fabric.proofs[proof["proof_id"]] = proof
+
+
 def _load_tasks(fabric: Fabric) -> None:
-    """Restore task listings into a fresh fabric (boot path only)."""
+    """Restore task listings into a fresh fabric (boot path only).
+
+    Boot sources, newest wins: the workflow checkpoint snapshot (which
+    also carries bids/commits/proofs — collections the JSON file never
+    persisted) and the legacy tasks JSON file. A corrupt persistence
+    file on either path RAISES: boot recovery is fail-closed, never a
+    silent empty board over existing state.
+    """
     if not _tasks_persist_enabled():
         return
+    checkpoint_state = _load_board_checkpoint()
     path = _tasks_persist_path()
-    if path is None or not path.is_file():
-        return
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+    raw = None
+    if path is not None and path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as err:
+            raise RuntimeError(
+                f"[A2A] task persistence file {path} is corrupt: "
+                f"{err}") from err
+    if checkpoint_state is not None:
+        checkpoint_saved_at = int(checkpoint_state.get("saved_at") or 0)
+        json_saved_at = (int(raw.get("saved_at") or 0)
+                         if isinstance(raw, dict) else 0)
+        if raw is None or checkpoint_saved_at >= json_saved_at:
+            _restore_board_state(fabric, checkpoint_state)
+            return
+    if raw is not None:
         tasks = raw.get("tasks") if isinstance(raw, dict) else raw
         items = tasks.values() if isinstance(tasks, dict) else tasks
         if items:
             for task in items:
                 if isinstance(task, dict) and task.get("task_id"):
                     fabric.tasks[task["task_id"]] = task
-    except Exception as err:
-        logger.warning("[A2A] task restore failed: %s", err)
 
 
 def _save_tasks(fabric: Fabric) -> None:
-    """Write-through task persistence (atomic tmp + os.replace).
+    """Write-through task persistence (atomic tmp + os.replace), plus a
+    hash-bound checkpoint snapshot in the workflow state store.
 
     Call outside ``fabric.lock`` after a task mutation, mirroring
     ``_save_agents``. Never raises: a failed write is logged, never fatal.
+    The checkpoint snapshot additionally carries bids, commits, and
+    proofs — an auction in flight at restart time keeps its bids, which
+    the JSON file alone never persisted.
     """
     if not _tasks_persist_enabled():
         return
     path = _tasks_persist_path()
     if path is None:
         return
+    saved_at = _now_ms()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_text(
-            json.dumps({"tasks": list(fabric.tasks.values()), "saved_at": _now_ms()}),
+            json.dumps({"tasks": list(fabric.tasks.values()), "saved_at": saved_at}),
             encoding="utf-8",
         )
         os.replace(tmp, path)
     except Exception as err:
         logger.warning("[A2A] task persist failed: %s", err)
+        return
+    _mirror_board_to_checkpoint({
+        "tasks": list(fabric.tasks.values()),
+        "bids": list(fabric.bids.values()),
+        "commits": dict(fabric.commits),
+        "proofs": list(fabric.proofs.values()),
+        "saved_at": saved_at,
+    })
 
 
 def health_snapshot() -> Dict[str, Any]:

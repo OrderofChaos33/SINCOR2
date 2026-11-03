@@ -40,7 +40,15 @@ retired and no longer read.
 
 Persistence: JSON file with atomic writes (tmp + os.replace), following the
 fee_conversion_executor.py ledger pattern. ``SINCOR_BOUNTY_POOL_PATH``
-overrides the file location (tests).
+overrides the file location (tests). Every save is ALSO mirrored into the
+workflow checkpoint store (sincor2.workflow_state) as a hash-bound
+snapshot: if the JSON ledger file is missing on boot (the 2026-11-02
+redeploy wipe), the exact last-saved state is restored from the verified
+checkpoint and the JSON file is rewritten. A present JSON file always
+wins (W-118/W-119 semantics are unchanged); a corrupt checkpoint on the
+missing-file path fails the boot loudly instead of booting empty. The
+checkpoint DB location is ``SINCOR_MARKETPLACE_CHECKPOINT_PATH`` or,
+by default, ``marketplace_checkpoints.db`` beside the ledger file.
 """
 from __future__ import annotations
 
@@ -188,6 +196,9 @@ class BountyPool:
         # file is restored from backup — a fresh boot then re-checks.
         self._rehydrate_blocked = False
         self._rehydrate_obligations: List[Dict[str, Any]] = []
+        # Set by _load() when the JSON ledger was missing on boot and the
+        # exact state came back from the workflow checkpoint store.
+        self._checkpoint_restored = False
         self._load()
         file_missing = not self.path.is_file()
         if self.reserve_wei > 0 and (file_missing or self._load_failed):
@@ -228,8 +239,92 @@ class BountyPool:
                     "from configured reserve", _wei_to_axm(self.reserve_wei))
 
     # -- persistence ------------------------------------------------------
+    def _checkpoint_db_path(self) -> Path:
+        from sincor2.workflow_state import marketplace_checkpoint_path
+        return Path(marketplace_checkpoint_path(self.path))
+
+    def _apply_payload(self, raw: Dict[str, Any]) -> None:
+        """Apply a persisted ledger payload (the _save() shape) in memory."""
+        self._funded_wei = int(raw.get("funded_wei") or 0)
+        self._spent_wei = int(raw.get("spent_wei") or 0)
+        allocs = raw.get("allocations") or {}
+        if isinstance(allocs, dict):
+            for aid, alloc in allocs.items():
+                if isinstance(alloc, dict):
+                    alloc = dict(alloc)
+                    alloc["amount_wei"] = int(alloc.get("amount_wei") or 0)
+                    self._allocations[aid] = alloc
+        hist = raw.get("history")
+        if isinstance(hist, list):
+            self._history = hist
+        # Total-write counter lets verify_ledger() detect a trimmed
+        # journal. Files written before the counter existed carry a
+        # history but no counter -> treat as maybe-trimmed.
+        hw = raw.get("history_writes")
+        if hw is None:
+            self._history_maybe_trimmed = bool(self._history)
+        else:
+            try:
+                self._history_writes = max(0, int(hw))
+            except (TypeError, ValueError):
+                self._history_maybe_trimmed = bool(self._history)
+
+    def _restore_from_checkpoint(self) -> bool:
+        """Missing-JSON boot path: restore the exact last-saved state
+        from the workflow checkpoint store and rewrite the JSON ledger.
+
+        Returns False when no checkpoint snapshot exists (the caller
+        then runs the historical W-119 missing-file logic). Raises
+        PoolError when a checkpoint DB exists but is corrupt or fails
+        verification — fail closed, never boot empty over checkpointed
+        state.
+        """
+        db_path = self._checkpoint_db_path()
+        if not db_path.is_file():
+            return False
+        try:
+            from sincor2.workflow_state import (
+                POOL_CHECKPOINT_NAME,
+                POOL_RUN_ID,
+                WorkflowStateStore,
+                load_state_snapshot,
+            )
+            store = WorkflowStateStore.open(str(db_path))
+            try:
+                state = load_state_snapshot(
+                    store, POOL_RUN_ID, POOL_CHECKPOINT_NAME)
+            finally:
+                store.close()
+        except PoolError:
+            raise
+        except Exception as exc:
+            raise PoolError(
+                f"bounty pool checkpoint store {db_path} is corrupt or "
+                f"failed verification ({exc}); refusing to boot empty "
+                "over checkpointed pool state") from exc
+        if state is None:
+            return False
+        self._apply_payload(state)
+        self._checkpoint_restored = True
+        logger.warning(
+            "bounty pool ledger %s missing on boot; restored exact "
+            "state from checkpoint store %s (funded=%s spent=%s "
+            "allocations=%d)", self.path, db_path,
+            _wei_to_axm(self._funded_wei), _wei_to_axm(self._spent_wei),
+            len(self._allocations))
+        # Rewrite the JSON ledger so legacy readers and the next warm
+        # boot see the restored state. (_save also re-mirrors, which is
+        # a harmless duplicate snapshot of identical state.)
+        self._save()
+        return True
+
     def _load(self) -> None:
         if not self.path.is_file():
+            # A missing ledger with a verified checkpoint snapshot is a
+            # wiped disk, not a first boot: restore exactly. Without a
+            # snapshot, fall through to the historical W-119 logic in
+            # __init__ (auto-fund only when no live obligations exist).
+            self._restore_from_checkpoint()
             return
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
@@ -245,29 +340,7 @@ class BountyPool:
                     "bounty pool file %s contains no pool state; "
                     "treating as corrupt (load failed)", self.path)
                 return
-            self._funded_wei = int(raw.get("funded_wei") or 0)
-            self._spent_wei = int(raw.get("spent_wei") or 0)
-            allocs = raw.get("allocations") or {}
-            if isinstance(allocs, dict):
-                for aid, alloc in allocs.items():
-                    if isinstance(alloc, dict):
-                        alloc = dict(alloc)
-                        alloc["amount_wei"] = int(alloc.get("amount_wei") or 0)
-                        self._allocations[aid] = alloc
-            hist = raw.get("history")
-            if isinstance(hist, list):
-                self._history = hist
-            # Total-write counter lets verify_ledger() detect a trimmed
-            # journal. Files written before the counter existed carry a
-            # history but no counter -> treat as maybe-trimmed.
-            hw = raw.get("history_writes")
-            if hw is None:
-                self._history_maybe_trimmed = bool(self._history)
-            else:
-                try:
-                    self._history_writes = max(0, int(hw))
-                except (TypeError, ValueError):
-                    self._history_maybe_trimmed = bool(self._history)
+            self._apply_payload(raw)
         except (json.JSONDecodeError, OSError, ValueError) as exc:
             self._load_failed = True
             logger.warning("bounty pool load failed (%s); starting empty", exc)
@@ -329,6 +402,32 @@ class BountyPool:
         }
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         os.replace(tmp, self.path)
+        self._mirror_to_checkpoint(payload)
+
+    def _mirror_to_checkpoint(self, payload: Dict[str, Any]) -> None:
+        """Mirror a just-saved ledger payload into the workflow
+        checkpoint store (hash-bound snapshot). Best-effort: the JSON
+        ledger above is already durable, so a mirror failure is logged
+        at ERROR but never bricks the money operation that called
+        _save(); the boot path treats a stale-but-verified checkpoint
+        as the floor it can restore, never as a reason to block."""
+        try:
+            from sincor2.workflow_state import (
+                POOL_CHECKPOINT_NAME,
+                POOL_RUN_ID,
+                WorkflowStateStore,
+                save_state_snapshot,
+            )
+            store = WorkflowStateStore.open(str(self._checkpoint_db_path()))
+            try:
+                save_state_snapshot(store, POOL_RUN_ID,
+                                    POOL_CHECKPOINT_NAME, payload)
+            finally:
+                store.close()
+        except Exception as exc:
+            logger.error(
+                "bounty pool checkpoint mirror failed (%s); JSON ledger "
+                "at %s remains authoritative", exc, self.path)
 
     def _record(self, action: str, amount_wei: int, detail: Dict[str, Any]) -> None:
         entry = {"action": action, "amount_wei": str(amount_wei),
