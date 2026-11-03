@@ -67,8 +67,24 @@ event, in order, with a monotonic sequence number. The audit log is
 includes ``prev_hash``; the genesis record's ``prev_hash`` is 64
 zeros), making the log a tamper-evident, append-only audit asset —
 any edit to a historical record breaks :func:`verify_chain`. Decision
-records carry the deciding actor + role (the attestation); real
-cryptographic key signing is Phase 2, deliberately not faked here.
+records carry the deciding actor + role (the attestation).
+
+**Phase 2 signing (directive pillar 2.1).** When an
+:class:`AuditSigner` is configured on the store, every newly appended
+audit record also gains a ``signature`` block — an Ed25519 signature,
+by the interceptor/signing node, over the record's canonical bytes
+*including* its ``record_hash`` (sign-the-hash-chain-head semantics:
+the signature binds the content and its position in the chain).
+Records also carry ``policy_id`` + ``policy_version`` from the
+audited package. Signing is opt-in: with no signer configured the
+store's behavior is byte-for-byte the Phase 1 behavior, unsigned
+history keeps verifying on hash links alone, and a mixed chain
+(unsigned history + signed tail) verifies. Private keys are loaded
+only from a file path named by the ``SINCOR_ESCALATION_SIGNING_KEY_FILE``
+env var — never from code, config JSON, or the store directory.
+Merkle epoch anchoring of these records (pillar 2.4) lives in
+:mod:`sincor2.merkle_anchor`.
+
 A corrupt state file raises :class:`StoreCorruptError` (fail closed)
 instead of silently starting empty over someone's pending decisions.
 
@@ -80,14 +96,47 @@ each founder-gated. The schema carries a ``tenant`` field defaulting to
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import math
 import os
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
+
+# POSIX file locking serializes EscalationStore writes across store
+# instances and processes (the sanctions tap builds a fresh store per
+# emission; two request threads must not interleave load→append→save).
+# Guarded: on a platform without fcntl the store degrades to its
+# per-instance threading lock rather than failing to import.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback
+    fcntl = None  # type: ignore[assignment]
+
+# Ed25519 signing (Phase 2, pillar 2.1) uses the `cryptography`
+# package. The import is guarded so the Phase 1 unsigned path never
+# depends on it: without the package, AuditSigner construction raises
+# and signed records fail verification (fail closed) — the unsigned
+# store keeps working exactly as before.
+try:
+    from cryptography.exceptions import InvalidSignature as _InvalidSignature
+    from cryptography.hazmat.primitives import serialization as _serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey as _Ed25519PrivateKey,
+        Ed25519PublicKey as _Ed25519PublicKey,
+    )
+
+    _CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only without the dep
+    _InvalidSignature = Exception  # type: ignore[assignment]
+    _serialization = None
+    _Ed25519PrivateKey = None
+    _Ed25519PublicKey = None
+    _CRYPTOGRAPHY_AVAILABLE = False
 
 __all__ = [
     "ALLOW",
@@ -109,7 +158,13 @@ __all__ = [
     "ACTION_CHOICES",
     "RECOMMENDED_ACTIONS",
     "GENESIS_PREV_HASH",
+    "SIGNATURE_ALG",
+    "SIGNING_KEY_ENV_VAR",
+    "DEFAULT_SIGNER_ID",
     "verify_chain",
+    "AuditSigner",
+    "generate_signing_key",
+    "load_signer_from_env",
     "EscalationError",
     "IllegalTransitionError",
     "PackageNotFoundError",
@@ -199,6 +254,18 @@ RECOMMENDED_ACTIONS = frozenset({"approve", "override", "escalate", "deny"})
 #: prev_hash of the first (genesis) audit record: 64 zero hex chars.
 GENESIS_PREV_HASH = "0" * 64
 
+#: Signature algorithm stamped into audit-record ``signature`` blocks.
+SIGNATURE_ALG = "Ed25519"
+
+#: Env var naming the FILE PATH of the signer's PEM private key. The
+#: key itself is only ever read from that file — never from a literal
+#: in code, config JSON, or chat (Phase 2 spec, hard rule).
+SIGNING_KEY_ENV_VAR = "SINCOR_ESCALATION_SIGNING_KEY_FILE"
+
+#: Default identity string for the signing (interceptor) node when an
+#: operator does not choose one.
+DEFAULT_SIGNER_ID = "sincor-interceptor"
+
 #: Context keys that force escalation even for an internal category.
 _CONTEXT_ESCALATION_FLAGS = ("irreversible", "external_effect")
 
@@ -256,6 +323,32 @@ class PolicyVerdict:
         }
 
 
+def _coerce_threshold_number(value: Any) -> Optional[float]:
+    """Coerce a context amount/threshold to a finite float, or None.
+
+    Accepts ints/floats (never bools) and numeric strings — JSON
+    payloads routinely carry amounts as strings, and a string amount
+    must not silently skip the spend check (W-127). NaN and the
+    infinities are NOT numbers for policy purposes: ``NaN > x`` is
+    False, which used to let a NaN amount sail past the threshold, so
+    they coerce to None and the caller fails closed.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    elif isinstance(value, str):
+        try:
+            number = float(value.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if math.isnan(number) or math.isinf(number):
+        return None
+    return number
+
+
 class PolicyEngine:
     """Deterministic classification of (action_category, context).
 
@@ -274,9 +367,11 @@ class PolicyEngine:
     1. ``context["rule_hit"]`` — a detector (sanctions screen, vuln
        score, …) already fired: ESCALATE, stamped with the detector's
        own ``{policy_id, rule, detail}``.
-    2. Spend threshold — numeric ``context["amount"]`` strictly greater
-       than numeric ``context["threshold"]``: ESCALATE under policy
-       ``spend-threshold``.
+    2. Spend threshold — when ``context["threshold"]`` is present, the
+       amount is coerced to a finite number (numeric strings accepted;
+       NaN / non-numeric values fail closed as unverifiable) and an
+       amount strictly greater than the threshold ESCALATEs under
+       policy ``spend-threshold``.
     3. Hard-gate category: ESCALATE under policy ``hard-gate``.
     4. Internal category with an irreversibility / external-effect
        context flag: ESCALATE under policy ``context-guard``.
@@ -309,23 +404,43 @@ class PolicyEngine:
                 detail=str(rule_hit.get("detail", "")),
             )
 
-        amount = ctx.get("amount")
-        threshold = ctx.get("threshold")
-        if (
-            isinstance(amount, (int, float))
-            and not isinstance(amount, bool)
-            and isinstance(threshold, (int, float))
-            and not isinstance(threshold, bool)
-            and amount > threshold
-        ):
-            return PolicyVerdict(
-                ESCALATE,
-                "spend_threshold_exceeded",
-                category,
-                policy_id="spend-threshold",
-                rule="amount_exceeds_threshold",
-                detail=f"amount={amount} threshold={threshold}",
-            )
+        raw_amount = ctx.get("amount")
+        raw_threshold = ctx.get("threshold")
+        if raw_threshold is not None:
+            # A spend threshold is present, so the spend check MUST
+            # resolve: amounts/thresholds arrive from JSON and may be
+            # numeric strings (coerced), and a value that cannot be
+            # coerced to a finite number (NaN, non-numeric string,
+            # bool) fails closed instead of skipping the check (W-127).
+            amount = _coerce_threshold_number(raw_amount)
+            threshold = _coerce_threshold_number(raw_threshold)
+            if threshold is None:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_unverifiable",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="threshold_not_numeric",
+                    detail=f"threshold={raw_threshold!r}",
+                )
+            if raw_amount is not None and amount is None:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_unverifiable",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="amount_not_numeric",
+                    detail=f"amount={raw_amount!r} threshold={raw_threshold!r}",
+                )
+            if amount is not None and amount > threshold:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_exceeded",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="amount_exceeds_threshold",
+                    detail=f"amount={raw_amount} threshold={raw_threshold}",
+                )
 
         if category in HARD_GATE_CATEGORIES:
             return PolicyVerdict(
@@ -378,9 +493,10 @@ class PolicyEngine:
 class Decision:
     """A decision record (attestation), as stored on the envelope.
 
-    Carries the deciding actor + role — the v1 attestation. (Real
-    cryptographic key signing is Phase 2; actor+role+hash-chained
-    audit is the v1 integrity story, and it is not dressed up as more.)
+    Carries the deciding actor + role — the envelope-level attestation.
+    (Cryptographic key signing is an audit-log property, added in
+    Phase 2: see :class:`AuditSigner`. The attestation here is not
+    dressed up as more than it is.)
     """
 
     by: str
@@ -536,6 +652,27 @@ class EscalationPackage:
 # ---------------------------------------------------------------------------
 
 
+def _normalize_required_signers(signers: Optional[Iterable]) -> list:
+    """Canonical form of a required-signers role list.
+
+    Roles are stripped + lowercased so the stored list and the
+    decision path always agree on role identity: ``decide()`` has
+    always normalized the deciding role, so a package created with
+    ``["Founder", "CFO"]`` used to store the raw mixed-case list and
+    its quorum could never be satisfied — the package sat PENDING
+    forever (W-125). Non-string entries pass through untouched so
+    :func:`_validate_risk_inputs` rejects them with its precise error
+    instead of an AttributeError here.
+    """
+    normalized = []
+    for signer in signers or []:
+        if isinstance(signer, str):
+            normalized.append(signer.strip().lower())
+        else:
+            normalized.append(signer)
+    return normalized
+
+
 def _normalize_risk(risk: Optional[dict]) -> dict:
     """Project any risk input onto the canonical risk-block shape."""
     risk = risk or {}
@@ -545,7 +682,9 @@ def _normalize_risk(risk: Optional[dict]) -> dict:
             dict(risk["exposure"]) if risk.get("exposure") is not None else None
         ),
         "recommended_action": risk.get("recommended_action", "escalate"),
-        "required_signers": list(risk.get("required_signers") or []),
+        "required_signers": _normalize_required_signers(
+            risk.get("required_signers")
+        ),
     }
 
 
@@ -582,9 +721,16 @@ def _validate_risk_inputs(
             or "currency" not in exposure
         ):
             raise ValueError("exposure must be {amount, currency} or None")
-    for signer in required_signers or []:
-        if not isinstance(signer, str) or not signer.strip():
+    seen_signers = set()
+    for signer in _normalize_required_signers(required_signers):
+        if not isinstance(signer, str) or not signer:
             raise ValueError("required_signers must be non-empty role strings")
+        if signer in seen_signers:
+            raise ValueError(
+                "duplicate required_signer after normalization "
+                f"(strip + lower): {signer!r}"
+            )
+        seen_signers.add(signer)
 
 
 def _canonical_record_bytes(record_without_hash: dict) -> bytes:
@@ -603,26 +749,237 @@ def _compute_record_hash(record_without_hash: dict) -> str:
     return hashlib.sha256(_canonical_record_bytes(record_without_hash)).hexdigest()
 
 
-def verify_chain(records: list) -> bool:
+# ---------------------------------------------------------------------------
+# Phase 2 audit-record signing (Ed25519, directive pillar 2.1)
+# ---------------------------------------------------------------------------
+
+
+def _require_cryptography() -> None:
+    if not _CRYPTOGRAPHY_AVAILABLE:
+        raise EscalationError(
+            "the `cryptography` package is required for Ed25519 audit "
+            "signing and is not importable in this environment"
+        )
+
+
+class AuditSigner:
+    """An Ed25519 signing identity for audit records (an interceptor node).
+
+    Wraps a private key that is generated in-process (tests, ephemeral
+    nodes) or loaded from a PEM key file (operators — see
+    :func:`generate_signing_key` and :func:`load_signer_from_env`).
+    The key material never leaves this object: signing exposes only
+    the public key and the signature.
+    """
+
+    def __init__(self, private_key: Any, signer_id: str):
+        _require_cryptography()
+        if not isinstance(private_key, _Ed25519PrivateKey):
+            raise TypeError("AuditSigner requires an Ed25519 private key")
+        if not isinstance(signer_id, str) or not signer_id.strip():
+            raise ValueError("signer_id must be a non-empty identity string")
+        self._private_key = private_key
+        self.signer_id = signer_id
+        self._signer_pubkey = (
+            private_key.public_key()
+            .public_bytes(
+                _serialization.Encoding.Raw,
+                _serialization.PublicFormat.Raw,
+            )
+            .hex()
+        )
+
+    @property
+    def signer_pubkey(self) -> str:
+        """Hex-encoded Ed25519 public key for this signer."""
+        return self._signer_pubkey
+
+    @classmethod
+    def generate(cls, signer_id: str = DEFAULT_SIGNER_ID) -> "AuditSigner":
+        """A fresh in-process keypair (tests / ephemeral nodes)."""
+        _require_cryptography()
+        return cls(_Ed25519PrivateKey.generate(), signer_id)
+
+    @classmethod
+    def from_key_file(cls, path: str, signer_id: str = DEFAULT_SIGNER_ID) -> "AuditSigner":
+        """Load a PEM (PKCS8, unencrypted) Ed25519 private key from a file."""
+        _require_cryptography()
+        with open(path, "rb") as fh:
+            pem_data = fh.read()
+        private_key = _serialization.load_pem_private_key(pem_data, password=None)
+        return cls(private_key, signer_id)
+
+    def sign_record(self, record: dict) -> dict:
+        """Signature block for an audit record that already has its hash.
+
+        Signs the record's canonical bytes *including* ``record_hash``
+        and excluding any ``signature`` block, so the signature binds
+        the content and the record's position in the hash chain.
+        """
+        payload = {k: v for k, v in record.items() if k != "signature"}
+        signature = self._private_key.sign(_canonical_record_bytes(payload))
+        return {
+            "alg": SIGNATURE_ALG,
+            "signer_id": self.signer_id,
+            "signer_pubkey": self._signer_pubkey,
+            "signature": signature.hex(),
+        }
+
+
+def generate_signing_key(path: str) -> str:
+    """Generate an Ed25519 signing key file for operator setup.
+
+    Writes a PEM (PKCS8, unencrypted — file permissions are the
+    operator's control) private key to ``path`` with owner-only
+    permissions, creating parent directories as needed. Refuses to
+    overwrite an existing file (FileExistsError) so a live identity
+    can never be silently replaced. Returns the hex public key.
+    """
+    _require_cryptography()
+    if os.path.exists(path):
+        raise FileExistsError(
+            f"signing key already exists at {path}; refusing to overwrite"
+        )
+    private_key = _Ed25519PrivateKey.generate()
+    pem = private_key.private_bytes(
+        _serialization.Encoding.PEM,
+        _serialization.PrivateFormat.PKCS8,
+        _serialization.NoEncryption(),
+    )
+    parent = os.path.dirname(os.path.abspath(path))
+    os.makedirs(parent, exist_ok=True)
+    # O_EXCL closes the check-then-write race: if the file appears
+    # between the exists() check and here, we fail instead of
+    # overwriting someone's key.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(fd, pem)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return (
+        private_key.public_key()
+        .public_bytes(
+            _serialization.Encoding.Raw,
+            _serialization.PublicFormat.Raw,
+        )
+        .hex()
+    )
+
+
+def load_signer_from_env(
+    signer_id: str = DEFAULT_SIGNER_ID,
+    env_var: str = SIGNING_KEY_ENV_VAR,
+) -> Optional["AuditSigner"]:
+    """Build an AuditSigner from the key file named by the env var.
+
+    Returns None when the env var is unset (signing stays off — the
+    Phase 1 default). This is the only env-driven key path: the
+    variable carries a file path, never key material.
+    """
+    path = os.environ.get(env_var)
+    if not path:
+        return None
+    return AuditSigner.from_key_file(path, signer_id)
+
+
+def _verify_record_signature(record: dict) -> bool:
+    """True iff the record's ``signature`` block verifies.
+
+    The signed payload is the record's canonical bytes including its
+    ``record_hash`` and excluding the ``signature`` block itself (the
+    exact bytes :meth:`AuditSigner.sign_record` signed). Any malformed
+    block, wrong algorithm, or bad signature returns False — this
+    never raises.
+    """
+    sig = record.get("signature")
+    if not isinstance(sig, dict) or sig.get("alg") != SIGNATURE_ALG:
+        return False
+    if not _CRYPTOGRAPHY_AVAILABLE:
+        return False
+    try:
+        public_key = _Ed25519PublicKey.from_public_bytes(
+            bytes.fromhex(str(sig["signer_pubkey"]))
+        )
+        payload = {k: v for k, v in record.items() if k != "signature"}
+        public_key.verify(
+            bytes.fromhex(str(sig["signature"])),
+            _canonical_record_bytes(payload),
+        )
+        return True
+    except Exception:
+        return False
+
+
+def verify_chain(records: list, expected_signer_pubkey: Optional[str] = None) -> bool:
     """Verify a hash-chained audit log (a full log or a seq-ordered slice).
 
     Checks, for every record: ``prev_hash`` links to the previous
     record's ``record_hash`` (genesis = 64 zeros for a full log),
-    ``record_hash`` recomputes from the canonical content, and ``seq``
-    is consecutive. Any tampering — edit, reorder, deletion — fails.
+    ``record_hash`` recomputes from the canonical content (excluding
+    ``record_hash`` itself and any ``signature`` block, which is added
+    after hashing), and ``seq`` is consecutive. Any tampering — edit,
+    reorder, deletion — fails.
+
+    Slice semantics (W-128): a mid-log slice is anchored at its first
+    record's ``prev_hash`` instead of GENESIS, so an auditor checking
+    a window is not told a valid log is broken. Internal linkage,
+    hash recomputation, signature checks, and ``seq`` consecutiveness
+    are still fully enforced within the slice; the anchor itself is
+    trusted input — a caller verifying a slice should confirm the
+    anchor equals the ``record_hash`` of the preceding record from a
+    trusted source. A slice may not masquerade as a full log: a first
+    record claiming the genesis position (``seq`` 1) must anchor at
+    GENESIS, and a non-genesis anchor without a ``seq`` proving the
+    slice starts mid-log fails closed.
+
+    Phase 2 signature rules: a record carrying a ``signature`` block
+    must verify against its embedded public key, and — when
+    ``expected_signer_pubkey`` is given — that embedded key must equal
+    it (a record signed by the wrong key is invalid). A bad or
+    malformed signature fails the chain; verification problems return
+    False, never raise. Records without a signature block (all Phase 1
+    history, and the unsigned head of a mixed chain) verify on hash
+    links alone, so history is never retroactively invalidated.
     """
     if not records:
         return True
     first_seq = records[0].get("seq")
-    prev_hash = GENESIS_PREV_HASH
+    first_prev_hash = records[0].get("prev_hash")
+    if first_prev_hash == GENESIS_PREV_HASH:
+        # Full log: anchored at genesis.
+        prev_hash = GENESIS_PREV_HASH
+    elif isinstance(first_seq, int) and first_seq > 1:
+        # Mid-log slice (W-128): the slice's first prev_hash is the
+        # anchor — the hash of the record just before the window,
+        # which the caller supplies implicitly by slicing a real log.
+        prev_hash = first_prev_hash
+    else:
+        # Claims the genesis position (or cannot prove it starts
+        # mid-log) but does not anchor at GENESIS: forgery, not a
+        # slice. Fail closed.
+        return False
     for offset, record in enumerate(records):
         if record.get("prev_hash") != prev_hash:
             return False
-        body = {k: v for k, v in record.items() if k != "record_hash"}
+        body = {
+            k: v
+            for k, v in record.items()
+            if k not in ("record_hash", "signature")
+        }
         if _compute_record_hash(body) != record.get("record_hash"):
             return False
         if first_seq is not None and record.get("seq") != first_seq + offset:
             return False
+        if "signature" in record:
+            sig = record["signature"]
+            if expected_signer_pubkey is not None and (
+                not isinstance(sig, dict)
+                or sig.get("signer_pubkey") != expected_signer_pubkey
+            ):
+                return False
+            if not _verify_record_signature(record):
+                return False
         prev_hash = record["record_hash"]
     return True
 
@@ -679,16 +1036,31 @@ class EscalationStore:
     - ``escalation_audit.jsonl`` — one JSON record per event, append
       only, ``seq`` strictly increasing, hash-chained (``prev_hash`` /
       ``record_hash``; see :func:`verify_chain`). Never rewritten.
+    - ``.escalation_store.lock`` — advisory file lock serializing
+      writes across store instances and processes (see
+      :meth:`_write_transaction`): every mutation reloads state under
+      the lock before appending, so concurrent emitters extend one
+      chain instead of forking it.
+
+    Pass ``signer`` (an :class:`AuditSigner`, e.g. from
+    :func:`load_signer_from_env`) to sign every newly appended audit
+    record. The default ``signer=None`` is byte-for-byte the Phase 1
+    behavior: no signature blocks are written, and verification checks
+    hash links (plus any signatures already present in the log,
+    against their embedded keys).
     """
 
     STATE_FILENAME = "escalation_state.json"
     AUDIT_FILENAME = "escalation_audit.jsonl"
+    LOCK_FILENAME = ".escalation_store.lock"
 
-    def __init__(self, base_dir: str):
+    def __init__(self, base_dir: str, signer: Optional[AuditSigner] = None):
+        self._signer = signer
         self.base_dir = str(base_dir)
         os.makedirs(self.base_dir, exist_ok=True)
         self.state_path = os.path.join(self.base_dir, self.STATE_FILENAME)
         self.audit_path = os.path.join(self.base_dir, self.AUDIT_FILENAME)
+        self.lock_path = os.path.join(self.base_dir, self.LOCK_FILENAME)
         self._lock = threading.Lock()
         self._packages: dict[str, EscalationPackage] = {}
         self._audit_seq = 0
@@ -725,6 +1097,44 @@ class EscalationStore:
                     f"escalation audit log is corrupt: {self.audit_path}: {exc}"
                 ) from exc
 
+    @contextlib.contextmanager
+    def _write_transaction(self):
+        """Serialize one read-modify-write cycle across store instances.
+
+        The per-instance ``threading.Lock`` cannot coordinate the
+        pattern the sanctions tap uses — a FRESH store per emission —
+        let alone separate processes: two stores constructed over the
+        same directory each snapshot ``_audit_seq`` / ``_last_hash`` /
+        ``_packages`` at load time, and interleaved
+        load→append→save cycles then fork the audit chain (duplicate
+        ``seq``, two records claiming the same ``prev_hash``) and
+        silently drop each other's packages from the state file.
+
+        This transaction therefore (1) takes the instance lock, (2)
+        takes an exclusive POSIX file lock on ``LOCK_FILENAME`` in the
+        store directory, and (3) RELOADS packages + audit tail from
+        disk under the lock, so the mutation is applied to the
+        freshest state and the appended records extend the real chain
+        head. Without ``fcntl`` (non-POSIX) it degrades to the instance
+        lock alone. Never nested: the public mutators
+        (``create_package`` / ``decide``) open exactly one transaction
+        and the internals they call take no lock.
+        """
+        with self._lock:
+            if fcntl is None:
+                yield
+                return
+            fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                self._load()
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+
     def _save_state(self) -> None:
         payload = {
             "schema_version": PACKAGE_SCHEMA_VERSION,
@@ -732,7 +1142,12 @@ class EscalationStore:
                 pid: pkg.to_dict() for pid, pkg in self._packages.items()
             },
         }
-        tmp_path = self.state_path + ".tmp"
+        # Unique tmp path per writer: even outside the write
+        # transaction, two savers must never share one tmp file and
+        # interleave their bytes before os.replace.
+        tmp_path = "{}.{}.{}.{}.tmp".format(
+            self.state_path, os.getpid(), threading.get_ident(), uuid.uuid4().hex
+        )
         with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, sort_keys=True)
             fh.flush()
@@ -755,6 +1170,8 @@ class EscalationStore:
         to_state: Optional[str] = None,
         note: Optional[str] = None,
         detail: Optional[str] = None,
+        policy_id: Optional[str] = None,
+        policy_version: Optional[str] = None,
     ) -> dict:
         self._audit_seq += 1
         record = {
@@ -770,7 +1187,20 @@ class EscalationStore:
             "detail": detail,
             "prev_hash": self._last_hash,
         }
+        # Directive 2.1 field completion: when the audited event
+        # carries them, the record names the exact policy + version
+        # that governed it (from the package's triggered rule and the
+        # envelope schema version).
+        if policy_id is not None:
+            record["policy_id"] = policy_id
+        if policy_version is not None:
+            record["policy_version"] = policy_version
         record["record_hash"] = _compute_record_hash(record)
+        if self._signer is not None:
+            # Phase 2 signing: the signature is computed over the
+            # record including its record_hash, then attached; the
+            # hash itself never covers the signature block.
+            record["signature"] = self._signer.sign_record(record)
         self._last_hash = record["record_hash"]
         with open(self.audit_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, sort_keys=True) + "\n")
@@ -790,9 +1220,20 @@ class EscalationStore:
                     records.append(json.loads(line))
         return records
 
-    def verify_audit_chain(self) -> bool:
-        """Verify this store's full audit log hash chain."""
-        return verify_chain(self.read_audit_log())
+    def verify_audit_chain(
+        self, expected_signer_pubkey: Optional[str] = None
+    ) -> bool:
+        """Verify this store's full audit log (hash chain + signatures).
+
+        Signed records must verify against their embedded public keys.
+        When this store has a signer configured, its public key is the
+        expected signer unless ``expected_signer_pubkey`` overrides
+        it — a log signed by a different key then fails verification.
+        """
+        expected = expected_signer_pubkey
+        if expected is None and self._signer is not None:
+            expected = self._signer.signer_pubkey
+        return verify_chain(self.read_audit_log(), expected_signer_pubkey=expected)
 
     # -- decision API ------------------------------------------------------
 
@@ -936,7 +1377,7 @@ class EscalationStore:
             },
             risk=risk,
         )
-        with self._lock:
+        with self._write_transaction():
             self._packages[package.id] = package
             self._append_audit(
                 package_id=package.id,
@@ -946,6 +1387,8 @@ class EscalationStore:
                 from_state=None,
                 to_state=PENDING,
                 detail=f"surface={source_surface}",
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._append_audit(
                 package_id=package.id,
@@ -955,6 +1398,8 @@ class EscalationStore:
                 from_state=PENDING,
                 to_state=PENDING,
                 detail=classified_detail,
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._save_state()
         return self._copy(package)
@@ -1001,7 +1446,7 @@ class EscalationStore:
             )
         role_norm = str(role).strip().lower() if role else "operator"
         decided_at = now or _utcnow_iso()
-        with self._lock:
+        with self._write_transaction():
             package = self._packages.get(package_id)
             if package is None:
                 raise PackageNotFoundError(f"no such package: {package_id}")
@@ -1068,6 +1513,8 @@ class EscalationStore:
                 to_state=package.state,
                 note=note,
                 detail=f"outcome={outcome}",
+                policy_id=package.triggered_rule.get("policy_id") or None,
+                policy_version=package.schema_version,
             )
             self._save_state()
             return self._copy(package)

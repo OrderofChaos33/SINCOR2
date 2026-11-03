@@ -1,0 +1,17 @@
+{
+  "name": "sincor2-zk-circuits-spike",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SINCOR2 Pillar 2.2 ZK circuit toolchain spike (see SPIKE-REPORT.md). NOT production.",
+  "scripts": {
+    "spike": "bash scripts/run_spike.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "circomlib": "^2.0.5",
+    "circomlibjs": "^0.1.7",
+    "snarkjs": "^0.7.5"
+  }
+}
