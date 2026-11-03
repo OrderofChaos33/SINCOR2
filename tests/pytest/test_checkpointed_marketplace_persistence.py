@@ -495,3 +495,148 @@ def test_checkpoint_snapshot_is_hash_bound(persist_env):
     persist_env["tasks"].unlink()
     with pytest.raises(RuntimeError, match="checkpoint"):
         _restart_board()
+
+
+# ---------------------------------------------------------------------------
+# Fix round 2: dual-location degraded markers (B2 rejection of ffe1ce78).
+# The single checkpoint-side marker shared the checkpoint store's
+# failure domain — one event breaking that store also blocked the
+# marker write, and the stale-restore double-spend reopened. These
+# tests fail on ffe1ce78 and pass on the dual-marker fix (pin-checked).
+# ---------------------------------------------------------------------------
+
+def _dual_env(tmp_path, monkeypatch):
+    """Ledger JSON and checkpoint DB in SEPARATE directories (the
+    documented production layout: SINCOR_MARKETPLACE_CHECKPOINT_PATH
+    may point at a different volume than the ledger)."""
+    ledger_dir = tmp_path / "ledger"
+    ckpt_dir = tmp_path / "ckptvol"
+    ledger_dir.mkdir(parents=True)
+    ckpt_dir.mkdir(parents=True)
+    env = {
+        "pool": ledger_dir / "pool.json",
+        "checkpoints": ckpt_dir / "checkpoints.db",
+        "ckpt_marker": ckpt_dir / "checkpoints.db.pool-degraded",
+        "ledger_marker": ledger_dir / "pool.json.pool-degraded",
+    }
+    monkeypatch.setenv("SINCOR_BOUNTY_POOL_PATH", str(env["pool"]))
+    monkeypatch.setenv("SINCOR_MARKETPLACE_CHECKPOINT_PATH",
+                       str(env["checkpoints"]))
+    return env
+
+
+def test_pool_checkpoint_domain_failure_still_fails_closed(
+        tmp_path, monkeypatch):
+    """B2 repro P1f, genuine (no monkeypatching of the mirror): the
+    checkpoint directory is replaced by a regular placeholder file
+    (failed mount artifact), so sqlite cannot open the DB AND the
+    checkpoint-side marker cannot be written. The ledger-side marker
+    — written in the directory _save() just proved writable — must
+    still guard the boot after the operator restores the last-good
+    checkpoint DB and the ledger JSON is wiped."""
+    import shutil
+
+    env = _dual_env(tmp_path, monkeypatch)
+    pool = reset_bounty_pool(path=str(env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    alloc = pool.allocate("task-a", 40.0)
+    assert not env["ckpt_marker"].exists()
+    assert not env["ledger_marker"].exists()
+    # Last-good checkpoint DB: holds the pre-spend state (spent=0,
+    # allocation still live) — restoring THIS is what would resurrect
+    # the allocation for a second spend if the boot were unguarded.
+    last_good = env["checkpoints"].read_bytes()
+
+    # Break the whole checkpoint failure domain at once.
+    ckpt_dir = env["checkpoints"].parent
+    shutil.rmtree(ckpt_dir)
+    ckpt_dir.write_text("failed mount placeholder", encoding="utf-8")
+    assert not env["ckpt_marker"].exists()  # unwritable by construction
+
+    # The spend's JSON write lands (ledger domain healthy); its mirror
+    # fails against the broken checkpoint domain.
+    with pytest.raises(PoolError, match="mirror"):
+        pool.spend(alloc["allocation_id"])
+    # Poisoned in-memory, and the ledger-side marker WAS written even
+    # though the checkpoint-side one could not be.
+    with pytest.raises(PoolError, match="degraded"):
+        pool.allocate("task-b", 1.0)
+    assert env["ledger_marker"].is_file()
+
+    # Operator restores the checkpoint DB from the last-good backup;
+    # the ledger JSON volume is wiped. The checkpoint-side marker
+    # still does not exist — only the ledger-side marker guards this
+    # boot, and it must fail closed.
+    ckpt_dir.unlink()
+    ckpt_dir.mkdir()
+    env["checkpoints"].write_bytes(last_good)
+    assert not env["ckpt_marker"].exists()
+    env["pool"].unlink()
+    with pytest.raises(PoolError, match="degraded"):
+        BountyPool(path=str(env["pool"]), reserve_axm=100.0)
+    # The failed boot cemented nothing: no new ledger was rewritten
+    # from the stale checkpoint, so no instance exists that could
+    # spend the allocation a second time.
+    assert not env["pool"].exists()
+
+
+def test_pool_ledger_side_marker_alone_blocks_restore(
+        tmp_path, monkeypatch):
+    """Either-marker semantics, ledger side: a marker ONLY beside the
+    ledger JSON (checkpoint-side absent) blocks the checkpoint
+    restore exactly like the original single marker did."""
+    env = _dual_env(tmp_path, monkeypatch)
+    pool = reset_bounty_pool(path=str(env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    a = pool.allocate("task-a", 40.0)
+    pool.spend(a["allocation_id"])
+    env["ledger_marker"].write_text("{}", encoding="utf-8")
+    env["pool"].unlink()
+    with pytest.raises(PoolError, match="degraded"):
+        BountyPool(path=str(env["pool"]), reserve_axm=100.0)
+
+
+def test_pool_successful_mirror_clears_both_markers(tmp_path, monkeypatch):
+    """Clearing covers BOTH domains: stale markers in either location
+    are removed by the next successful mirror, and only then (the
+    JSON is present throughout, so boot stays JSON-authoritative)."""
+    env = _dual_env(tmp_path, monkeypatch)
+    pool = reset_bounty_pool(path=str(env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    env["ckpt_marker"].write_text("{}", encoding="utf-8")
+    env["ledger_marker"].write_text("{}", encoding="utf-8")
+    pool2 = BountyPool(path=str(env["pool"]), reserve_axm=100.0)
+    pool2.allocate("task-a", 5.0)
+    assert not env["ckpt_marker"].exists()
+    assert not env["ledger_marker"].exists()
+
+
+def test_pool_unclearable_marker_fails_closed(tmp_path, monkeypatch):
+    """A marker that cannot be cleared must not be silently forgotten:
+    the save whose mirror succeeded but whose marker clear failed
+    raises and poisons the instance (fail-closed). Once the operator
+    removes the obstruction, a fresh instance operates normally —
+    the pool is guarded, not permanently bricked."""
+    import shutil
+
+    env = _dual_env(tmp_path, monkeypatch)
+    pool = reset_bounty_pool(path=str(env["pool"]), reserve_axm=100.0)
+    pool.fund()
+    a = pool.allocate("task-a", 40.0)
+    pool.spend(a["allocation_id"])
+    # A directory squatting on the checkpoint-side marker path cannot
+    # be removed by unlink — the genuine clear-failure shape.
+    env["ckpt_marker"].mkdir()
+    with pytest.raises(PoolError, match="could not be cleared"):
+        pool.allocate("task-b", 5.0)
+    with pytest.raises(PoolError, match="degraded"):
+        pool.allocate("task-c", 1.0)
+    # Operator removes the obstruction; the JSON was authoritative
+    # throughout, so a fresh instance boots from it and works.
+    shutil.rmtree(env["ckpt_marker"])
+    pool2 = BountyPool(path=str(env["pool"]), reserve_axm=100.0)
+    st = _assert_conserved(pool2)
+    assert st["spent_axm"] == 40.0
+    pool2.allocate("task-d", 5.0)
+    assert not env["ckpt_marker"].exists()
+    assert not env["ledger_marker"].exists()

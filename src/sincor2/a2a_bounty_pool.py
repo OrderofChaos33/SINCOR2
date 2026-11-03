@@ -52,12 +52,21 @@ by default, ``marketplace_checkpoints.db`` beside the ledger file.
 
 The mirror is part of the save's durability, NOT best-effort: a save
 whose mirror fails raises PoolError, poisons the in-memory pool (every
-further money operation refuses until restart), and leaves a durable
-degraded marker beside the checkpoint DB. A boot that finds the ledger
-JSON missing while that marker exists fails closed instead of
-restoring a checkpoint it knows may be one save behind — the
-crash-window resurrection that would let one allocation be spent
-twice. The marker is cleared by the next successful mirror.
+further money operation refuses until restart), and leaves durable
+degraded markers in TWO independent failure domains — beside the
+checkpoint DB and beside the ledger JSON itself. (A marker only beside
+the checkpoint DB shares that store's failure domain: one event that
+breaks the checkpoint store — e.g. its directory replaced by a failed
+mount's placeholder file — also prevents the marker write, and a
+later checkpoint restore resurrects spent allocations. The ledger's
+directory has just proven writable by accepting the JSON write, so it
+is an independent witness.) A boot that finds the ledger JSON missing
+while EITHER marker exists fails closed instead of restoring a
+checkpoint it knows may be one save behind — the crash-window
+resurrection that would let one allocation be spent twice. The
+markers are cleared only by the next successful mirror, and a clear
+that fails also fails closed (poison + raise): a stale marker an
+operator has not reconciled must never be silently forgotten.
 """
 from __future__ import annotations
 
@@ -340,18 +349,24 @@ class BountyPool:
             # one save behind the state the operator already acted on.
             # With the JSON also gone there is no trustworthy source —
             # fail closed (operator reconciles) rather than resurrect
-            # spent allocations for a second spend.
-            marker = self._degraded_marker_path()
-            if marker.is_file():
+            # spent allocations for a second spend. Markers live in two
+            # independent failure domains (beside the checkpoint DB and
+            # beside this ledger file); EITHER one present — as any
+            # filesystem object, not just a regular file — blocks the
+            # checkpoint restore.
+            markers = [p for p in self._degraded_marker_paths()
+                       if p.exists()]
+            if markers:
                 raise PoolError(
-                    f"bounty pool persistence degraded marker {marker} "
+                    "bounty pool persistence degraded marker(s) "
+                    f"{', '.join(str(m) for m in markers)} "
                     "present and ledger file "
                     f"{self.path} missing: a previous save's checkpoint "
                     "mirror failed, so the checkpoint store may lag the "
                     "last committed state; refusing to boot from a "
                     "possibly stale checkpoint (double-spend risk). "
                     "Restore the ledger JSON from backup or reconcile "
-                    "manually, then remove the marker and restart.")
+                    "manually, then remove the marker(s) and restart.")
             # A missing ledger with a verified checkpoint snapshot is a
             # wiped disk, not a first boot: restore exactly. Without a
             # snapshot, fall through to the historical W-119 logic in
@@ -437,7 +452,7 @@ class BountyPool:
         self._mirror_to_checkpoint(payload)
 
     def _degraded_marker_path(self) -> Path:
-        """Sidecar marker recording that a checkpoint mirror failed.
+        """Checkpoint-side degraded marker (first location).
 
         Lives beside the checkpoint DB (independent of the checkpoint
         machinery itself, so it can be written even when that machinery
@@ -445,22 +460,87 @@ class BountyPool:
         """
         return Path(str(self._checkpoint_db_path()) + ".pool-degraded")
 
-    def _write_degraded_marker(self, exc: Exception) -> None:
-        marker = self._degraded_marker_path()
-        try:
-            marker.parent.mkdir(parents=True, exist_ok=True)
-            marker.write_text(json.dumps({
-                "at": _now_ms(),
-                "reason": f"checkpoint mirror failed: {exc}",
-                "funded_wei": str(self._funded_wei),
-                "spent_wei": str(self._spent_wei),
-                "ledger_path": str(self.path),
-            }), encoding="utf-8")
-        except Exception as marker_exc:
+    def _ledger_degraded_marker_path(self) -> Path:
+        """Ledger-side degraded marker (second location).
+
+        Lives beside the ledger JSON — a directory whose writability
+        ``_save()`` has just proven by writing the JSON itself, and an
+        independent failure domain from the checkpoint store (the two
+        may sit on different volumes: the checkpoint path is env-
+        configurable separately from the ledger path). A file-level
+        wipe of the ledger leaves this marker in place, still guarding
+        the boot.
+        """
+        return Path(str(self.path) + ".pool-degraded")
+
+    def _degraded_marker_paths(self) -> List[Path]:
+        """Every degraded-marker location, deduplicated.
+
+        The two locations coincide when the checkpoint DB and the
+        ledger JSON live in the same directory under the same stem
+        rules; callers must not write/check/clear the same file twice.
+        """
+        paths: List[Path] = []
+        for candidate in (self._degraded_marker_path(),
+                          self._ledger_degraded_marker_path()):
+            if candidate not in paths:
+                paths.append(candidate)
+        return paths
+
+    def _write_degraded_marker(self, exc: Exception) -> List[Path]:
+        """Record a mirror failure durably in BOTH failure domains.
+
+        Each location is attempted independently: the signal counts as
+        durably recorded when AT LEAST ONE write lands (the boot path
+        fails closed on either marker). Returns the locations actually
+        written; when neither lands, both failures are error-logged —
+        the in-memory poison still protects this process, but no
+        durable signal survives it (two independent domains failing at
+        once is outside this guard's envelope and needs an operator).
+        """
+        body = json.dumps({
+            "at": _now_ms(),
+            "reason": f"checkpoint mirror failed: {exc}",
+            "funded_wei": str(self._funded_wei),
+            "spent_wei": str(self._spent_wei),
+            "ledger_path": str(self.path),
+        })
+        written: List[Path] = []
+        for marker in self._degraded_marker_paths():
+            try:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_text(body, encoding="utf-8")
+                written.append(marker)
+            except Exception as marker_exc:
+                logger.error(
+                    "bounty pool degraded marker %s could not be "
+                    "written (%s)", marker, marker_exc)
+        if not written:
             logger.error(
-                "bounty pool degraded marker %s could not be written "
-                "(%s); the in-memory pool is poisoned regardless",
-                marker, marker_exc)
+                "bounty pool degraded marker could not be written in "
+                "ANY location; the in-memory pool is poisoned, but no "
+                "durable degraded signal survives this process")
+        return written
+
+    def _clear_degraded_markers(self) -> List[Path]:
+        """Remove every degraded marker after a successful mirror.
+
+        Returns the locations that could NOT be removed (empty list =
+        fully cleared). A failed clear is never silently swallowed by
+        the caller: the stale marker is a durable "durability
+        unproven" signal, and forgetting it quietly would unguard the
+        next JSON-wipe boot.
+        """
+        failed: List[Path] = []
+        for marker in self._degraded_marker_paths():
+            try:
+                marker.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.error(
+                    "bounty pool degraded marker %s could not be "
+                    "cleared (%s)", marker, exc)
+                failed.append(marker)
+        return failed
 
     def _mirror_to_checkpoint(self, payload: Dict[str, Any]) -> None:
         """Mirror a just-saved ledger payload into the workflow
@@ -470,12 +550,15 @@ class BountyPool:
         best-effort. If it fails, the checkpoint may lag the JSON
         ledger by this save; restoring from it after a JSON wipe would
         resurrect spent allocations (a double-spend). So a failure:
-        (1) writes the degraded marker (the boot path fails closed if
-        it finds the marker with the JSON missing), (2) poisons this
-        instance so no further money moves on a diverged ledger, and
-        (3) raises PoolError so the calling operation reports failure
-        instead of silently committing. The next successful mirror
-        clears the marker and the poison.
+        (1) writes the degraded markers in both failure domains (the
+        boot path fails closed if it finds EITHER marker with the JSON
+        missing), (2) poisons this instance so no further money moves
+        on a diverged ledger, and (3) raises PoolError so the calling
+        operation reports failure instead of silently committing. The
+        next successful mirror clears both markers and the poison —
+        and if a marker cannot be cleared, that fails closed too
+        (poison + raise) rather than silently unguarding the next
+        boot.
         """
         try:
             from sincor2.workflow_state import (
@@ -503,10 +586,22 @@ class BountyPool:
             logger.warning(
                 "bounty pool checkpoint mirror recovered; degraded "
                 "state cleared")
-        try:
-            self._degraded_marker_path().unlink(missing_ok=True)
-        except OSError:
-            pass
+        # The mirror succeeded, so the checkpoint now holds exactly
+        # this state and the degraded signal is stale. Clearing happens
+        # ONLY here — after the successful mirror — and a marker that
+        # cannot be removed fails closed: the pool re-poisons and the
+        # save raises, because booting later over a forgotten-but-real
+        # marker must stay an operator decision, never a silent one.
+        clear_failed = self._clear_degraded_markers()
+        if clear_failed:
+            self._persistence_degraded = True
+            raise PoolError(
+                "bounty pool degraded marker(s) "
+                f"{', '.join(str(m) for m in clear_failed)} could not "
+                "be cleared after a successful checkpoint mirror; "
+                "failing closed (pool poisoned) rather than silently "
+                "unguarding a later boot — remove the marker(s) "
+                "manually after reconciling and restart")
 
     def _raise_if_degraded(self) -> None:
         if self._persistence_degraded:
