@@ -502,7 +502,7 @@ def _cached_spot(key: str, fetcher) -> float | None:
 
 
 def _fetch_sinc_spot_usd_uncached() -> float | None:
-    """Official SINC quote price — $0.15 floor ($150M / 1B tokens)."""
+    """Official SINC quote price lookup."""
     floor = float(os.environ.get("SINC_FLOOR_USD", "0.15"))
     try:
         import sys

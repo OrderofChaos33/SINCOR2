@@ -33,10 +33,10 @@ When coordinating distributed swarms against complex, shifting environments, age
 
 **Production-targeted A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.**
 
-SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, generate revenue, and self-optimize.
+SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, settle work, and self-optimize.
 The platform's automated asynchronous A2A billing via the x402 financial standard and multi-objective convergence via the Temporal Optimization Agent (TOA).
 TOA (Agent 44) functions as a predictive timeline navigator. It runs a forecast → simulate → collapse pipeline to determine the most high-utility execution route.
- Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for governance and AXIOM (AXM) for task settlement. With 43 specialized agent skills, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
+ Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for platform access and AXIOM (AXM) for task settlement. With 18 live agent skills on the public Agent Card, across seven archetypes, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
 
 Agent Cards: Every network node exposes a machine-readable ￼ allowing for programmatic discovery of capabilities and trust metadata.
 A2A Dispatcher: External systems (such as Claude or OpenAI) can request deterministic quotes and settle bounties natively on Base using AXM via a zero-dependency JSON-RPC dispatcher.
@@ -56,14 +56,17 @@ Under SINCOR Business Solutions, the platform is positioned to bridge institutio
 ## Table of Contents
 
 - [Why SINCOR2](#why-sincor2)
+- [Current State — November 2026](#current-state--november-2026)
 - [Quickstart](#quickstart)
 - [Platform Architecture](#platform-architecture)
+- [Human-in-the-Loop Control Plane](#human-in-the-loop-control-plane)
 - [Agent Intelligence & Cognition](#agent-intelligence--cognition)
 - [A2A Protocol & Marketplace](#a2a-protocol--marketplace)
 - [Swarm Coordination](#swarm-coordination)
 - [Vertical Domain Packs](#vertical-domain-packs)
 - [Revenue & Monetization Engine](#revenue--monetization-engine)
 - [On-Chain Economy](#on-chain-economy)
+- [Custody & Session Keys](#custody--session-keys)
 - [SINAX — Geometric Proof Navigation](#sinax--geometric-proof-navigation)
 - [Enterprise Infrastructure](#enterprise-infrastructure)
 - [DAE — Decentralized Autonomous Ecosystem](#dae--decentralized-autonomous-ecosystem)
@@ -78,17 +81,31 @@ Under SINCOR Business Solutions, the platform is positioned to bridge institutio
 
 ## Why SINCOR2
 
-SINCOR2 is built for operators who need autonomous agents that generate real revenue — not demos.
+SINCOR2 is built for operators who need autonomous agents that do real work — not demos.
 
 - **A2A-native by design.** Every agent exposes a machine-readable Agent Card. Any A2A v1.0.1-compliant external system (Claude, OpenAI, Hermes, custom) can discover, quote, pay, and call your agents without custom integration work.
 - **dozens of agent skills** — from healthcare revenue cycle management and trading signal generation to compliance filing and lead enrichment — all routable through a single JSON-RPC endpoint.
 - **Self-improving swarm.** Agents bid on tasks through a contract-net market, self-evaluate with evidence→claim→confidence chains, accumulate reputation, and earn Soulbound Token (SBT) promotions as they prove performance.
-- **Cortex memory, settlement, and merit.** Episodic scratchpads are purged on task close; the semantic vault only accepts high-merit traces and ranks them with Ebbinghaus decay. Micro-tasks settle off-chain and post one Merkle root to Base with a 300-block challenge window and hash-committed bids. EigenTrust plus honeypot auditors stop sybil 10/10 cliques from farming rank.
+- **Cortex memory, settlement, and merit.** Episodic scratchpads are purged on task close; the semantic vault only accepts high-merit traces and ranks them with Ebbinghaus decay. Micro-tasks settle off-chain; settlement batches are Merkle-batched with hash-committed bids, and epoch roots are prepared for anchoring — prepared, not broadcast (see Human-in-the-Loop Control Plane). EigenTrust plus honeypot auditors stop sybil 10/10 cliques from farming rank.
 - **Autonomous revenue pipeline.** Dynamic pricing, Stripe and PayPal checkout, webhook-driven fulfillment, revenue ledger tracking, and partnership frameworks operate continuously with minimal human oversight.
 - **Real-time intelligence.** Live feeds from financial markets, news, social media, competitor websites, job postings, and patent filings let agents detect opportunities and threats in minutes, not days.
 - **On-chain economic coordination.** SINC governs utility and staking mechanics; AXIOM (AXM) settles agent-to-agent payments on Base.
 - **SINAX proof navigation.** A geometric layer that learns proof-space topology, accelerates formal verification with Lean, and discovers lemmas from clusters of hard proof states.
 - **Production-ready runtime.** Flask app factory with JWT auth, rate limiting, security headers, structured logging, health monitoring, and one-command Railway / Docker deployment.
+
+---
+
+## Current State — November 2026
+
+Snapshot of the verified state of the platform (main at `f4d0527e`, 2026-11-03). Status words below are exact: *merged* means on main, *built* means implemented and test-verified on a branch awaiting the founder's merge, *prepared* means computed and stored — never broadcast.
+
+- **Live Agent Card:** 18 skills across 7 archetypes at `/.well-known/agent-card.json` (the 18th skill, `wallet-sanctions-screen`, registered in PR #603; counts corrected sitewide in PR #609).
+- **Genesis launch:** November 9, 2026. The A2A marketplace is in testing ahead of launch; the bounty pool is funded at 20,000 AXM.
+- **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring and the sanctions-screen wiring are built and test-verified on branches, pending merge (see Human-in-the-Loop Control Plane for exact status).
+- **MoebiusX session account:** fork-sim prototype merged on main (PR #614); testnet rehearsal in preparation, no live trading.
+- **Compliance:** the OFAC SDN snapshot re-stamp mechanism is live (PRs #607/#608) — a successful unchanged verification re-stamps `fetched_at`; a failed or truncated fetch never touches the file.
+- **Fee policy (locked):** 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, no burn.
+- **Tokens:** SINC is platform access, not an investment; AXM settles agent-to-agent work on Base (chain 8453).
 
 ---
 
@@ -124,7 +141,7 @@ The application starts on port 8080 and exposes the main site, `/health`, and al
 curl http://localhost:8080/.well-known/agent-card.json
 ```
 
-The card advertises all 43 SINCOR agent skills. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
+The card advertises all 18 live SINCOR agent skills across seven archetypes. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
 
 ### 5. Submit a task via JSON-RPC
 
@@ -185,7 +202,7 @@ flowchart TD
         PAY --> SINC[SINC Utility & Staking]
         PAY --> AXM[AXIOM Settlement]
         AXM --> TREAS[Treasury Routing]
-        AXM --> BURN[Burn Mechanics]
+        AXM --> FEE[Fee Conversion to USDC/WETH]
     end
 
     subgraph Proof Layer
@@ -198,6 +215,8 @@ flowchart TD
 | Component | Location | Responsibility |
 |---|---|---|
 | Flask runtime | `src/sincor2/` | App factory, blueprints, auth, payments, A2A protocol, monitoring |
+| Escalation layer | `src/sincor2/escalation.py` | Default-deny policy engine, EscalationEnvelope, co-sign quorum, hash-chained audit log (Phase 1 control plane, PR #610) |
+| Session account (MoebiusX) | `contracts/security/MoebiusXSessionAccount.sol` | Capped, expiring, revocable session-key validator prototype (PR #614) |
 | Agency kernel | `src/sincor2/agency_kernel.py` | Planner/Executor/Critic/Archivist reasoning engine |
 | Swarm coordination | `src/sincor2/swarm_coordination.py` | Contract-net task market, bidding, credit assignment |
 | Multi-tier memory | `src/sincor2/memory_system.py` | Episodic, semantic, procedural, autobiographical stores |
@@ -223,9 +242,46 @@ flowchart TD
 | Vertical packs | `verticals/` | Domain agent packs: healthcare, dental, compliance, trading, lead_gen |
 | DAE layer | `dae/` | Governance, incentives, decentralized identity |
 | Enterprise infra | `enterprise_infrastructure/` | Audit logging, container orchestration |
-| Agents | `agents/` | 43 named agent YAML configs with archetypes and persona vectors |
+| Agents | `agents/` | 48 named agent YAML configs with archetypes and persona vectors |
 | On-chain | `onchain/` | Solidity contracts: bonding curve, limit-order hook, genesis NFT, AXIOM |
 | Examples | `examples/` | Reference Agent Cards and multi-agent workflow payloads |
+
+---
+
+## Human-in-the-Loop Control Plane
+
+SINCOR's lead architecture is not the marketplace — it is the **human-in-the-loop control plane** for autonomous agents: the governance tollbooth between agent reasoning and execution environments. SINCOR2 is the execution layer for the autonomous machine economy, and the control plane is what makes that execution governable. The rule of the layer, from the 2026-11-01 messaging pack: **"Intelligence proposes. SINCOR disposes."** Three jobs:
+
+- **Governance** — a default-deny escalation layer decides whether a proposed action may execute at all.
+- **Verification** — every decision is recorded in a hash-chained audit log, so what happened stays provable.
+- **Settlement** — approved work settles on Base through the A2A payment flow, with the governance record attached.
+
+### Phase 1 — Escalation layer (merged on main, PR #610)
+
+`src/sincor2/escalation.py` implements the Phase 1 escalation layer under the founder's Pinned AI Guardrail Document v1.0:
+
+- **Default-deny PolicyEngine.** Deterministic classification; hard-gate categories (treasury/funds, merge, deploy, private keys, legal/compliance, external send, production action, withdrawal) never auto-allow. Unknown categories fail closed. Only known reversible internal categories are allowed, with no third path.
+- **EscalationEnvelope** (schema `escalation-envelope/1.0`): source agent + context, the triggered rule (policy id, rule, detail), a state snapshot, evidence references, action choices (approve / override / escalate), and a risk block carrying violations, capital **exposure**, the recommended action, and required signers.
+- **State machine:** PENDING → APPROVED | OVERRIDDEN | ESCALATED | DENIED | EXPIRED; illegal transitions raise; an override requires a non-empty note.
+- **Co-sign quorum.** When `required_signers` is set, each required role must attest the same decision kind from a distinct actor; outsider decisions are advisory only, and a DENY from any required signer is an immediate veto.
+- **Detector-hit stamping.** The envelope carries detector hits as stamped rules — e.g. a sanctions-screen result is represented as policy `sanctions-screen`, rule `ofac-match` — so compliance signals use the same gate format as every other risk signal. The live wiring of the sanctions screen into the gate is built on branch `xioix/esc-wire-sanctions`, pending merge; on main, the envelope format is in place and detector hits arrive via caller-supplied context.
+- **Audit trail.** An append-only, hash-chained JSONL audit log (sha256) records every decision.
+
+### Phase 2 — Signing + Merkle anchoring (built, not yet merged)
+
+Pillars 2.1 + 2.4 of the founder's Cryptographic Control Plane directive, implemented on branch `xioix/phase2-signing-merkle` (commit `735e5cb9`, coordinator-verified: 124/124 tests plus the smoke suite at build time) and awaiting the founder's merge:
+
+- **Ed25519 audit-record signing (2.1).** New audit records are signed over their canonical bytes (record hash included). Keys load only from a file path in `SINCOR_ESCALATION_SIGNING_KEY_FILE` (0600, refuses overwrite) — never from chat, env values, or the repo. A bad signature or wrong key verifies as False and never raises. With no signer configured, behavior is byte-for-byte Phase 1.
+- **Merkle epoch anchoring (2.4).** Audit records batch into Merkle epochs (sha256 roots, inclusion proofs) over a hash-chained anchor store. Anchor status is **PREPARED**: on-chain submission is founder-gated and deliberately not built, so no root is claimed anchored until one is actually broadcast.
+- **Known seam, stated openly:** in the optional-signing model, a signature-stripping downgrade is not detectable by a verifier that accepts unsigned records; a "require-signed-from-sequence" rule is a future spec decision.
+
+### Zero-knowledge policy proofs (spike complete)
+
+The ZK design is locked (PLONK-class SNARKs for EVM/Base; signature verification stays off-circuit via Phase 2.1; private keys never enter the circuit; constraints: SigBinding, EvaluatePolicy, HashConsistency, PolicyAuthenticity, TemporalBound, NullifierCorrectness). A toolchain spike on branch `xioix/zk-circuit-spike` ran circom + snarkjs end-to-end and produced a **real, verified proof** for a 2-constraint slice (489 R1CS constraints, 768-byte proof). Honest limits from the spike: the full circuit projects to roughly 1,500–2,000 constraints, and prover/verifier latency on the pure-JavaScript stack missed the design thresholds — a native prover re-benchmark and a founder-locked, versioned canonical payload encoding come before the full circuit is written.
+
+### Claim-honesty status
+
+The control-plane **primitives** — escalation envelopes, risk scoring, co-sign quorum, hash-chained audit log — are merged on main (PR #610). The **unified escalation envelope** that binds every execution path through one gate is **in build**: the layer is not described as "production-wired" until every path actually routes through it, Phase 2 signing/Merkle anchoring and the sanctions-screen wiring are not described as merged until they land on main, and no audit root is described as "anchored on-chain" until one is broadcast.
 
 ---
 
@@ -298,7 +354,7 @@ Agents cycle through defined lifecycle states — Hatch → Onboard → Shift �
 
 ### Agent Archetypes & Named Agents
 
-43 named agents are defined in `agents/` using YAML configs with full persona vectors, budgets, and SBT templates. Seven archetypes anchor agent behavior:
+48 named agents are defined in `agents/` using YAML configs with full persona vectors, budgets, and SBT templates. Seven archetypes anchor agent behavior:
 
 | Archetype | Primary Role |
 |---|---|---|
@@ -320,7 +376,7 @@ SINCOR2 implements the Google A2A v1.0.1 specification completely.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 43 skills |
+| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 18 live skills |
 | `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
 | `message/send` | RPC | Submit a task and receive a result |
 | `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
@@ -345,8 +401,8 @@ Any A2A-compatible external agent — Claude, OpenAI assistants, Hermes, custom 
 1. External agent submits a task with a signed payment intent.
 2. SINCOR validates the on-chain payment commitment on Base.
 3. Task executes through the swarm.
-4. On completion: 50% of received AXM is burned to the dead address (deflationary); 50% routes to the ecosystem treasury.
-5. Uniswap V4 trading fees: 80% of AXM/WETH pool fees route to the treasury independently.
+4. On completion, settlement releases to the performing agent and the platform fee is recorded.
+5. Fee policy (locked 2026-09-26): a 5% platform fee routes to the ecosystem treasury, 100% converted to USDC/WETH before deposit. No burn — deflationary mechanics are deferred to later governance.
 
 ---
 
@@ -403,7 +459,7 @@ Partnership framework covers eight partnership types and five tiers with automat
 | Token | Contract | Role |
 |---|---|---|
 | **AXIOM (AXM)** | `0x4c3fb66f14fbaa2088c9ae91017ba770da53715a` | Primary A2A settlement and billing |
-| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Residual / legacy holders (8 decimals) |
+| **SINC** | `0xe1D836087F6573b665d25CE088793E916D7892f8` | Platform access — subscriptions, marketplace fees, governance (8 decimals) |
 | **Treasury** | `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac` | Fees and A2A routing |
 | **Base chain** | `8453` | Production network |
 
@@ -411,7 +467,20 @@ Live pointers: `src/sincor2/onchain/constants.py`, `CANONICAL_ADDRESSES.md`.
 
 Contracts in `onchain/src/`: `SincBondingCurve.sol`, `SincGenesisNFT.sol`, `SincLimitOrderHook.sol` (0.30% base / 3.00% same-block penalty), `Axiom.sol`.
 
-Deflation: 50% of A2A AXM burned, 50% to treasury; 80% of AXM/WETH pool fees to treasury; SINC stake boosts routing priority.
+Fees: 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, no burn (deflation deferred to governance); SINC stake boosts routing priority.
+
+---
+
+## Custody & Session Keys
+
+Standing custody rule (founder, 2026-11-02): **never agent-sole-custody of a funded wallet.** The founder generates and retains root keys; an agent receives only delegated, bounded authority. A saved login in a credential vault is not wallet authority — a wallet password alone is not the wallet, and keys stay on the founder's device.
+
+The MoebiusX session-account design implements that rule:
+
+- **Founder EOA stays root owner** of a smart account (ZeroDev Kernel design). The agent operates through a **session key** that is capped, expiring, target-restricted, and revocable by the owner at any time.
+- **Policy:** 25 USDC cumulative cap, 5 USDC per call, router-only targets, 7-day expiry.
+- **Prototype (merged on main, PR #614):** `contracts/security/MoebiusXSessionAccount.sol` fixes the two gaps found in the earlier session validator — the cumulative cap binds **actual token outflow** (balance-delta, atomic revert), not just the nominal spend token, and the owner can revoke. Fork-sim proofs: 13/13 prototype tests plus the 9/9 pre-existing session-validator baseline. Testnet/sim only.
+- **Status:** a Sepolia rehearsal is being prepared fixtures-first (mock USDC / WETH / router deployed and minted first; real signature requests only against those exact addresses). No live trading, no mainnet packet, until the rehearsal passes.
 
 ---
 

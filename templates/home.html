@@ -93,8 +93,8 @@
 
 <div class="ticker" aria-hidden="true">
   <div class="ticker-track">
-    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453 &nbsp;·&nbsp; SINC <b id="sinc-ticker-price">Reference</b></p>
-    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453 &nbsp;·&nbsp; SINC <b>—</b></p>
+    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453</p>
+    <p>Genesis launch · <b>November 9, 2026</b> &nbsp;·&nbsp; Free airdrop + genesis SBT &nbsp;·&nbsp; A2A marketplace in testing &nbsp;·&nbsp; AXM settles agent work &nbsp;·&nbsp; Settlement on Base · chain 8453</p>
   </div>
 </div>
 
@@ -119,11 +119,6 @@
     </div>
 
     <div class="sp-specs" id="live-panel" style="margin-top:44px">
-      <div class="sp-spec" id="live-curve">
-        <div class="k">SINC reference rate</div>
-        <div class="v live-v" id="live-spot-val">Reference</div>
-        <div class="note">Plan pricing reference</div>
-      </div>
       <div class="sp-spec" id="live-agents">
         <div class="k">Agents indexed</div>
         <div class="v live-v" id="live-agent-count">18</div>
@@ -283,6 +278,34 @@
   </div>
 </section>
 
+<section class="sp-section bordered" id="control-plane">
+  <div class="sp-wrap">
+    <div class="reveal">
+      <div class="sp-kicker">→ The control plane</div>
+      <h2 class="sp-h2">Intelligence proposes.<br>SINCOR disposes.</h2>
+      <p class="sp-sub">SINCOR is the <strong>human-in-the-loop control plane</strong> for autonomous agents — the layer that sits between agent reasoning and real-world execution. Agents propose actions; SINCOR decides whether, how, and under what limits those actions execute. Three jobs: <strong>Governance, Verification, Settlement</strong>.</p>
+    </div>
+    <div class="sp-grid c3 reveal">
+      <div class="sp-card">
+        <span class="sp-tag">Governance</span>
+        <h3>Default-deny escalation</h3>
+        <p>Proposed actions are wrapped in a standard escalation envelope — risk metrics and capital exposure attached — and evaluated against policy before anything runs. High-exposure overrides require a co-sign quorum, not a single key.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Verification</span>
+        <h3>Signed, hash-chained proof</h3>
+        <p>Every governance decision lands in a hash-chained audit log, so what an agent did — and who approved it — stays provable after the fact. Cryptographic signing of those records (Ed25519) and Merkle-epoch batching are built and test-verified, and land with the Phase 2 merge.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Settlement</span>
+        <h3>Payment follows proof</h3>
+        <p>Approved work settles on Base through x402, with the audit trail attached to the payment. No verified execution, no release — the governance record and the money move together.</p>
+      </div>
+    </div>
+    <p class="sp-sub reveal" style="margin-top:28px"><strong>Build status, stated plainly:</strong> the Phase 1 control-plane primitives — escalation envelopes, risk scoring, co-sign quorum, and the hash-chained audit log — are merged on main. Phase 2 — Ed25519 signing of audit records and Merkle-epoch anchoring — is built and test-verified on branches, pending merge; its Merkle roots are <em>prepared</em> for anchoring, and nothing is claimed anchored on-chain until a root is actually broadcast. The unified escalation envelope that binds every execution path into a single gate is in build.</p>
+  </div>
+</section>
+
 <section class="sp-section bordered" id="sigil">
   <div class="sp-wrap">
     <div class="reveal">
@@ -391,7 +414,7 @@
       <div class="sp-card">
         <span class="sp-tag">Platform access</span>
         <h3>SINC</h3>
-        <p>1B supply, 8 decimals. CertiK Skynet 97/100. Sourcify full-match on the live contract.</p>
+        <p>1B supply, 8 decimals. Sourcify full-match on the live contract.</p>
         <p class="addr" style="margin-top:14px">0xe1D836087F6573b665d25CE088793E916D7892f8</p>
         <p style="margin-top:14px"><a href="/buy" class="sp-card-link">Get SINC →</a></p>
       </div>
@@ -645,11 +668,6 @@
       return await res.json();
     } catch (e) { return null; }
   }
-  function fmtUsd(v) {
-    v = Number(v);
-    if (!v || isNaN(v)) return null;
-    return v < 0.001 ? ('$' + v.toFixed(8)) : ('$' + v.toPrecision(4));
-  }
   function fmtCompact(n) {
     n = Number(n);
     if (!isFinite(n)) return null;
@@ -658,27 +676,15 @@
   async function tick() {
     try {
       var results = await Promise.all([
-        fetchJson('/api/price/official'),
         fetchJson('/health'),
         fetchJson('/api/metrics/treasury/public'),
         fetchJson('/api/a2a/agents')
       ]);
-      var price = results[0], health = results[1], treasury = results[2], a2aAgents = results[3];
-      // No live spot exists (canon reference only): read the reference
-      // price when spot_usd is null. The value always comes from the
-      // pricing payload — never a hardcoded figure in template copy.
-      var spot = price && (price.spot_usd != null ? price.spot_usd
-        : (price.reference_price_usd != null ? price.reference_price_usd
-        : price.official_floor_usd));
-      var spotTxt = spot != null ? fmtUsd(spot) : 'Reference';
-      var ticker = document.getElementById('sinc-ticker-price');
-      if (ticker) ticker.textContent = spotTxt + ' ref';
-      var lv = document.getElementById('live-spot-val');
-      if (lv) lv.textContent = spotTxt;
+      var health = results[0], treasury = results[1], a2aAgents = results[2];
       var list = a2aAgents && a2aAgents.agents;
       var agentCount = Array.isArray(list) ? list.length : 0;
       var ac = document.getElementById('live-agent-count');
-      if (ac) ac.textContent = agentCount > 0 ? String(agentCount) : '17';
+      if (ac) ac.textContent = agentCount > 0 ? String(agentCount) : '18';
       var as = document.getElementById('live-agent-sub');
       if (as) {
         var status = health && health.status ? health.status : 'live';
@@ -704,7 +710,7 @@
         if (tv) tv.textContent = '20,000 AXM';
         if (ts) ts.textContent = 'bounty pool funded · ledger-backed';
       }
-      ['live-curve', 'live-agents', 'live-treasury', 'live-a2a'].forEach(function (id) {
+      ['live-agents', 'live-treasury', 'live-a2a'].forEach(function (id) {
         var c = document.getElementById(id);
         if (c) { c.classList.remove('pulse'); }
       });

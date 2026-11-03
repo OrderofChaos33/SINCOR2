@@ -894,7 +894,7 @@ def api_hook_status():
 @app.route('/api/price/official')
 @limiter.exempt if limiter else lambda f: f
 def api_price_official():
-    """Canonical official SINC price — $0.15 floor."""
+    """Canonical official SINC price payload."""
     try:
         from launch_content_engine.onchain_stats import build_official_price_payload
         return jsonify(build_official_price_payload())
