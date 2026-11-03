@@ -294,7 +294,7 @@
       <div class="sp-card">
         <span class="sp-tag">Verification</span>
         <h3>Signed, hash-chained proof</h3>
-        <p>Every governance decision lands in a hash-chained audit log. Execution records can be cryptographically signed (Ed25519) and batched into Merkle epochs, so what an agent did — and who approved it — stays provable after the fact.</p>
+        <p>Every governance decision lands in a hash-chained audit log, so what an agent did — and who approved it — stays provable after the fact. Cryptographic signing of those records (Ed25519) and Merkle-epoch batching are built and test-verified, and land with the Phase 2 merge.</p>
       </div>
       <div class="sp-card">
         <span class="sp-tag">Settlement</span>
@@ -302,7 +302,7 @@
         <p>Approved work settles on Base through x402, with the audit trail attached to the payment. No verified execution, no release — the governance record and the money move together.</p>
       </div>
     </div>
-    <p class="sp-sub reveal" style="margin-top:28px"><strong>Build status, stated plainly:</strong> the control-plane primitives — escalation envelopes, risk scoring, co-sign quorum, the hash-chained audit log, signed execution records, and Merkle epoch preparation — are live in production. The unified escalation envelope that binds them into a single gate is in build. Merkle roots are <em>prepared</em> for anchoring; nothing is claimed anchored on-chain until a root is actually broadcast.</p>
+    <p class="sp-sub reveal" style="margin-top:28px"><strong>Build status, stated plainly:</strong> the Phase 1 control-plane primitives — escalation envelopes, risk scoring, co-sign quorum, and the hash-chained audit log — are merged on main. Phase 2 — Ed25519 signing of audit records and Merkle-epoch anchoring — is built and test-verified on branches, pending merge; its Merkle roots are <em>prepared</em> for anchoring, and nothing is claimed anchored on-chain until a root is actually broadcast. The unified escalation envelope that binds every execution path into a single gate is in build.</p>
   </div>
 </section>
 

@@ -101,7 +101,7 @@ Snapshot of the verified state of the platform (main at `f4d0527e`, 2026-11-03).
 
 - **Live Agent Card:** 18 skills across 7 archetypes at `/.well-known/agent-card.json` (the 18th skill, `wallet-sanctions-screen`, registered in PR #603; counts corrected sitewide in PR #609).
 - **Genesis launch:** November 9, 2026. The A2A marketplace is in testing ahead of launch; the bounty pool is funded at 20,000 AXM.
-- **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring is built on a branch (see Human-in-the-Loop Control Plane for exact status).
+- **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring and the sanctions-screen wiring are built and test-verified on branches, pending merge (see Human-in-the-Loop Control Plane for exact status).
 - **MoebiusX session account:** fork-sim prototype merged on main (PR #614); testnet rehearsal in preparation, no live trading.
 - **Compliance:** the OFAC SDN snapshot re-stamp mechanism is live (PRs #607/#608) — a successful unchanged verification re-stamps `fetched_at`; a failed or truncated fetch never touches the file.
 - **Fee policy (locked):** 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, no burn.
@@ -264,7 +264,7 @@ SINCOR's lead architecture is not the marketplace — it is the **human-in-the-l
 - **EscalationEnvelope** (schema `escalation-envelope/1.0`): source agent + context, the triggered rule (policy id, rule, detail), a state snapshot, evidence references, action choices (approve / override / escalate), and a risk block carrying violations, capital **exposure**, the recommended action, and required signers.
 - **State machine:** PENDING → APPROVED | OVERRIDDEN | ESCALATED | DENIED | EXPIRED; illegal transitions raise; an override requires a non-empty note.
 - **Co-sign quorum.** When `required_signers` is set, each required role must attest the same decision kind from a distinct actor; outsider decisions are advisory only, and a DENY from any required signer is an immediate veto.
-- **Sanctions wiring.** Detector hits are stamped onto the envelope as rules — e.g. a sanctions-screen result arrives as policy `sanctions-screen`, rule `ofac-match` — so compliance signals enter the same gate as every other risk signal instead of living in a side channel.
+- **Detector-hit stamping.** The envelope carries detector hits as stamped rules — e.g. a sanctions-screen result is represented as policy `sanctions-screen`, rule `ofac-match` — so compliance signals use the same gate format as every other risk signal. The live wiring of the sanctions screen into the gate is built on branch `xioix/esc-wire-sanctions`, pending merge; on main, the envelope format is in place and detector hits arrive via caller-supplied context.
 - **Audit trail.** An append-only, hash-chained JSONL audit log (sha256) records every decision.
 
 ### Phase 2 — Signing + Merkle anchoring (built, not yet merged)
@@ -281,7 +281,7 @@ The ZK design is locked (PLONK-class SNARKs for EVM/Base; signature verification
 
 ### Claim-honesty status
 
-The control-plane **primitives** — escalation envelopes, risk scoring, co-sign quorum, hash-chained audit log — are live in production code on main. The **unified escalation envelope** that binds every execution path through one gate is **in build**: the layer is not described as "production-wired" until every path actually routes through it, and no audit root is described as "anchored on-chain" until one is broadcast.
+The control-plane **primitives** — escalation envelopes, risk scoring, co-sign quorum, hash-chained audit log — are merged on main (PR #610). The **unified escalation envelope** that binds every execution path through one gate is **in build**: the layer is not described as "production-wired" until every path actually routes through it, Phase 2 signing/Merkle anchoring and the sanctions-screen wiring are not described as merged until they land on main, and no audit root is described as "anchored on-chain" until one is broadcast.
 
 ---
 
