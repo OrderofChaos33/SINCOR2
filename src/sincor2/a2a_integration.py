@@ -3949,12 +3949,63 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     return _rpc_ok(task_dict, rpc_id=rpc_id)
 
 
+def _record_kya_telemetry(task: "A2ATask", output: Optional[str],
+                          error: Optional[str]) -> None:
+    """Record one A2A execution outcome into the KYA telemetry store.
+
+    The agent key is the caller's reputation identity — the same
+    ``_reputation_key`` the reputation ledger uses in
+    ``_finalize_a2a_task`` — so telemetry, reputation, and the trust
+    score all describe the same verified party. Outcome mapping: an
+    error mentioning a timeout is a ``timeout``; any other error is
+    an ``error``; a completed execution is a ``success``. Latency is
+    the wall clock from task creation to finalization when the
+    creation stamp parses, else None. This function NEVER raises:
+    telemetry must not fail or alter the execution it describes.
+    """
+    try:
+        from sincor2 import kya_telemetry
+
+        if error:
+            lowered = str(error).lower()
+            outcome = (
+                kya_telemetry.OUTCOME_TIMEOUT
+                if ("timeout" in lowered or "timed out" in lowered)
+                else kya_telemetry.OUTCOME_ERROR
+            )
+        else:
+            outcome = kya_telemetry.OUTCOME_SUCCESS
+        latency_ms: Optional[float] = None
+        try:
+            started = datetime.fromisoformat(str(task.created_at))
+            if started.tzinfo is not None:
+                latency_ms = max(
+                    0.0,
+                    (datetime.now(timezone.utc) - started)
+                    .total_seconds() * 1000.0,
+                )
+        except Exception:
+            latency_ms = None
+        agent_key = _reputation_key(
+            (task.metadata or {}).get("verified_wallet"), task.caller_id)
+        kya_telemetry.record_execution_outcome(
+            agent_key, outcome, skill_id=task.skill_id,
+            latency_ms=latency_ms)
+    except Exception as err:  # telemetry must never brick finalization
+        logger.warning(
+            "kya telemetry hook failed for task %s: %s", task.id, err)
+
+
 def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[str]) -> Dict[str, Any]:
     """Persist swarm output, proof of settlement, and terminal task state.
 
     Called from the async worker (and the eager test path). Safe to invoke
     outside a Flask request context.
     """
+    # KYA telemetry (recommendation #2 wiring): record this execution's
+    # outcome before the terminal-state bookkeeping, in both the
+    # success and error branches. Fail-open by construction.
+    _record_kya_telemetry(task, output, error)
     if error:
         _update_task(task, state=TaskState.FAILED, error=error)
         _fire_toa_feedback(task, success=False)
