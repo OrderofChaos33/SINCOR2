@@ -96,14 +96,26 @@ each founder-gated. The schema carries a ``tenant`` field defaulting to
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import math
 import os
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
+
+# POSIX file locking serializes EscalationStore writes across store
+# instances and processes (the sanctions tap builds a fresh store per
+# emission; two request threads must not interleave load→append→save).
+# Guarded: on a platform without fcntl the store degrades to its
+# per-instance threading lock rather than failing to import.
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback
+    fcntl = None  # type: ignore[assignment]
 
 # Ed25519 signing (Phase 2, pillar 2.1) uses the `cryptography`
 # package. The import is guarded so the Phase 1 unsigned path never
@@ -311,6 +323,32 @@ class PolicyVerdict:
         }
 
 
+def _coerce_threshold_number(value: Any) -> Optional[float]:
+    """Coerce a context amount/threshold to a finite float, or None.
+
+    Accepts ints/floats (never bools) and numeric strings — JSON
+    payloads routinely carry amounts as strings, and a string amount
+    must not silently skip the spend check (W-127). NaN and the
+    infinities are NOT numbers for policy purposes: ``NaN > x`` is
+    False, which used to let a NaN amount sail past the threshold, so
+    they coerce to None and the caller fails closed.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    elif isinstance(value, str):
+        try:
+            number = float(value.strip())
+        except ValueError:
+            return None
+    else:
+        return None
+    if math.isnan(number) or math.isinf(number):
+        return None
+    return number
+
+
 class PolicyEngine:
     """Deterministic classification of (action_category, context).
 
@@ -329,9 +367,11 @@ class PolicyEngine:
     1. ``context["rule_hit"]`` — a detector (sanctions screen, vuln
        score, …) already fired: ESCALATE, stamped with the detector's
        own ``{policy_id, rule, detail}``.
-    2. Spend threshold — numeric ``context["amount"]`` strictly greater
-       than numeric ``context["threshold"]``: ESCALATE under policy
-       ``spend-threshold``.
+    2. Spend threshold — when ``context["threshold"]`` is present, the
+       amount is coerced to a finite number (numeric strings accepted;
+       NaN / non-numeric values fail closed as unverifiable) and an
+       amount strictly greater than the threshold ESCALATEs under
+       policy ``spend-threshold``.
     3. Hard-gate category: ESCALATE under policy ``hard-gate``.
     4. Internal category with an irreversibility / external-effect
        context flag: ESCALATE under policy ``context-guard``.
@@ -364,23 +404,43 @@ class PolicyEngine:
                 detail=str(rule_hit.get("detail", "")),
             )
 
-        amount = ctx.get("amount")
-        threshold = ctx.get("threshold")
-        if (
-            isinstance(amount, (int, float))
-            and not isinstance(amount, bool)
-            and isinstance(threshold, (int, float))
-            and not isinstance(threshold, bool)
-            and amount > threshold
-        ):
-            return PolicyVerdict(
-                ESCALATE,
-                "spend_threshold_exceeded",
-                category,
-                policy_id="spend-threshold",
-                rule="amount_exceeds_threshold",
-                detail=f"amount={amount} threshold={threshold}",
-            )
+        raw_amount = ctx.get("amount")
+        raw_threshold = ctx.get("threshold")
+        if raw_threshold is not None:
+            # A spend threshold is present, so the spend check MUST
+            # resolve: amounts/thresholds arrive from JSON and may be
+            # numeric strings (coerced), and a value that cannot be
+            # coerced to a finite number (NaN, non-numeric string,
+            # bool) fails closed instead of skipping the check (W-127).
+            amount = _coerce_threshold_number(raw_amount)
+            threshold = _coerce_threshold_number(raw_threshold)
+            if threshold is None:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_unverifiable",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="threshold_not_numeric",
+                    detail=f"threshold={raw_threshold!r}",
+                )
+            if raw_amount is not None and amount is None:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_unverifiable",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="amount_not_numeric",
+                    detail=f"amount={raw_amount!r} threshold={raw_threshold!r}",
+                )
+            if amount is not None and amount > threshold:
+                return PolicyVerdict(
+                    ESCALATE,
+                    "spend_threshold_exceeded",
+                    category,
+                    policy_id="spend-threshold",
+                    rule="amount_exceeds_threshold",
+                    detail=f"amount={raw_amount} threshold={raw_threshold}",
+                )
 
         if category in HARD_GATE_CATEGORIES:
             return PolicyVerdict(
@@ -592,6 +652,27 @@ class EscalationPackage:
 # ---------------------------------------------------------------------------
 
 
+def _normalize_required_signers(signers: Optional[Iterable]) -> list:
+    """Canonical form of a required-signers role list.
+
+    Roles are stripped + lowercased so the stored list and the
+    decision path always agree on role identity: ``decide()`` has
+    always normalized the deciding role, so a package created with
+    ``["Founder", "CFO"]`` used to store the raw mixed-case list and
+    its quorum could never be satisfied — the package sat PENDING
+    forever (W-125). Non-string entries pass through untouched so
+    :func:`_validate_risk_inputs` rejects them with its precise error
+    instead of an AttributeError here.
+    """
+    normalized = []
+    for signer in signers or []:
+        if isinstance(signer, str):
+            normalized.append(signer.strip().lower())
+        else:
+            normalized.append(signer)
+    return normalized
+
+
 def _normalize_risk(risk: Optional[dict]) -> dict:
     """Project any risk input onto the canonical risk-block shape."""
     risk = risk or {}
@@ -601,7 +682,9 @@ def _normalize_risk(risk: Optional[dict]) -> dict:
             dict(risk["exposure"]) if risk.get("exposure") is not None else None
         ),
         "recommended_action": risk.get("recommended_action", "escalate"),
-        "required_signers": list(risk.get("required_signers") or []),
+        "required_signers": _normalize_required_signers(
+            risk.get("required_signers")
+        ),
     }
 
 
@@ -638,9 +721,16 @@ def _validate_risk_inputs(
             or "currency" not in exposure
         ):
             raise ValueError("exposure must be {amount, currency} or None")
-    for signer in required_signers or []:
-        if not isinstance(signer, str) or not signer.strip():
+    seen_signers = set()
+    for signer in _normalize_required_signers(required_signers):
+        if not isinstance(signer, str) or not signer:
             raise ValueError("required_signers must be non-empty role strings")
+        if signer in seen_signers:
+            raise ValueError(
+                "duplicate required_signer after normalization "
+                f"(strip + lower): {signer!r}"
+            )
+        seen_signers.add(signer)
 
 
 def _canonical_record_bytes(record_without_hash: dict) -> bytes:
@@ -831,6 +921,18 @@ def verify_chain(records: list, expected_signer_pubkey: Optional[str] = None) ->
     after hashing), and ``seq`` is consecutive. Any tampering — edit,
     reorder, deletion — fails.
 
+    Slice semantics (W-128): a mid-log slice is anchored at its first
+    record's ``prev_hash`` instead of GENESIS, so an auditor checking
+    a window is not told a valid log is broken. Internal linkage,
+    hash recomputation, signature checks, and ``seq`` consecutiveness
+    are still fully enforced within the slice; the anchor itself is
+    trusted input — a caller verifying a slice should confirm the
+    anchor equals the ``record_hash`` of the preceding record from a
+    trusted source. A slice may not masquerade as a full log: a first
+    record claiming the genesis position (``seq`` 1) must anchor at
+    GENESIS, and a non-genesis anchor without a ``seq`` proving the
+    slice starts mid-log fails closed.
+
     Phase 2 signature rules: a record carrying a ``signature`` block
     must verify against its embedded public key, and — when
     ``expected_signer_pubkey`` is given — that embedded key must equal
@@ -843,7 +945,20 @@ def verify_chain(records: list, expected_signer_pubkey: Optional[str] = None) ->
     if not records:
         return True
     first_seq = records[0].get("seq")
-    prev_hash = GENESIS_PREV_HASH
+    first_prev_hash = records[0].get("prev_hash")
+    if first_prev_hash == GENESIS_PREV_HASH:
+        # Full log: anchored at genesis.
+        prev_hash = GENESIS_PREV_HASH
+    elif isinstance(first_seq, int) and first_seq > 1:
+        # Mid-log slice (W-128): the slice's first prev_hash is the
+        # anchor — the hash of the record just before the window,
+        # which the caller supplies implicitly by slicing a real log.
+        prev_hash = first_prev_hash
+    else:
+        # Claims the genesis position (or cannot prove it starts
+        # mid-log) but does not anchor at GENESIS: forgery, not a
+        # slice. Fail closed.
+        return False
     for offset, record in enumerate(records):
         if record.get("prev_hash") != prev_hash:
             return False
@@ -921,6 +1036,11 @@ class EscalationStore:
     - ``escalation_audit.jsonl`` — one JSON record per event, append
       only, ``seq`` strictly increasing, hash-chained (``prev_hash`` /
       ``record_hash``; see :func:`verify_chain`). Never rewritten.
+    - ``.escalation_store.lock`` — advisory file lock serializing
+      writes across store instances and processes (see
+      :meth:`_write_transaction`): every mutation reloads state under
+      the lock before appending, so concurrent emitters extend one
+      chain instead of forking it.
 
     Pass ``signer`` (an :class:`AuditSigner`, e.g. from
     :func:`load_signer_from_env`) to sign every newly appended audit
@@ -932,6 +1052,7 @@ class EscalationStore:
 
     STATE_FILENAME = "escalation_state.json"
     AUDIT_FILENAME = "escalation_audit.jsonl"
+    LOCK_FILENAME = ".escalation_store.lock"
 
     def __init__(self, base_dir: str, signer: Optional[AuditSigner] = None):
         self._signer = signer
@@ -939,6 +1060,7 @@ class EscalationStore:
         os.makedirs(self.base_dir, exist_ok=True)
         self.state_path = os.path.join(self.base_dir, self.STATE_FILENAME)
         self.audit_path = os.path.join(self.base_dir, self.AUDIT_FILENAME)
+        self.lock_path = os.path.join(self.base_dir, self.LOCK_FILENAME)
         self._lock = threading.Lock()
         self._packages: dict[str, EscalationPackage] = {}
         self._audit_seq = 0
@@ -975,6 +1097,44 @@ class EscalationStore:
                     f"escalation audit log is corrupt: {self.audit_path}: {exc}"
                 ) from exc
 
+    @contextlib.contextmanager
+    def _write_transaction(self):
+        """Serialize one read-modify-write cycle across store instances.
+
+        The per-instance ``threading.Lock`` cannot coordinate the
+        pattern the sanctions tap uses — a FRESH store per emission —
+        let alone separate processes: two stores constructed over the
+        same directory each snapshot ``_audit_seq`` / ``_last_hash`` /
+        ``_packages`` at load time, and interleaved
+        load→append→save cycles then fork the audit chain (duplicate
+        ``seq``, two records claiming the same ``prev_hash``) and
+        silently drop each other's packages from the state file.
+
+        This transaction therefore (1) takes the instance lock, (2)
+        takes an exclusive POSIX file lock on ``LOCK_FILENAME`` in the
+        store directory, and (3) RELOADS packages + audit tail from
+        disk under the lock, so the mutation is applied to the
+        freshest state and the appended records extend the real chain
+        head. Without ``fcntl`` (non-POSIX) it degrades to the instance
+        lock alone. Never nested: the public mutators
+        (``create_package`` / ``decide``) open exactly one transaction
+        and the internals they call take no lock.
+        """
+        with self._lock:
+            if fcntl is None:
+                yield
+                return
+            fd = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                self._load()
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+
     def _save_state(self) -> None:
         payload = {
             "schema_version": PACKAGE_SCHEMA_VERSION,
@@ -982,7 +1142,12 @@ class EscalationStore:
                 pid: pkg.to_dict() for pid, pkg in self._packages.items()
             },
         }
-        tmp_path = self.state_path + ".tmp"
+        # Unique tmp path per writer: even outside the write
+        # transaction, two savers must never share one tmp file and
+        # interleave their bytes before os.replace.
+        tmp_path = "{}.{}.{}.{}.tmp".format(
+            self.state_path, os.getpid(), threading.get_ident(), uuid.uuid4().hex
+        )
         with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, sort_keys=True)
             fh.flush()
@@ -1212,7 +1377,7 @@ class EscalationStore:
             },
             risk=risk,
         )
-        with self._lock:
+        with self._write_transaction():
             self._packages[package.id] = package
             self._append_audit(
                 package_id=package.id,
@@ -1281,7 +1446,7 @@ class EscalationStore:
             )
         role_norm = str(role).strip().lower() if role else "operator"
         decided_at = now or _utcnow_iso()
-        with self._lock:
+        with self._write_transaction():
             package = self._packages.get(package_id)
             if package is None:
                 raise PackageNotFoundError(f"no such package: {package_id}")
