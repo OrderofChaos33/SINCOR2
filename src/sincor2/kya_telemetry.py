@@ -11,9 +11,15 @@ throttle verdict (an allocation multiplier and a rate-limit tier) so a
 future engine wiring can scale work DOWN for agents that are failing
 live, instead of trusting standing reputation alone.
 
-This pass deliberately builds the brain + store only. Nothing here
-changes live allocation, bidding, or rate-limit behaviour: applying a
-verdict inside the engine is a separate, founder-gated wiring step.
+Wiring (landed as the follow-on step): the live loop now calls the
+two fail-open helpers at the bottom of this module —
+``record_execution_outcome`` from the A2A finalization path
+(``a2a_integration._finalize_a2a_task``) and ``throttle_verdict``
+from marketplace winner selection
+(``a2a_inbound_market.close_auction``), where the multiplier scales
+a candidate's ranking score. The helpers never raise and return
+neutral results when telemetry is missing or unavailable, so an
+empty store leaves engine behaviour byte-for-byte unchanged.
 
 Honesty contract (same spirit as the trust score):
 
@@ -41,12 +47,15 @@ for deterministic tests; timestamps are epoch seconds (float).
 
 from __future__ import annotations
 
+import logging
 import math
 import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
+
+logger = logging.getLogger("sincor2.kya_telemetry")
 
 OUTCOME_SUCCESS = "success"
 OUTCOME_ERROR = "error"
@@ -233,6 +242,64 @@ def get_default_store() -> TelemetryStore:
     if _default_store is None:
         _default_store = TelemetryStore()
     return _default_store
+
+
+# ---------------------------------------------------------------------------
+# Live-wiring helpers (fail-open)
+# ---------------------------------------------------------------------------
+
+def record_execution_outcome(
+    agent_id: Optional[str],
+    outcome: str,
+    *,
+    skill_id: Optional[str] = None,
+    latency_ms: Optional[float] = None,
+    store: Optional[TelemetryStore] = None,
+) -> bool:
+    """Best-effort outcome recording for the live execution path.
+
+    NEVER raises: a telemetry write failure must not fail or alter
+    the execution it describes. Returns True when the event was
+    stored, False when it was dropped (and logged).
+    """
+    if not agent_id:
+        return False
+    try:
+        (store or get_default_store()).record(
+            agent_id, outcome, skill_id=skill_id,
+            latency_ms=latency_ms)
+        return True
+    except Exception as err:
+        logger.warning(
+            "kya telemetry record failed for %s: %s", agent_id, err)
+        return False
+
+
+def throttle_verdict(
+    agent_id: Optional[str],
+    *,
+    store: Optional[TelemetryStore] = None,
+    policy: Optional[TelemetryPolicy] = None,
+) -> Optional[Dict[str, Any]]:
+    """Throttle verdict for the live allocation path, or None.
+
+    None means "no throttle information": the agent has no recorded
+    telemetry at all, or telemetry is unavailable (any store/policy
+    error is swallowed and logged). Callers treat None as multiplier
+    1.0, which keeps behaviour byte-for-byte identical on a fresh
+    deploy with an empty store.
+    """
+    if not agent_id:
+        return None
+    try:
+        store = store or get_default_store()
+        if store.count(agent_id) == 0:
+            return None
+        return store.verdict(agent_id, policy=policy)
+    except Exception as err:
+        logger.warning(
+            "kya telemetry verdict failed for %s: %s", agent_id, err)
+        return None
 
 
 # ---------------------------------------------------------------------------
