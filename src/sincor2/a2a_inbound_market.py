@@ -671,6 +671,78 @@ def open_escrow_exposure_axm(agent_id: str) -> float:
         return _open_exposure_locked(fabric, agent_id)
 
 
+def _kya_effective_score(score: Any, multiplier: Any) -> float:
+    """Apply a KYA allocation multiplier without reversing bid order.
+
+    Production bid scores can be negative, so a plain multiplication
+    would move a throttled negative score toward zero and promote the
+    throttled bidder. Scale the score's magnitude instead: positive
+    scores are multiplied by ``m`` and negative scores are divided by
+    ``m``. For every valid ``0 < m <= 1``, the result is <= the raw
+    score and the transform is strictly increasing in the raw score
+    (slopes ``m`` and ``1 / m`` on the two sides of zero, joined at 0).
+    Invalid multipliers fail open to the raw score.
+    """
+    raw = float(score)
+    try:
+        mult = float(multiplier)
+    except (TypeError, ValueError):
+        return raw
+    if not (0.0 < mult <= 1.0):
+        return raw
+    return raw * mult if raw >= 0 else raw / mult
+
+
+def _kya_telemetry_adjustments(
+        agent_ids: Any, fabric: Any = None) -> Dict[str, Dict[str, Any]]:
+    """KYA telemetry verdicts for winner-selection ranking.
+
+    Returns ``{agent_id: verdict}`` for the candidates that HAVE
+    recorded telemetry. Marketplace candidates are resolved through
+    their registered wallet — the binding enforced for bid auth — and
+    looked up only in telemetry's ``wallet:`` namespace. The
+    unauthenticated ``id:`` namespace is never consulted here.
+
+    Fail-open: any telemetry failure yields {} (raw-score ranking —
+    byte-for-byte the pre-wiring behaviour). Verdicts that actually
+    throttle (multiplier < 1.0) are logged with their evidence so the
+    adjustment is observable in ops logs as well as in the
+    ``telemetry_throttle`` audit fields stamped on the task at
+    assignment.
+    """
+    try:
+        from sincor2 import kya_telemetry
+
+        if fabric is None:
+            fabric = get_fabric()
+        agents = getattr(fabric, "agents", {}) or {}
+        adjustments: Dict[str, Dict[str, Any]] = {}
+        for agent_id in agent_ids:
+            agent = agents.get(agent_id) or {}
+            registered_wallet = str(agent.get("wallet") or "").strip().lower()
+            if not registered_wallet:
+                continue
+            telemetry_key = "wallet:" + registered_wallet
+            verdict = kya_telemetry.throttle_verdict(telemetry_key)
+            if verdict is None:
+                continue
+            adjustments[agent_id] = verdict
+            if verdict["allocation_multiplier"] < 1.0:
+                logger.info(
+                    "kya telemetry throttle: agent %s (%s) multiplier %.4f "
+                    "(attempts=%d errors=%d timeouts=%d)",
+                    agent_id, telemetry_key,
+                    verdict["allocation_multiplier"],
+                    verdict["evidence"]["attempts"],
+                    verdict["evidence"]["errors"],
+                    verdict["evidence"]["timeouts"],
+                )
+        return adjustments
+    except Exception as err:  # telemetry must never brick auction close
+        logger.warning("kya telemetry adjustments failed: %s", err)
+        return {}
+
+
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     expire_stale_assignments()
     fabric = get_fabric()
@@ -745,7 +817,28 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 logger.warning("pool release failed for expired task %s: %s",
                                task_id, err)
         else:
-            ranked = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))
+            # KYA telemetry throttle (recommendation #2 wiring): rank
+            # on each candidate's magnitude-scaled score, using the
+            # live-reliability multiplier for its registered wallet.
+            # Fail-open and neutral by default — candidates with no
+            # recorded telemetry (or any telemetry failure) rank on
+            # their raw score exactly as before, and a throttled
+            # candidate is scaled, never excluded. Magnitude scaling
+            # keeps the adjustment rank-monotonic for negative as
+            # well as positive production scores. Raw bid scores are
+            # never rewritten; the adjustment lives only in this
+            # ranking plus the audit fields stamped at assignment.
+            telemetry_adj = _kya_telemetry_adjustments(
+                {str(b.get("agent_id")) for b in cands}, fabric=fabric)
+
+            def _effective_score(b: Dict[str, Any]) -> float:
+                verdict = telemetry_adj.get(str(b.get("agent_id")))
+                if not verdict:
+                    return float(b["score"])
+                return _kya_effective_score(
+                    b["score"], verdict["allocation_multiplier"])
+
+            ranked = sorted(cands, key=lambda b: (-_effective_score(b), int(b["received_at"]), b["bid_id"]))
             # Hunt-15 W-78: the concentration cap binds at WIN time, never at
             # bid commit.  Walk the ranking; the first candidate whose win
             # would keep the agent's aggregate open exposure within
@@ -790,6 +883,32 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                     "time_est_ms": winner.get("time_est_ms"),
                     "assigned_at": ts,
                 })
+                # Audit: when the winner has a telemetry verdict, stamp
+                # the applied multiplier and its evidence basis onto the
+                # task record (persisted by _save_tasks below). Winners
+                # with no recorded telemetry get no stamp — the record
+                # stays exactly as it was before this wiring.
+                _winner_verdict = telemetry_adj.get(
+                    str(winner["agent_id"]))
+                if _winner_verdict:
+                    task["telemetry_throttle"] = {
+                        "agent_id": winner["agent_id"],
+                        "multiplier":
+                            _winner_verdict["allocation_multiplier"],
+                        "status": _winner_verdict["status"],
+                        "rate_limit_tier":
+                            _winner_verdict["rate_limit_tier"],
+                        "raw_score": winner["score"],
+                        "effective_score": _effective_score(winner),
+                        "evidence": {
+                            "attempts":
+                                _winner_verdict["evidence"]["attempts"],
+                            "errors":
+                                _winner_verdict["evidence"]["errors"],
+                            "timeouts":
+                                _winner_verdict["evidence"]["timeouts"],
+                        },
+                    }
                 task.pop("close_blocked_reason", None)
                 task.pop("close_blocked_at", None)
                 if task.get("sealed"):
