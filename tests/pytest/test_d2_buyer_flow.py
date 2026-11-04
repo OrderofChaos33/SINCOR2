@@ -296,10 +296,23 @@ def test_full_loop_mvp_checkout_bind_pay_settle_download(
     assert bound["payment"]["payTo"]
     assert bound["payment"]["asset"]
 
-    # 2b. second bind of the same challenge -> still 409.
+    # 2b. second bind of the same challenge with the SAME wallet +
+    # signature -> 200 success (Wren PR 5 retry-bind contract,
+    # founder-approved 2026-11-04): the retry re-verifies the
+    # signature and returns the standard success payload instead of
+    # the old 409 challenge_already_bound. (Different-wallet and
+    # already-fulfilled retries still 409 — pinned in
+    # test_wren_pr5_retry_bind.py.)
     b2 = _bind_http(client, cid, rid)
-    assert b2.status_code == 409, b2.get_json()
-    assert b2.get_json()["error"] == "challenge_already_bound"
+    assert b2.status_code == 200, b2.get_json()
+    retry = b2.get_json()
+    assert retry["ok"] is True
+    assert retry["ownership_proven"] is True
+    assert retry["bound"] is True
+    assert retry["challenge_id"] == cid
+    assert retry["payer_wallet"] == VICTIM.lower()
+    assert retry.get("error") is None
+    assert retry["payment"]["payTo"]
 
     # 3+4. pay (canned chain) + settle, carrying the ITEM 8 capture
     # fields exactly as the page now sends them.
