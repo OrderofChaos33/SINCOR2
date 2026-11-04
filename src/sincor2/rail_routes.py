@@ -625,8 +625,9 @@ def _render_pack_email(*, customer_name: str, pack_name: str,
     else:
         agent_count = "dedicated vertical agent"
         feature_list = (
-            f"{pack_name} deployment kickoff — vertical agent queued. "
-            f"Complete your intake here: {intake_url}"
+            f"{pack_name}: complete your intake here: {intake_url} "
+            f"The owner reviews your intake, and you receive a "
+            f"human-reviewed deliverable prepared from your intake."
         )
         quickstart = (
             f"https://getsincor.com/files/guides/quickstart-{order_id}.pdf"
@@ -669,8 +670,8 @@ def _render_pack_email(*, customer_name: str, pack_name: str,
             '<h4 style="margin:0 0 10px 0;color:#667eea;">Next step: '
             'complete your intake</h4>'
             '<p style="margin:0 0 12px 0;font-size:14px;color:#4a5568;">'
-            'Your vertical agent is queued. Tell us about your operation so '
-            'it can start your first paid workflow:</p>'
+            'Tell us about your operation so the owner can review your '
+            'intake and prepare your human-reviewed deliverable:</p>'
             f'<a href="{intake_url}" style="display:inline-block;background:'
             '#667eea;color:white;padding:12px 24px;border-radius:6px;'
             'text-decoration:none;font-weight:600;">Complete intake →</a>'
@@ -716,8 +717,9 @@ def _send_pack_email(*, to_email: str, customer_name: str,
         subject = f"Your SINCOR {pack_name} pack — complete your intake"
         text = (
             f"Thank you for purchasing SINCOR {pack_name}!\n\n"
-            f"Your vertical agent deployment is queued.\n"
-            f"Next step — complete your intake: {intake_url}\n\n"
+            f"Next step — complete your intake: {intake_url}\n"
+            f"The owner reviews your intake, and you receive a "
+            f"human-reviewed deliverable prepared from your intake.\n\n"
             f"Order: {order_id}\nSupport: support@getsincor.com\n"
         )
     result = EmailSender().send_email(
@@ -2462,6 +2464,40 @@ def rail_checkout():
     if buyer_email:
         body["buyer_email"] = buyer_email
     return jsonify(body), http_status
+
+
+@rail_bp.get("/replay-message")
+def rail_replay_message():
+    """Wren PR 2: buyer-recovery helper — the exact EIP-191 replay
+    message a payer signs to re-issue a fulfilled order's delivery
+    links after the original settle session dropped.
+
+    The message format is public and deterministic
+    (x402.build_replay_message binds the challenge_id and a millisecond
+    timestamp under the SINCOR-X402-REPLAY domain), so serving it
+    discloses nothing: the settle-side W-103/W-115 gate still requires
+    a valid personal_sign from the rail event's RECORDED payer wallet
+    inside the 10-minute freshness window before any token-gated URL
+    is revealed. The server stamps ts_ms so the client signs exactly
+    the timestamp it re-posts as replay_ts_ms. No state is read or
+    written here — an unknown challenge_id gets the same shape, so the
+    helper is not an existence oracle either.
+    """
+    import time as _time
+
+    from sincor2 import x402_payments as x402
+
+    challenge_id = str(request.args.get("challenge_id") or "").strip()
+    if not challenge_id:
+        return jsonify({"ok": False, "error": "challenge_id_required"}), 400
+    ts_ms = int(_time.time() * 1000)
+    return jsonify({
+        "ok": True,
+        "challenge_id": challenge_id,
+        "replay_ts_ms": ts_ms,
+        "replay_message": x402.build_replay_message(challenge_id, ts_ms),
+        "replay_hint": _REPLAY_HINT,
+    })
 
 
 @rail_bp.post("/settle")

@@ -173,6 +173,15 @@
     </div>
   </div>
 
+  <div class="step" id="recoverStep">
+    <h2>Already paid?</h2>
+    <div class="sub">If your payment went through but this page closed before
+      your download / intake link appeared, recover your delivery here.
+      You&rsquo;ll sign a free message with the wallet you paid from &mdash;
+      no new payment, and the links are only ever shown to that wallet.</div>
+    <button id="btnRecover" type="button" class="secondary">Recover my delivery</button>
+  </div>
+
   {% if bootstrap.resource_id in ["rail-pack-credentialing_launch", "rail-pack-chroma_compliance", "rail-pack-sadas_execution"] %}
   <div class="step" id="afterPay">
     <h2>What happens after you pay</h2>
@@ -225,8 +234,15 @@
     var data = null;
     try { data = await r.json(); } catch (e) { /* non-JSON: fall through */ }
     if (!r.ok) {
-      var err = (data && data.error) ? String(data.error) : ("HTTP " + r.status);
-      throw new Error(err);
+      // Keep the parsed body on the thrown error: some refusals carry
+      // state the caller can act on (e.g. a 409 challenge_already_bound
+      // flagged bound_to_you is a success state for the bind step, not
+      // a failure — Wren PR 5).
+      var err = new Error(
+        (data && data.error) ? String(data.error) : ("HTTP " + r.status));
+      err.data = data;
+      err.status = r.status;
+      throw err;
     }
     return data;
   }
@@ -436,6 +452,7 @@
       return;
     }
     payment = challenge.payment;
+    stashRecovery(challenge.challenge_id, null);
     var extra = payment.extra || {};
     $("amountLine").textContent =
       (extra.amount_display != null ? extra.amount_display : "?") + " " +
@@ -517,6 +534,17 @@
       setMsg("Wallet ownership verified.", "ok");
     } catch (e) {
       if (e && e.code === 4001) setMsg("Signature rejected in wallet.", "err");
+      else if (e && e.data && e.data.error === "challenge_already_bound" &&
+               e.data.bound_to_you === true) {
+        // The challenge is already bound to THIS wallet (an earlier
+        // bind whose response never reached the page, or an already
+        // fulfilled challenge): that IS the verified state — treat it
+        // as success instead of "Wallet verification failed" (PR 5).
+        bound = true;
+        $("btnBind").disabled = true;
+        $("btnBind").textContent = "\u2713 Wallet verified";
+        setMsg("Wallet ownership verified.", "ok");
+      }
       else setMsg("Wallet verification failed: " + (e && e.message || e), "err");
     }
     refreshButtons();
@@ -563,6 +591,7 @@
           chainId: BASE_CHAIN_HEX
         }]
       });
+      stashRecovery(challenge.challenge_id, txHash);
       setMsg("Transaction sent (" + trunc(txHash) + "). Waiting for confirmation\u2026");
       await waitForReceipt(eth, txHash);
       setMsg("Payment confirmed onchain. Finalizing with SINCOR\u2026");
@@ -585,28 +614,7 @@
         setMsg("Payment complete.", "ok");
         $("btnPay").disabled = true;
         $("btnPay").textContent = "\u2713 Paid";
-        if (settle.access_token) {
-          $("tokenBox").hidden = false;
-          $("tokenField").value = settle.access_token;
-        }
-        // Completion-screen fulfillment links, from the settle
-        // response's fulfillment object (digital packs carry a
-        // token-gated download_url; B2B packs carry an intake_url).
-        var fulfillment = settle.fulfillment || {};
-        var hasLink = false;
-        if (fulfillment.download_url) {
-          var dl = $("downloadLink");
-          dl.href = fulfillment.download_url;
-          dl.hidden = false;
-          hasLink = true;
-        }
-        if (fulfillment.intake_url) {
-          var il = $("intakeLink");
-          il.href = fulfillment.intake_url;
-          il.hidden = false;
-          hasLink = true;
-        }
-        if (hasLink) $("fulfillmentLinks").hidden = false;
+        renderFulfillment(settle);
       } else {
         throw new Error((settle && settle.error) || "settle rejected the payment");
       }
@@ -636,6 +644,141 @@
     } catch (e) {
       setMsg("Card purchase unavailable: " + (e && e.message || e), "err");
     }
+  });
+
+  // ---- fulfillment rendering (shared by Pay and Recover) -------------
+  // Completion-screen token + links, from a settle response's
+  // fulfillment object (digital packs carry a token-gated
+  // download_url; B2B packs carry an intake_url).
+  function renderFulfillment(settle) {
+    if (settle.access_token) {
+      $("tokenBox").hidden = false;
+      $("tokenField").value = settle.access_token;
+    }
+    var fulfillment = settle.fulfillment || {};
+    var hasLink = false;
+    if (fulfillment.download_url) {
+      var dl = $("downloadLink");
+      dl.href = fulfillment.download_url;
+      dl.hidden = false;
+      hasLink = true;
+    }
+    if (fulfillment.intake_url) {
+      var il = $("intakeLink");
+      il.href = fulfillment.intake_url;
+      il.hidden = false;
+      hasLink = true;
+    }
+    if (hasLink) $("fulfillmentLinks").hidden = false;
+    return hasLink;
+  }
+
+  // ---- delivery recovery (Wren PR 2) -----------------------------------
+  // If the buyer's session drops after the onchain payment but before
+  // the fulfillment links render, the order is fulfilled server-side
+  // with nobody holding the token-gated links. The settle endpoint's
+  // duplicate/retry paths are payer-gated (W-115): the links are
+  // re-issued ONLY to a caller who proves control of the recorded
+  // payer wallet with the W-103 EIP-191 replay signature
+  // (personal_sign of build_replay_message(challenge_id, ts_ms)).
+  // The pay flow stashes challenge_id + tx_hash in sessionStorage so a
+  // dropped session in the SAME browser can recover here; support can
+  // also hand the buyer this page's URL with ?challenge_id=..&tx_hash=..
+  var RECOVERY_CHALLENGE_KEY = "sincor_rail_challenge_id";
+  var RECOVERY_TX_KEY = "sincor_rail_tx_hash";
+
+  function stashRecovery(challengeId, txHash) {
+    try {
+      if (challengeId) {
+        sessionStorage.setItem(RECOVERY_CHALLENGE_KEY, challengeId);
+      }
+      if (txHash) sessionStorage.setItem(RECOVERY_TX_KEY, txHash);
+    } catch (e) { /* storage unavailable: recovery via URL params only */ }
+  }
+
+  function recoveryIds() {
+    var params = new URLSearchParams(window.location.search);
+    var cid = params.get("challenge_id");
+    var tx = params.get("tx_hash");
+    try {
+      if (!cid) cid = sessionStorage.getItem(RECOVERY_CHALLENGE_KEY);
+      if (!tx) tx = sessionStorage.getItem(RECOVERY_TX_KEY);
+    } catch (e) { /* fall through with whatever the URL carried */ }
+    return { challenge_id: cid || "", tx_hash: tx || "" };
+  }
+
+  $("btnRecover").addEventListener("click", async function () {
+    if (busy) return;
+    var eth = provider();
+    if (!eth) {
+      setMsg("No Ethereum wallet found. Install MetaMask or Coinbase Wallet, " +
+        "then reload this page.", "err");
+      return;
+    }
+    var ids = recoveryIds();
+    if (!ids.challenge_id || !ids.tx_hash) {
+      setMsg("No earlier payment was found for this browser. Recovery needs " +
+        "the challenge and transaction from your purchase: reopen this page " +
+        "in the browser you paid with, or use the recovery link from your " +
+        "delivery email.", "err");
+      return;
+    }
+    busy = true;
+    setMsg("");
+    try {
+      if (!wallet) {
+        var accounts = await eth.request({ method: "eth_requestAccounts" });
+        if (!accounts || !accounts.length) throw new Error("no accounts returned");
+        wallet = accounts[0];
+        $("walletLine").textContent = "Connected: " + trunc(wallet);
+      }
+      // The server stamps the canonical replay message (and its
+      // timestamp) so the signature below binds exactly what the
+      // settle will check.
+      var hr = await fetch("/rail/replay-message?challenge_id=" +
+        encodeURIComponent(ids.challenge_id));
+      var hint = null;
+      try { hint = await hr.json(); } catch (e) { /* non-JSON: fall through */ }
+      if (!hr.ok || !hint || !hint.ok) {
+        throw new Error((hint && hint.error) || ("HTTP " + hr.status));
+      }
+      setMsg("Sign the free recovery message in your wallet\u2026");
+      var signature = await eth.request({
+        method: "personal_sign",
+        params: [hint.replay_message, wallet]
+      });
+      setMsg("Verifying your signature\u2026");
+      var settle = await postJSON("/rail/settle", {
+        challenge_id: ids.challenge_id,
+        tx_hash: ids.tx_hash,
+        payer_wallet: wallet,
+        replay_signature: signature,
+        replay_ts_ms: hint.replay_ts_ms
+      });
+      var fulfillment = (settle && settle.fulfillment) || {};
+      if (settle && settle.ok &&
+          (fulfillment.download_url || fulfillment.intake_url)) {
+        renderFulfillment(settle);
+        setMsg("Delivery recovered \u2014 your links are above.", "ok");
+      } else if (settle && settle.status === "already_fulfilled") {
+        // Status-only ack: the signature did not prove the payer
+        // wallet (the server never reveals links without that proof).
+        setMsg("That signature did not match the wallet that paid for this " +
+          "order. Connect the wallet you paid with and try again.", "err");
+      } else {
+        throw new Error((settle && settle.error) || "recovery rejected");
+      }
+    } catch (e) {
+      if (e && e.code === 4001) setMsg("Signature rejected in wallet.", "err");
+      else if (e && e.message === "payer_proof_required") {
+        setMsg("That signature did not match the wallet that paid for this " +
+          "order. Connect the wallet you paid with and try again.", "err");
+      } else {
+        setMsg("Recovery failed: " + (e && e.message || e), "err");
+      }
+    }
+    busy = false;
+    refreshButtons();
   });
 
   // ---- detail fields: reveal per-SKU groups + live Pay gating --------

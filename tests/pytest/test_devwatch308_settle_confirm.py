@@ -1,19 +1,11 @@
-"""Dev-watch 308: settlement counts ONLY on status==1 AND the expected
-Transfer event in the receipt logs.
+"""Dev-watch 308 — RETIREMENT CONTRACT for the legacy crypto verify route.
 
-Item 308 (external): an x402 facilitator's ``confirm_transaction``
-reported success for transactions whose execution had failed — receipt
-presence / confirmation alone was treated as settlement.
-
-Our analog found by audit: ``POST /api/crypto/verify-payment``
+History: item 308 found that ``POST /api/crypto/verify-payment``
 (``mvp_blueprints/billing.py::crypto_verify_payment``) fulfilled orders
 whenever a receipt existed with status 0x1 and ``receipt.to`` equal to
-the payment address. It never inspected the receipt logs. A bare,
-value-less call to the payment address (status 0x1, ``to`` == recipient,
-NO Transfer event — nothing was paid) therefore released fulfillment,
-while a genuine ERC-20 payment (whose receipt ``to`` is the *token
-contract*, the recipient appearing only in the Transfer event) was
-rejected. These tests pin the corrected rule:
+the payment address, without inspecting the receipt logs. This suite
+originally pinned the corrected settlement rule (settlement counts ONLY
+on status==1 AND the expected Transfer event in the receipt logs):
 
   * receipt present + status 0            -> settlement FAILURE
   * receipt present + status 1, no
@@ -22,9 +14,18 @@ rejected. These tests pin the corrected rule:
   * zero-value Transfer event             -> settlement FAILURE
   * status 1 + Transfer event to the
     payment recipient with value > 0      -> settlement SUCCESS
-                                             (order stored + fulfillment)
 
-No order row and no fulfillment call may occur on any failure path.
+RETIREMENT CONTRACT (founder-approved 2026-11-04, Wren PR 3): the
+legacy direct-verify route is retired. ``POST /api/crypto/verify-payment``
+(and ``POST /api/crypto/checkout``) now return 410 Gone with
+``{"error": "use_rail_checkout"}`` unconditionally — regardless of
+BASE_PAYMENT_ADDRESS or any parameters — and never create an order row
+or trigger a fulfillment. The rail checkout is the only payment path.
+
+These tests stage the SAME receipt shapes that used to attack (or
+satisfy) the verifier and assert the door is closed for every one of
+them — including the genuine full payment that used to settle: each
+now gets 410, with no order row and no fulfillment call.
 """
 from __future__ import annotations
 
@@ -144,70 +145,71 @@ def _order_count(db_path) -> int:
         conn.close()
 
 
-def _assert_failure(crypto_env, resp):
-    assert resp.status_code == 402, resp.get_data(as_text=True)
-    assert resp.get_json().get("status") != "verified"
+def _assert_retired(crypto_env, resp):
+    """The retirement contract: 410 Gone, the exact rail-redirect error
+    body, and zero side effects — no order row, no fulfillment."""
+    assert resp.status_code == 410, resp.get_data(as_text=True)
+    assert resp.get_json() == {"error": "use_rail_checkout"}
     assert crypto_env["fulfillments"] == []
     assert _order_count(crypto_env["db_path"]) == 0
 
 
 # ---------------------------------------------------------------------------
-# Failure shapes: a confirmed-but-failed / empty transfer is NEVER success
+# Attack shapes: every receipt that used to be judged is now refused
+# sight-unseen with 410 — the verifier no longer exists behind the route.
 # ---------------------------------------------------------------------------
 
-def test_reverted_receipt_is_settlement_failure(crypto_env):
-    """Receipt present, status 0 (execution failed) -> failure."""
+def test_reverted_receipt_is_settlement_failure_retired(crypto_env):
+    """Receipt present, status 0 (execution failed) -> 410 retired."""
     crypto_env["state"]["receipt"] = _receipt("0x0", RECIPIENT, [])
-    _assert_failure(crypto_env, _post(crypto_env["client"]))
+    _assert_retired(crypto_env, _post(crypto_env["client"]))
 
 
-def test_success_status_without_transfer_event_is_failure(crypto_env):
-    """DW-308 core: status 0x1 + receipt addressed to the recipient but
-    NO Transfer event in the logs (a bare value-less call) moved no
-    tokens — it must not settle or fulfill anything."""
+def test_success_status_without_transfer_event_is_failure_retired(crypto_env):
+    """DW-308 core shape: status 0x1 + receipt addressed to the
+    recipient but NO Transfer event in the logs (a bare value-less
+    call). It used to be a settlement failure; now the whole route is
+    retired -> 410, still zero side effects."""
     crypto_env["state"]["receipt"] = _receipt("0x1", RECIPIENT, [])
-    _assert_failure(crypto_env, _post(crypto_env["client"]))
+    _assert_retired(crypto_env, _post(crypto_env["client"]))
 
 
-def test_transfer_event_to_wrong_recipient_is_failure(crypto_env):
-    """A Transfer event exists but pays someone else -> failure."""
+def test_transfer_event_to_wrong_recipient_is_failure_retired(crypto_env):
+    """A Transfer event exists but pays someone else -> 410 retired."""
     crypto_env["state"]["receipt"] = _receipt(
         "0x1", USDC, [_transfer_log(OTHER, 25_000_000)])
-    _assert_failure(crypto_env, _post(crypto_env["client"]))
+    _assert_retired(crypto_env, _post(crypto_env["client"]))
 
 
-def test_zero_value_transfer_event_is_failure(crypto_env):
-    """A Transfer event to the recipient carrying zero value settles
-    nothing -> failure."""
+def test_zero_value_transfer_event_is_failure_retired(crypto_env):
+    """A Transfer event to the recipient carrying zero value ->
+    410 retired."""
     crypto_env["state"]["receipt"] = _receipt(
         "0x1", USDC, [_transfer_log(RECIPIENT, 0)])
-    _assert_failure(crypto_env, _post(crypto_env["client"]))
+    _assert_retired(crypto_env, _post(crypto_env["client"]))
 
 
-def test_non_transfer_event_to_recipient_is_failure(crypto_env):
-    """Some other event naming the recipient is not a payment."""
+def test_non_transfer_event_to_recipient_is_failure_retired(crypto_env):
+    """Some other event naming the recipient is not a payment ->
+    410 retired."""
     log = {
         "address": USDC,
         "topics": ["0x" + "ff" * 32, _padded(PAYER), _padded(RECIPIENT)],
         "data": hex(25_000_000),
     }
     crypto_env["state"]["receipt"] = _receipt("0x1", USDC, [log])
-    _assert_failure(crypto_env, _post(crypto_env["client"]))
+    _assert_retired(crypto_env, _post(crypto_env["client"]))
 
 
 # ---------------------------------------------------------------------------
-# Positive control
+# Positive control, inverted: the genuine payment no longer settles here
 # ---------------------------------------------------------------------------
 
-def test_status1_with_matching_transfer_event_settles(crypto_env):
+def test_status1_with_matching_transfer_event_settles_retired(crypto_env):
     """Status 0x1 + Transfer event to the payment recipient with value
-    -> settled: order stored as completed and fulfillment triggered.
-    (For an ERC-20 payment the receipt's `to` is the token contract;
-    the recipient appears only in the Transfer event.)"""
+    — the exact receipt that USED to settle (order stored + fulfillment
+    triggered) — now gets 410 like everything else: no order row, no
+    fulfillment. Settlement runs only through the rail flow."""
     crypto_env["state"]["receipt"] = _receipt(
         "0x1", USDC, [_transfer_log(RECIPIENT, 25_000_000)])
-    resp = _post(crypto_env["client"])
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    assert resp.get_json().get("status") == "verified"
-    assert _order_count(crypto_env["db_path"]) == 1
-    assert len(crypto_env["fulfillments"]) == 1
+    _assert_retired(crypto_env, _post(crypto_env["client"]))

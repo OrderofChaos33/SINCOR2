@@ -86,8 +86,13 @@
       var body = null;
       try { body = await r.json(); } catch (e) { /* non-JSON */ }
       if (r.ok && body && body.ok) {
-        msg.textContent = "Intake received — thank you. Our team has been " +
-          "notified and will start work on your pack.";
+        // Claim a notification only when the server says one was
+        // actually sent (owner_notified); otherwise the honest
+        // receipt is just "Intake received".
+        msg.textContent = body.owner_notified
+          ? "Intake received — thank you. Our team has been notified " +
+            "and will review your intake."
+          : "Intake received — thank you.";
         msg.className = "ok";
         var btn = document.getElementById("btnSubmit");
         if (btn) btn.disabled = true;

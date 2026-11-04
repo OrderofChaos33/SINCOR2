@@ -5,10 +5,21 @@ import os
 
 from flask import Blueprint, current_app, jsonify, request, session
 
+from sincor2.admin_api_key import (
+    admin_key_rate_limit_response,
+    check_admin_header_key,
+)
 from sincor2.error_handling import ApiError, api_error
 from sincor2.validation_models import WaitlistSignup, validate_request
 
 waitlist_bp = Blueprint("waitlist", __name__, url_prefix="/api/waitlist")
+
+
+@waitlist_bp.before_request
+def _waitlist_key_rate_limit_gate():
+    # Wren PR 4: failed X-Admin-Key attempts are rate-limited per
+    # client address (10/min -> 429). Valid credentials never count.
+    return admin_key_rate_limit_response()
 
 
 def _is_admin_request() -> bool:
@@ -24,8 +35,10 @@ def _is_admin_request() -> bool:
     * a Bearer JWT (or ``access_token`` cookie) whose ``sub`` is the
       admin username AND whose ``role`` claim is ``'admin'``
       (mvp_app._check_admin_token), or
-    * the ``X-Admin-Key`` header matching ADMIN_PASSWORD
-      (mvp_app._check_admin_key).
+    * the ``X-Admin-Key`` header: the dedicated ADMIN_API_KEY when
+      one is configured (>= 32 chars), otherwise ADMIN_PASSWORD
+      (sincor2.admin_api_key.check_admin_header_key, the shared
+      implementation behind mvp_app._check_admin_key).
 
     Fail-closed: any missing or mismatched credential returns False.
     On the production app this is a second layer — mvp_app also runs
@@ -58,16 +71,10 @@ def _is_admin_request() -> bool:
         except Exception:
             pass
 
-    admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
-    key = request.headers.get("X-Admin-Key", "")
-    if key and admin_password:
-        try:
-            if hmac.compare_digest(str(key), admin_password):
-                return True
-        except (TypeError, ValueError):
-            # Non-ASCII header value: un-comparable in constant time —
-            # fail closed instead of surfacing a 500 (hunt-32 W-44).
-            pass
+    # X-Admin-Key header (fail-closed on non-ASCII values, hunt-32
+    # W-44 — the shared helper never raises).
+    if check_admin_header_key(request.headers.get("X-Admin-Key", "")):
+        return True
 
     return False
 

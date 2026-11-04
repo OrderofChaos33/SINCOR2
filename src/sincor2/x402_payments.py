@@ -968,6 +968,22 @@ def bind_challenge_payer(
     the binding is written; any unsigned, malformed, high-s, or
     wrong-signer signature is rejected and the row is left unbound.
     A draft can be bound exactly once (challenge_already_bound).
+
+    Wren PR 5 (retry-bind): a retry naming the SAME wallet the draft is
+    already bound to is not an error — the first bind's success response
+    can be lost in transit, and dead-ending that buyer with
+    challenge_already_bound strands a legitimate purchase. The retry
+    RE-VERIFIES the signature (a bad retry signature is still
+    ownership_proof_failed) and returns the standard successful-bind
+    envelope, so the route answers the retry with the same 200 success
+    payload as the first bind. A different wallet still gets
+    challenge_already_bound, and so does an already-fulfilled
+    challenge — with bound_to_you=True when the fulfilled challenge is
+    bound to the requester's own wallet AND the request's signature
+    verifies against that wallet, so the client can present
+    "yours, already done" instead of a verification failure. The flag
+    is never set on an unverified claim (it would otherwise be an
+    unauthenticated oracle for the bound wallet).
     """
     cid = (challenge_id or "").strip()
     if not cid:
@@ -984,12 +1000,33 @@ def bind_challenge_payer(
         ).fetchone()
         if not row:
             return {"ok": False, "error": "challenge_not_found"}
+        recorded = (row["payer_wallet"] or "").strip().lower()
         if row["status"] == "fulfilled":
-            return {"ok": False, "error": "challenge_already_bound"}
+            result: dict[str, Any] = {
+                "ok": False, "error": "challenge_already_bound"}
+            if recorded and recorded == wallet:
+                # bound_to_you is an ownership signal: set it only
+                # after the EIP-191 bind signature verifies against
+                # the recorded payer (mirroring the pending and
+                # lost-race paths below, which flag only after
+                # recovered == wallet). An unverified claim — garbage
+                # signature, or a different wallet's signature —
+                # collapses to the bare 409 above, so the flag can
+                # never serve as an unauthenticated oracle confirming
+                # which wallet a fulfilled challenge is bound to.
+                message = challenge_bind_message(
+                    cid, str(row["resource_id"]), wallet)
+                try:
+                    recovered = _recover_bind_signer(message, signature)
+                except ValueError:
+                    recovered = ""
+                if recovered and recovered.lower() == wallet:
+                    result["bound_to_you"] = True
+            return result
         expires = row["expires_at"]
         if expires and _parse_iso(expires) < datetime.now(timezone.utc):
             return {"ok": False, "error": "challenge_expired"}
-        if (row["payer_wallet"] or "").strip():
+        if recorded and recorded != wallet:
             return {"ok": False, "error": "challenge_already_bound"}
 
         resource_id = str(row["resource_id"])
@@ -1014,22 +1051,59 @@ def bind_challenge_payer(
             )
             return {"ok": False, "error": "ownership_proof_failed"}
 
-        # Atomic bind: the UPDATE itself is the claim. The conditional
-        # WHERE closes the race between the SELECT above and this write —
-        # two concurrent binds cannot both succeed; the loser sees
-        # rowcount 0 and gets challenge_already_bound.
-        cur = conn.execute(
-            "UPDATE x402_challenges SET payer_wallet=? WHERE challenge_id=? "
-            "AND status='pending' AND (payer_wallet='' OR payer_wallet IS NULL)",
-            (wallet, cid),
-        )
-        if cur.rowcount != 1:
-            conn.rollback()
-            logger.warning(
-                "x402: bind lost race for challenge %s; already bound", cid
+        if recorded == wallet:
+            # Wren PR 5 retry: already bound to THIS wallet and the
+            # signature above just re-verified — the binding is in
+            # place, nothing to write. Fall through to the standard
+            # successful-bind envelope below.
+            logger.info(
+                "x402: idempotent re-bind for challenge %s by bound "
+                "wallet %s", cid, wallet,
             )
-            return {"ok": False, "error": "challenge_already_bound"}
-        conn.commit()
+        else:
+            # Atomic bind: the UPDATE itself is the claim. The conditional
+            # WHERE closes the race between the SELECT above and this write —
+            # two concurrent binds cannot both succeed; the loser sees
+            # rowcount 0 and gets challenge_already_bound.
+            cur = conn.execute(
+                "UPDATE x402_challenges SET payer_wallet=? WHERE challenge_id=? "
+                "AND status='pending' AND (payer_wallet='' OR payer_wallet IS NULL)",
+                (wallet, cid),
+            )
+            if cur.rowcount != 1:
+                conn.rollback()
+                # Lost a race: re-read who holds the binding now. A twin
+                # request from the SAME wallet winning the race is the
+                # PR 5 retry case — fall through to the success envelope.
+                # Anything else keeps challenge_already_bound (flagged
+                # bound_to_you when the row is ours but already fulfilled).
+                fresh = conn.execute(
+                    "SELECT payer_wallet, status FROM x402_challenges "
+                    "WHERE challenge_id=?", (cid,),
+                ).fetchone()
+                fresh_wallet = (
+                    (fresh["payer_wallet"] or "").strip().lower()
+                    if fresh else ""
+                )
+                if not (
+                    fresh
+                    and fresh["status"] != "fulfilled"
+                    and fresh_wallet == wallet
+                ):
+                    logger.warning(
+                        "x402: bind lost race for challenge %s; already "
+                        "bound", cid,
+                    )
+                    result = {
+                        "ok": False, "error": "challenge_already_bound"}
+                    if fresh_wallet and fresh_wallet == wallet:
+                        result["bound_to_you"] = True
+                    return result
+                logger.info(
+                    "x402: bind race for challenge %s won by twin "
+                    "request from bound wallet %s", cid, wallet,
+                )
+            conn.commit()
 
     payload = build_payment_payload(resource, resource_id, cid)
 
