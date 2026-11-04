@@ -14,6 +14,17 @@ bad/expired/mismatched signature) returns the same generic
 
 All keys below are throwaway ``Account.create()`` keys — never real keys.
 All on-chain verification is mocked; no network, no real funds.
+
+Fixture note (Wren PR 6 triage, founder ruling 2026-11-04): the helpers
+below follow the CURRENT locked production flow (W-102 round 3 + the
+W-103/W-115 replay-auth standard). ``create_challenge`` now mints an
+UNBOUND draft that records no payer; the payer binds it with an EIP-191
+ownership signature via ``bind_challenge_payer`` before
+``verify_challenge`` can fulfill it. The fixtures were updated to that
+flow; every security assertion in this file is unchanged — unsigned,
+wrong-signer, cross-challenge, stale, and blank-wallet replays are still
+asserted refused, and a valid payer signature is still asserted to
+re-issue the SAME token.
 """
 from __future__ import annotations
 
@@ -25,7 +36,7 @@ from eth_account import Account
 from eth_account.messages import encode_defunct
 
 import sincor2.x402_payments as x402
-from sincor2.x402_payments import build_replay_message
+from sincor2.x402_payments import build_replay_message, challenge_bind_message
 
 
 @pytest.fixture()
@@ -54,17 +65,37 @@ def _sign(acct, challenge_id: str, ts_ms: int) -> str:
     return acct.sign_message(msg).signature.hex()
 
 
+def _sign_bind(acct, challenge_id: str, resource_id: str) -> str:
+    """EIP-191 personal_sign of the canonical challenge-bind message."""
+    msg = encode_defunct(
+        text=challenge_bind_message(challenge_id, resource_id, acct.address))
+    return acct.sign_message(msg).signature.hex()
+
+
 def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _fulfill(x402_db, monkeypatch, payer_addr: str,
+def _fulfill(x402_db, monkeypatch, payer,
              resource_id: str = "agent_task",
              tx_seed: str = "aa") -> dict:
-    """Fulfill a challenge as payer_addr (mocked on-chain success)."""
+    """Fulfill a challenge as ``payer`` (mocked on-chain success).
+
+    ``payer`` is a throwaway ``Account``, or ``""`` for the
+    blank-recorded-wallet scenario. Follows the locked production flow:
+    create an UNBOUND draft, bind it with the payer's EIP-191 ownership
+    signature (skipped for the blank case — an empty wallet cannot
+    bind), then verify.
+    """
+    payer_addr = payer.address if payer else ""
     _mock_onchain_payer(monkeypatch, payer_addr)
-    ch = x402.create_challenge(resource_id, payer_wallet=payer_addr)
+    ch = x402.create_challenge(resource_id)
     assert ch["ok"] is False and ch["http_status"] == 402, ch
+    if payer:
+        bound = x402.bind_challenge_payer(
+            ch["challenge_id"], payer_addr,
+            _sign_bind(payer, ch["challenge_id"], resource_id))
+        assert bound.get("ownership_proven") is True, bound
     res = x402.verify_challenge(
         ch["challenge_id"], _real_hash(tx_seed), payer_wallet=payer_addr)
     assert res["ok"] is True and res["status"] == "fulfilled", res
@@ -78,7 +109,7 @@ def _fulfill(x402_db, monkeypatch, payer_addr: str,
 class TestLegitimateReissue:
     def test_valid_signature_reissues_token(self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="a1")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="a1")
         cid = res["challenge_id"]
         token = res["access_token"]
         ts = _now_ms()
@@ -99,7 +130,7 @@ class TestLegitimateReissue:
     def test_signature_accepts_hex_prefix(self, x402_db, monkeypatch):
         """0x-prefixed hex (the common wallet serialization) is accepted."""
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="a2")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="a2")
         cid = res["challenge_id"]
         ts = _now_ms()
         sig = "0x" + _sign(payer, cid, ts)
@@ -117,14 +148,14 @@ class TestLegitimateReissue:
 class TestNoSignatureRejected:
     def test_replay_without_signature_rejected(self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="b1")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="b1")
         replay = x402.verify_challenge(res["challenge_id"], res["tx_hash"])
         assert replay == {"ok": False, "error": "replay_auth_failed"}
         assert "access_token" not in replay
 
     def test_replay_with_empty_fields_rejected(self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="b2")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="b2")
         replay = x402.verify_challenge(
             res["challenge_id"], res["tx_hash"],
             replay_signature="", replay_ts_ms=None)
@@ -154,7 +185,7 @@ class TestWrongSignerRejected:
     def test_attacker_signature_rejected(self, x402_db, monkeypatch):
         victim = Account.create()
         attacker = Account.create()
-        res = _fulfill(x402_db, monkeypatch, victim.address, tx_seed="c1")
+        res = _fulfill(x402_db, monkeypatch, victim, tx_seed="c1")
         cid = res["challenge_id"]
         ts = _now_ms()
         # Attacker knows the challenge_id and signs with their OWN key.
@@ -174,8 +205,8 @@ class TestCrossChallengeReplayRejected:
     def test_sig_for_challenge_a_rejected_on_challenge_b(
             self, x402_db, monkeypatch):
         payer = Account.create()
-        a = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="d1")
-        b = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="d2")
+        a = _fulfill(x402_db, monkeypatch, payer, tx_seed="d1")
+        b = _fulfill(x402_db, monkeypatch, payer, tx_seed="d2")
         ts = _now_ms()
         sig_for_a = _sign(payer, a["challenge_id"], ts)
         replay = x402.verify_challenge(
@@ -210,7 +241,7 @@ class TestBlankPayerWalletRejected:
 class TestStaleTimestampRejected:
     def test_one_hour_old_signature_rejected(self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="f1")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="f1")
         cid = res["challenge_id"]
         stale_ts = _now_ms() - 3_600_000  # 1 hour old
         sig = _sign(payer, cid, stale_ts)
@@ -223,7 +254,7 @@ class TestStaleTimestampRejected:
     def test_future_timestamp_beyond_window_rejected(
             self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="f2")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="f2")
         cid = res["challenge_id"]
         future_ts = _now_ms() + 3_600_000  # 1 hour in the future
         sig = _sign(payer, cid, future_ts)
@@ -235,7 +266,7 @@ class TestStaleTimestampRejected:
 
     def test_malformed_signature_rejected(self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="f3")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="f3")
         replay = x402.verify_challenge(
             res["challenge_id"], res["tx_hash"],
             replay_signature="not-a-signature", replay_ts_ms=_now_ms())
@@ -251,11 +282,18 @@ class TestW102VectorStillBlocked:
     def test_victim_tx_reused_under_attacker_challenge_blocked(
             self, x402_db, monkeypatch):
         victim = Account.create()
-        vres = _fulfill(x402_db, monkeypatch, victim.address, tx_seed="77")
+        vres = _fulfill(x402_db, monkeypatch, victim, tx_seed="77")
         victim_tx = vres["tx_hash"]
 
         attacker = Account.create()
-        ach = x402.create_challenge("agent_task", payer_wallet=attacker.address)
+        ach = x402.create_challenge("agent_task")
+        # The attacker's OWN challenge, properly bound with the
+        # attacker's OWN ownership signature — binding is not what
+        # stops this attack; the tx_hash claim guard is.
+        bound = x402.bind_challenge_payer(
+            ach["challenge_id"], attacker.address,
+            _sign_bind(attacker, ach["challenge_id"], "agent_task"))
+        assert bound.get("ownership_proven") is True, bound
         _mock_onchain_payer(monkeypatch, attacker.address)
         attack = x402.verify_challenge(
             ach["challenge_id"], victim_tx, payer_wallet=attacker.address)
@@ -268,7 +306,7 @@ class TestW102VectorStillBlocked:
         challenge_id and calls verify with NO signature — must no longer
         receive the victim's live token."""
         victim = Account.create()
-        vres = _fulfill(x402_db, monkeypatch, victim.address, tx_seed="78")
+        vres = _fulfill(x402_db, monkeypatch, victim, tx_seed="78")
         attack = x402.verify_challenge(vres["challenge_id"], vres["tx_hash"])
         assert attack == {"ok": False, "error": "replay_auth_failed"}
         assert "access_token" not in attack
@@ -282,7 +320,7 @@ class TestNoSelfDos:
     def test_concurrent_valid_replays_all_succeed(
             self, x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="91")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="91")
         cid = res["challenge_id"]
         token = res["access_token"]
         ts = _now_ms()
@@ -337,12 +375,13 @@ class TestVerifyRoute:
     def test_route_reissues_with_valid_signature(self, billing_client, x402_db,
                                                  monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="r1")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="r1")
         ts = _now_ms()
         sig = _sign(payer, res["challenge_id"], ts)
         resp = billing_client.post("/api/x402/verify", json={
             "challenge_id": res["challenge_id"],
             "tx_hash": res["tx_hash"],
+            "payer_wallet": payer.address,
             "replay_signature": sig,
             "replay_ts_ms": str(ts),
         })
@@ -356,12 +395,13 @@ class TestVerifyRoute:
                                          monkeypatch):
         """replay_ts_ms as a JSON number (not just a string) works."""
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="r3")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="r3")
         ts = _now_ms()
         sig = _sign(payer, res["challenge_id"], ts)
         resp = billing_client.post("/api/x402/verify", json={
             "challenge_id": res["challenge_id"],
             "tx_hash": res["tx_hash"],
+            "payer_wallet": payer.address,
             "replay_signature": sig,
             "replay_ts_ms": ts,
         })
@@ -371,10 +411,11 @@ class TestVerifyRoute:
     def test_route_rejects_replay_without_signature(self, billing_client,
                                                     x402_db, monkeypatch):
         payer = Account.create()
-        res = _fulfill(x402_db, monkeypatch, payer.address, tx_seed="r2")
+        res = _fulfill(x402_db, monkeypatch, payer, tx_seed="r2")
         resp = billing_client.post("/api/x402/verify", json={
             "challenge_id": res["challenge_id"],
             "tx_hash": res["tx_hash"],
+            "payer_wallet": payer.address,
         })
         assert resp.status_code == 400, resp.get_data(as_text=True)
         body = resp.get_json()
