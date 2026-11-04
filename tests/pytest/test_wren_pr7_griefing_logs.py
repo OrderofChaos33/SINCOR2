@@ -26,11 +26,13 @@ Hardhat dev accounts — test-only, never funded.
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 from pathlib import Path
 
 import pytest
 
 import sincor2.rail_routes as rr
+import sincor2.rail_subscriptions as rs
 import sincor2.x402_payments as x402
 from sincor2 import payment_ledger as pl
 
@@ -89,12 +91,14 @@ def rail_app():
     from flask import Flask
 
     from sincor2.blueprints.intake import init_intake_routes
+    from sincor2.rail_delivery import init_rail_delivery_routes
 
     template_dir = Path(__file__).resolve().parents[2] / "templates"
     app = Flask(__name__, template_folder=str(template_dir))
     app.config["TESTING"] = True
     rr.init_rail_routes(app)
     init_intake_routes(app)
+    init_rail_delivery_routes(app)
     return app
 
 
@@ -258,5 +262,207 @@ def test_intake_responses_carry_privacy_headers(rail_env, rail_app):
     _assert_privacy_headers(resp)
 
     resp = client.get(f"/intake/{intake.intake_id}?token=wrong-token")
+    assert resp.status_code == 404
+    _assert_privacy_headers(resp)
+
+
+# ---------------------------------------------------------------------------
+# adversarial-fix round: server-issued subscription challenges must not
+# feed the pack-path per-wallet cap, and issuance itself is throttled
+#
+# The PR 7 claim "the bound count can only be raised by the wallet's
+# owner" was false for SUBSCRIPTION challenges: /rail/checkout with
+# {subscription_plan, payer_wallet: W} server-binds a challenge to W
+# with NO ownership signature (sound for settle — the benefit can only
+# accrue to W — but those rows are indistinguishable in the counter's
+# SQL from EIP-191-bound pack challenges). An attacker naming a victim
+# 100x inflated the victim's bound count and locked the victim out of
+# pack checkout with a 429. The fix: the pack-path counter excludes
+# rail-sub-* resources, subscription issuance reuses a wallet's open
+# challenge for the same plan instead of minting duplicates, and a
+# per-wallet cap (5) bounds open server-issued challenges outright.
+# ---------------------------------------------------------------------------
+
+SUB_PLANS = ("starter", "professional", "enterprise")
+SUB_CAP = 5  # rs.MAX_OPEN_SUB_CHALLENGES_PER_WALLET — see fix comment
+
+
+def _sub_checkout(client, ip, plan, wallet):
+    return client.post(
+        "/rail/checkout",
+        json={"subscription_plan": plan, "payer_wallet": wallet},
+        environ_base={"REMOTE_ADDR": ip})
+
+
+def _seed_server_issued(wallet, resource_id, count):
+    """Mint + server-bind ``count`` challenges for ``wallet`` directly
+    in the x402 store, bypassing issue_renewal_challenge — the state an
+    unthrottled issuance path would accumulate."""
+    ids = []
+    for _ in range(count):
+        minted = x402.create_challenge(resource_id)
+        assert minted.get("challenge_id"), minted
+        bound = x402.bind_server_issued_challenge(
+            minted["challenge_id"], wallet)
+        assert bound.get("ok"), bound
+        ids.append(minted["challenge_id"])
+    return ids
+
+
+def test_subscription_flood_cannot_lock_victim_out_of_pack_checkout(
+        rail_env, rail_app):
+    """100 subscription checkouts naming the VICTIM's wallet (cycling
+    all three plans, from the attacker's IP) must leave the victim's
+    pack-path bound count at ZERO and the victim's own pack checkout
+    working. Pre-fix every one of these mints landed in the victim's
+    bound count — at 100 the victim's pack checkout returned 429."""
+    client = rail_app.test_client()
+    for i in range(100):
+        resp = _sub_checkout(
+            client, ATTACKER_IP, SUB_PLANS[i % len(SUB_PLANS)], VICTIM)
+        assert resp.status_code == 402, resp.get_json()
+        assert resp.get_json()["challenge_id"]
+    # None of the server-issued rows count toward the pack-path cap.
+    assert rr._wallet_open_bound_challenges(VICTIM.lower()) == 0
+    # And the victim can still buy a pack from their own address.
+    resp = _checkout(client, VICTIM_IP, wallet=VICTIM)
+    assert resp.status_code == 402, resp.get_json()
+    assert resp.get_json()["challenge_id"]
+
+
+def test_subscription_issuance_capped_per_wallet(rail_env, rail_app):
+    """A wallet already holding the cap of OPEN server-issued
+    challenges is refused further issuance with the shared 429
+    rate_limited shape — at the issuance choke point and over HTTP.
+    The cap is per-wallet: any other wallet still issues."""
+    assert rs.MAX_OPEN_SUB_CHALLENGES_PER_WALLET == SUB_CAP
+    _seed_server_issued(VICTIM, "rail-sub-starter", SUB_CAP)
+
+    with pytest.raises(rs.RateLimitedError):
+        rs.issue_renewal_challenge(VICTIM, "professional")
+
+    client = rail_app.test_client()
+    resp = _sub_checkout(client, ATTACKER_IP, "professional", VICTIM)
+    assert resp.status_code == 429, resp.get_json()
+    assert resp.get_json()["error"] == "rate_limited"
+    assert resp.get_json()["ok"] is False
+
+    # A different wallet is not collateral damage.
+    resp = _sub_checkout(client, ATTACKER_IP, "professional", PAYER)
+    assert resp.status_code == 402, resp.get_json()
+    assert resp.get_json()["challenge_id"]
+
+
+def test_subscription_reissue_reuses_open_challenge(rail_env, rail_app):
+    """Legitimate flow stays intact — and gets idempotent: a second
+    checkout for the same wallet + plan while the first challenge is
+    still open returns THAT challenge (a page reload or double-click
+    must not pile up duplicate challenges), a different plan issues
+    its own, and the issued challenge is the recorded server-bound
+    issuance settle will require."""
+    client = rail_app.test_client()
+    r1 = _sub_checkout(client, VICTIM_IP, "starter", PAYER)
+    assert r1.status_code == 402, r1.get_json()
+    cid1 = r1.get_json()["challenge_id"]
+    assert cid1
+
+    r2 = _sub_checkout(client, VICTIM_IP, "starter", PAYER)
+    assert r2.status_code == 402, r2.get_json()
+    assert r2.get_json()["challenge_id"] == cid1
+    assert r2.get_json()["payment"] == r1.get_json()["payment"]
+
+    r3 = _sub_checkout(client, VICTIM_IP, "professional", PAYER)
+    assert r3.status_code == 402, r3.get_json()
+    cid3 = r3.get_json()["challenge_id"]
+    assert cid3 and cid3 != cid1
+
+    issued = rs._get_issued(cid1)
+    assert issued is not None
+    assert issued["wallet"] == PAYER.lower()
+    assert issued["plan_id"] == "starter"
+    # Exactly one open server-issued challenge per plan — no duplicates.
+    assert len(rs._open_server_issued_challenges(PAYER.lower())) == 2
+
+
+def test_settled_subscription_challenge_is_never_reused(
+        rail_env, rail_app):
+    """Reuse covers ONLY the never-settled in-flight checkout. Once a
+    challenge has been presented for settlement — a rail_sub_settles
+    row exists, the subscription layer's authoritative journal — it is
+    no longer open, and the next checkout mints a FRESH challenge:
+    re-issuing the settled one would hand the buyer an
+    already_renewed dead end instead of a new billing period (the
+    exact failure the atomic-extend renewal suites caught in the
+    first fix draft, where "open" was judged by the x402 row's
+    status alone)."""
+    client = rail_app.test_client()
+    r1 = _sub_checkout(client, VICTIM_IP, "starter", PAYER)
+    assert r1.status_code == 402, r1.get_json()
+    cid1 = r1.get_json()["challenge_id"]
+    assert cid1
+
+    # Record the settle claim the way _claim_sub_settle does.
+    conn = sqlite3.connect(rail_env["revenue_db"])
+    try:
+        conn.execute(
+            "INSERT INTO rail_sub_settles "
+            "(settle_id, challenge_id, wallet, plan_id, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (f"railsub-{cid1}", cid1, PAYER.lower(), "starter",
+             "2026-11-04T00:00:00+00:00"))
+        conn.commit()
+    finally:
+        conn.close()
+
+    r2 = _sub_checkout(client, VICTIM_IP, "starter", PAYER)
+    assert r2.status_code == 402, r2.get_json()
+    assert r2.get_json()["challenge_id"] != cid1
+
+
+# ---------------------------------------------------------------------------
+# download response headers (HOLE 3): the /download URL is the same
+# class of bearer credential as the intake URL — PR 7's own gunicorn
+# comment names both — so its responses carry the same three headers.
+# ---------------------------------------------------------------------------
+
+DELIVERY_TOKEN = "<MASKED_SECRET_002>"
+DIGITAL_SKU = "digital_bi_template_pack"
+DIGITAL_ASSET = "money_assets/instant_bi_template_pack.md"
+
+
+def _seed_digital_intake(db, intake_id="intake-rail-pr7dl01"):
+    details = {
+        "pack_name": rr.PACK_SKUS[DIGITAL_SKU]["name"],
+        "delivery_token": DELIVERY_TOKEN,
+        "asset": DIGITAL_ASSET,
+        "rail": True,
+    }
+    intake, _is_new = pl.record_pack_intake(
+        db,
+        intake_id=intake_id,
+        customer_email="buyer@example.com",
+        pack_sku=DIGITAL_SKU,
+        event_id="rail-pr7dl01",
+        intake_url=f"https://getsincor.com/download/{intake_id}"
+                   f"?token={DELIVERY_TOKEN}",
+        details=details,
+    )
+    return intake
+
+
+def test_download_responses_carry_privacy_headers(rail_env, rail_app):
+    """The download success response AND the fail-closed 404 carry
+    no-store / noindex / no-referrer, matching the intake treatment:
+    the ?token= URL must not be stored, indexed, or leaked as a
+    referrer. (Pre-fix the 200 carried Cache-Control only.)"""
+    intake = _seed_digital_intake(rail_env["revenue_db"])
+    client = rail_app.test_client()
+
+    resp = client.get(
+        f"/download/{intake.intake_id}?token={DELIVERY_TOKEN}")
+    assert resp.status_code == 200, resp.status_code
+    _assert_privacy_headers(resp)
+
+    resp = client.get(f"/download/{intake.intake_id}?token=wrong-token")
     assert resp.status_code == 404
     _assert_privacy_headers(resp)

@@ -125,6 +125,25 @@ SUB_PLANS: Dict[str, Dict[str, Any]] = {
 # config/x402_pricing.yaml with amount_usdc == price_cents / 100.
 RAIL_SUB_RESOURCE_PREFIX = "rail-sub-"
 
+#: WREN PR 7 (adversarial-fix round): ceiling on OPEN server-issued
+#: challenges per wallet. issue_renewal_challenge() binds challenges
+#: server-side with NO ownership signature and the checkout route is
+#: unauthenticated, so without a ceiling anyone could mint unbounded
+#: bound rows naming any wallet. 5 = one in-flight checkout per plan
+#: (SUB_PLANS has 3) plus headroom for a plan switch / retry race,
+#: while a wallet's open server-issued footprint stays negligible;
+#: rows also expire with the 900s challenge TTL. Same-plan re-issue
+#: REUSES the open challenge (see issue_renewal_challenge), so
+#: legitimate retries never approach this cap — it binds only
+#: cross-plan accumulation and store-seeded rows.
+MAX_OPEN_SUB_CHALLENGES_PER_WALLET = 5
+
+
+class RateLimitedError(Exception):
+    """The wallet already holds MAX_OPEN_SUB_CHALLENGES_PER_WALLET open
+    server-issued challenges. The checkout route renders this as the
+    shared 429 {"ok": false, "error": "rate_limited"} shape."""
+
 # Settle statuses that mean "already done" — a re-settle is acknowledged
 # without re-extending the period.
 _FULFILLED_STATUSES = ("renewed", "upgraded", "downgraded")
@@ -434,12 +453,109 @@ def gate(wallet: str, feature: str):
 
 
 # --- Challenge issuance -------------------------------------------------------
+def _open_server_issued_challenges(wallet: str) -> list[Dict[str, Any]]:
+    """Open server-issued x402 challenges bound to ``wallet`` — the
+    rail-sub-* rows in the x402 challenge store that are still
+    in-flight: pending and unexpired in the store AND never presented
+    for settlement.
+
+    Reads the orders DB directly (the store x402_payments writes),
+    mirroring rail_routes._wallet_open_bound_challenges. Server-issued
+    rows are exactly the rail-sub-* challenges carrying a payer
+    binding: this module is their only minter and it binds every one
+    at issuance via bind_server_issued_challenge.
+
+    "Presented for settlement" is judged by THIS module's settle
+    journal (rail_sub_settles), not by the x402 row's status: the
+    journal is the subscription layer's authoritative record, written
+    by _claim_sub_settle on the first settle attempt, while the x402
+    status flip belongs to verify_challenge — an external boundary
+    the settle path is explicitly designed to treat as replaceable.
+    A challenge with a settle row is spoken for (settled, or mid
+    crash-repair on that same challenge id) and is never re-issued or
+    counted as open again.
+    """
+    from sincor2.data_paths import orders_db_path
+
+    db_path = orders_db_path()
+    if not db_path.exists():
+        return []
+    conn = sqlite3.connect(str(db_path), timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = [dict(r) for r in conn.execute(
+            """SELECT challenge_id, resource_id, expires_at
+               FROM x402_challenges
+               WHERE LOWER(payer_wallet) = ? AND status = 'pending'
+                 AND expires_at > ? AND resource_id LIKE ?""",
+            (wallet, _utc_now_iso(), f"{RAIL_SUB_RESOURCE_PREFIX}%"),
+        ).fetchall()]
+    finally:
+        conn.close()
+    if not rows:
+        return rows
+    conn = _connect()
+    try:
+        marks = ",".join("?" for _ in rows)
+        settled = {r[0] for r in conn.execute(
+            f"SELECT challenge_id FROM rail_sub_settles "
+            f"WHERE challenge_id IN ({marks})",
+            [r["challenge_id"] for r in rows])}
+    finally:
+        conn.close()
+    return [r for r in rows if r["challenge_id"] not in settled]
+
+
+def _server_issued_response(plan: str, expected_usdc: float,
+                            resource: Dict[str, Any], resource_id: str,
+                            challenge_id: str,
+                            expires_at: str) -> Dict[str, Any]:
+    """The issue_renewal_challenge() return shape for an EXISTING open
+    challenge (the reuse path). payment/bind/message are rebuilt with
+    the same constructors create_challenge() uses, so a reused
+    challenge's checkout response matches a fresh mint's field for
+    field. The bind block mirrors x402_payments.create_challenge's
+    verbatim — advisory only here: the challenge is already
+    server-bound, so no client bind step follows from it."""
+    from sincor2 import x402_payments as x402
+
+    return {
+        "ok": False,
+        "plan_id": plan,
+        "plan_name": SUB_PLANS[plan]["name"],
+        "amount_usdc": expected_usdc,
+        "challenge_id": challenge_id,
+        "resource_id": resource_id,
+        "expires_at": expires_at,
+        "payment": x402.build_payment_payload(
+            resource, resource_id, challenge_id),
+        "bind": {
+            "bind_url": "/api/x402/challenge-bind",
+            "sign_message_format": (
+                "SINCOR-X402-CHALLENGE-BIND|<challenge_id>|<resource_id>|"
+                "<payer_wallet_lowercase> — sign with EIP-191 personal_sign "
+                "using the payer wallet, then POST "
+                "{challenge_id, payer_wallet, signature} to "
+                "/api/x402/challenge-bind"
+            ),
+        },
+        "message": (
+            f"Send {resource['amount_display']} {resource['token']} "
+            f"to {resource['treasury']} on Base after binding your wallet"
+        ),
+    }
+
+
 def issue_renewal_challenge(wallet: str, plan_id: str) -> Dict[str, Any]:
     """Mint an x402 challenge for one billing period of ``plan_id``.
 
     Raises ValueError on unknown plan / bad wallet (fail closed, no
     challenge minted); RuntimeError when the server-side resource or
-    price config is missing or drifted (never mis-charge).
+    price config is missing or drifted (never mis-charge);
+    RateLimitedError when the wallet already holds
+    MAX_OPEN_SUB_CHALLENGES_PER_WALLET open server-issued challenges.
+    A re-issue for a plan whose challenge is still open returns that
+    challenge instead of minting a duplicate.
     """
     from sincor2 import x402_payments as x402
 
@@ -462,6 +578,30 @@ def issue_renewal_challenge(wallet: str, plan_id: str) -> Dict[str, Any]:
             "[RAIL-SUB] price config drift for %s: SUB_PLANS=%s vs yaml=%s",
             plan, expected_usdc, resource["amount_usdc"])
         raise RuntimeError("subscription_price_mismatch")
+
+    # WREN PR 7 (adversarial-fix round): throttle server-side issuance.
+    # This mint+bind needs no ownership signature and checkout is
+    # unauthenticated, so a wallet's open server-issued rows are
+    # capped (MAX_OPEN_SUB_CHALLENGES_PER_WALLET). A re-issue for a
+    # plan whose challenge is still open returns THAT challenge
+    # instead of minting a duplicate — a page reload, double-click, or
+    # client retry is the same in-flight checkout, not a new one.
+    open_rows = _open_server_issued_challenges(w)
+    for row in open_rows:
+        if row["resource_id"] == resource_id:
+            logger.info(
+                "[RAIL-SUB] reusing open challenge %s for wallet %s "
+                "plan %s", row["challenge_id"], w, plan)
+            return _server_issued_response(
+                plan, expected_usdc, resource, resource_id,
+                row["challenge_id"], row["expires_at"])
+    if len(open_rows) >= MAX_OPEN_SUB_CHALLENGES_PER_WALLET:
+        logger.warning(
+            "[RAIL-SUB] issuance refused: wallet %s holds %d open "
+            "server-issued challenges (cap %d)",
+            w, len(open_rows), MAX_OPEN_SUB_CHALLENGES_PER_WALLET)
+        raise RateLimitedError(
+            "too many open subscription challenges for wallet")
 
     challenge = x402.create_challenge(resource_id)
     challenge_id = challenge.get("challenge_id")

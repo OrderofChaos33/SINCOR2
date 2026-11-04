@@ -21,6 +21,12 @@ with user input. The asset read is additionally confined under
 money_assets/ (defense in depth against any future allowlist change).
 Successful downloads carry ``Cache-Control: no-store`` and a
 ``Content-Disposition: attachment`` header naming the delivered file.
+Every response from this blueprint — the 200 above and the fail-closed
+404s alike — additionally carries ``X-Robots-Tag: noindex`` and
+``Referrer-Policy: no-referrer`` via the after_request hook below: the
+token-bearing URL must never be stored, indexed, or leaked to a third
+party as a referrer (the same treatment the intake blueprint gives its
+token-bearing URLs).
 """
 
 from __future__ import annotations
@@ -33,6 +39,21 @@ from flask import Blueprint, Response, abort, request
 logger = logging.getLogger("sincor.rail_delivery")
 
 rail_delivery_bp = Blueprint("rail_digital_delivery", __name__)
+
+
+@rail_delivery_bp.after_request
+def _download_privacy_headers(response):
+    """WREN PR 7 (adversarial-fix round): stamp anti-storage/anti-leak
+    headers on EVERY download response (the asset 200 and the
+    fail-closed 404s alike), mirroring the intake blueprint's hook.
+    The download URL carries the delivery token as a query parameter,
+    so responses must never be cached (no-store), never indexed
+    (noindex), and never leak the URL to a third party as a referrer
+    (no-referrer)."""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 def _repo_root() -> Path:
