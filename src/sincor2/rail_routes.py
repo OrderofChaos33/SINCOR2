@@ -180,7 +180,10 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
     publish that was abandoned at its deadline but eventually landed
     after the fallback already ran the kickoff — loses the transition
     and returns an 'already_ran' receipt WITHOUT instantiating the
-    agent a second time.
+    agent a second time. A buyer-first delivery (the buyer completed
+    intake before this job ran) wins the execution claim instead:
+    intake completion alone is not proof the kickoff ran, so the job
+    still executes (Wren PR 8 / #600, founder ruling 2026-11-04).
     """
     from sincor2.payment_ledger import update_pack_intake_status
 
@@ -218,6 +221,11 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
         "agent_kickoff",
         details={"agent": agent_info, "customer_email": customer_email},
     )
+    # A buyer-first execution claim (if this run held one) has done
+    # its job: the completion write above — specifically its 'agent'
+    # key — is now the durable proof the kickoff executed. The
+    # marker itself stays in details as an audit timestamp.
+    _kickoff_execution_claims.pop(intake_id, None)
     logger.info(
         "[FULFILLMENT] pack agent kickoff: intake=%s pack=%s agent=%s",
         intake_id, pack_sku, (agent_info or {}).get("agent"),
@@ -776,18 +784,46 @@ def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
 
 # Pack-intake lifecycle (payment_ledger.pack_intakes.status):
 # created -> kickoff_claimed -> agent_kickoff -> intake_complete ->
-# in_progress -> delivered. The agent_kickoff write is the pack-agent
-# job's OWN final step, so a row sitting at agent_kickoff or beyond
-# is proof the kickoff executed — no matter what the queue reported
-# afterwards. kickoff_claimed (WREN PR 10 repair round 2) is the
-# atomic enqueue claim: exactly one _queue_pack_agent_job caller may
-# transition a row out of 'created', and only that caller enqueues;
-# the worker gate (_begin_pack_kickoff) transitions the claimed (or
-# freshly created) row into agent_kickoff before executing, so a
-# duplicate delivery can never execute the kickoff a second time.
+# in_progress -> delivered. Two progressions share this one status
+# column: the kickoff progression (created -> kickoff_claimed ->
+# agent_kickoff, driven by the queue/worker machinery) and the
+# buyer/admin progression (intake_complete -> in_progress ->
+# delivered). The buyer's intake POST advances a row straight from
+# created (or kickoff_claimed) to intake_complete, so a row sitting
+# at intake_complete or beyond is NOT by itself proof the kickoff
+# executed — see _kickoff_execution_proven for the evidence rule
+# (the #600 false positive, founder ruling 2026-11-04).
+# kickoff_claimed (WREN PR 10 repair round 2) is the atomic enqueue
+# claim: exactly one _queue_pack_agent_job caller may transition a
+# row out of 'created', and only that caller enqueues; the worker
+# gate (_begin_pack_kickoff) transitions the claimed (or freshly
+# created) row into agent_kickoff before executing, so a duplicate
+# delivery can never execute the kickoff a second time.
 _PACK_KICKOFF_DONE_STATUSES = frozenset({
     "agent_kickoff", "intake_complete", "in_progress", "delivered",
 })
+
+
+def _kickoff_execution_proven(status, details) -> bool:
+    """Positive evidence the pack-agent kickoff body already executed.
+
+    'agent_kickoff' is the kickoff's OWN status — the worker gate
+    moves the row there before executing and the completion write
+    lands there — so a row sitting at agent_kickoff is proof on its
+    own. The later lifecycle statuses are NOT: the buyer's intake
+    POST advances a row straight from created (or kickoff_claimed)
+    to intake_complete, so a row can sit at intake_complete — or
+    beyond, once an admin starts work — with the kickoff never
+    having run. For those statuses the proof is the kickoff
+    completion write's own marker: the 'agent' key it merges into
+    details (fulfill_pack_agent's completion write is the only
+    write that ever sets that key).
+    """
+    if status == "agent_kickoff":
+        return True
+    if status in _PACK_KICKOFF_DONE_STATUSES:
+        return "agent" in (details or {})
+    return False
 
 
 def _pack_kickoff_already_ran(intake_id: str) -> bool:
@@ -799,24 +835,19 @@ def _pack_kickoff_already_ran(intake_id: str) -> bool:
     ran. In both shapes a blind fallback / re-settle enqueue would
     execute the kickoff a second time for one payment, so callers
     check the row — the execution record — before enqueueing again.
-    Never raises: a failed check degrades to 'not proven run' and the
-    kickoff's convergent status write remains the second line of
-    defense.
+    The check is _kickoff_execution_proven: lifecycle position past
+    agent_kickoff counts only with the completion marker, because a
+    buyer who finished intake first parks the row at intake_complete
+    with the kickoff never having run (#600). Never raises: a failed
+    check degrades to 'not proven run' and the kickoff's convergent
+    status write remains the second line of defense.
     """
     if not intake_id:
         return False
-    try:
-        from sincor2.payment_ledger import get_pack_intake
-
-        intake = get_pack_intake(_rail_db_path(), intake_id)
-    except Exception:
-        logger.warning(
-            "[FULFILLMENT] kickoff-state check failed for intake=%s — "
-            "treating the kickoff as not-yet-run", intake_id,
-            exc_info=True)
+    status, details = _pack_intake_state(intake_id)
+    if status is None or status is _STATUS_UNKNOWN:
         return False
-    return bool(intake is not None
-                and intake.status in _PACK_KICKOFF_DONE_STATUSES)
+    return _kickoff_execution_proven(status, details)
 
 
 def _existing_pack_job_ref(intake_id: str) -> str:
@@ -885,23 +916,41 @@ def _try_claim_pack_kickoff(intake_id: str) -> bool:
     not depend on it) drives orphan-claim staleness."""
     if not intake_id:
         return False
-    from sincor2.payment_ledger import transition_pack_intake_status_if
+    from sincor2.payment_ledger import (
+        transition_pack_intake_status_if,
+        update_pack_intake_status,
+    )
 
-    details = None
-    status, current = _pack_intake_state(intake_id)
-    if status == "created":
-        details = dict(current)
-        details["kickoff_claimed_at"] = _utc_now_iso()
     try:
-        return transition_pack_intake_status_if(
+        claimed = transition_pack_intake_status_if(
             _rail_db_path(), intake_id,
             from_statuses=("created",),
-            to_status=_KICKOFF_CLAIMED_STATUS, details=details)
+            to_status=_KICKOFF_CLAIMED_STATUS)
     except Exception:
         logger.warning(
             "[FULFILLMENT] kickoff claim failed for intake=%s",
             intake_id, exc_info=True)
         return False
+    if claimed:
+        # Stamp the claim time by MERGING it through the ledger's
+        # read-merge-write helper (Wren PR 8). The previous shape
+        # pre-merged a snapshot read BEFORE the transition and
+        # passed it back as the transition's details — which the
+        # transition then wrote as a wholesale REPLACE: any key a
+        # concurrent writer merged between the read and the claim
+        # (the intake token binding, the buyer's answers) was
+        # silently dropped. A status-only transition plus a merge
+        # keeps the claim atomic AND every existing key intact.
+        try:
+            update_pack_intake_status(
+                _rail_db_path(), intake_id, _KICKOFF_CLAIMED_STATUS,
+                details={"kickoff_claimed_at": _utc_now_iso()})
+        except Exception:
+            logger.warning(
+                "[FULFILLMENT] kickoff claim timestamp merge failed "
+                "for intake=%s (the claim itself stands)",
+                intake_id, exc_info=True)
+    return claimed
 
 
 def _release_pack_kickoff_claim(intake_id: str) -> bool:
@@ -924,12 +973,13 @@ def _release_pack_kickoff_claim(intake_id: str) -> bool:
         return False
 
 
-def _kickoff_claim_is_stale(details: Dict[str, Any]) -> bool:
+def _kickoff_claim_is_stale(details: Dict[str, Any],
+                            key: str = "kickoff_claimed_at") -> bool:
     """True when a kickoff claim is old enough to presume orphaned.
     A missing/unparseable claim timestamp counts as stale: orphan
     safety beats double-enqueue risk because the worker gate still
     guarantees at-most-once execution across a reclaim."""
-    claimed_at = details.get("kickoff_claimed_at")
+    claimed_at = details.get(key)
     if not claimed_at:
         return True
     try:
@@ -958,7 +1008,7 @@ def _acquire_pack_kickoff_claim(intake_id: str) -> str:
     if _pack_kickoff_already_ran(intake_id):
         return "already"
     status, details = _pack_intake_state(intake_id)
-    if status in _PACK_KICKOFF_DONE_STATUSES:
+    if _kickoff_execution_proven(status, details):
         return "already"
     if status == _KICKOFF_CLAIMED_STATUS:
         if _kickoff_claim_is_stale(details):
@@ -992,7 +1042,11 @@ def _begin_pack_kickoff(intake_id: str):
     atomic transition into agent_kickoff (from kickoff_claimed, or
     from created for a directly delivered job) and may execute; if
     the kickoff body then fails, _release_pack_kickoff_run hands the
-    consumed status back so a retry can execute. 'already': the
+    consumed status back so a retry can execute. A buyer-first row
+    (already at intake_complete or beyond, kickoff never ran) begins
+    instead via the execution claim (_claim_pack_kickoff_execution):
+    prior_status is then the row's lifecycle status, no status is
+    consumed, and the release hands the claim back. 'already': the
     kickoff provably executed, is claimed by a queue operation whose
     own delivery will execute it, or the state is unprovable — this
     delivery must NOT execute. 'legacy': no gate applies (missing
@@ -1018,10 +1072,21 @@ def _begin_pack_kickoff(intake_id: str):
             "[FULFILLMENT] kickoff execution gate failed for "
             "intake=%s — declining to execute", intake_id, exc_info=True)
         return "already", None
-    status, _details = _pack_intake_state(intake_id)
-    if (status in _PACK_KICKOFF_DONE_STATUSES
-            or status == _KICKOFF_CLAIMED_STATUS
+    status, details = _pack_intake_state(intake_id)
+    if (status == _KICKOFF_CLAIMED_STATUS
             or status is _STATUS_UNKNOWN):
+        return "already", None
+    if _kickoff_execution_proven(status, details):
+        return "already", None
+    if status in _POST_KICKOFF_STATUSES:
+        # Buyer-first row (#600): finishing intake advanced the row
+        # past agent_kickoff without the kickoff ever running, so
+        # lifecycle position proves nothing either way. Claim the
+        # execution atomically — exactly one delivery executes; the
+        # rest see the fresh claim (or, later, the completion
+        # marker) and stand down.
+        if _claim_pack_kickoff_execution(intake_id, details):
+            return "begun", status
         return "already", None
     return "legacy", None
 
@@ -1031,7 +1096,11 @@ def _release_pack_kickoff_run(intake_id: str,
     """Undo a worker-gate begin after the kickoff body failed:
     agent_kickoff -> the status the gate consumed ('created' or
     'kickoff_claimed'), so a retry delivery can execute instead of
-    the failed run being mistaken for a completed kickoff."""
+    the failed run being mistaken for a completed kickoff. For a
+    buyer-first begin no status was consumed: the execution claim
+    is handed back instead (_release_pack_kickoff_execution)."""
+    if prior_status in _POST_KICKOFF_STATUSES:
+        return _release_pack_kickoff_execution(intake_id)
     if prior_status not in ("created", _KICKOFF_CLAIMED_STATUS):
         return False
     from sincor2.payment_ledger import transition_pack_intake_status_if
@@ -1044,6 +1113,111 @@ def _release_pack_kickoff_run(intake_id: str,
         logger.warning(
             "[FULFILLMENT] kickoff run release failed for intake=%s",
             intake_id, exc_info=True)
+        return False
+
+
+# --- Wren PR 8: execution claim for buyer-first rows (#600) ----------
+#
+# When the buyer completes intake before the kickoff job runs, the
+# row already sits at intake_complete (or beyond) and the worker
+# gate cannot claim execution with a status transition — the status
+# only moves forward and agent_kickoff is behind it. The claim is
+# instead a compare-and-swap on a details marker: one conditional
+# UPDATE stamps kickoff_execution_claimed_at iff the stored marker
+# still equals the value the caller just read (absent, or stale
+# enough to presume orphaned — a worker that died mid-body without
+# releasing). Exactly one concurrent delivery can win it, json_set
+# merges the single key so no existing details key is ever dropped,
+# and once the body completes, the completion write's 'agent' key
+# is the durable proof the claim no longer needs to provide.
+
+_KICKOFF_EXECUTION_CLAIM_KEY = "kickoff_execution_claimed_at"
+
+# This process's live execution claims (intake_id -> stamped ts), so
+# a failed body releases exactly its own claim and never a later
+# delivery's fresher one.
+_kickoff_execution_claims: Dict[str, str] = {}
+
+_POST_KICKOFF_STATUSES = ("intake_complete", "in_progress", "delivered")
+
+
+def _claim_pack_kickoff_execution(intake_id: str,
+                                  details: Dict[str, Any]) -> bool:
+    """Atomically claim kickoff execution for a buyer-first row.
+
+    True iff THIS delivery stamped the claim marker. A fresh marker
+    from another delivery, or the completion write's 'agent' marker,
+    refuses the claim (checked again inside the UPDATE, so the
+    answer stays correct under races). A stale marker is
+    reclaimable: the CAS compares against the exact value read, so
+    two reclaimers still produce exactly one winner.
+    """
+    observed = (details or {}).get(_KICKOFF_EXECUTION_CLAIM_KEY)
+    if observed is not None and not _kickoff_claim_is_stale(
+            details, key=_KICKOFF_EXECUTION_CLAIM_KEY):
+        return False
+    new_ts = _utc_now_iso()
+    placeholders = ",".join("?" for _ in _POST_KICKOFF_STATUSES)
+    try:
+        conn = _connect_rail()
+        try:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET details = json_set("
+                "CASE WHEN json_valid(details) THEN details "
+                "ELSE '{}' END, '$.' || ?, ?) "
+                "WHERE intake_id = ? "
+                f"AND status IN ({placeholders}) "
+                "AND (CASE WHEN json_valid(details) THEN "
+                "COALESCE(json_extract(details, '$.' || ?), '') "
+                "ELSE '' END) = ? "
+                "AND (NOT json_valid(details) OR "
+                "json_extract(details, '$.agent') IS NULL)",
+                (_KICKOFF_EXECUTION_CLAIM_KEY, new_ts, intake_id,
+                 *_POST_KICKOFF_STATUSES,
+                 _KICKOFF_EXECUTION_CLAIM_KEY, str(observed or "")),
+            )
+            conn.commit()
+            won = cur.rowcount == 1
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution claim failed for "
+            "intake=%s — declining to execute", intake_id,
+            exc_info=True)
+        return False
+    if won:
+        _kickoff_execution_claims[intake_id] = new_ts
+    return won
+
+
+def _release_pack_kickoff_execution(intake_id: str) -> bool:
+    """Undo this process's execution claim after the kickoff body
+    failed: remove the marker, CAS-guarded on the exact timestamp
+    this process stamped, so a fresher claim from a later delivery
+    is never cleared by a stale failure."""
+    claimed_ts = _kickoff_execution_claims.pop(intake_id, None)
+    if not claimed_ts:
+        return False
+    try:
+        conn = _connect_rail()
+        try:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET details = "
+                "json_remove(details, '$.' || ?) "
+                "WHERE intake_id = ? AND json_valid(details) "
+                "AND json_extract(details, '$.' || ?) = ?",
+                (_KICKOFF_EXECUTION_CLAIM_KEY, intake_id,
+                 _KICKOFF_EXECUTION_CLAIM_KEY, claimed_ts),
+            )
+            conn.commit()
+            return cur.rowcount == 1
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution claim release failed "
+            "for intake=%s", intake_id, exc_info=True)
         return False
 
 
@@ -1194,9 +1368,13 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     and re-queueable rather than failing a verified payment.
 
     At-most-once (WREN PR 10 repair): if the pack-intake row already
-    proves the kickoff executed for this payment (agent_kickoff or
-    beyond), return the existing-execution reference without
-    enqueueing — a re-settle must never run the kickoff twice.
+    proves the kickoff executed for this payment (agent_kickoff, or a
+    later status carrying the completion write's 'agent' marker —
+    see _kickoff_execution_proven), return the existing-execution
+    reference without enqueueing — a re-settle must never run the
+    kickoff twice. A row the buyer advanced to intake_complete
+    WITHOUT the kickoff having run is not proof (#600): it takes the
+    claim flow below and the kickoff still gets its one execution.
 
     Atomic claim (repair round 2): the enqueue decision is the
     created -> kickoff_claimed transition (see
@@ -1472,9 +1650,10 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                             _rail_db_path(),
                             event_id or "unknown",
                             "pack_email_failed",
-                            "Pack email failed for %s: %s"
-                            % (customer_email, email_exc),
+                            "Pack email failed for intake %s: %s"
+                            % (intake.intake_id, email_exc),
                             details={"pack_sku": pack_sku,
+                                     "intake_id": intake.intake_id,
                                      "retryable": True, "rail": True},
                         )
                     except Exception as alert_exc:

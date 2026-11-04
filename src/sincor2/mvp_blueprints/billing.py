@@ -1328,10 +1328,14 @@ def _paid_skill_dispatch(resource_id):
         toa_payload = _skill_request_payload(strip_wallet=True)
         status, body = serve_toa_micro_decision(toa_payload)
         return status, body
-    payload = request.get_json(silent=True)
-    if payload is None:
-        payload = request.args.to_dict(flat=True)
-        payload.pop('access_token', None)
+    # Default branch (Wren PR 8): route through the same
+    # transport-stripping as every named branch. The previous shape
+    # stripped nothing from JSON bodies and popped only an
+    # exact-case 'access_token' from args payloads, so a replayed
+    # serve could carry transport keys (or case variants) into
+    # execute_paid_resource. 'wallet' is preserved (strip_wallet
+    # off): for unlisted resources it may be a domain field.
+    payload = _skill_request_payload(strip_wallet=False)
     status, body = execute_paid_resource(resource_id, payload)
     return status, body
 

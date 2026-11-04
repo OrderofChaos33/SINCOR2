@@ -175,8 +175,31 @@ def postal_address() -> str:
 # Signed unsubscribe tokens (HMAC over the email; fail closed)
 # ---------------------------------------------------------------------------
 
+def _production_env() -> bool:
+    """True unless the environment explicitly declares a
+    non-production profile — the codebase convention (a2a_inbound)
+    is that an unset FLASK_ENV/ENVIRONMENT means production."""
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT")
+           or "production").strip().lower()
+    return env not in ("test", "testing", "dev", "development", "local")
+
+
 def _token_secret() -> Optional[bytes]:
-    for var in ("UNSUBSCRIBE_TOKEN_SECRET", "SECRET_KEY", "JWT_SECRET_KEY"):
+    """Secret for unsubscribe tokens.
+
+    In production ONLY the dedicated UNSUBSCRIBE_TOKEN_SECRET counts
+    (Wren PR 8): falling back to the app/JWT secret there would let
+    anyone holding those broadly-shared secrets mint unsubscribe
+    tokens for arbitrary addresses. Outside production the fallback
+    chain stays for local/dev convenience. No usable secret -> None,
+    and token minting/verification fail closed.
+    """
+    dedicated = os.environ.get("UNSUBSCRIBE_TOKEN_SECRET", "").strip()
+    if dedicated:
+        return dedicated.encode("utf-8")
+    if _production_env():
+        return None
+    for var in ("SECRET_KEY", "JWT_SECRET_KEY"):
         val = os.environ.get(var, "").strip()
         if val:
             return val.encode("utf-8")

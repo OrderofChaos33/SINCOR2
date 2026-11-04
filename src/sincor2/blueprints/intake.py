@@ -433,16 +433,65 @@ def intake_submit(intake_id):
     if error_body is not None:
         return jsonify(error_body), error_status
 
-    from sincor2.payment_ledger import update_pack_intake_status
+    from sincor2.payment_ledger import (
+        get_pack_intake,
+        transition_pack_intake_status_if,
+        update_pack_intake_status,
+    )
 
-    # The owner notification keys off the ledger write's own atomic
-    # transition signal — not the status this request happened to
-    # read beforehand. Under concurrent first POSTs every request can
-    # observe the pre-completion record, but only the one whose write
-    # actually advanced the record into intake_complete is told so,
-    # and only that one notifies.
-    advanced = update_pack_intake_status(
-        _intake_db_path(), intake.intake_id, "intake_complete",
+    # Expected-status guard (Wren PR 8): the locked pre-check above
+    # read the record's status BEFORE validation, but a concurrent
+    # admin action can advance the record to in_progress/delivered
+    # in between — and the plain status write would still merge
+    # these answers onto the locked record (its forward-only guard
+    # protects the status, never the details). So the completion is
+    # claimed atomically: the record may enter intake_complete only
+    # from a writable status, and the conditional UPDATE's rowcount
+    # — not the earlier read — is the decision.
+    #
+    # The owner notification keeps keying off the atomic signal, as
+    # it did off the status write's return value: under concurrent
+    # first POSTs every request can observe the pre-completion
+    # record, but only the one whose transition actually advanced
+    # the record into intake_complete notifies.
+    db_path = _intake_db_path()
+    advanced = transition_pack_intake_status_if(
+        db_path, intake.intake_id,
+        from_statuses=("created", "kickoff_claimed", "agent_kickoff"),
+        to_status="intake_complete")
+    if not advanced:
+        # Already intake_complete: an idempotent re-submit is still
+        # writable — the self-transition proves the CURRENT status
+        # atomically. It never notifies (the first completion did).
+        resubmitted = transition_pack_intake_status_if(
+            db_path, intake.intake_id,
+            from_statuses=("intake_complete",),
+            to_status="intake_complete")
+        if not resubmitted:
+            current = get_pack_intake(db_path, intake.intake_id)
+            current_status = current.status if current is not None else None
+            if (current_status is None
+                    or _STATUS_RANK.get(current_status, 0)
+                    >= _IN_PROGRESS_RANK):
+                # An admin locked the record between the pre-check
+                # and this write: refuse, exactly like the pre-check
+                # — and write nothing.
+                return jsonify({
+                    "ok": False, "error": "intake_locked",
+                    "status": current_status or intake.status}), 409
+            # An unranked legacy status: writable under the old rules
+            # and no admin action produces one, so keep the previous
+            # write path (and its notify signal) for those rows.
+            advanced = update_pack_intake_status(
+                db_path, intake.intake_id, "intake_complete",
+                details={"intake_answers": answers})
+            logger.info("[INTAKE] intake %s completed (sku=%s)",
+                        intake.intake_id, intake.pack_sku)
+            if advanced:
+                _notify_owner(intake)
+            return jsonify({"ok": True, "status": "intake_complete"}), 200
+    update_pack_intake_status(
+        db_path, intake.intake_id, "intake_complete",
         details={"intake_answers": answers})
     logger.info("[INTAKE] intake %s completed (sku=%s)",
                 intake.intake_id, intake.pack_sku)
