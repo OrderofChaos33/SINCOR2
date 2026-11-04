@@ -380,25 +380,33 @@ ACTIONS: Dict[str, Dict[str, object]] = {
         "notes": "Generic payment-provider webhook intake.",
     },
     "crypto_create_checkout": {
-        "entry_point": "src/sincor2/mvp_blueprints/billing.py:840",
+        "entry_point": "src/sincor2/mvp_blueprints/billing.py:2115",
         "http": "POST /api/crypto/checkout",
         "auth": ["none"],
-        "side_effects": "write-local",
-        "risk_tier": "high",
-        "reversibility": "reversible",
+        "side_effects": "none",
+        "risk_tier": "low",
+        "reversibility": "n/a",
         "domain": "payments",
-        "notes": "Creates an onchain crypto checkout intent.",
+        "notes": "RETIRED 2026-11-04 (Wren PR 3): returns 410 Gone "
+                 "{error: use_rail_checkout} unconditionally, regardless "
+                 "of BASE_PAYMENT_ADDRESS or request parameters. Never "
+                 "persists a checkout expectation. The rail checkout is "
+                 "the only supported payment path.",
     },
     "crypto_verify_payment": {
-        "entry_point": "src/sincor2/mvp_blueprints/billing.py:904",
+        "entry_point": "src/sincor2/mvp_blueprints/billing.py:2293",
         "http": "POST /api/crypto/verify-payment",
         "auth": ["none"],
-        "side_effects": "write-local",
-        "risk_tier": "critical",
-        "reversibility": "irreversible",
+        "side_effects": "none",
+        "risk_tier": "low",
+        "reversibility": "n/a",
         "domain": "payments",
-        "notes": "Verifies claimed onchain payment and provisions access. "
-                 "Grants value; mis-verification is a money-path risk.",
+        "notes": "RETIRED 2026-11-04 (Wren PR 3): returns 410 Gone "
+                 "{error: use_rail_checkout} unconditionally. The legacy "
+                 "direct-verify path — fulfillment on a caller-claimed "
+                 "tx_hash whenever BASE_PAYMENT_ADDRESS was set — no "
+                 "longer exists; settlement runs only through the rail "
+                 "flow. Never creates an order or fulfillment record.",
     },
     "cancel_subscription": {
         "entry_point": "src/sincor2/mvp_blueprints/billing.py:1032",

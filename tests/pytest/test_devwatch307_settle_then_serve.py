@@ -371,10 +371,13 @@ MATRIX = [
      {"json": {"challenge_id": "no-such-challenge",
                "tx_hash": TX_OK, "payer_wallet": PAYER}},
      (400, 402), ("access_token",)),
+    # RETIRED 2026-11-04 (founder-approved, Wren PR 3): the legacy
+    # direct-verify route now answers 410 Gone to every caller, paid
+    # or not — it serves no content and settles nothing, ever.
     ("static", "POST", "/api/crypto/verify-payment",
      {"json": {"payment_id": "p1", "tx_hash": TX_OK,
                "email": "buyer@example.com", "amount": 10}},
-     (402, 503), ("order_id",)),
+     (410,), ("order_id",)),
     # wildcard — must not become a content side-channel
     ("wildcard", "GET", "/guides/some/retired/deep/link", {}, (301, 302),
      ()),
