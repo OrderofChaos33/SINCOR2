@@ -55,6 +55,20 @@ logger = logging.getLogger("sincor.rail_intake")
 
 intake_bp = Blueprint("rail_intake", __name__)
 
+
+@intake_bp.after_request
+def _intake_privacy_headers(response):
+    """WREN PR 7: stamp anti-storage/anti-leak headers on EVERY intake
+    response (form page, submit JSON, and error responses alike). The
+    intake URL carries the buyer's access token as a query parameter,
+    so responses must never be cached (no-store), never indexed
+    (noindex), and never leak the URL to a third party as a referrer
+    (no-referrer)."""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
 # --- Per-SKU intake fields ---------------------------------------------------
 # Field names verified against the pack definitions in rail_routes
 # (PACK_SKUS) and the directive's field sets. Every pack collects the
