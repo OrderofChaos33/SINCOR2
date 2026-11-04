@@ -1208,19 +1208,23 @@ def _x402_paid_resource_leader(resource_id, token, access_granted):
 
 
 #: x402 transport keys: fields the payment layer itself put in the
-#: buyer's request (the token, the payer binding). They are never
+#: buyer's request (the token, the payer binding, and the W-103
+#: replay proof a recovery re-serve carries). They are never
 #: domain input to a skill handler.
-_TRANSPORT_KEYS = frozenset({'access_token', 'payer_wallet'})
+_TRANSPORT_KEYS = frozenset({
+    'access_token', 'payer_wallet',
+    'replay_signature', 'replay_ts_ms',
+})
 
 
 def _strip_transport_keys(payload, strip_wallet=False):
     """Copy of ``payload`` without the x402 transport keys.
 
-    Removes ``access_token`` and ``payer_wallet`` case-insensitively
-    (a replayed serve re-sends them in whatever case the buyer's
-    client kept), plus ``wallet`` when ``strip_wallet`` is set.
-    Non-dict payloads pass through unchanged — the handlers reject
-    those themselves.
+    Removes ``access_token``, ``payer_wallet``, ``replay_signature``
+    and ``replay_ts_ms`` case-insensitively (a replayed serve
+    re-sends them in whatever case the buyer's client kept), plus
+    ``wallet`` when ``strip_wallet`` is set. Non-dict payloads pass
+    through unchanged — the handlers reject those themselves.
     """
     if not isinstance(payload, dict):
         return payload

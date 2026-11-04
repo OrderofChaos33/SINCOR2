@@ -39,7 +39,8 @@ import os
 import re
 import sqlite3
 import threading
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -224,8 +225,9 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
     # A buyer-first execution claim (if this run held one) has done
     # its job: the completion write above — specifically its 'agent'
     # key — is now the durable proof the kickoff executed. The
-    # marker itself stays in details as an audit timestamp.
-    _kickoff_execution_claims.pop(intake_id, None)
+    # marker itself stays in details as an audit timestamp; forget
+    # this run's claim registration so its heartbeat stands down.
+    _forget_kickoff_execution_claim(intake_id)
     logger.info(
         "[FULFILLMENT] pack agent kickoff: intake=%s pack=%s agent=%s",
         intake_id, pack_sku, (agent_info or {}).get("agent"),
@@ -1135,10 +1137,28 @@ def _release_pack_kickoff_run(intake_id: str,
 
 _KICKOFF_EXECUTION_CLAIM_KEY = "kickoff_execution_claimed_at"
 
-# This process's live execution claims (intake_id -> stamped ts), so
-# a failed body releases exactly its own claim and never a later
-# delivery's fresher one.
-_kickoff_execution_claims: Dict[str, str] = {}
+# This process's live execution claims: intake_id -> {the timestamp
+# a claim was WON under: the marker timestamp that claim currently
+# holds}. Keyed by winning timestamp because a release must be
+# strictly ownership-checked (adversarial fix, Hole B): after a
+# same-process reclaim, two claims can be registered for one intake,
+# and a stale holder's release must never resolve to — and clear —
+# the fresher claim's marker. The winning thread also records its
+# (intake_id, win_ts) in _kickoff_claim_local so its own release /
+# completion-forget names exactly its claim.
+_kickoff_execution_claims: Dict[str, Dict[str, str]] = {}
+_kickoff_execution_claims_lock = threading.Lock()
+_kickoff_claim_local = threading.local()
+
+# While a claim holder's body runs, a heartbeat re-stamps its
+# marker well inside the staleness window (adversarial fix,
+# Hole A): the 120s reclaim window alone cannot distinguish a
+# slow-but-live body from a dead worker, and a redelivery that
+# reclaimed a LIVE claim executed the kickoff a second time
+# mid-body. With the heartbeat, a live claim never goes stale;
+# a dead holder's heartbeat dies with it, so its marker goes
+# stale on schedule and the orphan-reclaim path still works.
+_KICKOFF_EXECUTION_CLAIM_HEARTBEAT_SECONDS = 30.0
 
 _POST_KICKOFF_STATUSES = ("intake_complete", "in_progress", "delivered")
 
@@ -1189,28 +1209,46 @@ def _claim_pack_kickoff_execution(intake_id: str,
             exc_info=True)
         return False
     if won:
-        _kickoff_execution_claims[intake_id] = new_ts
+        with _kickoff_execution_claims_lock:
+            _kickoff_execution_claims.setdefault(intake_id, {})[
+                new_ts] = new_ts
+        _kickoff_claim_local.token = (intake_id, new_ts)
+        _start_kickoff_execution_heartbeat(intake_id, new_ts)
     return won
 
 
-def _release_pack_kickoff_execution(intake_id: str) -> bool:
-    """Undo this process's execution claim after the kickoff body
-    failed: remove the marker, CAS-guarded on the exact timestamp
-    this process stamped, so a fresher claim from a later delivery
-    is never cleared by a stale failure."""
-    claimed_ts = _kickoff_execution_claims.pop(intake_id, None)
-    if not claimed_ts:
-        return False
+def _drop_kickoff_execution_claim_locked(intake_id: str,
+                                         win_ts: str) -> None:
+    """Remove one claim from the registry. Caller holds the lock."""
+    claims = _kickoff_execution_claims.get(intake_id)
+    if claims is not None:
+        claims.pop(win_ts, None)
+        if not claims:
+            _kickoff_execution_claims.pop(intake_id, None)
+
+
+def _refresh_kickoff_execution_claim(intake_id: str, current_ts: str,
+                                     new_ts: str) -> bool:
+    """Re-stamp a live claim's marker (heartbeat): CAS on the exact
+    marker the claim currently holds, so a refresh can never move
+    another claim's marker. False when the marker no longer equals
+    ours — the claim was reclaimed or completed."""
+    placeholders = ",".join("?" for _ in _POST_KICKOFF_STATUSES)
     try:
         conn = _connect_rail()
         try:
             cur = conn.execute(
-                "UPDATE pack_intakes SET details = "
-                "json_remove(details, '$.' || ?) "
-                "WHERE intake_id = ? AND json_valid(details) "
-                "AND json_extract(details, '$.' || ?) = ?",
-                (_KICKOFF_EXECUTION_CLAIM_KEY, intake_id,
-                 _KICKOFF_EXECUTION_CLAIM_KEY, claimed_ts),
+                "UPDATE pack_intakes SET details = json_set("
+                "CASE WHEN json_valid(details) THEN details "
+                "ELSE '{}' END, '$.' || ?, ?) "
+                "WHERE intake_id = ? "
+                f"AND status IN ({placeholders}) "
+                "AND (CASE WHEN json_valid(details) THEN "
+                "COALESCE(json_extract(details, '$.' || ?), '') "
+                "ELSE '' END) = ?",
+                (_KICKOFF_EXECUTION_CLAIM_KEY, new_ts, intake_id,
+                 *_POST_KICKOFF_STATUSES,
+                 _KICKOFF_EXECUTION_CLAIM_KEY, current_ts),
             )
             conn.commit()
             return cur.rowcount == 1
@@ -1218,9 +1256,122 @@ def _release_pack_kickoff_execution(intake_id: str) -> bool:
             conn.close()
     except Exception:
         logger.warning(
+            "[FULFILLMENT] kickoff execution claim heartbeat failed "
+            "for intake=%s", intake_id, exc_info=True)
+        return False
+
+
+def _start_kickoff_execution_heartbeat(intake_id: str,
+                                       win_ts: str) -> None:
+    """Keep a won execution claim visibly alive while its body
+    runs: every heartbeat interval, re-stamp the marker (CAS on the
+    timestamp the claim currently holds) and record the new stamp
+    in the registry. The thread exits when the claim leaves the
+    registry (released, completed) or when a refresh finds the
+    marker is no longer ours (reclaimed — the claim is lost, and
+    the registry entry goes with it)."""
+
+    def _beat() -> None:
+        while True:
+            time.sleep(_KICKOFF_EXECUTION_CLAIM_HEARTBEAT_SECONDS)
+            with _kickoff_execution_claims_lock:
+                claims = _kickoff_execution_claims.get(intake_id) or {}
+                current = claims.get(win_ts)
+                if current is None:
+                    return
+                new_ts = _utc_now_iso()
+                if not _refresh_kickoff_execution_claim(
+                        intake_id, current, new_ts):
+                    _drop_kickoff_execution_claim_locked(
+                        intake_id, win_ts)
+                    return
+                claims[win_ts] = new_ts
+
+    threading.Thread(
+        target=_beat, name=f"kickoff-claim-heartbeat-{intake_id}",
+        daemon=True).start()
+
+
+def _resolve_kickoff_execution_claim_locked(intake_id: str):
+    """(win_ts, current_ts) of the claim a release/forget on THIS
+    thread may act on, or None. Caller holds the lock.
+
+    Ownership rule (Hole B): the thread's own claim token names
+    the claim exactly. Without a token, the claim is resolvable
+    only when exactly one claim is registered for the intake —
+    with two or more, a tokenless release cannot know which holder
+    it speaks for and must refuse rather than guess (guessing is
+    how a stale release cleared a fresher claim)."""
+    claims = _kickoff_execution_claims.get(intake_id) or {}
+    token = getattr(_kickoff_claim_local, "token", None)
+    if token is not None and token[0] == intake_id:
+        current = claims.get(token[1])
+        if current is not None:
+            return token[1], current
+        return None
+    if len(claims) == 1:
+        win_ts, current = next(iter(claims.items()))
+        return win_ts, current
+    return None
+
+
+def _forget_kickoff_execution_claim(intake_id: str) -> None:
+    """Drop THIS thread's claim registration after the kickoff
+    body completed: the completion write's 'agent' key is the
+    durable proof now, the marker stays as an audit timestamp,
+    and the heartbeat thread exits on its next tick."""
+    with _kickoff_execution_claims_lock:
+        resolved = _resolve_kickoff_execution_claim_locked(intake_id)
+        if resolved is not None:
+            _drop_kickoff_execution_claim_locked(intake_id, resolved[0])
+    token = getattr(_kickoff_claim_local, "token", None)
+    if token is not None and token[0] == intake_id:
+        _kickoff_claim_local.token = None
+
+
+def _release_pack_kickoff_execution(intake_id: str) -> bool:
+    """Undo this process's execution claim after the kickoff body
+    failed: remove the marker, CAS-guarded on the exact timestamp
+    the RELEASING claim currently holds (its win stamp as refreshed
+    by its heartbeat). Strictly ownership-checked (Hole B): the
+    claim is resolved under the registry lock — by this thread's
+    claim token, or as the intake's only registered claim — and
+    the resolve + marker removal happen inside the same lock hold,
+    so a stale holder can never clear a fresher claim's marker.
+    An unresolvable (ambiguous or absent) claim releases nothing
+    and returns False: the marker then ages out and is reclaimed,
+    which is safe, instead of being guessed at, which was not."""
+    token = getattr(_kickoff_claim_local, "token", None)
+    try:
+        with _kickoff_execution_claims_lock:
+            resolved = _resolve_kickoff_execution_claim_locked(
+                intake_id)
+            if resolved is None:
+                return False
+            win_ts, current_ts = resolved
+            _drop_kickoff_execution_claim_locked(intake_id, win_ts)
+            conn = _connect_rail()
+            try:
+                cur = conn.execute(
+                    "UPDATE pack_intakes SET details = "
+                    "json_remove(details, '$.' || ?) "
+                    "WHERE intake_id = ? AND json_valid(details) "
+                    "AND json_extract(details, '$.' || ?) = ?",
+                    (_KICKOFF_EXECUTION_CLAIM_KEY, intake_id,
+                     _KICKOFF_EXECUTION_CLAIM_KEY, current_ts),
+                )
+                conn.commit()
+                return cur.rowcount == 1
+            finally:
+                conn.close()
+    except Exception:
+        logger.warning(
             "[FULFILLMENT] kickoff execution claim release failed "
             "for intake=%s", intake_id, exc_info=True)
         return False
+    finally:
+        if token is not None and token[0] == intake_id:
+            _kickoff_claim_local.token = None
 
 
 # Hard TOTAL-duration bound on one Celery publish attempt. The
@@ -1445,6 +1596,25 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     return result.id
 
 
+_EMAIL_SHAPE_RE = re.compile(
+    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def _scrub_email_addresses(text: Any) -> str:
+    """``text`` with every email-shaped substring redacted.
+
+    For exception/error text persisted into operator-facing
+    records (the pack_email_failed alert, the rail event's
+    pack_email_error): mail-layer failures routinely echo the
+    recipient address (SMTP 550s name the rejected mailbox), so
+    raw exception text would carry the buyer's email into records
+    whose contract is 'name the intake id, never the buyer'
+    (Wren PR 8 item 4 + adversarial Hole C). The error's substance
+    (codes, host, refusal reason) survives; only the address goes.
+    """
+    return _EMAIL_SHAPE_RE.sub("[redacted email]", str(text))
+
+
 def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
     """Fulfill a pack order paid over the x402 rail.
 
@@ -1643,7 +1813,8 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                         "pack_email_status": "failed",
                         "pack_email_failed": True,
                         "pack_email_retryable": True,
-                        "pack_email_error": str(email_exc),
+                        "pack_email_error":
+                            _scrub_email_addresses(email_exc),
                     })
                     try:
                         from sincor2.payment_ledger import record_alert
@@ -1653,7 +1824,8 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                             event_id or "unknown",
                             "pack_email_failed",
                             "Pack email failed for intake %s: %s"
-                            % (intake.intake_id, email_exc),
+                            % (intake.intake_id,
+                               _scrub_email_addresses(email_exc)),
                             details={"pack_sku": pack_sku,
                                      "intake_id": intake.intake_id,
                                      "retryable": True, "rail": True},
