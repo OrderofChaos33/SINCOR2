@@ -1838,8 +1838,33 @@ def js_shell_violations_from_source(
 
 
 def _js_files() -> list[Path]:
+    """Repo-owned JS/TS files: the git index (tracked + staged), NOT a
+    whole-tree walk. Gitignored vendored installs (lib/forge-std,
+    lib/openzeppelin-contracts — required locally to compile the
+    Foundry contracts) contain upstream scripts that use
+    child_process.exec; they are not repo content and cannot be
+    committed, so scanning them fails this test on any tree with the
+    libs installed. Mirrors the enumeration in
+    scripts/pre-commit-sincor (dev-watch 302). Falls back to a tree
+    walk skipping vendored/build dirs when git metadata is
+    unavailable."""
+    try:
+        raw = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
+            capture_output=True,
+            check=True,
+        ).stdout.decode("utf-8", "replace")
+        candidates = [REPO_ROOT / n for n in raw.split("\0") if n]
+    except Exception:
+        candidates = [
+            p
+            for p in REPO_ROOT.rglob("*")
+            if not (_JS_SKIP_DIRS | {"lib", "out", "cache"}).intersection(
+                p.parts
+            )
+        ]
     out = []
-    for path in sorted(REPO_ROOT.rglob("*")):
+    for path in sorted(candidates):
         if path.suffix not in _JS_SUFFIXES or not path.is_file():
             continue
         if _JS_SKIP_DIRS.intersection(path.parts):
