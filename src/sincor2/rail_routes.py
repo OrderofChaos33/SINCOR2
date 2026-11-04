@@ -2199,6 +2199,48 @@ def _rail_subscription_checkout(data: Dict[str, Any], plan_id: str):
     }), http_status
 
 
+#: WREN PR 7: per-wallet ceiling on OPEN BOUND x402 challenges. A bind
+#: requires an EIP-191 ownership signature from the wallet itself, so
+#: this count can only ever be raised by the wallet's owner — never by
+#: a third party naming the wallet at checkout (the victim-lockout
+#: vector the old wallet-keyed mint cap allowed). Set far above the
+#: per-IP mint cap (20) so ordinary buyers never see it.
+MAX_OPEN_BOUND_CHALLENGES_PER_WALLET = 100
+
+
+def _wallet_open_bound_challenges(wallet: str) -> int:
+    """Count one wallet's open (pending, unexpired) BOUND x402 challenges.
+
+    Reads the x402 challenge store (the orders DB). Fail-open on any
+    store error: this is the secondary cap — the primary per-IP mint
+    cap inside create_challenge still applies, and a store read
+    failure must not take checkout down with it.
+    """
+    try:
+        from sincor2.data_paths import orders_db_path
+
+        db_path = orders_db_path()
+        if not db_path.exists():
+            return 0
+        conn = sqlite3.connect(str(db_path), timeout=5.0)
+        try:
+            (count,) = conn.execute(
+                """SELECT COUNT(*) FROM x402_challenges
+                   WHERE LOWER(payer_wallet) = ? AND status = 'pending'
+                     AND expires_at > ?""",
+                (wallet, _utc_now_iso()),
+            ).fetchone()
+            return int(count)
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning(
+            "[RAIL] open bound challenge count failed for wallet %s; "
+            "per-wallet cap skipped for this checkout",
+            wallet, exc_info=True)
+        return 0
+
+
 @rail_bp.post("/checkout")
 def rail_checkout():
     """Mint an x402 challenge for a pack purchase or a subscription period.
@@ -2245,13 +2287,27 @@ def rail_checkout():
             pack_sku, expected_usdc, resource["amount_usdc"])
         return jsonify({"ok": False, "error": "pack_price_mismatch"}), 500
 
-    # WREN PR 4: name the minting source (wallet when the buyer gave
-    # one, else the client address) so create_challenge can cap open
-    # unbound challenges per source; render its refusal as the shared
-    # 429 rate_limited shape.
+    # WREN PR 7 (checkout griefing): the open-challenge cap keys on the
+    # CLIENT ADDRESS — never on a client-supplied wallet. Under the
+    # PR 4 keying (source = the named wallet), anyone could name a
+    # victim's wallet in MAX_OPEN_UNBOUND_CHALLENGES_PER_SOURCE
+    # checkout calls and lock that wallet out of checkout entirely;
+    # keyed on remote_addr, a flood burns only the flooder's own
+    # budget. The separate per-wallet cap below counts only BOUND open
+    # challenges, which a third party cannot inflate (see
+    # MAX_OPEN_BOUND_CHALLENGES_PER_WALLET). Refusals render as the
+    # shared 429 rate_limited shape.
+    if payer_wallet:
+        open_bound = _wallet_open_bound_challenges(payer_wallet)
+        if open_bound >= MAX_OPEN_BOUND_CHALLENGES_PER_WALLET:
+            logger.warning(
+                "[RAIL] checkout refused: wallet holds %d open bound "
+                "challenges (per-wallet cap %d)",
+                open_bound, MAX_OPEN_BOUND_CHALLENGES_PER_WALLET)
+            return jsonify({"ok": False, "error": "rate_limited"}), 429
     challenge = x402.create_challenge(
         resource_id,
-        source_key=payer_wallet or (request.remote_addr or ""))
+        source_key=request.remote_addr or "")
     if challenge.get("error") == "rate_limited":
         return jsonify({"ok": False, "error": "rate_limited"}), 429
     http_status = int(challenge.get("http_status") or 402)
