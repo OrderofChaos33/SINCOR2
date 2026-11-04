@@ -22,7 +22,19 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, session
 
+from sincor2.admin_api_key import (
+    admin_key_rate_limit_response,
+    check_admin_header_key,
+)
+
 admin_intakes_bp = Blueprint("admin_intakes", __name__, url_prefix="/api/admin")
+
+
+@admin_intakes_bp.before_request
+def _admin_intakes_key_rate_limit_gate():
+    # Wren PR 4: failed X-Admin-Key attempts are rate-limited per
+    # client address (10/min -> 429). Valid credentials never count.
+    return admin_key_rate_limit_response()
 
 STALE_INTAKE_MIN_AGE_HOURS = 24.0
 
@@ -38,7 +50,9 @@ def _is_admin_request() -> bool:
       ``session["admin_username"]`` matching ADMIN_USERNAME, or
     * a Bearer JWT (or ``access_token`` cookie) whose ``sub`` is the
       admin username, or
-    * the ``X-Admin-Key`` header matching ADMIN_PASSWORD.
+    * the ``X-Admin-Key`` header: the dedicated ADMIN_API_KEY when
+      one is configured (>= 32 chars), otherwise ADMIN_PASSWORD
+      (sincor2.admin_api_key.check_admin_header_key).
 
     Fail-closed: any missing or mismatched credential returns False.
     """
@@ -67,11 +81,8 @@ def _is_admin_request() -> bool:
         except Exception:
             pass
 
-    admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
-    key = request.headers.get("X-Admin-Key", "")
-    if key and admin_password:
-        if hmac.compare_digest(str(key), admin_password):
-            return True
+    if check_admin_header_key(request.headers.get("X-Admin-Key", "")):
+        return True
 
     return False
 

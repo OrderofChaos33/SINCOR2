@@ -1139,26 +1139,22 @@ def _check_admin_token(req):
 
 
 def _check_admin_key(req) -> bool:
-    import hmac
-    expected = _admin_password()
-    if not expected:
-        return False
     # Header ONLY (hunt-32 W-44): the admin key is never accepted from
     # the request body, query string, form, or cookies — the
     # secret-in-body fallback admitted anyone who could place the key
     # in a JSON payload (it flipped the Command Center killswitch).
     # Same posture as sponsored_stake._admin_key_ok and the waitlist
     # handler's _is_admin_request.
-    key = req.headers.get('X-Admin-Key', '')
-    if not key:
-        return False
-    try:
-        return hmac.compare_digest(str(key), str(expected))
-    except (TypeError, ValueError):
-        # hmac.compare_digest raises TypeError on non-ASCII str input;
-        # an un-comparable header value fails CLOSED (401), never a 500
-        # (hunt-32 W-44, Builder B minor).
-        return False
+    #
+    # Wren PR 4: the comparison itself lives in the shared helper
+    # (sincor2.admin_api_key.check_admin_header_key). When a dedicated
+    # ADMIN_API_KEY (>= 32 chars) is configured it is the ONLY accepted
+    # header key and the login password stops doubling as an API key;
+    # while it is unset, the legacy ADMIN_PASSWORD header key keeps
+    # working. Constant-time, and an un-comparable (non-ASCII) header
+    # value fails CLOSED (401), never a 500 (hunt-32 W-44).
+    from sincor2.admin_api_key import check_admin_header_key
+    return check_admin_header_key(req.headers.get('X-Admin-Key', ''))
 
 
 def _is_admin_session() -> bool:
@@ -1210,14 +1206,18 @@ from sincor2.blueprints.vitals import vitals_bp as _vitals_bp
 
 app.register_blueprint(_vitals_bp)
 
-# /command-center page on production (GET only). Same login gate as the other
-# operator surfaces on this app (see /dashboard, /operator). This page route
+# /command-center page on production (GET only). Admin-session gate —
+# stricter than the other operator surfaces on this app (see /dashboard,
+# /operator): the console is operators-only (Wren PR 4). This page route
 # is registered BEFORE the command-center API blueprint below, so it stays
 # the handler for /command-center (the blueprint's own page route is
 # shadowed and never runs on this app).
 @app.get("/command-center")
 def _console_command_center_page():
-    if not (_is_admin_session() or session.get("user_email")):
+    # Wren PR 4: admin session ONLY. The old `session.get("user_email")`
+    # fallback admitted ANY logged-in customer to the operator console
+    # page; a login is not an admin credential.
+    if not _is_admin_session():
         return redirect("/login?next=/command-center")
     return render_template("command_center.html", nav_active="command")
 
@@ -1233,6 +1233,20 @@ def _console_command_center_page():
 from sincor2.blueprints.command_center import command_center_bp as _command_center_bp
 
 app.register_blueprint(_command_center_bp)
+
+
+@app.before_request
+def _admin_key_rate_limit_gate():
+    # Wren PR 4: failed X-Admin-Key attempts are rate-limited per
+    # client address (10/min -> 429 JSON) across every admin surface —
+    # /api/command-center/, /api/waitlist/stats, /api/airdrop/stats,
+    # /api/admin/, and any other path where a key is presented. This
+    # guard is registered BEFORE the admin auth guards below so a
+    # brute-force burst is refused before credential checks run;
+    # requests that authenticate never consume budget (see
+    # sincor2.admin_api_key).
+    from sincor2.admin_api_key import admin_key_rate_limit_response
+    return admin_key_rate_limit_response()
 
 
 @app.before_request

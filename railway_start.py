@@ -200,6 +200,24 @@ def boot_status() -> dict:
     }
 
 
+def _public_boot_status() -> dict:
+    """Public /boot view (Wren PR 4): short build SHA + build time ONLY.
+
+    boot_status() keeps the full 40-char SHA for internal/diagnostic
+    use, but /boot is unauthenticated — the full SHA must not be
+    disclosed there (it stays available behind the app's admin gates
+    via sincor2.build_info). Never raises beyond boot_status()'s own
+    guarantees: the build mapping degrades to "unknown" fields.
+    """
+    payload = boot_status()
+    build = payload.get("build") or {}
+    payload["build"] = {
+        "short": build.get("short") or "unknown",
+        "time": build.get("time") or "unknown",
+    }
+    return payload
+
+
 def _respond(start_response, status: str, body: bytes, content_type: str = "application/json"):
     start_response(
         status,
@@ -238,7 +256,8 @@ def wsgi(environ, start_response):
         return _respond(start_response, "200 OK", _HEALTH)
 
     if path == "/boot":
-        return _respond(start_response, "200 OK", _json_bytes(boot_status()))
+        # Public view: 12-char SHA + build time only (Wren PR 4).
+        return _respond(start_response, "200 OK", _json_bytes(_public_boot_status()))
 
     start_background_load()
 
