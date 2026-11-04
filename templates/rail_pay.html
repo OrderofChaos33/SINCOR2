@@ -234,8 +234,15 @@
     var data = null;
     try { data = await r.json(); } catch (e) { /* non-JSON: fall through */ }
     if (!r.ok) {
-      var err = (data && data.error) ? String(data.error) : ("HTTP " + r.status);
-      throw new Error(err);
+      // Keep the parsed body on the thrown error: some refusals carry
+      // state the caller can act on (e.g. a 409 challenge_already_bound
+      // flagged bound_to_you is a success state for the bind step, not
+      // a failure — Wren PR 5).
+      var err = new Error(
+        (data && data.error) ? String(data.error) : ("HTTP " + r.status));
+      err.data = data;
+      err.status = r.status;
+      throw err;
     }
     return data;
   }
@@ -527,6 +534,17 @@
       setMsg("Wallet ownership verified.", "ok");
     } catch (e) {
       if (e && e.code === 4001) setMsg("Signature rejected in wallet.", "err");
+      else if (e && e.data && e.data.error === "challenge_already_bound" &&
+               e.data.bound_to_you === true) {
+        // The challenge is already bound to THIS wallet (an earlier
+        // bind whose response never reached the page, or an already
+        // fulfilled challenge): that IS the verified state — treat it
+        // as success instead of "Wallet verification failed" (PR 5).
+        bound = true;
+        $("btnBind").disabled = true;
+        $("btnBind").textContent = "\u2713 Wallet verified";
+        setMsg("Wallet ownership verified.", "ok");
+      }
       else setMsg("Wallet verification failed: " + (e && e.message || e), "err");
     }
     refreshButtons();
