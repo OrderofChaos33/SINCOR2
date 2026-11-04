@@ -979,8 +979,11 @@ def bind_challenge_payer(
     payload as the first bind. A different wallet still gets
     challenge_already_bound, and so does an already-fulfilled
     challenge — with bound_to_you=True when the fulfilled challenge is
-    bound to the requester's own wallet, so the client can present
-    "yours, already done" instead of a verification failure.
+    bound to the requester's own wallet AND the request's signature
+    verifies against that wallet, so the client can present
+    "yours, already done" instead of a verification failure. The flag
+    is never set on an unverified claim (it would otherwise be an
+    unauthenticated oracle for the bound wallet).
     """
     cid = (challenge_id or "").strip()
     if not cid:
@@ -1002,7 +1005,23 @@ def bind_challenge_payer(
             result: dict[str, Any] = {
                 "ok": False, "error": "challenge_already_bound"}
             if recorded and recorded == wallet:
-                result["bound_to_you"] = True
+                # bound_to_you is an ownership signal: set it only
+                # after the EIP-191 bind signature verifies against
+                # the recorded payer (mirroring the pending and
+                # lost-race paths below, which flag only after
+                # recovered == wallet). An unverified claim — garbage
+                # signature, or a different wallet's signature —
+                # collapses to the bare 409 above, so the flag can
+                # never serve as an unauthenticated oracle confirming
+                # which wallet a fulfilled challenge is bound to.
+                message = challenge_bind_message(
+                    cid, str(row["resource_id"]), wallet)
+                try:
+                    recovered = _recover_bind_signer(message, signature)
+                except ValueError:
+                    recovered = ""
+                if recovered and recovered.lower() == wallet:
+                    result["bound_to_you"] = True
             return result
         expires = row["expires_at"]
         if expires and _parse_iso(expires) < datetime.now(timezone.utc):

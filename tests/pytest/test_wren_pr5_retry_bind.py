@@ -26,6 +26,12 @@ Fix under test:
      response body on the thrown error, and the bind handler treats
      challenge_already_bound + bound_to_you === true as the success
      state instead of "Wallet verification failed".
+  4. Adversarial fix (PR 5 review): on the fulfilled path,
+     bound_to_you is set ONLY after the EIP-191 bind signature
+     verifies against the recorded payer. An unverified claim
+     (garbage signature, or another wallet's signature) collapses to
+     the bare 409 — the flag must never be an unauthenticated oracle
+     for which wallet a fulfilled challenge is bound to.
 
 Wallets are freshly generated keys probed for low-s signatures (the
 codebase bind standard, mirrored from test_w102r3_challenge_ownership)
@@ -238,6 +244,46 @@ def test_fulfilled_challenge_bind_other_wallet_409_not_bound_to_you(
     res = _bind_http(client, cid, OTHER_KEY)
     assert res.status_code == 409, res.get_json()
     body = res.get_json()
+    assert body["error"] == "challenge_already_bound"
+    assert body.get("bound_to_you") is not True
+
+
+# ---------------------------------------------------------------------------
+# Adversarial regression: bound_to_you must never be set unverified.
+# The fulfilled early-return originally flagged bound_to_you from the
+# claimed wallet string alone (the route only requires a non-empty
+# signature field), making it an unauthenticated oracle confirming
+# which wallet a fulfilled challenge is bound to. The flag is an
+# ownership signal: it may only be set after the EIP-191 bind
+# signature recovers to the recorded payer.
+# ---------------------------------------------------------------------------
+
+def test_fulfilled_bind_garbage_signature_bare_409_no_flag(client, x402_db):
+    cid = _draft()
+    assert _bind_http(client, cid, BUYER_KEY).status_code == 200
+    _mark_fulfilled(cid)
+    # Owner's wallet string, garbage signature: the reviewer's PoC.
+    res = _bind_http(client, cid, BUYER_KEY, signature="0xdeadbeef")
+    assert res.status_code == 409, res.get_json()
+    body = res.get_json()
+    assert body["ok"] is False
+    assert body["error"] == "challenge_already_bound"
+    assert body.get("bound_to_you") is not True
+
+
+def test_fulfilled_bind_wrong_signer_signature_bare_409_no_flag(
+        client, x402_db):
+    cid = _draft()
+    assert _bind_http(client, cid, BUYER_KEY).status_code == 200
+    _mark_fulfilled(cid)
+    # A VALID signature — but from a different wallet than the one the
+    # request claims (and than the challenge is bound to).
+    msg = x402.challenge_bind_message(cid, RESOURCE, BUYER)
+    forged = OTHER_KEY.sign_message(encode_defunct(text=msg)).signature.hex()
+    res = _bind_http(client, cid, BUYER_KEY, signature=forged)
+    assert res.status_code == 409, res.get_json()
+    body = res.get_json()
+    assert body["ok"] is False
     assert body["error"] == "challenge_already_bound"
     assert body.get("bound_to_you") is not True
 
