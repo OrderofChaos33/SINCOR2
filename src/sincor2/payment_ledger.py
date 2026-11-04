@@ -1876,16 +1876,27 @@ def list_stale_completed_pack_intakes(
     An intake_complete record is a buyer who did their part and is now
     waiting on a human; the ones past the age threshold are the ones an
     operator must not lose sight of. Oldest first.
+
+    Age is measured from when the buyer COMPLETED the intake —
+    ``details["intake_completed_at"]``, stamped by the intake route
+    on the advancing POST — not from record creation: a record can
+    sit at created/agent_kickoff for days before the buyer submits,
+    and the operator's clock starts at completion. Records with no
+    stamp (completed before the stamp existed) fall back to
+    created_at, exactly as before.
     """
     now = now or datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=min_age_hours)
-    stale: list[PackIntake] = []
+    stale: list[tuple[datetime, PackIntake]] = []
     for intake in list_pack_intakes(store_or_db, status="intake_complete"):
-        created = _parse_iso_utc(intake.created_at)
-        if created is not None and created <= cutoff:
-            stale.append(intake)
-    stale.sort(key=lambda i: i.created_at)
-    return stale
+        details = intake.details or {}
+        basis = _parse_iso_utc(
+            str(details.get("intake_completed_at") or "")
+        ) or _parse_iso_utc(intake.created_at)
+        if basis is not None and basis <= cutoff:
+            stale.append((basis, intake))
+    stale.sort(key=lambda pair: pair[0])
+    return [intake for _basis, intake in stale]
 
 
 def allowed_transitions() -> dict[str, list[str]]:

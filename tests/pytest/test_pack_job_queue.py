@@ -399,8 +399,21 @@ def test_queue_failure_leaves_pending_then_requeue_succeeds(
 
     # The queue recovers: a re-settle re-queues and delivers, still
     # without duplicating the payment, the intake, or the email.
+    # W-115: a retry of a claimed-but-pending settle moves money-path
+    # state, so the re-settle must carry the payer's W-103 replay proof
+    # — sign build_replay_message(cid, ts_ms) with the payer key.
+    # (Test-only fix: the production payer-proof gate is unchanged; the
+    # unsigned retry was refused with payer_proof_required, which is
+    # the gate working as designed, not the pending -> re-queue path
+    # this test pins.)
     enqueued = _counting_enqueue(monkeypatch, real_enqueue=real_enqueue)
-    second = _settle(client, cid)
+    ts_ms = int(time.time() * 1000)
+    replay_sig = "0x" + _PAYER_ACCT.sign_message(_encode_defunct(
+        text=x402.build_replay_message(cid, ts_ms))).signature.hex()
+    second = client.post("/rail/settle", json={
+        "challenge_id": cid, "tx_hash": TX_HASH, "payer_wallet": PAYER,
+        "buyer_email": "buyer@example.com", "buyer_name": "Test Buyer",
+        "replay_signature": replay_sig, "replay_ts_ms": ts_ms})
     second_body = second.get_json()
     assert second.status_code == 200, second_body
     assert second_body["ok"] is True

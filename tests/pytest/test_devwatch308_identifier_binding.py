@@ -1,36 +1,45 @@
-"""Dev-watch 308 REPAIR round 3: identifier + consumption binding for
-``POST /api/crypto/checkout`` / ``POST /api/crypto/verify-payment``
-(``mvp_blueprints/billing.py``).
+"""Dev-watch 308 — RETIREMENT CONTRACT for identifier + consumption binding.
 
-Builder B's re-check of the amount/token/removed repair CONFIRMED that
-binding is sound when the checkout record is intact — but proved the
-identifier design defeats it:
+History: Builder B's re-check of the amount/token/removed repair
+CONFIRMED that binding was sound when the checkout record was intact —
+but proved the identifier design defeated it:
 
   S1  payment_id was ``CRYPTO-{second-resolution timestamp}`` and the
       persist used INSERT OR REPLACE: two checkouts in the same second
-      collided, the later ($1) silently replaced the earlier ($40)
-      expectation, and a $1 receipt then settled the $40 checkout.
+      collided and the later expectation silently replaced the earlier.
   S1b product_name was caller-supplied at verify and never bound to
-      the checkout; fulfillment fired for whatever product the caller
-      named.
-  S2  order_id used the same second-resolution pattern; the orders
-      insert's IntegrityError was swallowed and fulfillment ran
-      unconditionally — a second genuine payment in the same second
-      fulfilled with NO order row, so re-presenting its tx later
-      fulfilled AGAIN (one payment, two fulfillments).
+      the checkout.
+  S2  order_id used the same second-resolution pattern; a swallowed
+      insert error let fulfillment run with NO order row, so
+      re-presenting the tx fulfilled AGAIN.
   S3  payment_id was never consumed: one checkout settled two distinct
       full-payment transactions back-to-back.
-  S4  ``_settled_transfer_total`` summed duplicate log entries: a
-      receipt listing the same log twice (identical logIndex) counted
-      it twice.
+  S4  ``_settled_transfer_total`` summed duplicate log entries.
 
-Pins: payment_id / order_id are unique + unguessable (timestamp prefix
-kept); the persist is a plain INSERT that refuses to overwrite; the
-persisted product governs fulfillment when a checkout record exists;
-an order-insert failure is a 5xx with ZERO fulfillments; settlement
-consumes the checkout record (settled_tx_hash) and a second verify
-against it is refused 409; duplicate (transactionHash, logIndex) logs
-count once while distinct logs still sum.
+The round-3 repair pinned unique unguessable ids, a plain-INSERT
+persist that refuses to overwrite, persisted-product governance,
+5xx-with-zero-fulfillments on order-insert failure, settlement
+consuming the checkout record (second verify -> 409), and
+duplicate-log dedup.
+
+RETIREMENT CONTRACT (founder-approved 2026-11-04, Wren PR 3): the
+legacy routes themselves are retired. ``POST /api/crypto/checkout``
+and ``POST /api/crypto/verify-payment`` now return 410 Gone with
+``{"error": "use_rail_checkout"}`` unconditionally — regardless of
+BASE_PAYMENT_ADDRESS or any parameters. The route issues no
+payment_ids, persists no expectations, creates no orders, fires no
+fulfillments, and never consumes a checkout record.
+
+These tests stage the SAME identifier/consumption shapes (same-second
+checkouts under a frozen clock, product substitution, two genuine
+payments, a forced order-insert failure, double-settlement attempts,
+duplicate logs) and assert the door is closed for every one: 410,
+zero orders, zero fulfillments, seeded records untouched.
+
+The DW-308 persistence helpers remain in production code (unreachable
+via HTTP); their direct behavior — in particular the plain-INSERT
+refusal to overwrite — keeps its helper-level coverage below in
+test_persist_refuses_to_overwrite_existing_checkout, unchanged.
 """
 from __future__ import annotations
 
@@ -154,12 +163,30 @@ def crypto_env(tmp_path, monkeypatch):
     }
 
 
-def _checkout(client, amount, currency="USDC", **extra):
+def _checkout_retired(client, amount, currency="USDC", **extra):
+    """The checkout route is retired: the create attempt itself is 410
+    with the rail-redirect error body, and no payment_id is issued."""
     body = {"currency": currency, "amount": amount, "wallet": PAYER}
     body.update(extra)
     resp = client.post("/api/crypto/checkout", json=body)
-    assert resp.status_code == 201, resp.get_data(as_text=True)
-    return resp.get_json()["payment_id"]
+    assert resp.status_code == 410, resp.get_data(as_text=True)
+    assert resp.get_json() == {"error": "use_rail_checkout"}
+    return resp
+
+
+def _seed_checkout(crypto_env, payment_id, amount_usd, expected_atomic,
+                   product_name=""):
+    """Seed the expectation a pre-retirement checkout would have left
+    behind, directly through the persistence helper."""
+    with crypto_env["app"].app_context():
+        billing._persist_crypto_checkout(
+            payment_id, "USDC", USDC, expected_atomic, amount_usd,
+            PAYER, product_name)
+
+
+def _checkout_record(crypto_env, payment_id):
+    with crypto_env["app"].app_context():
+        return billing._crypto_checkout_record(payment_id)
 
 
 def _verify(client, payment_id, tx_hash, amount, product_name="R3 Product"):
@@ -188,33 +215,59 @@ def _orders(db_path) -> list:
         conn.close()
 
 
-# ---------------------------------------------------------------------------
-# S1 — payment_id collision overwrite
-# ---------------------------------------------------------------------------
+def _checkout_count(db_path) -> int:
+    conn = sqlite3.connect(str(db_path))
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='crypto_checkouts'",
+        ).fetchone()
+        if not exists:
+            return 0
+        return int(conn.execute(
+            "SELECT COUNT(*) FROM crypto_checkouts").fetchone()[0])
+    finally:
+        conn.close()
 
-def test_same_second_checkouts_get_distinct_payment_ids(crypto_env, frozen_time):
-    """Two checkouts in the same second must NEVER share a payment_id,
-    and each persisted expectation stays intact: the $1 receipt settles
-    the $1 checkout and is refused (402) against the $40 checkout."""
-    client = crypto_env["client"]
-    pid40 = _checkout(client, 40)
-    pid1 = _checkout(client, 1)
-    assert pid40.startswith("CRYPTO-")
-    assert pid1.startswith("CRYPTO-")
-    assert pid40 != pid1
 
-    _pay(crypto_env, TX_A, 1_000_000)
-    resp = _verify(client, pid40, TX_A, 1)
-    assert resp.status_code == 402, resp.get_data(as_text=True)
+def _assert_retired(crypto_env, resp):
+    """The retirement contract on verify: 410 Gone, the exact
+    rail-redirect error body, and zero side effects."""
+    assert resp.status_code == 410, resp.get_data(as_text=True)
+    assert resp.get_json() == {"error": "use_rail_checkout"}
     assert crypto_env["fulfillments"] == []
     assert _orders(crypto_env["db_path"]) == []
 
+
+def _assert_unconsumed(crypto_env, payment_id):
+    record = _checkout_record(crypto_env, payment_id)
+    assert record is not None
+    assert record["settled_tx_hash"] == ""  # never consumed
+
+
+# ---------------------------------------------------------------------------
+# S1 — payment_id collision overwrite (shape staged, route retired)
+# ---------------------------------------------------------------------------
+
+def test_same_second_checkouts_get_distinct_payment_ids_retired(
+        crypto_env, frozen_time):
+    """Two checkouts in the same second under a frozen clock: the S1
+    collision can no longer happen because the retired route issues
+    NO payment_ids at all — both creates are 410 and nothing is
+    persisted. Verify attempts against the would-be colliding ids,
+    with the $1 receipts staged, are likewise 410 with zero orders
+    and zero fulfillments."""
+    client = crypto_env["client"]
+    _checkout_retired(client, 40)
+    _checkout_retired(client, 1)
+    assert _checkout_count(crypto_env["db_path"]) == 0
+
+    _pay(crypto_env, TX_A, 1_000_000)
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-FROZEN-40", TX_A, 1))
+
     _pay(crypto_env, TX_B, 1_000_000)
-    resp = _verify(client, pid1, TX_B, 1)
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    assert len(_orders(crypto_env["db_path"])) == 1
-    assert _orders(crypto_env["db_path"])[0][3] == 1
-    assert len(crypto_env["fulfillments"]) == 1
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-FROZEN-1", TX_B, 1))
+    assert _checkout_count(crypto_env["db_path"]) == 0
 
 
 def test_persist_refuses_to_overwrite_existing_checkout(crypto_env):
@@ -234,70 +287,62 @@ def test_persist_refuses_to_overwrite_existing_checkout(crypto_env):
 
 
 # ---------------------------------------------------------------------------
-# S1b — the persisted product governs fulfillment
+# S1b — the persisted product governs fulfillment (shape staged, retired)
 # ---------------------------------------------------------------------------
 
-def test_checkout_product_governs_fulfillment(crypto_env):
-    """Verify naming a different product than the checkout's: the
-    PERSISTED product reaches the order row and the fulfillment call,
-    exactly as the persisted amount already does."""
+def test_checkout_product_governs_fulfillment_retired(crypto_env):
+    """A checkout record exists (seeded directly) naming "Persisted
+    Product"; verify names "Caller Named Product" and presents a
+    genuine full payment. Retired: 410 — no product reaches an order
+    row or a fulfillment call, because neither is ever created, and
+    the record stays unconsumed."""
     client = crypto_env["client"]
-    pid = _checkout(client, 25, product_name="Persisted Product")
+    _seed_checkout(crypto_env, "CRYPTO-PROD-1", 25, 25_000_000,
+                   product_name="Persisted Product")
     _pay(crypto_env, TX_A, 25_000_000)
-    resp = _verify(client, pid, TX_A, 25, product_name="Caller Named Product")
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    orders = _orders(crypto_env["db_path"])
-    assert len(orders) == 1
-    assert orders[0][2] == "Persisted Product"
-    # trigger_fulfillment(order_id, email, product_name, amount, ...)
-    assert crypto_env["fulfillments"][0][2] == "Persisted Product"
+    _assert_retired(crypto_env, _verify(
+        client, "CRYPTO-PROD-1", TX_A, 25,
+        product_name="Caller Named Product"))
+    _assert_unconsumed(crypto_env, "CRYPTO-PROD-1")
 
 
-def test_recordless_verify_product_unchanged(crypto_env):
-    """Preserved behavior: with no checkout record there is nothing to
-    bind, so the caller's product stands (self-consistent fallback)."""
+def test_recordless_verify_product_unchanged_retired(crypto_env):
+    """With no checkout record, the caller-named product presentation
+    that used to settle now gets 410 like everything else: zero
+    orders, zero fulfillments."""
     _pay(crypto_env, TX_A, 25_000_000)
-    resp = _verify(crypto_env["client"], "CRYPTO-NOREC", TX_A, 25,
-                   product_name="Caller Named Product")
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    assert crypto_env["fulfillments"][0][2] == "Caller Named Product"
+    _assert_retired(crypto_env, _verify(
+        crypto_env["client"], "CRYPTO-NOREC", TX_A, 25,
+        product_name="Caller Named Product"))
 
 
 # ---------------------------------------------------------------------------
-# S2 — order_id collision / swallowed insert error -> double fulfillment
+# S2 — order_id collision / swallowed insert error (shapes staged, retired)
 # ---------------------------------------------------------------------------
 
-def test_same_second_two_genuine_payments_each_settle_once(
+def test_same_second_two_genuine_payments_each_settle_once_retired(
         crypto_env, frozen_time):
     """Two distinct genuine full payments verified in the same second:
-    BOTH get order rows and exactly one fulfillment each; re-presenting
-    the second tx later is a replay refusal (409), never a third
-    fulfillment."""
+    the double-fulfillment shape is unreachable — BOTH verifies are
+    410, no order rows exist, no fulfillments fire, and re-presenting
+    the second tx is another 410 (not a replay 409 against a settled
+    order that was never created)."""
     client = crypto_env["client"]
     _pay(crypto_env, TX_A, 25_000_000)
     _pay(crypto_env, TX_B, 25_000_000)
 
-    resp = _verify(client, "CRYPTO-NOREC-A", TX_A, 25)
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    resp = _verify(client, "CRYPTO-NOREC-B", TX_B, 25)
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-
-    orders = _orders(crypto_env["db_path"])
-    assert len(orders) == 2
-    assert {o[1] for o in orders} == {TX_A, TX_B}
-    assert orders[0][0] != orders[1][0]  # distinct order_ids
-    assert len(crypto_env["fulfillments"]) == 2
-
-    resp = _verify(client, "CRYPTO-NOREC-B", TX_B, 25)
-    assert resp.status_code == 409, resp.get_data(as_text=True)
-    assert len(_orders(crypto_env["db_path"])) == 2
-    assert len(crypto_env["fulfillments"]) == 2
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-NOREC-A", TX_A, 25))
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-NOREC-B", TX_B, 25))
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-NOREC-B", TX_B, 25))
 
 
-def test_order_insert_failure_is_5xx_with_zero_fulfillments(crypto_env):
-    """A forced order-insert IntegrityError must fail the request
-    (5xx), log the failure, and fire ZERO fulfillments — never swallow
-    the error and fulfill an order that does not exist."""
+def test_order_insert_failure_is_5xx_with_zero_fulfillments_retired(
+        crypto_env):
+    """The forced order-insert failure trigger is armed exactly as
+    before — but the retired verify route never reaches the orders
+    insert at all. The answer is a clean 410 (not a 5xx from a
+    half-completed settlement), with zero fulfillments and zero
+    orders."""
     conn = sqlite3.connect(str(crypto_env["db_path"]))
     try:
         conn.execute(
@@ -308,78 +353,67 @@ def test_order_insert_failure_is_5xx_with_zero_fulfillments(crypto_env):
         conn.close()
 
     _pay(crypto_env, TX_A, 25_000_000)
-    resp = _verify(crypto_env["client"], "CRYPTO-NOREC", TX_A, 25)
-    assert resp.status_code >= 500, resp.get_data(as_text=True)
-    assert crypto_env["fulfillments"] == []
-    assert _orders(crypto_env["db_path"]) == []
+    _assert_retired(crypto_env, _verify(
+        crypto_env["client"], "CRYPTO-NOREC", TX_A, 25))
 
 
 # ---------------------------------------------------------------------------
-# S3 — settlement consumes the checkout record
+# S3 — settlement consumes the checkout record (shape staged, retired)
 # ---------------------------------------------------------------------------
 
-def test_settlement_consumes_checkout_record(crypto_env):
-    """One checkout settles exactly one transaction: after TX_A settles
-    payment_id P, a second genuine full payment (TX_B) against P is
-    refused 409 with no second order or fulfillment, and the record
-    shows the consuming tx_hash."""
+def test_settlement_consumes_checkout_record_retired(crypto_env):
+    """One checkout, two genuine full payments (TX_A then TX_B), plus
+    a re-presentation of TX_A: consumption can never happen because
+    settlement never happens — every verify is 410, and the seeded
+    record's settled_tx_hash stays empty forever."""
     client = crypto_env["client"]
-    pid = _checkout(client, 25)
+    _seed_checkout(crypto_env, "CRYPTO-CONSUME-1", 25, 25_000_000)
 
     _pay(crypto_env, TX_A, 25_000_000)
-    resp = _verify(client, pid, TX_A, 25)
-    assert resp.status_code == 200, resp.get_data(as_text=True)
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-CONSUME-1", TX_A, 25))
 
     _pay(crypto_env, TX_B, 25_000_000)
-    resp = _verify(client, pid, TX_B, 25)
-    assert resp.status_code == 409, resp.get_data(as_text=True)
-    assert len(_orders(crypto_env["db_path"])) == 1
-    assert len(crypto_env["fulfillments"]) == 1
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-CONSUME-1", TX_B, 25))
 
-    # Re-presenting the settling tx itself is still a 409 refusal.
-    resp = _verify(client, pid, TX_A, 25)
-    assert resp.status_code == 409, resp.get_data(as_text=True)
-    assert len(crypto_env["fulfillments"]) == 1
+    _assert_retired(crypto_env, _verify(client, "CRYPTO-CONSUME-1", TX_A, 25))
+    _assert_unconsumed(crypto_env, "CRYPTO-CONSUME-1")
 
     conn = sqlite3.connect(str(crypto_env["db_path"]))
     try:
         row = conn.execute(
             "SELECT settled_tx_hash FROM crypto_checkouts "
-            "WHERE payment_id=?", (pid,),
+            "WHERE payment_id=?", ("CRYPTO-CONSUME-1",),
         ).fetchone()
     finally:
         conn.close()
     assert row is not None
-    assert row[0] == TX_A
+    assert row[0] in (None, "")
 
 
 # ---------------------------------------------------------------------------
-# S4 — duplicate log entries count once
+# S4 — duplicate log entries count once (shapes staged, retired route)
 # ---------------------------------------------------------------------------
 
-def test_duplicate_log_entry_counts_once(crypto_env):
+def test_duplicate_log_entry_counts_once_retired(crypto_env):
     """The SAME log listed twice in one receipt (identical
-    transactionHash + logIndex) is ONE transfer: 15M duplicated must
-    not reach the 25M expectation's tolerance floor -> 402."""
+    transactionHash + logIndex) — the S4 double-count shape. Retired:
+    the receipt is never even parsed; 410, zero side effects."""
     log = _transfer_log(RECIPIENT, 15_000_000,
                         transactionHash=TX_A, logIndex="0x0")
     crypto_env["state"]["receipts"][TX_A] = _receipt(TX_A, [log, dict(log)])
-    resp = _verify(crypto_env["client"], "CRYPTO-NOREC", TX_A, 25)
-    assert resp.status_code == 402, resp.get_data(as_text=True)
-    assert crypto_env["fulfillments"] == []
-    assert _orders(crypto_env["db_path"]) == []
+    _assert_retired(crypto_env, _verify(
+        crypto_env["client"], "CRYPTO-NOREC", TX_A, 25))
 
 
-def test_distinct_log_indexes_still_sum(crypto_env):
-    """Dedup must not eat genuine split payments: two logs with
-    distinct logIndex values sum to the expected amount and settle."""
+def test_distinct_log_indexes_still_sum_retired(crypto_env):
+    """Two logs with distinct logIndex values summing to the expected
+    amount — the genuine split payment that used to settle. Retired:
+    410, zero orders, zero fulfillments."""
     crypto_env["state"]["receipts"][TX_A] = _receipt(TX_A, [
         _transfer_log(RECIPIENT, 10_000_000,
                       transactionHash=TX_A, logIndex="0x0"),
         _transfer_log(RECIPIENT, 15_000_000,
                       transactionHash=TX_A, logIndex="0x1"),
     ])
-    resp = _verify(crypto_env["client"], "CRYPTO-NOREC", TX_A, 25)
-    assert resp.status_code == 200, resp.get_data(as_text=True)
-    assert len(_orders(crypto_env["db_path"])) == 1
-    assert len(crypto_env["fulfillments"]) == 1
+    _assert_retired(crypto_env, _verify(
+        crypto_env["client"], "CRYPTO-NOREC", TX_A, 25))

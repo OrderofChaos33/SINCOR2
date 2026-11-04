@@ -88,6 +88,18 @@ def _bootstrap_live_client() -> None:
 def _is_admin_request(req: Any) -> bool:
     """Check admin auth without circular-importing mvp_app at request time."""
     try:
+        # Wren PR 4: dedicated ADMIN_API_KEY (>= 32 chars) via the
+        # shared helper — when configured it is the only X-Admin-Key
+        # value accepted; while unset the ADMIN_PASSWORD header key
+        # remains the fallback. Checked here directly so this module
+        # honors the dedicated key even if mvp_app is not importable.
+        from sincor2.admin_api_key import check_admin_header_key
+
+        if check_admin_header_key(req.headers.get("X-Admin-Key", "")):
+            return True
+    except Exception:
+        pass
+    try:
         from sincor2.mvp_app import _check_admin_key, _check_admin_token
         return _check_admin_token(req) or _check_admin_key(req)
     except Exception:

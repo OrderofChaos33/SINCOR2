@@ -6,6 +6,9 @@ Routes (registered by :func:`init_intake_routes`):
   POST /intake/<intake_id>?token=<intake_token>   (JSON or form body)
     -> validate + store the answers, status -> intake_complete,
        owner notified once
+  GET  /api/admin/intakes/<intake_id>
+    -> admin-gated read of one intake (status, customer email,
+       intake_answers); the operator counterpart to the buyer form
 
 Why this exists: every paid B2B pack ($297/$997/$2,997) and WebBuilder
 ($497) buyer is emailed an /intake/<id> link at fulfillment, but no
@@ -42,6 +45,7 @@ import logging
 import os
 import re
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -345,10 +349,41 @@ def sanitize_prefill_answers(pack_sku: str,
     return answers
 
 
-def _notify_owner(intake) -> None:
-    """Email the owner that an intake was completed. Best-effort: a
-    provider failure is logged (no PII) and swallowed — the buyer's
-    submission already succeeded and must not 5xx."""
+def _notify_owner(intake) -> bool:
+    """Email the owner that an intake was completed, answers included.
+
+    The notification is part of the fulfillment record, not a
+    fire-and-forget side effect. Every recipient send must report
+    status "sent"; ANY other outcome — a provider "failed"/"stub"
+    status, a raised exception, or no configured recipient — is a
+    FAILURE: an ``intake_owner_notify_failed`` alert is recorded
+    (retryable) and ``details.owner_notified`` is persisted False, so
+    a completed intake is never silently unannounced and the
+    buyer-facing page never claims a notification that did not
+    happen. On full success ``details.owner_notified`` is persisted
+    True.
+
+    Still best-effort toward the buyer: this function never raises,
+    so a notification failure can never fail the submission itself.
+    Returns True iff the owner was actually notified.
+    """
+    db_path = _intake_db_path()
+    # Re-read the record: the caller's copy predates the submission
+    # write, so the answers — and the status the owner_notified flag
+    # is merged under — must come from the stored row.
+    current = intake
+    try:
+        from sincor2.payment_ledger import get_pack_intake
+
+        fresh = get_pack_intake(db_path, intake.intake_id)
+        if fresh is not None:
+            current = fresh
+    except Exception:
+        logger.exception(
+            "[INTAKE] owner-notify re-read failed for intake %s",
+            intake.intake_id)
+    details = current.details or {}
+
     alert = (os.environ.get("LAUNCH_REVIEW_ALERT_EMAIL")
              or "court@getsincor.com").strip()
     support = (os.environ.get("SUPPORT_EMAIL")
@@ -357,36 +392,89 @@ def _notify_owner(intake) -> None:
     for addr in (alert, support):
         if addr and addr not in recipients:
             recipients.append(addr)
-    if not recipients:
-        return
-    details = intake.details or {}
-    pack_name = str(details.get("pack_name") or intake.pack_sku)
-    subject = f"SINCOR pack intake completed: {pack_name} ({intake.intake_id})"
+
+    pack_name = str(details.get("pack_name") or current.pack_sku)
+    subject = (f"SINCOR pack intake completed: {pack_name} "
+               f"({current.intake_id})")
+    answers = details.get("intake_answers") or {}
+    answer_lines = [
+        f"- {FIELD_LABELS.get(name, name)}: {value}"
+        for name, value in answers.items()
+    ]
     text = (
         f"A buyer completed the intake for the {pack_name} pack.\n\n"
-        f"Intake: {intake.intake_id}\n"
-        f"SKU: {intake.pack_sku}\n"
+        f"Intake: {current.intake_id}\n"
+        f"SKU: {current.pack_sku}\n"
         f"Status: intake_complete\n\n"
-        "The submitted answers are stored on the intake record in the "
-        "payment ledger (details.intake_answers)."
+        "Submitted answers:\n"
+        + ("\n".join(answer_lines) if answer_lines else "(none recorded)")
     )
     html_body = "<p>" + html.escape(text).replace("\n", "<br>") + "</p>"
-    try:
-        from sincor2.email_sender import EmailSender
 
-        sender = EmailSender()
-        for addr in recipients:
-            sender.send_email(
-                to_email=addr, to_name="SINCOR Owner",
-                subject=subject, html_content=html_body,
-                text_content=text,
-                metadata={"type": "pack_intake_complete",
-                          "intake_id": intake.intake_id,
-                          "pack_sku": intake.pack_sku})
+    notified = bool(recipients)
+    if recipients:
+        try:
+            from sincor2.email_sender import EmailSender
+
+            sender = EmailSender()
+            for addr in recipients:
+                try:
+                    result = sender.send_email(
+                        to_email=addr, to_name="SINCOR Owner",
+                        subject=subject, html_content=html_body,
+                        text_content=text,
+                        metadata={"type": "pack_intake_complete",
+                                  "intake_id": current.intake_id,
+                                  "pack_sku": current.pack_sku})
+                except Exception:
+                    logger.exception(
+                        "[INTAKE] owner notification send raised for "
+                        "intake %s", current.intake_id)
+                    notified = False
+                    continue
+                status = (result.get("status")
+                          if isinstance(result, dict) else None)
+                if status != "sent":
+                    logger.error(
+                        "[INTAKE] owner notification not sent for "
+                        "intake %s (status=%s)",
+                        current.intake_id, status)
+                    notified = False
+        except Exception:
+            logger.exception(
+                "[INTAKE] owner notification failed for intake %s "
+                "(submission unaffected)", current.intake_id)
+            notified = False
+
+    if not notified:
+        try:
+            from sincor2.payment_ledger import record_alert
+
+            record_alert(
+                db_path,
+                current.event_id or current.intake_id,
+                "intake_owner_notify_failed",
+                "Owner notification for completed intake %s was not "
+                "sent" % current.intake_id,
+                details={"retryable": True,
+                         "intake_id": current.intake_id,
+                         "pack_sku": current.pack_sku},
+            )
+        except Exception:
+            logger.exception(
+                "[INTAKE] could not record owner-notify alert for "
+                "intake %s", current.intake_id)
+    try:
+        from sincor2.payment_ledger import update_pack_intake_status
+
+        update_pack_intake_status(
+            db_path, current.intake_id, current.status,
+            details={"owner_notified": notified})
     except Exception:
         logger.exception(
-            "[INTAKE] owner notification failed for intake %s "
-            "(submission unaffected)", intake.intake_id)
+            "[INTAKE] could not persist owner_notified for intake %s",
+            current.intake_id)
+    return notified
 
 
 @intake_bp.route("/intake/<intake_id>", methods=["GET"])
@@ -460,9 +548,76 @@ def intake_submit(intake_id):
         details={"intake_answers": answers})
     logger.info("[INTAKE] intake %s completed (sku=%s)",
                 intake.intake_id, intake.pack_sku)
+    owner_notified = False
     if advanced:
-        _notify_owner(intake)
-    return jsonify({"ok": True, "status": "intake_complete"}), 200
+        # Stamp WHEN the intake was completed: the stale-intake list
+        # ages rows from this moment, not from record creation (a
+        # record can sit at created/agent_kickoff long before the
+        # buyer submits). Same-status merge write — details only, the
+        # status does not move again.
+        update_pack_intake_status(
+            _intake_db_path(), intake.intake_id, "intake_complete",
+            details={"intake_completed_at":
+                     datetime.now(timezone.utc).isoformat()})
+        owner_notified = _notify_owner(intake)
+    else:
+        # Re-submission: report the notification outcome already on
+        # record so the page's claim matches reality.
+        try:
+            from sincor2.payment_ledger import get_pack_intake
+
+            fresh = get_pack_intake(_intake_db_path(), intake.intake_id)
+            if fresh is not None:
+                owner_notified = bool(
+                    (fresh.details or {}).get("owner_notified"))
+        except Exception:
+            owner_notified = False
+    return jsonify({"ok": True, "status": "intake_complete",
+                    "owner_notified": owner_notified}), 200
+
+
+@intake_bp.route("/api/admin/intakes/<intake_id>", methods=["GET"])
+def admin_intake_detail(intake_id):
+    """GET /api/admin/intakes/<id>: one pack intake, answers included.
+
+    The stale-intakes list (blueprints/admin_intakes) says WHICH
+    completed intakes are waiting; this endpoint lets an operator
+    actually READ one — pack status, customer email, and the buyer's
+    submitted answers — without opening a SQLite shell.
+
+    Admin-gated twice, exactly like the list: the production app
+    runs _require_admin as a before_request guard over the
+    /api/admin/intakes prefix (mvp_app._admin_intakes_admin_gate),
+    and this handler re-checks admin itself before any ledger
+    access. Without admin credentials the response is 401 and
+    carries no intake data; with them, an unknown id is a plain 404.
+    """
+    from sincor2.blueprints.admin_intakes import _is_admin_request
+
+    if not _is_admin_request():
+        return jsonify({"error": "Unauthorized"}), 401
+    from sincor2.payment_ledger import get_pack_intake
+
+    try:
+        intake = get_pack_intake(_intake_db_path(), intake_id)
+    except Exception:
+        logger.exception("[INTAKE] admin intake lookup failed")
+        intake = None
+    if intake is None:
+        return jsonify({"error": "Not found"}), 404
+    details = intake.details or {}
+    return jsonify({
+        "ok": True,
+        "intake_id": intake.intake_id,
+        "pack_sku": intake.pack_sku,
+        "pack_name": details.get("pack_name"),
+        "status": intake.status,
+        "customer_email": intake.customer_email,
+        "created_at": intake.created_at,
+        "intake_completed_at": details.get("intake_completed_at"),
+        "owner_notified": details.get("owner_notified"),
+        "intake_answers": details.get("intake_answers") or {},
+    }), 200
 
 
 def init_intake_routes(app) -> None:
