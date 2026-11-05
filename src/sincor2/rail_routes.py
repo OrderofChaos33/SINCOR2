@@ -39,7 +39,8 @@ import os
 import re
 import sqlite3
 import threading
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -180,7 +181,10 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
     publish that was abandoned at its deadline but eventually landed
     after the fallback already ran the kickoff — loses the transition
     and returns an 'already_ran' receipt WITHOUT instantiating the
-    agent a second time.
+    agent a second time. A buyer-first delivery (the buyer completed
+    intake before this job ran) wins the execution claim instead:
+    intake completion alone is not proof the kickoff ran, so the job
+    still executes (Wren PR 8 / #600, founder ruling 2026-11-04).
     """
     from sincor2.payment_ledger import update_pack_intake_status
 
@@ -218,6 +222,12 @@ def fulfill_pack_agent(self=None, intake_id: str = "", pack_sku: str = "",
         "agent_kickoff",
         details={"agent": agent_info, "customer_email": customer_email},
     )
+    # A buyer-first execution claim (if this run held one) has done
+    # its job: the completion write above — specifically its 'agent'
+    # key — is now the durable proof the kickoff executed. The
+    # marker itself stays in details as an audit timestamp; forget
+    # this run's claim registration so its heartbeat stands down.
+    _forget_kickoff_execution_claim(intake_id)
     logger.info(
         "[FULFILLMENT] pack agent kickoff: intake=%s pack=%s agent=%s",
         intake_id, pack_sku, (agent_info or {}).get("agent"),
@@ -778,18 +788,46 @@ def _pack_agent_queue_handler(payload: Dict[str, Any], job_id: str) -> Any:
 
 # Pack-intake lifecycle (payment_ledger.pack_intakes.status):
 # created -> kickoff_claimed -> agent_kickoff -> intake_complete ->
-# in_progress -> delivered. The agent_kickoff write is the pack-agent
-# job's OWN final step, so a row sitting at agent_kickoff or beyond
-# is proof the kickoff executed — no matter what the queue reported
-# afterwards. kickoff_claimed (WREN PR 10 repair round 2) is the
-# atomic enqueue claim: exactly one _queue_pack_agent_job caller may
-# transition a row out of 'created', and only that caller enqueues;
-# the worker gate (_begin_pack_kickoff) transitions the claimed (or
-# freshly created) row into agent_kickoff before executing, so a
-# duplicate delivery can never execute the kickoff a second time.
+# in_progress -> delivered. Two progressions share this one status
+# column: the kickoff progression (created -> kickoff_claimed ->
+# agent_kickoff, driven by the queue/worker machinery) and the
+# buyer/admin progression (intake_complete -> in_progress ->
+# delivered). The buyer's intake POST advances a row straight from
+# created (or kickoff_claimed) to intake_complete, so a row sitting
+# at intake_complete or beyond is NOT by itself proof the kickoff
+# executed — see _kickoff_execution_proven for the evidence rule
+# (the #600 false positive, founder ruling 2026-11-04).
+# kickoff_claimed (WREN PR 10 repair round 2) is the atomic enqueue
+# claim: exactly one _queue_pack_agent_job caller may transition a
+# row out of 'created', and only that caller enqueues; the worker
+# gate (_begin_pack_kickoff) transitions the claimed (or freshly
+# created) row into agent_kickoff before executing, so a duplicate
+# delivery can never execute the kickoff a second time.
 _PACK_KICKOFF_DONE_STATUSES = frozenset({
     "agent_kickoff", "intake_complete", "in_progress", "delivered",
 })
+
+
+def _kickoff_execution_proven(status, details) -> bool:
+    """Positive evidence the pack-agent kickoff body already executed.
+
+    'agent_kickoff' is the kickoff's OWN status — the worker gate
+    moves the row there before executing and the completion write
+    lands there — so a row sitting at agent_kickoff is proof on its
+    own. The later lifecycle statuses are NOT: the buyer's intake
+    POST advances a row straight from created (or kickoff_claimed)
+    to intake_complete, so a row can sit at intake_complete — or
+    beyond, once an admin starts work — with the kickoff never
+    having run. For those statuses the proof is the kickoff
+    completion write's own marker: the 'agent' key it merges into
+    details (fulfill_pack_agent's completion write is the only
+    write that ever sets that key).
+    """
+    if status == "agent_kickoff":
+        return True
+    if status in _PACK_KICKOFF_DONE_STATUSES:
+        return "agent" in (details or {})
+    return False
 
 
 def _pack_kickoff_already_ran(intake_id: str) -> bool:
@@ -801,24 +839,19 @@ def _pack_kickoff_already_ran(intake_id: str) -> bool:
     ran. In both shapes a blind fallback / re-settle enqueue would
     execute the kickoff a second time for one payment, so callers
     check the row — the execution record — before enqueueing again.
-    Never raises: a failed check degrades to 'not proven run' and the
-    kickoff's convergent status write remains the second line of
-    defense.
+    The check is _kickoff_execution_proven: lifecycle position past
+    agent_kickoff counts only with the completion marker, because a
+    buyer who finished intake first parks the row at intake_complete
+    with the kickoff never having run (#600). Never raises: a failed
+    check degrades to 'not proven run' and the kickoff's convergent
+    status write remains the second line of defense.
     """
     if not intake_id:
         return False
-    try:
-        from sincor2.payment_ledger import get_pack_intake
-
-        intake = get_pack_intake(_rail_db_path(), intake_id)
-    except Exception:
-        logger.warning(
-            "[FULFILLMENT] kickoff-state check failed for intake=%s — "
-            "treating the kickoff as not-yet-run", intake_id,
-            exc_info=True)
+    status, details = _pack_intake_state(intake_id)
+    if status is None or status is _STATUS_UNKNOWN:
         return False
-    return bool(intake is not None
-                and intake.status in _PACK_KICKOFF_DONE_STATUSES)
+    return _kickoff_execution_proven(status, details)
 
 
 def _existing_pack_job_ref(intake_id: str) -> str:
@@ -887,23 +920,41 @@ def _try_claim_pack_kickoff(intake_id: str) -> bool:
     not depend on it) drives orphan-claim staleness."""
     if not intake_id:
         return False
-    from sincor2.payment_ledger import transition_pack_intake_status_if
+    from sincor2.payment_ledger import (
+        transition_pack_intake_status_if,
+        update_pack_intake_status,
+    )
 
-    details = None
-    status, current = _pack_intake_state(intake_id)
-    if status == "created":
-        details = dict(current)
-        details["kickoff_claimed_at"] = _utc_now_iso()
     try:
-        return transition_pack_intake_status_if(
+        claimed = transition_pack_intake_status_if(
             _rail_db_path(), intake_id,
             from_statuses=("created",),
-            to_status=_KICKOFF_CLAIMED_STATUS, details=details)
+            to_status=_KICKOFF_CLAIMED_STATUS)
     except Exception:
         logger.warning(
             "[FULFILLMENT] kickoff claim failed for intake=%s",
             intake_id, exc_info=True)
         return False
+    if claimed:
+        # Stamp the claim time by MERGING it through the ledger's
+        # read-merge-write helper (Wren PR 8). The previous shape
+        # pre-merged a snapshot read BEFORE the transition and
+        # passed it back as the transition's details — which the
+        # transition then wrote as a wholesale REPLACE: any key a
+        # concurrent writer merged between the read and the claim
+        # (the intake token binding, the buyer's answers) was
+        # silently dropped. A status-only transition plus a merge
+        # keeps the claim atomic AND every existing key intact.
+        try:
+            update_pack_intake_status(
+                _rail_db_path(), intake_id, _KICKOFF_CLAIMED_STATUS,
+                details={"kickoff_claimed_at": _utc_now_iso()})
+        except Exception:
+            logger.warning(
+                "[FULFILLMENT] kickoff claim timestamp merge failed "
+                "for intake=%s (the claim itself stands)",
+                intake_id, exc_info=True)
+    return claimed
 
 
 def _release_pack_kickoff_claim(intake_id: str) -> bool:
@@ -926,12 +977,13 @@ def _release_pack_kickoff_claim(intake_id: str) -> bool:
         return False
 
 
-def _kickoff_claim_is_stale(details: Dict[str, Any]) -> bool:
+def _kickoff_claim_is_stale(details: Dict[str, Any],
+                            key: str = "kickoff_claimed_at") -> bool:
     """True when a kickoff claim is old enough to presume orphaned.
     A missing/unparseable claim timestamp counts as stale: orphan
     safety beats double-enqueue risk because the worker gate still
     guarantees at-most-once execution across a reclaim."""
-    claimed_at = details.get("kickoff_claimed_at")
+    claimed_at = details.get(key)
     if not claimed_at:
         return True
     try:
@@ -960,7 +1012,7 @@ def _acquire_pack_kickoff_claim(intake_id: str) -> str:
     if _pack_kickoff_already_ran(intake_id):
         return "already"
     status, details = _pack_intake_state(intake_id)
-    if status in _PACK_KICKOFF_DONE_STATUSES:
+    if _kickoff_execution_proven(status, details):
         return "already"
     if status == _KICKOFF_CLAIMED_STATUS:
         if _kickoff_claim_is_stale(details):
@@ -994,7 +1046,11 @@ def _begin_pack_kickoff(intake_id: str):
     atomic transition into agent_kickoff (from kickoff_claimed, or
     from created for a directly delivered job) and may execute; if
     the kickoff body then fails, _release_pack_kickoff_run hands the
-    consumed status back so a retry can execute. 'already': the
+    consumed status back so a retry can execute. A buyer-first row
+    (already at intake_complete or beyond, kickoff never ran) begins
+    instead via the execution claim (_claim_pack_kickoff_execution):
+    prior_status is then the row's lifecycle status, no status is
+    consumed, and the release hands the claim back. 'already': the
     kickoff provably executed, is claimed by a queue operation whose
     own delivery will execute it, or the state is unprovable — this
     delivery must NOT execute. 'legacy': no gate applies (missing
@@ -1020,10 +1076,21 @@ def _begin_pack_kickoff(intake_id: str):
             "[FULFILLMENT] kickoff execution gate failed for "
             "intake=%s — declining to execute", intake_id, exc_info=True)
         return "already", None
-    status, _details = _pack_intake_state(intake_id)
-    if (status in _PACK_KICKOFF_DONE_STATUSES
-            or status == _KICKOFF_CLAIMED_STATUS
+    status, details = _pack_intake_state(intake_id)
+    if (status == _KICKOFF_CLAIMED_STATUS
             or status is _STATUS_UNKNOWN):
+        return "already", None
+    if _kickoff_execution_proven(status, details):
+        return "already", None
+    if status in _POST_KICKOFF_STATUSES:
+        # Buyer-first row (#600): finishing intake advanced the row
+        # past agent_kickoff without the kickoff ever running, so
+        # lifecycle position proves nothing either way. Claim the
+        # execution atomically — exactly one delivery executes; the
+        # rest see the fresh claim (or, later, the completion
+        # marker) and stand down.
+        if _claim_pack_kickoff_execution(intake_id, details):
+            return "begun", status
         return "already", None
     return "legacy", None
 
@@ -1033,7 +1100,11 @@ def _release_pack_kickoff_run(intake_id: str,
     """Undo a worker-gate begin after the kickoff body failed:
     agent_kickoff -> the status the gate consumed ('created' or
     'kickoff_claimed'), so a retry delivery can execute instead of
-    the failed run being mistaken for a completed kickoff."""
+    the failed run being mistaken for a completed kickoff. For a
+    buyer-first begin no status was consumed: the execution claim
+    is handed back instead (_release_pack_kickoff_execution)."""
+    if prior_status in _POST_KICKOFF_STATUSES:
+        return _release_pack_kickoff_execution(intake_id)
     if prior_status not in ("created", _KICKOFF_CLAIMED_STATUS):
         return False
     from sincor2.payment_ledger import transition_pack_intake_status_if
@@ -1047,6 +1118,260 @@ def _release_pack_kickoff_run(intake_id: str,
             "[FULFILLMENT] kickoff run release failed for intake=%s",
             intake_id, exc_info=True)
         return False
+
+
+# --- Wren PR 8: execution claim for buyer-first rows (#600) ----------
+#
+# When the buyer completes intake before the kickoff job runs, the
+# row already sits at intake_complete (or beyond) and the worker
+# gate cannot claim execution with a status transition — the status
+# only moves forward and agent_kickoff is behind it. The claim is
+# instead a compare-and-swap on a details marker: one conditional
+# UPDATE stamps kickoff_execution_claimed_at iff the stored marker
+# still equals the value the caller just read (absent, or stale
+# enough to presume orphaned — a worker that died mid-body without
+# releasing). Exactly one concurrent delivery can win it, json_set
+# merges the single key so no existing details key is ever dropped,
+# and once the body completes, the completion write's 'agent' key
+# is the durable proof the claim no longer needs to provide.
+
+_KICKOFF_EXECUTION_CLAIM_KEY = "kickoff_execution_claimed_at"
+
+# This process's live execution claims: intake_id -> {the timestamp
+# a claim was WON under: the marker timestamp that claim currently
+# holds}. Keyed by winning timestamp because a release must be
+# strictly ownership-checked (adversarial fix, Hole B): after a
+# same-process reclaim, two claims can be registered for one intake,
+# and a stale holder's release must never resolve to — and clear —
+# the fresher claim's marker. The winning thread also records its
+# (intake_id, win_ts) in _kickoff_claim_local so its own release /
+# completion-forget names exactly its claim.
+_kickoff_execution_claims: Dict[str, Dict[str, str]] = {}
+_kickoff_execution_claims_lock = threading.Lock()
+_kickoff_claim_local = threading.local()
+
+# While a claim holder's body runs, a heartbeat re-stamps its
+# marker well inside the staleness window (adversarial fix,
+# Hole A): the 120s reclaim window alone cannot distinguish a
+# slow-but-live body from a dead worker, and a redelivery that
+# reclaimed a LIVE claim executed the kickoff a second time
+# mid-body. With the heartbeat, a live claim never goes stale;
+# a dead holder's heartbeat dies with it, so its marker goes
+# stale on schedule and the orphan-reclaim path still works.
+_KICKOFF_EXECUTION_CLAIM_HEARTBEAT_SECONDS = 30.0
+
+_POST_KICKOFF_STATUSES = ("intake_complete", "in_progress", "delivered")
+
+
+def _claim_pack_kickoff_execution(intake_id: str,
+                                  details: Dict[str, Any]) -> bool:
+    """Atomically claim kickoff execution for a buyer-first row.
+
+    True iff THIS delivery stamped the claim marker. A fresh marker
+    from another delivery, or the completion write's 'agent' marker,
+    refuses the claim (checked again inside the UPDATE, so the
+    answer stays correct under races). A stale marker is
+    reclaimable: the CAS compares against the exact value read, so
+    two reclaimers still produce exactly one winner.
+    """
+    observed = (details or {}).get(_KICKOFF_EXECUTION_CLAIM_KEY)
+    if observed is not None and not _kickoff_claim_is_stale(
+            details, key=_KICKOFF_EXECUTION_CLAIM_KEY):
+        return False
+    new_ts = _utc_now_iso()
+    placeholders = ",".join("?" for _ in _POST_KICKOFF_STATUSES)
+    try:
+        conn = _connect_rail()
+        try:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET details = json_set("
+                "CASE WHEN json_valid(details) THEN details "
+                "ELSE '{}' END, '$.' || ?, ?) "
+                "WHERE intake_id = ? "
+                f"AND status IN ({placeholders}) "
+                "AND (CASE WHEN json_valid(details) THEN "
+                "COALESCE(json_extract(details, '$.' || ?), '') "
+                "ELSE '' END) = ? "
+                "AND (NOT json_valid(details) OR "
+                "json_extract(details, '$.agent') IS NULL)",
+                (_KICKOFF_EXECUTION_CLAIM_KEY, new_ts, intake_id,
+                 *_POST_KICKOFF_STATUSES,
+                 _KICKOFF_EXECUTION_CLAIM_KEY, str(observed or "")),
+            )
+            conn.commit()
+            won = cur.rowcount == 1
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution claim failed for "
+            "intake=%s — declining to execute", intake_id,
+            exc_info=True)
+        return False
+    if won:
+        with _kickoff_execution_claims_lock:
+            _kickoff_execution_claims.setdefault(intake_id, {})[
+                new_ts] = new_ts
+        _kickoff_claim_local.token = (intake_id, new_ts)
+        _start_kickoff_execution_heartbeat(intake_id, new_ts)
+    return won
+
+
+def _drop_kickoff_execution_claim_locked(intake_id: str,
+                                         win_ts: str) -> None:
+    """Remove one claim from the registry. Caller holds the lock."""
+    claims = _kickoff_execution_claims.get(intake_id)
+    if claims is not None:
+        claims.pop(win_ts, None)
+        if not claims:
+            _kickoff_execution_claims.pop(intake_id, None)
+
+
+def _refresh_kickoff_execution_claim(intake_id: str, current_ts: str,
+                                     new_ts: str) -> bool:
+    """Re-stamp a live claim's marker (heartbeat): CAS on the exact
+    marker the claim currently holds, so a refresh can never move
+    another claim's marker. False when the marker no longer equals
+    ours — the claim was reclaimed or completed."""
+    placeholders = ",".join("?" for _ in _POST_KICKOFF_STATUSES)
+    try:
+        conn = _connect_rail()
+        try:
+            cur = conn.execute(
+                "UPDATE pack_intakes SET details = json_set("
+                "CASE WHEN json_valid(details) THEN details "
+                "ELSE '{}' END, '$.' || ?, ?) "
+                "WHERE intake_id = ? "
+                f"AND status IN ({placeholders}) "
+                "AND (CASE WHEN json_valid(details) THEN "
+                "COALESCE(json_extract(details, '$.' || ?), '') "
+                "ELSE '' END) = ?",
+                (_KICKOFF_EXECUTION_CLAIM_KEY, new_ts, intake_id,
+                 *_POST_KICKOFF_STATUSES,
+                 _KICKOFF_EXECUTION_CLAIM_KEY, current_ts),
+            )
+            conn.commit()
+            return cur.rowcount == 1
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution claim heartbeat failed "
+            "for intake=%s", intake_id, exc_info=True)
+        return False
+
+
+def _start_kickoff_execution_heartbeat(intake_id: str,
+                                       win_ts: str) -> None:
+    """Keep a won execution claim visibly alive while its body
+    runs: every heartbeat interval, re-stamp the marker (CAS on the
+    timestamp the claim currently holds) and record the new stamp
+    in the registry. The thread exits when the claim leaves the
+    registry (released, completed) or when a refresh finds the
+    marker is no longer ours (reclaimed — the claim is lost, and
+    the registry entry goes with it)."""
+
+    def _beat() -> None:
+        while True:
+            time.sleep(_KICKOFF_EXECUTION_CLAIM_HEARTBEAT_SECONDS)
+            with _kickoff_execution_claims_lock:
+                claims = _kickoff_execution_claims.get(intake_id) or {}
+                current = claims.get(win_ts)
+                if current is None:
+                    return
+                new_ts = _utc_now_iso()
+                if not _refresh_kickoff_execution_claim(
+                        intake_id, current, new_ts):
+                    _drop_kickoff_execution_claim_locked(
+                        intake_id, win_ts)
+                    return
+                claims[win_ts] = new_ts
+
+    threading.Thread(
+        target=_beat, name=f"kickoff-claim-heartbeat-{intake_id}",
+        daemon=True).start()
+
+
+def _resolve_kickoff_execution_claim_locked(intake_id: str):
+    """(win_ts, current_ts) of the claim a release/forget on THIS
+    thread may act on, or None. Caller holds the lock.
+
+    Ownership rule (Hole B): the thread's own claim token names
+    the claim exactly. Without a token, the claim is resolvable
+    only when exactly one claim is registered for the intake —
+    with two or more, a tokenless release cannot know which holder
+    it speaks for and must refuse rather than guess (guessing is
+    how a stale release cleared a fresher claim)."""
+    claims = _kickoff_execution_claims.get(intake_id) or {}
+    token = getattr(_kickoff_claim_local, "token", None)
+    if token is not None and token[0] == intake_id:
+        current = claims.get(token[1])
+        if current is not None:
+            return token[1], current
+        return None
+    if len(claims) == 1:
+        win_ts, current = next(iter(claims.items()))
+        return win_ts, current
+    return None
+
+
+def _forget_kickoff_execution_claim(intake_id: str) -> None:
+    """Drop THIS thread's claim registration after the kickoff
+    body completed: the completion write's 'agent' key is the
+    durable proof now, the marker stays as an audit timestamp,
+    and the heartbeat thread exits on its next tick."""
+    with _kickoff_execution_claims_lock:
+        resolved = _resolve_kickoff_execution_claim_locked(intake_id)
+        if resolved is not None:
+            _drop_kickoff_execution_claim_locked(intake_id, resolved[0])
+    token = getattr(_kickoff_claim_local, "token", None)
+    if token is not None and token[0] == intake_id:
+        _kickoff_claim_local.token = None
+
+
+def _release_pack_kickoff_execution(intake_id: str) -> bool:
+    """Undo this process's execution claim after the kickoff body
+    failed: remove the marker, CAS-guarded on the exact timestamp
+    the RELEASING claim currently holds (its win stamp as refreshed
+    by its heartbeat). Strictly ownership-checked (Hole B): the
+    claim is resolved under the registry lock — by this thread's
+    claim token, or as the intake's only registered claim — and
+    the resolve + marker removal happen inside the same lock hold,
+    so a stale holder can never clear a fresher claim's marker.
+    An unresolvable (ambiguous or absent) claim releases nothing
+    and returns False: the marker then ages out and is reclaimed,
+    which is safe, instead of being guessed at, which was not."""
+    token = getattr(_kickoff_claim_local, "token", None)
+    try:
+        with _kickoff_execution_claims_lock:
+            resolved = _resolve_kickoff_execution_claim_locked(
+                intake_id)
+            if resolved is None:
+                return False
+            win_ts, current_ts = resolved
+            _drop_kickoff_execution_claim_locked(intake_id, win_ts)
+            conn = _connect_rail()
+            try:
+                cur = conn.execute(
+                    "UPDATE pack_intakes SET details = "
+                    "json_remove(details, '$.' || ?) "
+                    "WHERE intake_id = ? AND json_valid(details) "
+                    "AND json_extract(details, '$.' || ?) = ?",
+                    (_KICKOFF_EXECUTION_CLAIM_KEY, intake_id,
+                     _KICKOFF_EXECUTION_CLAIM_KEY, current_ts),
+                )
+                conn.commit()
+                return cur.rowcount == 1
+            finally:
+                conn.close()
+    except Exception:
+        logger.warning(
+            "[FULFILLMENT] kickoff execution claim release failed "
+            "for intake=%s", intake_id, exc_info=True)
+        return False
+    finally:
+        if token is not None and token[0] == intake_id:
+            _kickoff_claim_local.token = None
 
 
 # Hard TOTAL-duration bound on one Celery publish attempt. The
@@ -1196,9 +1521,13 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     and re-queueable rather than failing a verified payment.
 
     At-most-once (WREN PR 10 repair): if the pack-intake row already
-    proves the kickoff executed for this payment (agent_kickoff or
-    beyond), return the existing-execution reference without
-    enqueueing — a re-settle must never run the kickoff twice.
+    proves the kickoff executed for this payment (agent_kickoff, or a
+    later status carrying the completion write's 'agent' marker —
+    see _kickoff_execution_proven), return the existing-execution
+    reference without enqueueing — a re-settle must never run the
+    kickoff twice. A row the buyer advanced to intake_complete
+    WITHOUT the kickoff having run is not proof (#600): it takes the
+    claim flow below and the kickoff still gets its one execution.
 
     Atomic claim (repair round 2): the enqueue decision is the
     created -> kickoff_claimed transition (see
@@ -1265,6 +1594,25 @@ def _queue_pack_agent_job(*, intake_id: str, pack_sku: str,
     logger.info(
         "[FULFILLMENT] Queued pack agent job %s on %s", result.id, PACK_AGENT_QUEUE)
     return result.id
+
+
+_EMAIL_SHAPE_RE = re.compile(
+    r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def _scrub_email_addresses(text: Any) -> str:
+    """``text`` with every email-shaped substring redacted.
+
+    For exception/error text persisted into operator-facing
+    records (the pack_email_failed alert, the rail event's
+    pack_email_error): mail-layer failures routinely echo the
+    recipient address (SMTP 550s name the rejected mailbox), so
+    raw exception text would carry the buyer's email into records
+    whose contract is 'name the intake id, never the buyer'
+    (Wren PR 8 item 4 + adversarial Hole C). The error's substance
+    (codes, host, refusal reason) survives; only the address goes.
+    """
+    return _EMAIL_SHAPE_RE.sub("[redacted email]", str(text))
 
 
 def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
@@ -1465,7 +1813,8 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                         "pack_email_status": "failed",
                         "pack_email_failed": True,
                         "pack_email_retryable": True,
-                        "pack_email_error": str(email_exc),
+                        "pack_email_error":
+                            _scrub_email_addresses(email_exc),
                     })
                     try:
                         from sincor2.payment_ledger import record_alert
@@ -1474,9 +1823,11 @@ def _fulfill_rail_pack(order: Dict[str, Any]) -> Dict[str, Any]:
                             _rail_db_path(),
                             event_id or "unknown",
                             "pack_email_failed",
-                            "Pack email failed for %s: %s"
-                            % (customer_email, email_exc),
+                            "Pack email failed for intake %s: %s"
+                            % (intake.intake_id,
+                               _scrub_email_addresses(email_exc)),
                             details={"pack_sku": pack_sku,
+                                     "intake_id": intake.intake_id,
                                      "retryable": True, "rail": True},
                         )
                     except Exception as alert_exc:

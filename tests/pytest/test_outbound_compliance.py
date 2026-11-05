@@ -211,11 +211,36 @@ class TestUnsubscribe:
         app.register_blueprint(unsubscribe_bp)
         return app.test_client()
 
-    def test_get_unsubscribe_suppresses_and_send_path_honors_it(self, armed_env):
+    # Wren PR 8 contract (founder-approved 2026-11-04): GET
+    # /unsubscribe renders a confirmation page and NEVER suppresses —
+    # mail-scanner prefetch protection. Only POST (incl. the RFC 8058
+    # one-click POST) suppresses, and the send path honors that.
+    def test_get_unsubscribe_renders_confirmation_and_send_path_still_delivers(self, armed_env):
         from sincor2 import comms_compliance
         token = comms_compliance.make_unsubscribe_token("ops@example.com")
         assert token
         resp = self._client().get(f"/unsubscribe/{token}")
+        assert resp.status_code == 200
+        body = resp.get_data(as_text=True)
+        assert "<form" in body and 'method="post"' in body
+        # A scanner prefetch must not unsubscribe anyone.
+        assert not comms_compliance.is_suppressed("ops@example.com")
+        from sincor2.comms_gating import outreach_send_allowed
+        assert outreach_send_allowed("ops@example.com") == (True, "ok")
+        from sincor2.outreach_engine import OutreachEngine
+        fake = _FakeResend()
+        assert OutreachEngine().send_outreach_email(
+            {"email": "ops@example.com", "name": "Ops"}, fake
+        ) is True
+        assert len(fake.emails.sent) == 1
+
+    def test_post_unsubscribe_suppresses_and_send_path_honors_it(self, armed_env):
+        from sincor2 import comms_compliance
+        token = comms_compliance.make_unsubscribe_token("ops@example.com")
+        assert token
+        resp = self._client().post(
+            f"/unsubscribe/{token}", data={"List-Unsubscribe": "One-Click"}
+        )
         assert resp.status_code == 200
         assert comms_compliance.is_suppressed("ops@example.com")
         from sincor2.comms_gating import outreach_send_allowed
