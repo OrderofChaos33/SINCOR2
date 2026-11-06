@@ -489,8 +489,30 @@ class TestGenesisCohortFuzz:
         assert genesis_cohort.get_member(evil) is None
         assert genesis_cohort.get_member_by_wallet(evil) is None
         assert genesis_cohort.is_genesis_member(evil) is False
+        # W-136 STALE update: claim() starts a pending claim and binds
+        # only on emailed-token confirmation — drive the confirmed flow
+        # (fake sender injected directly; monkeypatch restores it).
+        import re as _re
+
+        class _GenesisSender:
+            mode = "test"
+
+            def __init__(self):
+                self.sent = []
+
+            def send_email(self, to_email, to_name="", subject="",
+                           html_content="", text_content=None, metadata=None):
+                self.sent.append(html_content + " " + (text_content or ""))
+                return {"status": "sent", "message_id": "dw304"}
+
+        sender = _GenesisSender()
+        monkeypatch.setattr(genesis_cohort, "email_sender", sender)
         claimed = genesis_cohort.claim("member@example.com", "password-123")
         assert claimed["ok"]
+        token = _re.search(
+            r"token=([A-Za-z0-9_\-]+)", sender.sent[-1]).group(1)
+        confirmed = genesis_cohort.confirm_claim(token)
+        assert confirmed["ok"]
         # The evil probes changed nothing: the real member still reads.
         assert genesis_cohort.get_member("member@example.com") is not None
         assert genesis_cohort.genesis_count() == 1

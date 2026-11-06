@@ -12,8 +12,9 @@ Pins, against the real production app assembly (sincor2.mvp_app):
   * Rate-limit headers (X-RateLimit-*) ride on claim responses, and the
     429 carries Retry-After plus the shared {"error": "rate_limited"}
     JSON shape.
-  * A normal single claim behaves exactly as before (200 + genesis
-    cookie for a valid claim; 400 for an invalid one).
+  * A normal single claim behaves as before in shape (200 for a valid
+    claim; 400 for an invalid one) — W-136 update: the genesis cookie
+    is set by the emailed-token confirmation, not by the bare claim.
   * Every response carries a Content-Security-Policy with
     default-src 'self', object-src 'none', base-uri 'self' and
     frame-ancestors 'self', alongside the pre-existing header set.
@@ -46,14 +47,50 @@ def mvp_client():
 BAD_CLAIM = {"email": "not-an-email", "password": "testpass123"}
 
 
+class _FakeGenesisSender:
+    """W-136: captures genesis confirmation mail for the confirmed flow."""
+
+    mode = "test"
+
+    def __init__(self):
+        self.sent = []
+
+    def send_email(self, to_email, to_name="", subject="",
+                   html_content="", text_content=None, metadata=None):
+        self.sent.append({"to": to_email, "html": html_content,
+                          "text": text_content or ""})
+        return {"status": "sent", "message_id": "test-genesis"}
+
+    def last_token(self):
+        import re
+
+        m = re.search(r"token=([A-Za-z0-9_\-]+)",
+                      self.sent[-1]["html"] + " " + self.sent[-1]["text"])
+        assert m
+        return m.group(1)
+
+
 def test_single_valid_claim_behaves_as_before(mvp_client, monkeypatch, tmp_path):
+    # W-136 STALE update: a bare claim used to return 200 + the genesis
+    # cookie with no email proof. It now returns the neutral pending
+    # receipt (200, no allocation, no cookie); the cookie is set when
+    # the emailed token is confirmed — driven here to preserve the
+    # original intent (a normal valid claim flow succeeds end to end).
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
+    from sincor2 import genesis_cohort
+
+    sender = _FakeGenesisSender()
+    monkeypatch.setattr(genesis_cohort, "email_sender", sender)
     r = mvp_client.post(
         "/api/genesis/claim",
         json={"email": "b44-single@example.com", "password": "testpass123", "wallet": ""},
     )
     assert r.status_code == 200
     assert r.get_json()["ok"] is True
+    assert "allocation" not in r.get_json()
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    assert r.status_code == 200
     assert "sincor_genesis" in (r.headers.get("Set-Cookie") or "")
 
 

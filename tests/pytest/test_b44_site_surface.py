@@ -78,14 +78,55 @@ def test_gate_claim_form_has_no_password_field(mvp_client, monkeypatch):
     assert "form.password" not in html
 
 
+class _FakeGenesisSender:
+    """W-136: captures genesis confirmation mail for the confirmed flow."""
+
+    mode = "test"
+
+    def __init__(self):
+        self.sent = []
+
+    def send_email(self, to_email, to_name="", subject="",
+                   html_content="", text_content=None, metadata=None):
+        self.sent.append({"to": to_email, "html": html_content,
+                          "text": text_content or ""})
+        return {"status": "sent", "message_id": "test-genesis"}
+
+    def last_token(self):
+        m = re.search(r"token=([A-Za-z0-9_\-]+)",
+                      self.sent[-1]["html"] + " " + self.sent[-1]["text"])
+        assert m
+        return m.group(1)
+
+
+def _inject_genesis_sender(monkeypatch):
+    from sincor2 import genesis_cohort
+
+    sender = _FakeGenesisSender()
+    monkeypatch.setattr(genesis_cohort, "email_sender", sender)
+    return sender
+
+
 def test_genesis_claim_api_works_without_password(mvp_client, monkeypatch, tmp_path):
+    # W-136 STALE update: this test pinned the vulnerable instant-bind
+    # (claim -> ok + gate cookie with no email proof). The claim now
+    # returns a neutral pending receipt and sets no cookie; the cookie
+    # arrives only after the emailed token is confirmed — which is the
+    # flow driven here. Original intent preserved: no password anywhere.
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
+    sender = _inject_genesis_sender(monkeypatch)
     r = mvp_client.post(
         "/api/genesis/claim",
         json={"email": "nopass@example.com", "wallet": ""},
     )
     assert r.status_code == 200
     assert r.get_json()["ok"] is True
+    assert "allocation" not in r.get_json()
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+    assert r.get_json()["allocation"]
     assert "sincor_genesis" in (r.headers.get("Set-Cookie") or "")
 
 
@@ -98,11 +139,20 @@ def test_genesis_claim_api_still_rejects_bad_email(mvp_client, monkeypatch, tmp_
 
 def test_genesis_cohort_claim_needs_no_password_and_stores_none(
         monkeypatch, tmp_path):
+    # W-136 STALE update: claim() used to bind instantly; it now starts
+    # a pending claim. The confirmed flow is driven to preserve the
+    # original intent: a passwordless claim binds the wallet and stores
+    # no password anywhere.
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
     from sincor2 import genesis_cohort
 
+    sender = _inject_genesis_sender(monkeypatch)
     result = genesis_cohort.claim("plain@example.com", wallet="0x" + "11" * 20)
     assert result["ok"], result
+    assert "allocation" not in result
+    assert genesis_cohort.get_member("plain@example.com") is None
+    confirmed = genesis_cohort.confirm_claim(sender.last_token())
+    assert confirmed["ok"], confirmed
     member = genesis_cohort.get_member("plain@example.com")
     assert member is not None
     assert member["wallet"] == "0x" + "11" * 20
@@ -133,8 +183,14 @@ def test_genesis_cohort_legacy_password_db_migrates(monkeypatch, tmp_path):
     from sincor2 import genesis_cohort
 
     assert genesis_cohort.get_member("legacy@example.com") is not None
+    # W-136 STALE update: the fresh claim completes through email
+    # confirmation before it counts as a member (was: instant bind).
+    sender = _inject_genesis_sender(monkeypatch)
     result = genesis_cohort.claim("fresh@example.com")
     assert result["ok"], result
+    assert genesis_cohort.genesis_count() == 1  # still pending
+    confirmed = genesis_cohort.confirm_claim(sender.last_token())
+    assert confirmed["ok"], confirmed
     assert genesis_cohort.genesis_count() == 2
     db = sqlite3.connect(str(tmp_path / "genesis_cohort.db"))
     cols = [row[1] for row in db.execute("PRAGMA table_info(genesis_cohort)")]
