@@ -25,6 +25,47 @@ _PROJECT_ROOT = os.path.dirname(
 _REPO_STATIC = os.path.join(_PROJECT_ROOT, "static")
 
 
+def _repo_doc_candidates(relpath: str):
+    """Candidate paths for a repo doc (``docs/<relpath>``) across layouts.
+
+    The repo/test layout puts docs/ at the repo root, four dirname steps
+    above this module (``_PROJECT_ROOT``). Deployed layouts break that
+    fixed depth: the Docker image flattens the tree under /app, and an
+    installed package can sit in site-packages while the process working
+    directory is the app root. ``_PROJECT_ROOT`` alone resolved to a root
+    with no docs/ tree in production and the doc routes 404'd. Walk every
+    ancestor of this module, then the import-time project root, then the
+    working directory, and serve the first hit. ``relpath`` is only ever
+    a hardcoded literal from the routes below, never user input.
+    """
+    parts = relpath.split("/")
+    roots = []
+    cur = os.path.dirname(os.path.abspath(__file__))
+    while True:
+        roots.append(cur)
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    roots.append(_PROJECT_ROOT)
+    roots.append(os.getcwd())
+    seen = set()
+    for root in roots:
+        if root not in seen:
+            seen.add(root)
+            yield os.path.join(root, "docs", *parts)
+
+
+def _serve_repo_doc(relpath: str) -> Response:
+    for path in _repo_doc_candidates(relpath):
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as fh:
+                return Response(fh.read(), mimetype="text/markdown")
+    from werkzeug.exceptions import NotFound
+
+    raise NotFound(f"repo doc not found: {relpath}")
+
+
 def _serve_static_text(relpath: str, mimetype: str) -> Response:
     candidates = [
         os.path.join(current_app.static_folder, relpath),
@@ -89,10 +130,13 @@ def trust_stack_doc():
     # static/.well-known/trust-stack.json names this exact URL as its
     # "doc"; the content lives in the repo at docs/TRUST_STACK.md but no
     # route served it, so the manifest pointed at a 404. Serve the file.
-    path = os.path.join(_PROJECT_ROOT, "docs", "TRUST_STACK.md")
-    if os.path.isfile(path):
-        with open(path, "r", encoding="utf-8") as fh:
-            return Response(fh.read(), mimetype="text/markdown")
-    from werkzeug.exceptions import NotFound
+    return _serve_repo_doc("TRUST_STACK.md")
 
-    raise NotFound("trust stack doc not found")
+
+@bp.route("/docs/architecture/AUCTION_GROUND_TRUTH.md", methods=["GET"])
+def auction_ground_truth_doc():
+    # Machine surfaces name this spec as the canonical auction invariants
+    # (a2a_inbound_market.py, mcp_server.py, auction_bridge.py, and the
+    # A2A API's "invariants" field all cite
+    # docs/architecture/AUCTION_GROUND_TRUTH.md), but no route served it.
+    return _serve_repo_doc("architecture/AUCTION_GROUND_TRUTH.md")
