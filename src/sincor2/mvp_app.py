@@ -507,6 +507,11 @@ if OAUTH_AVAILABLE:
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
+    # Base44 review (2026-11-06): limit refusals existed but were
+    # invisible — no X-RateLimit-* / Retry-After headers on any
+    # response. headers_enabled makes every limited response carry its
+    # limit / remaining / reset, and 429s carry Retry-After.
+    headers_enabled=True,
     default_limits=["10000 per day", "1000 per hour"],
     # SINCOR_LIMITER_STORAGE_URI=redis://... shares the app-wide limiter
     # across gunicorn workers (G2.8). Default memory:// preserves dev/test
@@ -827,8 +832,69 @@ def log_request():
         logger.info('%s %s', request.method, request.path)
 
 
+# Content-Security-Policy (Base44 review 2026-11-06: header set was
+# good but carried no CSP at all). The directives below are the
+# strictest set the current templates survive, inventoried from
+# templates/ + static/ on 2026-11-06:
+#   * script-src 'unsafe-inline' — 50 inline <script> blocks and ~101
+#     inline event-handler attributes across the templates; removing it
+#     means rewriting every template, out of scope here.
+#   * script-src 'unsafe-eval' — the Alpine.js standard build (unpkg)
+#     evaluates x-data expressions through the Function constructor,
+#     and the Tailwind Play CDN (cdn.tailwindcss.com) compiles in the
+#     browser. Dropping eval breaks the dashboards that use them.
+#   * script host allowlist — cdn.jsdelivr.net (chart.js),
+#     cdn.tailwindcss.com, unpkg.com (alpine), cdnjs.cloudflare.com
+#     (three.js, socket.io), esm.sh (WalletConnect provider, dynamically
+#     imported by static/js/sinc_wallet.js).
+#   * style-src 'unsafe-inline' — 60 <style> blocks + ~595 style=
+#     attributes, plus the Tailwind Play CDN's runtime-injected styles.
+#     Hosts: fonts.googleapis.com (font CSS), jsdelivr / tailwindcss
+#     (tailwind stylesheet).
+#   * img-src https: — image URLs are partly data-driven (API-returned
+#     media, api.qrserver.com QR codes in refer.html, the team.finance
+#     badge); images cannot execute script, so the scheme-wide allow is
+#     the functional floor. data:/blob: cover inline + generated media.
+#   * font-src — fonts.gstatic.com serves the Google Font files.
+#   * connect-src — 'self' covers same-origin fetch/XHR and the
+#     socket.io client (io() with no URL = same origin, incl. its ws
+#     upgrade); api.dexscreener.com is fetched by templates/axiom.html;
+#     mainnet.base.org is the Base RPC the wallet config names;
+#     *.walletconnect.com / *.walletconnect.org (https + wss) are the
+#     WalletConnect relay/verify endpoints for the esm.sh provider.
+#   * frame-src 'self' — the genesis gate iframes /?inner=1 as its
+#     backdrop; frame-ancestors 'self' matches the X-Frame-Options
+#     SAMEORIGIN posture below (the gate frames its own homepage, so
+#     'none' would break it).
+#   * object-src 'none', base-uri 'self', form-action 'self' — no
+#     plugins, no base-tag hijack, forms post same-origin only.
+_CONTENT_SECURITY_POLICY = "; ".join((
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    " https://cdn.jsdelivr.net https://cdn.tailwindcss.com"
+    " https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
+    " https://cdn.jsdelivr.net https://cdn.tailwindcss.com",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' https://api.dexscreener.com https://esm.sh"
+    " https://mainnet.base.org https://*.walletconnect.com"
+    " wss://*.walletconnect.com https://*.walletconnect.org"
+    " wss://*.walletconnect.org",
+    "media-src 'self' data: blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-src 'self'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+))
+
+
 @app.after_request
 def apply_security_headers(response):
+    response.headers['Content-Security-Policy'] = _CONTENT_SECURITY_POLICY
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
