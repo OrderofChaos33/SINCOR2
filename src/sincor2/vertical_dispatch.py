@@ -60,6 +60,15 @@ def _reset_dispatch_registry() -> None:
 
 # Maps A2A skill ids for cross-cutting SINCOR skills to AgencyKernel task types.
 _KERNEL_SKILL_MAP: Dict[str, str] = {
+    "webapp-testing": "quality_audit",
+    "mcp-builder": "agent_management",
+    "skill-creator": "agent_management",
+    "internal-comms": "content_generation",
+    "brand-guidelines": "content_generation",
+    "canvas-design": "content_generation",
+    "theme-factory": "local_business_site",
+    "artifacts-builder": "local_business_site",
+    "slack-gif-creator": "content_generation",
     "market-intelligence": "market_analysis",
     "competitor-intel":    "market_analysis",
     "lead-enrichment": "lead_enrichment",
@@ -76,9 +85,35 @@ _KERNEL_SKILL_MAP: Dict[str, str] = {
     "toa-decision": "toa_decision",
     "cashflow-recovery": "cashflow_recovery",
     "local-business-site-builder": "local_business_site",
+    # Adopt-24 T1 methodology skills (obra/superpowers, MIT) — kernel
+    # task types mirror _SKILL_TASK_TYPE_MAP below.
+    "verification-before-completion": "quality_audit",
+    "test-driven-development": "quality_audit",
+    "systematic-debugging": "quality_audit",
+    "requesting-code-review": "quality_audit",
+    "receiving-code-review": "quality_audit",
+    "agent-methodology-self-check": "quality_audit",
+    "brainstorming": "toa_decision",
+    "subagent-driven-development": "agent_management",
+    "dispatching-parallel-agents": "agent_management",
+    "writing-plans": "agent_management",
+    "executing-plans": "agent_management",
+    "using-git-worktrees": "agent_management",
+    "writing-skills": "agent_management",
+    "finishing-a-development-branch": "agent_management",
+    "agent-methodology-guide": "agent_management",
 }
 
 _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
+    "webapp-testing": "quality_audit",
+    "mcp-builder": "agent_management",
+    "skill-creator": "agent_management",
+    "internal-comms": "content_generation",
+    "brand-guidelines": "content_generation",
+    "canvas-design": "content_generation",
+    "theme-factory": "local_business_site",
+    "artifacts-builder": "local_business_site",
+    "slack-gif-creator": "content_generation",
     "healthcare-rcm": "eligibility_verification",
     "provider-credentialing": "credentialing_workflow",
     "healthcare-credential-check": "credentialing_workflow",
@@ -124,6 +159,22 @@ _SKILL_TASK_TYPE_MAP: Dict[str, str] = {
     "detailing-social": "social_schedule",
     "detailing-copy": "ad_copy",
     "detailing-engage": "landing_engage",
+    # Adopt-24 T1 methodology skills (obra/superpowers, MIT).
+    "verification-before-completion": "quality_audit",
+    "test-driven-development": "quality_audit",
+    "systematic-debugging": "quality_audit",
+    "requesting-code-review": "quality_audit",
+    "receiving-code-review": "quality_audit",
+    "agent-methodology-self-check": "quality_audit",
+    "brainstorming": "toa_decision",
+    "subagent-driven-development": "agent_management",
+    "dispatching-parallel-agents": "agent_management",
+    "writing-plans": "agent_management",
+    "executing-plans": "agent_management",
+    "using-git-worktrees": "agent_management",
+    "writing-skills": "agent_management",
+    "finishing-a-development-branch": "agent_management",
+    "agent-methodology-guide": "agent_management",
 }
 
 
