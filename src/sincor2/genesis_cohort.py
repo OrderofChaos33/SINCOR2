@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
-import os
 import re
 import sqlite3
-import secrets
 from datetime import datetime, timezone
 
 from sincor2.data_paths import data_dir
@@ -28,25 +25,44 @@ def _connect() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS genesis_cohort (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
             wallet TEXT,
             created_at TEXT NOT NULL
         )
         """
     )
+    _drop_legacy_password_column(conn)
     conn.commit()
     return conn
 
 
-def _hash_password(password: str, salt: str | None = None) -> str:
-    salt = salt or secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        salt.encode("utf-8"),
-        120_000,
-    ).hex()
-    return f"{salt}${digest}"
+def _drop_legacy_password_column(conn: sqlite3.Connection) -> None:
+    """Migrate pre-fix databases: drop the stored password hash.
+
+    The genesis claim used to collect a password and store a PBKDF2 hash,
+    but customer password login is disabled (see the /login audit note in
+    mvp_blueprints/pages.py), so the credential was a dead end — collected
+    and stored, never usable. Existing volume databases still carry the
+    column; rebuild the table without it, preserving every member row.
+    """
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(genesis_cohort)")]
+    if "password_hash" not in cols:
+        return
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS genesis_cohort_nopw (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            wallet TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO genesis_cohort_nopw (id, email, wallet, created_at)"
+        " SELECT id, email, wallet, created_at FROM genesis_cohort"
+    )
+    conn.execute("DROP TABLE genesis_cohort")
+    conn.execute("ALTER TABLE genesis_cohort_nopw RENAME TO genesis_cohort")
 
 
 def genesis_count() -> int:
@@ -122,14 +138,19 @@ def is_genesis_member(email: str) -> bool:
     return get_member(email) is not None
 
 
-def claim(email: str, password: str, wallet: str = "") -> dict:
+def claim(email: str, password: str | None = None, wallet: str = "") -> dict:
+    """Claim a genesis allocation for (email, optional wallet).
+
+    ``password`` is a deprecated shim: pre-fix callers pass one
+    positionally, but it is ignored — never required, hashed, or stored.
+    Customer password login is disabled, so a claim password could never
+    be used anywhere; the claim form no longer collects one.
+    """
+    del password  # ignored by design (see docstring)
     email = (email or "").strip().lower()
-    password = password or ""
     wallet = (wallet or "").strip()[:120]
     if not EMAIL_RE.match(email):
         return {"ok": False, "error": "Enter a valid email."}
-    if len(password) < 8:
-        return {"ok": False, "error": "Password must be at least 8 characters."}
 
     now = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
@@ -146,8 +167,8 @@ def claim(email: str, password: str, wallet: str = "") -> dict:
                 "count": genesis_count(),
             }
         conn.execute(
-            "INSERT INTO genesis_cohort (email, password_hash, wallet, created_at) VALUES (?, ?, ?, ?)",
-            (email, _hash_password(password), wallet, now),
+            "INSERT INTO genesis_cohort (email, wallet, created_at) VALUES (?, ?, ?)",
+            (email, wallet, now),
         )
         conn.commit()
         row = conn.execute("SELECT id FROM genesis_cohort WHERE email = ?", (email,)).fetchone()

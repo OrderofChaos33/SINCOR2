@@ -9,7 +9,11 @@
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
   <meta property="og:title" content="SINCOR — Execution Layers for the Autonomous Machine Economy">
   <meta property="og:description" content="Genesis launches November 9, 2026. Claim a free genesis airdrop, A2A access, and the Agent Gateway.">
-  <meta property="og:image" content="https://getsincor.com/static/sincor_og.jpg">
+  <meta property="og:image" content="https://getsincor.com/static/sincor_og_1200x630.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://getsincor.com/static/sincor_og_1200x630.jpg">
   <meta property="og:url" content="https://getsincor.com/">
   <meta name="theme-color" content="#050814">
   <link rel="canonical" href="https://getsincor.com/">
@@ -173,8 +177,6 @@
         <form id="gate" autocomplete="on">
           <label for="email">Email</label>
           <input id="email" name="email" type="email" required placeholder="you@protocol.io" autocomplete="email">
-          <label for="password">Password</label>
-          <input id="password" name="password" type="password" required minlength="8" placeholder="8+ characters" autocomplete="new-password">
           <label for="wallet">Wallet <span style="font-weight:500;opacity:.7">(optional · Base)</span></label>
           <input id="wallet" name="wallet" type="text" placeholder="0x…" autocomplete="off">
           <button type="submit" id="go">Claim free genesis pass</button>
@@ -225,7 +227,6 @@
           credentials: "same-origin",
           body: JSON.stringify({
             email: form.email.value,
-            password: form.password.value,
             wallet: form.wallet.value
           })
         });

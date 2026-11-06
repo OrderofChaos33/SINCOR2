@@ -8,4 +8,4 @@ Allow: /
 # /llms.txt
 # /ai.txt
 
-Sitemap: https://getsincor.com/sitemap
+Sitemap: https://getsincor.com/sitemap.xml

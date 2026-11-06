@@ -109,10 +109,11 @@ def genesis_claim_api():
     except Exception:
         return jsonify({"ok": False, "error": "Claim service unavailable."}), 503
     payload = request.get_json(silent=True) or {}
+    # No password: customer password login is disabled, so the claim form
+    # no longer collects one and nothing here reads or forwards one.
     result = genesis_claim(
         payload.get("email", ""),
-        payload.get("password", ""),
-        payload.get("wallet", ""),
+        wallet=payload.get("wallet", ""),
     )
     status = 200 if result.get("ok") else 400
     resp = jsonify(result)
