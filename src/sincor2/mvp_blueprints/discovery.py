@@ -82,3 +82,17 @@ def robots_txt():
 @bp.route("/.well-known/security.txt", methods=["GET"])
 def security_txt():
     return _serve_static_text(".well-known/security.txt", "text/plain")
+
+
+@bp.route("/docs/TRUST_STACK.md", methods=["GET"])
+def trust_stack_doc():
+    # static/.well-known/trust-stack.json names this exact URL as its
+    # "doc"; the content lives in the repo at docs/TRUST_STACK.md but no
+    # route served it, so the manifest pointed at a 404. Serve the file.
+    path = os.path.join(_PROJECT_ROOT, "docs", "TRUST_STACK.md")
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as fh:
+            return Response(fh.read(), mimetype="text/markdown")
+    from werkzeug.exceptions import NotFound
+
+    raise NotFound("trust stack doc not found")

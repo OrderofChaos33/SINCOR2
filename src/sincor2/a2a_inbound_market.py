@@ -2666,7 +2666,7 @@ def attach_market_routes(bp: Blueprint) -> None:
                 "vickreyResult(bytes32 auctionId) -> (address winner, "
                 "uint256 price)",
             ],
-            "docs": "/docs/a2a/bidder-wallet-flow",
+            "docs": "/docs/a2a",
         }
         agent_id = request.args.get("agent_id")
         if agent_id:
