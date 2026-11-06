@@ -87,7 +87,16 @@ def index():
 
 
 @bp.route("/api/genesis/claim", methods=["POST"])
-@limiter.limit("10 per minute")
+# Base44 review (2026-11-06): the claim write path needs a burst limit
+# tight enough to stop scripted genesis-cohort farming — 5/minute per
+# client address (single digits; a human retrying the form never comes
+# close), stacked under a 30/hour ceiling so a slow drip from one
+# address also stops. Keying is the limiter default (get_remote_address,
+# i.e. the ProxyFix-derived address — see the trusted-edge note where
+# the limiter is constructed in mvp_app). Limiter refusals surface as
+# 429 {"error": "rate_limited"} via the app errorhandler, with
+# X-RateLimit-* / Retry-After headers (headers_enabled on the limiter).
+@limiter.limit("5 per minute; 30 per hour")
 def genesis_claim_api():
     """Genesis pass claim — the signup target of the launch gate's form.
 
