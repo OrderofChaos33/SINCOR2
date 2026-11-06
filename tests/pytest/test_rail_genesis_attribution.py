@@ -162,10 +162,53 @@ def rail_app():
     return app
 
 
+class _GenesisSender:
+    """W-136: captures genesis confirmation mail (dedicated sender, so
+    the rail mock_comms capture of settle-time mail stays untouched)."""
+
+    mode = "test"
+
+    def __init__(self):
+        self.sent = []
+
+    def send_email(self, to_email, to_name="", subject="",
+                   html_content="", text_content=None, metadata=None):
+        self.sent.append({"to": to_email, "html": html_content,
+                          "text": text_content or ""})
+        return {"status": "sent", "message_id": "genesis-test"}
+
+    def last_token(self):
+        import re
+
+        m = re.search(r"token=([A-Za-z0-9_\-]+)",
+                      self.sent[-1]["html"] + " " + self.sent[-1]["text"])
+        assert m
+        return m.group(1)
+
+
+def _confirmed_claim(email, password=None, wallet="") -> dict:
+    """W-136 STALE update helper: claim() no longer binds instantly —
+    drive the emailed-token confirmation so the member is CONFIRMED,
+    preserving the original intent (attribution for confirmed members).
+
+    ``password`` is accepted only so pre-fix call sites keep their
+    shape; genesis_cohort ignores it by design.
+    """
+    sender = _GenesisSender()
+    prev = genesis_cohort.email_sender
+    genesis_cohort.email_sender = sender
+    try:
+        result = genesis_cohort.claim(email, password, wallet=wallet)
+        assert result["ok"], result
+        confirmed = genesis_cohort.confirm_claim(sender.last_token())
+        assert confirmed["ok"], confirmed
+        return confirmed
+    finally:
+        genesis_cohort.email_sender = prev
+
+
 def _claim_member(email=GENESIS_EMAIL, wallet="") -> dict:
-    result = genesis_cohort.claim(email, "supersecret-pass-1", wallet=wallet)
-    assert result["ok"], result
-    return result
+    return _confirmed_claim(email, "supersecret-pass-1", wallet=wallet)
 
 
 def _checkout(client, sku="credentialing_launch", **kw):
@@ -254,10 +297,11 @@ def test_email_takes_precedence_over_wallet_lookup(rail_app, rail_env,
                                                    mock_comms):
     """Email is the primary key: when the buyer_email matches a member, the
     wallet is not consulted (no cross-attribution from a shared wallet)."""
-    email_member = genesis_cohort.claim(
+    # W-136 STALE update: confirmed claims (was: instant-bind claim()).
+    email_member = _confirmed_claim(
         "email.member@getsincor.com", "supersecret-pass-1",
         wallet="0x" + "99" * 20)["allocation"]
-    wallet_member = genesis_cohort.claim(
+    wallet_member = _confirmed_claim(
         "wallet.member@getsincor.com", "supersecret-pass-1",
         wallet=PAYER)["allocation"]
     assert email_member != wallet_member

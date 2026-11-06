@@ -101,8 +101,12 @@ def genesis_claim_api():
     """Genesis pass claim — the signup target of the launch gate's form.
 
     Public and intentionally ungated by launch date (it must work before
-    launch). A successful claim sets the genesis cookie, which lifts the
-    homepage gate for that browser.
+    launch). W-136: a claim request only creates a PENDING claim and
+    emails a confirmation link to the address — it binds no wallet,
+    reveals no allocation, and sets NO genesis cookie. The cookie (and
+    the wallet binding) happen only in genesis_confirm_api, once the
+    emailed token proves ownership of the email address. The response
+    is the same neutral receipt for new, pending, and existing emails.
     """
     try:
         from sincor2.genesis_cohort import claim as genesis_claim
@@ -115,6 +119,35 @@ def genesis_claim_api():
         payload.get("email", ""),
         wallet=payload.get("wallet", ""),
     )
+    if result.get("ok"):
+        status = 200
+    elif result.get("email_unavailable"):
+        status = 503
+    else:
+        status = 400
+    return jsonify(result), status
+
+
+@bp.route("/api/genesis/confirm", methods=["GET", "POST"])
+@limiter.limit("30 per minute; 200 per hour")
+def genesis_confirm_api():
+    """Confirm a pending genesis claim via its emailed token (W-136).
+
+    Accepts the token as a ?token= query parameter (the emailed link,
+    GET), a JSON body {"token": ...}, or a form field (POST). On
+    success the wallet binds (or is replaced, for a reclaim), the
+    member's allocation is returned to the now-verified owner, and the
+    genesis cookie is set — this is the only path that sets it.
+    """
+    try:
+        from sincor2.genesis_cohort import confirm_claim
+    except Exception:
+        return jsonify({"ok": False, "error": "Claim service unavailable."}), 503
+    token = request.args.get("token") or ""
+    if not token:
+        payload = request.get_json(silent=True) or {}
+        token = payload.get("token") or request.form.get("token") or ""
+    result = confirm_claim(token)
     status = 200 if result.get("ok") else 400
     resp = jsonify(result)
     if result.get("ok"):
