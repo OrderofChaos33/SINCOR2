@@ -2815,11 +2815,32 @@ class A2ARouter:
             quota_identity = _resolve_quota_identity(
                 skill_id=skill_id, params=src, msg_obj=msg_obj, input_text=None,
             )
-            free_remaining = _free_quota_tracker.remaining(quota_identity or "", skill)
-            # Wave 1: the daily ration also makes a quote free for
-            # registered-agent wallets (display only here — consumption
-            # happens atomically on send).
-            daily_remaining = _daily_ration_remaining(quota_identity or "", skill)
+            if quota_identity is not None:
+                free_remaining = _free_quota_tracker.remaining(quota_identity, skill)
+                # Wave 1: the daily ration also makes a quote free for
+                # registered-agent wallets (display only here — consumption
+                # happens atomically on send).
+                daily_remaining = _daily_ration_remaining(quota_identity, skill)
+            else:
+                # B44 (Base44 review 2026-11-06): no verified identity was
+                # presented, so there is NO attributable usage to report —
+                # the trackers' empty-identity 0 read as "entitlement
+                # exhausted" and flatly contradicted the documented
+                # new-caller promise (llms.txt / ai.txt: quote
+                # unauthenticated, "5 free executions per caller", daily
+                # ration 3/agent/skill/day). Report the documented
+                # NEW-CALLER entitlement instead: the lifetime quota a
+                # fresh verified wallet receives on the top-5 skills, and
+                # the daily ration a fresh registered agent receives on
+                # every skill. The note below names the claiming steps
+                # (wallet signature / agent registration). This grants
+                # NOTHING: is_free stays False, the paid price stays
+                # visible, and send-path consumption still requires the
+                # verified / registered identities exactly as before.
+                free_remaining = (
+                    skill.free_quota if skill.id in FREE_QUOTA_SKILLS else 0
+                )
+                daily_remaining = DAILY_RATION_LIMIT
             is_free_call = quota_identity is not None and (
                 free_remaining > 0 or daily_remaining > 0)
 

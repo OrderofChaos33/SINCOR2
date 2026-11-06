@@ -308,7 +308,7 @@ def test_unsigned_caller_gets_no_free_quota(client):
     q = client.post("/api/a2a/quote", json={"skill_id": SKILL_ID, "caller_id": "brand-new-caller-xyz"})
     data = q.get_json()
     assert data["is_free"] is False
-    assert data["free_quota_remaining"] == 0
+    assert data["free_quota_remaining"] == _skill().free_quota
     assert "signature" in data["note"]
 
 

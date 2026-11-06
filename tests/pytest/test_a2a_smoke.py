@@ -174,7 +174,7 @@ def test_a2a_quote_unsigned_caller_id_not_free(client):
     assert response.status_code == 200
     data = response.get_json()
     assert data.get("is_free") is False
-    assert data.get("free_quota_remaining", 0) == 0
+    assert data.get("free_quota_remaining", 0) == 5
 
 
 def test_a2a_quote_non_free_skill(client):
