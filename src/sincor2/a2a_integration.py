@@ -27,10 +27,10 @@ Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
             POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
 The AgentCard advertises the SINCOR skill catalogue as individual skills
-(18 entries in SINCOR_SKILLS at import — 17 cross-cutting skills plus the
+(42 entries in SINCOR_SKILLS at import — 41 cross-cutting skills plus the
 P24 creator-token issuance skill — and further registry-backed vertical
 skills appended at platform bootstrap: 14 against the current
-marketplace/agent_cards.json registry, 32 total advertised; description-less
+marketplace/agent_cards.json registry, 56 total advertised; description-less
 fixture records are quarantined and never advertised.  The count grows as
 vertical packs are registered).
 External agents select the skill they need and submit a task with their
@@ -1115,6 +1115,386 @@ SINCOR_SKILLS: List[AgentSkill] = [
         reputation_floor=0,
         free_quota=0,
     ),
+    # ── Adopt-24 T2: ComposioHQ Tier-2 content/document skills ──────────
+    # Adapted from ComposioHQ/awesome-claude-skills (each skill folder
+    # carries its own Apache-2.0 LICENSE.txt; see
+    # THIRD_PARTY_NOTICES_COMPOSIO.md). Re-expressed in AgentSkill format;
+    # file-producing skills return their artifact as text/JSON output.
+    AgentSkill(
+        id="webapp-testing",
+        name="Web Application Testing",
+        description=(
+            "Test local web applications with Playwright: verify frontend "
+            "functionality, debug UI behaviour, capture screenshots, and "
+            "review browser logs. The caller receives a structured test "
+            "report with per-check results and findings. Powered by "
+            "Auditor + Builder agents."
+        ),
+        tags=["testing", "playwright", "qa", "web", "browser"],
+        examples=[
+            "Test my local web app at localhost:5173 and verify the checkout flow works end to end.",
+            "Debug why the signup form UI breaks on submit and capture screenshots of the failure.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["target"],
+            "properties": {
+                "target": {"type": "string", "description": "Local app URL or HTML file to test"},
+                "checks": {"type": "array", "items": {"type": "string"},
+                           "description": "Flows or behaviours to verify"},
+                "capture": {"type": "array", "items": {"type": "string"},
+                            "description": "Evidence to capture: screenshots, console logs"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "checks": {"type": "array", "items": {"type": "object"}},
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "screenshots": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="mcp-builder",
+        name="MCP Server Builder",
+        description=(
+            "Design and build high-quality MCP (Model Context Protocol) "
+            "servers that connect LLMs to external APIs and services, in "
+            "Python (FastMCP) or Node/TypeScript (MCP SDK). The caller "
+            "receives a tool design, implementation plan, and evaluation "
+            "set for the server. Powered by Builder agents."
+        ),
+        tags=["mcp", "developer-tools", "api", "integration", "servers"],
+        examples=[
+            "Build an MCP server that exposes our inventory API as agent tools in Python.",
+            "Design the tool set and schemas for a TypeScript MCP server over the GitHub API.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["service"],
+            "properties": {
+                "service": {"type": "string", "description": "External API or service to integrate"},
+                "language": {"type": "string", "enum": ["python", "typescript"],
+                             "description": "Implementation language"},
+                "tools": {"type": "array", "items": {"type": "string"},
+                          "description": "Workflows the server should expose as tools"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "tool_designs": {"type": "array", "items": {"type": "object"}},
+                "implementation_plan": {"type": "array", "items": {"type": "string"}},
+                "evaluation_questions": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="skill-creator",
+        name="Skill Creator",
+        description=(
+            "Create effective agent skills that extend capabilities with "
+            "specialised knowledge, workflows, and tool integrations. The "
+            "caller receives a complete skill package design: trigger "
+            "description, SKILL.md draft, and the scripts, references, and "
+            "assets to bundle. Powered by Builder agents."
+        ),
+        tags=["skills", "agent-development", "workflows", "authoring"],
+        examples=[
+            "Create a skill that teaches an agent our PDF rotation workflow.",
+            "Design a skill for onboarding agents onto our BigQuery schema.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["skill_goal"],
+            "properties": {
+                "skill_goal": {"type": "string", "description": "What the new skill should enable"},
+                "use_cases": {"type": "array", "items": {"type": "string"},
+                              "description": "Concrete example requests the skill should handle"},
+                "resources": {"type": "array", "items": {"type": "string"},
+                              "description": "Scripts, references, or assets to bundle"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "skill_name": {"type": "string"},
+                "skill_markdown": {"type": "string"},
+                "structure": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="internal-comms",
+        name="Internal Communications Writer",
+        description=(
+            "Write internal communications in proven company formats: 3P "
+            "updates (Progress, Plans, Problems), company newsletters, "
+            "FAQ responses, status reports, leadership updates, project "
+            "updates, and incident reports. The caller receives a "
+            "ready-to-send draft matched to the format. Powered by "
+            "Builder + Synthesizer agents."
+        ),
+        tags=["communications", "writing", "internal", "newsletter", "status-report"],
+        examples=[
+            "Write a 3P update for the platform team covering this week's progress, plans, and problems.",
+            "Draft a company newsletter announcing the new release and answering the top FAQs.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["comm_type"],
+            "properties": {
+                "comm_type": {"type": "string",
+                              "description": "Format: 3p-update, newsletter, faq, status-report, leadership-update, project-update, incident-report"},
+                "audience": {"type": "string", "description": "Who will read it"},
+                "key_points": {"type": "array", "items": {"type": "string"},
+                               "description": "Points the communication must cover"},
+                "context": {"type": "string", "description": "Background details to weave in"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="brand-guidelines",
+        name="Brand Guidelines Styler",
+        description=(
+            "Apply a brand's colours, typography, and visual identity to "
+            "artifacts such as slides, documents, and pages. The caller "
+            "supplies the brand palette and fonts and receives the styled "
+            "artifact specification with the exact colours and type "
+            "choices applied. Powered by Builder agents."
+        ),
+        tags=["branding", "design", "typography", "visual-identity", "styling"],
+        examples=[
+            "Style this slide deck with our brand colours and heading fonts.",
+            "Apply our corporate identity to this report: palette, typography, and accent shapes.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["artifact"],
+            "properties": {
+                "artifact": {"type": "string", "description": "The artifact to style"},
+                "brand_colors": {"type": "array", "items": {"type": "string"},
+                                 "description": "Brand colour hex codes"},
+                "heading_font": {"type": "string"},
+                "body_font": {"type": "string"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "palette": {"type": "array", "items": {"type": "string"}},
+                "fonts": {"type": "object"},
+                "styled_artifact": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="canvas-design",
+        name="Canvas Design Studio",
+        description=(
+            "Create original visual art and posters as PNG or PDF "
+            "artifacts, guided by a written design philosophy covering "
+            "form, space, colour, and composition. The caller receives "
+            "the design philosophy document plus the finished canvas "
+            "artifact description. Powered by Builder agents."
+        ),
+        tags=["design", "art", "poster", "visual", "canvas"],
+        examples=[
+            "Create a poster for a jazz night with a bold geometric design philosophy.",
+            "Design a single-page visual artwork that expresses quiet minimalism.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["brief"],
+            "properties": {
+                "brief": {"type": "string", "description": "Subject and mood for the artwork"},
+                "format": {"type": "string", "enum": ["png", "pdf"],
+                           "description": "Artifact format"},
+                "style_notes": {"type": "string", "description": "Aesthetic direction"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "design_philosophy": {"type": "string"},
+                "artifact": {"type": "string",
+                             "description": "The produced canvas artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="theme-factory",
+        name="Theme Factory",
+        description=(
+            "Style slides, documents, reports, and HTML landing pages "
+            "with a curated professional theme — colour palette plus "
+            "font pairings — or generate a custom theme from a short "
+            "description. The caller receives the themed artifact "
+            "specification and the full theme definition. Powered by "
+            "Builder agents."
+        ),
+        tags=["themes", "design", "slides", "styling", "templates"],
+        examples=[
+            "Apply the Ocean Depths theme to my pitch deck.",
+            "Create a custom warm autumn theme for this landing page and apply it.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["artifact"],
+            "properties": {
+                "artifact": {"type": "string", "description": "Artifact to theme: slides, doc, report, or landing page"},
+                "theme_name": {"type": "string",
+                               "description": "Preset theme name, or a description for a custom theme"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "theme_name": {"type": "string"},
+                "palette": {"type": "array", "items": {"type": "string"}},
+                "fonts": {"type": "object"},
+                "artifact": {"type": "string",
+                             "description": "The themed artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=40,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="artifacts-builder",
+        name="Artifacts Builder",
+        description=(
+            "Build elaborate multi-component HTML artifacts with modern "
+            "frontend technology — React, Tailwind CSS, and shadcn/ui — "
+            "including state management and routing, bundled into a "
+            "single self-contained HTML file. The caller receives the "
+            "bundled artifact and a component summary. Powered by "
+            "Builder agents."
+        ),
+        tags=["artifacts", "frontend", "react", "html", "web"],
+        examples=[
+            "Build an interactive dashboard artifact with charts and stateful filters.",
+            "Create a multi-view planning tool artifact bundled as a single HTML file.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["artifact_request"],
+            "properties": {
+                "artifact_request": {"type": "string", "description": "What the artifact should do"},
+                "features": {"type": "array", "items": {"type": "string"},
+                             "description": "Components or capabilities to include"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "components": {"type": "array", "items": {"type": "string"}},
+                "artifact": {"type": "string",
+                             "description": "The bundled single-file HTML artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="slack-gif-creator",
+        name="Slack GIF Creator",
+        description=(
+            "Create animated GIFs optimised for Slack — message GIFs and "
+            "emoji GIFs — from a plain description, using composable "
+            "animation primitives and validators for Slack's size and "
+            "dimension limits. The caller receives the GIF artifact "
+            "specification with its validated dimensions and size. "
+            "Powered by Builder agents."
+        ),
+        tags=["gif", "slack", "animation", "media", "emoji"],
+        examples=[
+            "Make me a Slack GIF of a rocket launching with the word LIFTOFF.",
+            "Create a 128x128 emoji GIF of a party parrot bouncing, under the 64KB emoji limit.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["description"],
+            "properties": {
+                "description": {"type": "string", "description": "What the GIF should show"},
+                "gif_type": {"type": "string", "enum": ["message", "emoji"],
+                             "description": "message = up to ~2MB at 480x480; emoji = 64KB at 128x128"},
+                "animation": {"type": "string",
+                              "description": "Motion style: shake, bounce, spin, pulse, fade, zoom, slide, flip"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "dimensions": {"type": "string"},
+                "size_kb": {"type": "number"},
+                "artifact": {"type": "string",
+                             "description": "The produced GIF artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
     # ── Micro-reads: deterministic single-read skills ─────────────────────
     # The A2A face of the x402 wallet-sanctions-screen resource: one EVM
     # wallet address in, one OFAC SDN verdict out, screened by
@@ -1166,6 +1546,553 @@ SINCOR_SKILLS: List[AgentSkill] = [
             },
         },
         estimated_latency_seconds=5,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    # ── Adopt-24 T1: methodology skills (obra/superpowers, MIT) ─────────
+    # Re-expressed in SINCOR AgentSkill format from the upstream
+    # superpowers skill procedures; see THIRD_PARTY_NOTICES.md for the
+    # full attribution, the MIT licence, and the two brand renames
+    # (using-superpowers -> agent-methodology-guide,
+    # diagnosing-superpowers -> agent-methodology-self-check).
+    # free_quota=0 for all: the Wave 1 universal daily ration
+    # (freeDailyRation, added by AgentSkill.to_dict) applies as usual.
+    AgentSkill(
+        id="verification-before-completion",
+        name="Verification Before Completion",
+        description=(
+            "Run fresh verification commands for a completion claim and return an "
+            "evidence-backed verdict: the commands run, their outputs, and whether "
+            "the claim holds. Callers receive proof they can cite before committing, "
+            "merging, or reporting success. Powered by Auditor agents."
+        ),
+        tags=["methodology", "verification", "quality", "evidence"],
+        examples=[
+            "Verify the claim that the new quote route passes its tests.",
+            "Verify that the settlement tests pass before this branch is reported done.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["claim"],
+            "properties": {
+                "claim": {"type": "string", "description": "The completion claim to verify"},
+                "context": {"type": "string", "description": "Where the work lives (branch, repo, files)"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string"},
+                "commands": {"type": "array", "items": {"type": "string"}},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="test-driven-development",
+        name="Test-Driven Development",
+        description=(
+            "Guide a feature or bugfix through the red-green-refactor cycle: a failing "
+            "test first, the smallest code change that passes it, then cleanup with the "
+            "suite green. Callers receive the test cases, the cycle record, and the "
+            "passing evidence. Powered by Builder agents."
+        ),
+        tags=["methodology", "tdd", "testing", "development"],
+        examples=[
+            "Add a retry helper that retries a failed operation three times.",
+            "Fix the empty-email bug with a failing test that proves the fix.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["feature"],
+            "properties": {
+                "feature": {"type": "string", "description": "Feature or bugfix to build test-first"},
+                "context": {"type": "string", "description": "Codebase or module context"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tests": {"type": "array", "items": {"type": "string"}},
+                "cycle": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="systematic-debugging",
+        name="Systematic Debugging",
+        description=(
+            "Investigate a bug, test failure, or unexpected behaviour through root-cause "
+            "analysis: reproduce the issue, trace the data flow, test one hypothesis at "
+            "a time, and fix the cause. Callers receive the root cause, the evidence "
+            "trail, and the verified fix. Powered by Auditor agents."
+        ),
+        tags=["methodology", "debugging", "root-cause", "quality"],
+        examples=[
+            "The settlement test fails only when run after the quota tests — find the root cause.",
+            "Trace why this payment webhook intermittently returns a 500 error.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["issue"],
+            "properties": {
+                "issue": {"type": "string", "description": "Bug, failure, or unexpected behaviour to investigate"},
+                "context": {"type": "string", "description": "Error output, repro steps, or recent changes"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "root_cause": {"type": "string"},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+                "fix": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="requesting-code-review",
+        name="Requesting Code Review",
+        description=(
+            "Prepare and dispatch a focused code review request for a completed change, "
+            "with the base and head commits, the requirements, and a summary of what was "
+            "built. Callers receive structured review findings grouped by severity with "
+            "a readiness assessment. Powered by Auditor agents."
+        ),
+        tags=["methodology", "code-review", "quality", "review"],
+        examples=[
+            "Review the branch that adds the new catalogue skills before it merges.",
+            "Request a review of the payment reconciliation change against its requirements.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["change"],
+            "properties": {
+                "change": {"type": "string", "description": "The completed change to review"},
+                "requirements": {"type": "string", "description": "Plan or requirements the change should meet"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "assessment": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="receiving-code-review",
+        name="Receiving Code Review",
+        description=(
+            "Evaluate incoming code review feedback item by item against the codebase, "
+            "verify each point technically, and produce an implementation order with "
+            "reasoned responses. Callers receive a verified action list that separates "
+            "fixes, clarifications, and pushback. Powered by Auditor agents."
+        ),
+        tags=["methodology", "code-review", "quality", "review"],
+        examples=[
+            "A reviewer asked for the price constants to be named values — evaluate the feedback.",
+            "Work through these six review comments and give me the verified action order.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["feedback"],
+            "properties": {
+                "feedback": {"type": "string", "description": "The review feedback to evaluate"},
+                "context": {"type": "string", "description": "Codebase context for verification"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "actions": {"type": "array", "items": {"type": "string"}},
+                "clarifications": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="agent-methodology-self-check",
+        name="Agent Methodology Self-Check",
+        description=(
+            "Examine a finished agent session that went wrong — repeated work, missed "
+            "plans, slow or costly runs — and assemble an evidence-cited report from "
+            "the session record. Callers receive findings where every claim points at "
+            "a concrete source line. Powered by Auditor agents."
+        ),
+        tags=["methodology", "diagnosis", "session-review", "quality"],
+        examples=[
+            "The last session re-ran a finished task twice and cost too much — examine it.",
+            "Build an evidence report on why the previous run ignored the plan.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["session"],
+            "properties": {
+                "session": {"type": "string", "description": "Session id, path, or description of what went wrong"},
+                "concern": {"type": "string", "description": "The observable that matters: time, cost, repeated work"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "report": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="brainstorming",
+        name="Brainstorming & Design Exploration",
+        description=(
+            "Explore what to build before building it: clarify intent and success "
+            "criteria, compare concrete approaches with their trade-offs, and shape an "
+            "approved design. Callers receive a design summary with the chosen approach "
+            "and the reasoning behind it. Powered by Synthesizer agents."
+        ),
+        tags=["methodology", "brainstorming", "design", "planning"],
+        examples=[
+            "Design a booking reminder flow for a local detailing shop.",
+            "Explore approaches for adding a new settlement rail and recommend one.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["topic"],
+            "properties": {
+                "topic": {"type": "string", "description": "What to design or decide"},
+                "context": {"type": "string", "description": "Known constraints, audience, or goals"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "approaches": {"type": "array", "items": {"type": "string"}},
+                "recommendation": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="subagent-driven-development",
+        name="Subagent-Driven Development",
+        description=(
+            "Execute an implementation plan with a fresh subagent per task, a spec and "
+            "quality review after each task, and a whole-branch review at the end. "
+            "Callers receive per-task completion records, review outcomes, and a final "
+            "branch assessment. Powered by Director agents."
+        ),
+        tags=["methodology", "subagents", "orchestration", "management"],
+        examples=[
+            "Execute the catalogue adoption plan task by task with reviews.",
+            "Run this implementation plan with a fresh implementer and reviewer per task.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["plan"],
+            "properties": {
+                "plan": {"type": "string", "description": "Plan file path or plan summary to execute"},
+                "context": {"type": "string", "description": "Spec or global constraints for the plan"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "reviews": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="dispatching-parallel-agents",
+        name="Dispatching Parallel Agents",
+        description=(
+            "Split two or more independent problems into focused agent assignments that "
+            "run concurrently, each with a clear scope, constraints, and expected output. "
+            "Callers receive the assignment set and an integration summary once the "
+            "agents return. Powered by Director agents."
+        ),
+        tags=["methodology", "parallel", "orchestration", "management"],
+        examples=[
+            "Three unrelated test files are failing in different subsystems — dispatch them in parallel.",
+            "Split this audit into independent domains and assign one agent per domain.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["workload"],
+            "properties": {
+                "workload": {"type": "string", "description": "The independent problems to dispatch in parallel"},
+                "constraints": {"type": "string", "description": "Shared constraints for every assignment"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "assignments": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="writing-plans",
+        name="Writing Plans",
+        description=(
+            "Turn a spec or requirements set into a bite-sized implementation plan with "
+            "exact files, interfaces, test steps, and commit points for each task. "
+            "Callers receive a complete plan an implementer can execute task by task "
+            "with verification at every step. Powered by Director agents."
+        ),
+        tags=["methodology", "planning", "spec", "management"],
+        examples=[
+            "Plan the multi-step rollout of the new skill catalogue.",
+            "Write the implementation plan for the sanctions screening upgrade from its spec.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["spec"],
+            "properties": {
+                "spec": {"type": "string", "description": "Spec, requirements, or feature description to plan"},
+                "context": {"type": "string", "description": "Codebase structure or constraints"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "plan": {"type": "string"},
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="executing-plans",
+        name="Executing Plans",
+        description=(
+            "Execute a written implementation plan task by task in the current session, "
+            "proving each step with tests and recording progress in a durable ledger. "
+            "Callers receive per-task completion evidence and a final whole-branch "
+            "review outcome. Powered by Director agents."
+        ),
+        tags=["methodology", "execution", "planning", "management"],
+        examples=[
+            "Execute the written catalogue adoption plan in this session.",
+            "Work through this implementation plan task by task and ledger the results.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["plan"],
+            "properties": {
+                "plan": {"type": "string", "description": "Plan file path or plan summary to execute"},
+                "context": {"type": "string", "description": "Spec the plan argues from"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="using-git-worktrees",
+        name="Using Git Worktrees",
+        description=(
+            "Set up an isolated git worktree workspace for feature work, with the right "
+            "branch, project setup, and a clean baseline test run. Callers receive the "
+            "workspace path, branch details, and the verified baseline result. "
+            "Powered by Builder agents."
+        ),
+        tags=["methodology", "git", "worktrees", "management"],
+        examples=[
+            "Start the catalogue feature in an isolated workspace.",
+            "Create a worktree for the payment fix and verify its baseline tests.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["feature"],
+            "properties": {
+                "feature": {"type": "string", "description": "Feature or branch the workspace is for"},
+                "context": {"type": "string", "description": "Repository or base branch details"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "workspace": {"type": "string"},
+                "branch": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="writing-skills",
+        name="Writing Skills",
+        description=(
+            "Create or refine an agent skill with test-driven documentation: pressure "
+            "scenarios first, then the skill text, then verification that agents follow "
+            "it. Callers receive the finished skill draft with its test scenarios and "
+            "compliance evidence. Powered by Builder agents."
+        ),
+        tags=["methodology", "skills", "documentation", "management"],
+        examples=[
+            "Create a skill that teaches the sanctions screening workflow.",
+            "Refine the debugging skill with pressure scenarios that close its loopholes.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["skill_topic"],
+            "properties": {
+                "skill_topic": {"type": "string", "description": "Technique, pattern, or tool the skill teaches"},
+                "context": {"type": "string", "description": "Audience or runtime for the skill"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "skill": {"type": "string"},
+                "scenarios": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="finishing-a-development-branch",
+        name="Finishing a Development Branch",
+        description=(
+            "Bring a completed development branch to integration: verify the full test "
+            "suite, identify the base branch and workspace state, and present the merge, "
+            "pull-request, or keep options. Callers receive the verified state and the "
+            "integration choices. Powered by Director agents."
+        ),
+        tags=["methodology", "git", "integration", "management"],
+        examples=[
+            "The catalogue branch is green and ready to integrate — finish it.",
+            "Verify this feature branch and give me the integration options.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["branch"],
+            "properties": {
+                "branch": {"type": "string", "description": "Branch ready to integrate"},
+                "context": {"type": "string", "description": "Base branch or workspace details"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "options": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="agent-methodology-guide",
+        name="Agent Methodology Guide",
+        description=(
+            "Match any incoming task to the methodology skills that apply to it and "
+            "return the ordered skill sequence to follow, starting with process skills. "
+            "Callers receive a concrete starting skill and the full sequence for their "
+            "task. Powered by Director agents."
+        ),
+        tags=["methodology", "guide", "skills", "management"],
+        examples=[
+            "Starting a new task: which methodology skill applies first?",
+            "I am about to fix a bug — give me the methodology sequence for it.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["task"],
+            "properties": {
+                "task": {"type": "string", "description": "The task about to start"},
+                "context": {"type": "string", "description": "Session or plan state, if any"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "starting_skill": {"type": "string"},
+                "skills": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=10,
         reputation_floor=0,
         free_quota=0,
     ),
@@ -1920,7 +2847,7 @@ class _FreeQuotaTracker:
             return 0
         return max(0, skill.free_quota - self._store.get(identity_key, skill.id))
 
-    # -- Wave 1: universal DAILY ration (new layer, all 18 skills) --------
+    # -- Wave 1: universal DAILY ration (new layer, all 42 skills) --------
     # The lifetime top-5 quota above is untouched. The daily ration lives
     # in sincor2.free_ration (shared with the x402 surface), keyed on
     # identity + skill + UTC date, resetting at UTC midnight, with a
