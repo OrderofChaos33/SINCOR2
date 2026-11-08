@@ -2,6 +2,9 @@
 pragma solidity ^0.8.24;
 
 import "./IExecutionEscrowManager.sol";
+// Also brings ReentrancyGuard into scope: it is vendored at the bottom of
+// security/ScopedPausable.sol (see the note there) so the fixed-source-set
+// Python harnesses that compile this contract keep resolving every import.
 import "./security/ScopedPausable.sol";
 
 /**
@@ -13,6 +16,10 @@ import "./security/ScopedPausable.sol";
  * @dev Security properties:
  *      - Checks-Effects-Interactions everywhere: every state transition and
  *        balance mutation happens BEFORE any external call.
+ *      - Defense-in-depth (Perimeter Freeze S-01): the dispute-resolution
+ *        entrypoints are additionally nonReentrant, so a payout recipient
+ *        cannot reenter any resolution path mid-payout even though the
+ *        finalized state already blocks it.
  *      - Low-level .call for payouts (agents may be contract wallets; the
  *        2300-gas stipend of .transfer would strand them).
  *      - Fund credits are ledger-only and never leave as ETH: poster refunds
@@ -49,7 +56,7 @@ import "./security/ScopedPausable.sol";
  *        griefing would cost gas + lockup only, precisely when no
  *        adjudicator is present to tell junk from merit.
  */
-contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
+contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable, ReentrancyGuard {
     /// @notice The sealed-bid core; the only caller allowed to initialize escrows.
     address public immutable auctionCore;
     /// @notice Optimistic batch adjudicator; resolves quality disputes.
@@ -250,7 +257,12 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     }
 
     /// @inheritdoc IExecutionEscrowManager
-    function resolveQualityDispute(bytes32 auctionId, bool slashWorker) external override onlyAdjudicator {
+    function resolveQualityDispute(bytes32 auctionId, bool slashWorker)
+        external
+        override
+        onlyAdjudicator
+        nonReentrant
+    {
         Escrow storage esc = escrows[auctionId];
         if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
 
@@ -280,7 +292,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     }
 
     /// @inheritdoc IExecutionEscrowManager
-    function rejectEvidenceFreeDispute(bytes32 auctionId) external override {
+    function rejectEvidenceFreeDispute(bytes32 auctionId) external override nonReentrant {
         Escrow storage esc = escrows[auctionId];
         if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
         Dispute memory d = disputes[auctionId];
@@ -296,7 +308,7 @@ contract ExecutionEscrowManager is IExecutionEscrowManager, ScopedPausable {
     }
 
     /// @inheritdoc IExecutionEscrowManager
-    function rejectUnsubstantiatedDispute(bytes32 auctionId) external override {
+    function rejectUnsubstantiatedDispute(bytes32 auctionId) external override nonReentrant {
         Escrow storage esc = escrows[auctionId];
         if (esc.state != ExecutionState.DisputeWindow || !esc.disputeActive) revert InvalidState();
         Dispute memory d = disputes[auctionId];

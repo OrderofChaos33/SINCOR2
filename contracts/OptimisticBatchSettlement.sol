@@ -3,11 +3,13 @@ pragma solidity ^0.8.24;
 
 /// @title OptimisticBatchSettlement
 /// @notice Posts Merkle roots of off-chain AXM / merit / assignment events
-///         to Base. A 300-block challenge window lets anyone freeze a root
+///         to Base. A 3000-block challenge window lets anyone freeze a root
 ///         by proving a posted leaf. Micro-tasks never each pay L2 gas.
 /// @dev Companion Python simulator: marketplace/optimistic.
+///      Base Denim: 200ms per block -> 3000 blocks ~= 10 minutes of wall
+///      time (was 300 blocks at 2s/block before Denim).
 contract OptimisticBatchSettlement {
-    uint256 public constant CHALLENGE_BLOCKS = 300;
+    uint256 public constant CHALLENGE_BLOCKS = 3000;
     address public immutable treasury;
     address public operator;
 
