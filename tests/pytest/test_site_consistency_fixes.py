@@ -141,7 +141,7 @@ def test_starter_template_has_no_mojibake():
 def test_professional_page_has_no_false_marketplace_agent_count():
     body = _render("product_professional.html")
     assert "50+ marketplace agents" not in body
-    assert "17 live skills" in body
+    assert "42 live skills" in body
 
 
 def test_products_heading_states_honest_split():

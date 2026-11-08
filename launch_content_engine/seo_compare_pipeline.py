@@ -14,7 +14,7 @@ COMPARISONS = [
             "2. Ownership renounced (no hidden mint)\n"
             "3. Live contracts you can call today\n\n"
             "SINC (`0xe1D836087F6573b665d25CE088793E916D7892f8`) ships a 42-agent swarm "
-            "with a $0.15 floor ($150M FDV / 1B tokens) — verifiable in 30 seconds.\n"
+            "with 1B fixed supply — verifiable in 30 seconds.\n"
             "Checkout: https://getsincor.com/buy"
         ),
     },
@@ -22,7 +22,7 @@ COMPARISONS = [
         "title": "Where is the SINC inventory?",
         "body": (
             "An LBP with $0 seeded liquidity is a billboard, not a market.\n"
-            "SINC is 1B supply at a $0.15 official floor ($150M FDV), with v4 hook "
+            "SINC is the platform access token with 1B fixed supply, with v4 hook "
             "limit orders on Base — on-chain, not in a pitch deck.\n"
             "https://getsincor.com/buy"
         ),

@@ -56,7 +56,6 @@ def test_build_official_price_payload_includes_onchain(monkeypatch) -> None:
     }
     monkeypatch.setattr(live_snapshot, "fetch_live_onchain", lambda force=False: fake)
     payload = build_official_price_payload({"official_floor_usd": 0.15, "eth_usd": 3000, "price_note": "test"})
-    assert payload["official_floor_usd"] == 0.15
     assert payload["sinc_holders"] == 3455
     assert payload["onchain"]["axiom"]["holders"] == 3354
 

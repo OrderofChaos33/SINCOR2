@@ -1,8 +1,11 @@
 """Marketing-claim scanner (P1_P6).
 
 Scans the public-claim sources (README.md, product-page templates,
-data/sku_catalog.json, config/x402_pricing.yaml) for assertion-of-fact
-patterns and classifies each hit. Shared by the claim-register generator
+data/sku_catalog.json, config/x402_pricing.yaml, and the Python copy
+modules that publish SINC token copy — mvp_blueprints/sinc.py,
+onchain/constants.py, value_engine.py, and the launch_content_engine
+stats/spotlight/SEO modules) for assertion-of-fact patterns and
+classifies each hit. Shared by the claim-register generator
 and tests/pytest/test_marketing_claims.py so the register and the
 blocking test can never disagree about what was found.
 
@@ -50,6 +53,15 @@ def source_files(root: Optional[str] = None) -> List[str]:
     files += sorted(glob.glob(os.path.join(root, "templates", "**", "*.html"), recursive=True))
     files += [os.path.join(root, "data", "sku_catalog.json"),
               os.path.join(root, "config", "x402_pricing.yaml")]
+    # Python copy modules that publish SINC token claims (cleanup wave 2):
+    # their strings feed live endpoints and drafted posts, so planted
+    # price claims there must be caught the same as in templates.
+    files += [os.path.join(root, "src", "sincor2", "mvp_blueprints", "sinc.py"),
+              os.path.join(root, "src", "sincor2", "onchain", "constants.py"),
+              os.path.join(root, "src", "sincor2", "value_engine.py"),
+              os.path.join(root, "launch_content_engine", "onchain_stats.py"),
+              os.path.join(root, "launch_content_engine", "agent_spotlight.py"),
+              os.path.join(root, "launch_content_engine", "seo_compare_pipeline.py")]
     return [f for f in files if os.path.isfile(f)]
 
 
@@ -75,6 +87,18 @@ FORBIDDEN_PATTERNS: Dict[str, re.Pattern] = {
     "soc2": re.compile(r"\bsoc\s*2\b"),
     "audited": re.compile(r"\baudited\b"),
     "adgm": re.compile(r"\badgm\b"),
+    # Token-price claims (names mirror scripts/claim-blocklist.txt).
+    # Deliberately NARROW: a bare "floor price" / "price floor" regex
+    # would false-positive on legitimate copy — NFT appraisal wording
+    # ("not just floor price", templates/products/p23-nftfi-pools.html)
+    # and the canon disclaimer ("does not publish a token price, floor,
+    # or valuation", templates/token_canon.html). The patterns anchor to
+    # the actual claim forms: the declared $0.15 figure (with or without
+    # "floor" beside it) and an "official price/floor" backed by a $.
+    "fdv": re.compile(r"\bfdv\b"),
+    "price-floor": re.compile(
+        r"\$\s*0\.15\b"
+        r"|\bofficial\s+(?:price|floor)\b[^.!?;]*\$"),
 }
 
 _TAG_RE = re.compile(r"<[^>]*>")

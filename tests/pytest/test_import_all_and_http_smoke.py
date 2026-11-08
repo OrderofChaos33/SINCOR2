@@ -56,5 +56,5 @@ def test_gunicorn_boot_smoke_routes() -> None:
     price = client.get("/api/price/official")
     assert price.status_code == 200, price.data
     payload = price.get_json() or {}
-    assert payload.get("official_floor_usd") == 0.15
+    assert "official_floor_usd" not in payload
     assert "onchain" in payload or payload.get("sinc_holders") is not None

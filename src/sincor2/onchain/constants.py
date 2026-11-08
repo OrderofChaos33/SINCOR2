@@ -38,9 +38,10 @@ AXM_DECIMALS = 18
 SINC_SYMBOL = "SINC"
 SINC_DECIMALS = 8
 SINC_TOTAL_SUPPLY = 1_000_000_000
-SINC_FLOOR_USD = 0.15
-SINC_FDV_AT_FLOOR_USD = 150_000_000
-# $1.50 is a ceiling / sell-wall concept only. Never treat as official price.
+# SINC is platform access with fixed supply. SINCOR publishes no token
+# price or valuation, so no price constants live here.
+# $1.50 is a ceiling / sell-wall concept only — an internal bound,
+# never a published price.
 SINC_CEILING_USD = 1.50
 USDC_SYMBOL = "USDC"
 USDC_DECIMALS = 6
@@ -119,7 +120,7 @@ def catalog() -> Dict[str, Mapping[str, object]]:
             "decimals": SINC_DECIMALS,
             "address": resolve_address("SINC_CONTRACT_ADDRESS", SINC_TOKEN),
             "canonical": SINC_TOKEN,
-            "role": "platform subscriptions + governance; official floor $0.15",
+            "role": "platform subscriptions + governance; platform access, 1B fixed supply",
         },
         "treasury": {
             "symbol": "TREASURY",

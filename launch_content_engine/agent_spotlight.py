@@ -56,6 +56,6 @@ def draft_referral_cta() -> tuple[str, str]:
     body = (
         "You don't need to know the founder to earn on SINC buys.\n\n"
         "Connect a wallet at https://getsincor.com/buy.\n"
-        "SINC official price is $0.15 — $150M FDV / 1 billion tokens.\n"
+        "SINC is the platform access token — 1 billion fixed supply.\n"
     )
     return title, body
