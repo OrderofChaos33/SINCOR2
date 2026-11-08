@@ -185,9 +185,16 @@ def _emit_escalation_envelope(result: Dict[str, Any]) -> None:
     if not sink:
         return
     try:
-        from sincor2.escalation import EscalationStore
+        from sincor2.escalation import EscalationStore, load_signer_from_env
 
-        store = EscalationStore(sink)
+        # W-133: honor the configured Ed25519 signing key exactly as
+        # every other EscalationStore consumer does — the tap's audit
+        # records must be signed when SINCOR_ESCALATION_SIGNING_KEY_FILE
+        # is set, not silently written unsigned. With no key configured
+        # load_signer_from_env() returns None and the store keeps its
+        # Phase 1 unsigned behavior. A bad key path raises here and is
+        # swallowed by the caller's fail-safe, like any sink failure.
+        store = EscalationStore(sink, signer=load_signer_from_env())
         store.create_package(
             source_surface="sanctions-screen",
             actor="sincor2.sanctions_screen",

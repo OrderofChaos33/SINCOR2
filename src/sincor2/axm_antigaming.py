@@ -294,6 +294,53 @@ def reset_antigaming_store(path: Optional[str] = None) -> AntigamingStore:
 
 
 # --- guard 1: self-bid rejection ---------------------------------------------
+_WALLET_RE = None  # compiled lazily in _is_wallet_address
+
+
+def _is_wallet_address(value: Any) -> bool:
+    global _WALLET_RE
+    if _WALLET_RE is None:
+        import re as _re
+
+        _WALLET_RE = _re.compile(r"^0x[0-9a-fA-F]{40}$")
+    return bool(_WALLET_RE.match(str(value or "").strip()))
+
+
+def _bidder_wallets(agent_id: str) -> set:
+    """KYA wallets bound to a bidder agent (``wallet`` + ``owner_wallet``).
+
+    Resolved lazily from the inbound fabric — this module is imported
+    by the market module that owns the fabric, so the import must not
+    happen at module scope. Returns an empty set when the fabric is
+    unavailable or the agent is unknown: the string-form and anonymous
+    checks in :func:`check_self_bid` still apply unchanged, so a
+    lookup failure never *widens* access beyond today's behavior for
+    agent-form posters, and wallet-form posters are checked against
+    whatever record exists (external bidders are always registered —
+    commit/reveal and plaintext paths reject unknown agents before
+    this guard's wallet layer matters).
+
+    The read is deliberately LOCK-FREE: this guard is called from
+    inside ``fabric.lock`` on the commit/place paths (the fabric lock
+    is a plain ``threading.Lock``), so acquiring it here deadlocks the
+    bid path outright. A dict ``get`` is atomic under the GIL, and a
+    bidder's registration record is written before it can bid, so the
+    wallet set read here is stable in practice.
+    """
+    try:
+        from sincor2.a2a_inbound import get_fabric
+
+        fabric = get_fabric()
+        agent = fabric.agents.get(str(agent_id)) or {}
+        return {
+            str(agent.get(field) or "").strip().lower()
+            for field in ("wallet", "owner_wallet")
+            if str(agent.get(field) or "").strip()
+        }
+    except Exception:
+        return set()
+
+
 def _audit_rejection(agent_id: str, task_id: str, reason: str,
                      detail: str = "") -> None:
     """Append to the durable rejection audit log. Never raises: audit
@@ -324,6 +371,22 @@ def check_self_bid(task: Dict[str, Any], agent_id: str) -> None:
                        agent_id, task_id)
         raise SelfBidError(
             f"agent {agent_id} cannot bid on its own task {task_id}")
+    if poster_id and _is_wallet_address(poster_id):
+        # Wallet-form poster (external server-bound post): poster_id
+        # IS the poster's wallet (the recovered EIP-191 signer), so
+        # the string comparison above can never recognise the poster
+        # bidding through its own registered agent. Resolve the
+        # bidder's KYA-bound wallets and compare principals, not
+        # identifier spellings.
+        if str(poster_id).strip().lower() in _bidder_wallets(agent_id):
+            logger.warning(
+                "self-bid rejected (wallet principal) agent=%s task=%s "
+                "poster_wallet=%s", agent_id, task_id, poster_id)
+            _audit_rejection(agent_id, task_id, "self_bid_wallet_poster",
+                             f"poster_wallet={poster_id}")
+            raise SelfBidError(
+                f"agent {agent_id} cannot bid on its own task {task_id} "
+                f"(poster wallet {poster_id} is the bidder's wallet)")
     if not poster_id:
         try:
             bounty = float(task.get("bounty_axm") or 0)

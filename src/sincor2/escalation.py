@@ -160,11 +160,14 @@ __all__ = [
     "GENESIS_PREV_HASH",
     "SIGNATURE_ALG",
     "SIGNING_KEY_ENV_VAR",
+    "OPERATOR_KEYS_ENV_VAR",
     "DEFAULT_SIGNER_ID",
     "verify_chain",
     "AuditSigner",
     "generate_signing_key",
     "load_signer_from_env",
+    "attestation_payload_bytes",
+    "load_operator_keys_from_env",
     "EscalationError",
     "IllegalTransitionError",
     "PackageNotFoundError",
@@ -261,6 +264,11 @@ SIGNATURE_ALG = "Ed25519"
 #: key itself is only ever read from that file — never from a literal
 #: in code, config JSON, or chat (Phase 2 spec, hard rule).
 SIGNING_KEY_ENV_VAR = "SINCOR_ESCALATION_SIGNING_KEY_FILE"
+
+#: Env var naming the operator-registry JSON file for W-122 identity
+#: binding (identity -> {"pubkey": hex, "roles": [...]}). Like the
+#: signing-key var, it carries a file path, never key material.
+OPERATOR_KEYS_ENV_VAR = "SINCOR_ESCALATION_OPERATOR_KEYS_FILE"
 
 #: Default identity string for the signing (interceptor) node when an
 #: operator does not choose one.
@@ -504,6 +512,10 @@ class Decision:
     kind: str
     note: Optional[str] = None
     role: str = "operator"
+    #: Ed25519 attestation signature (hex) over
+    #: :func:`attestation_payload_bytes` — present only when the store
+    #: enforces the operator registry (W-122); None in Phase 1 stores.
+    signature: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -512,6 +524,7 @@ class Decision:
             "kind": self.kind,
             "note": self.note,
             "role": self.role,
+            "signature": self.signature,
         }
 
     @classmethod
@@ -522,6 +535,7 @@ class Decision:
             kind=data["kind"],
             note=data.get("note"),
             role=data.get("role", "operator"),
+            signature=data.get("signature"),
         )
 
 
@@ -883,6 +897,97 @@ def load_signer_from_env(
     return AuditSigner.from_key_file(path, signer_id)
 
 
+# ---------------------------------------------------------------------------
+# Operator identity binding for decisions (W-122)
+# ---------------------------------------------------------------------------
+#
+# Phase 1 ``decide()`` took ``by``/``role`` as caller-supplied strings:
+# the co-sign quorum's "distinct actors" check compared strings, so one
+# unauthenticated caller could attest every required role under a
+# different string per role and complete the quorum alone. The registry
+# below is the identity binding: when a store is configured with
+# operator keys, a decision counts only if (1) the claimed ``by`` is a
+# registered identity, (2) the claimed ``role`` is authorized for that
+# identity, and (3) the attestation carries a valid Ed25519 signature
+# by that identity's key over the canonical attestation payload.
+# ``require_decision`` re-verifies the signatures from the stored
+# attestations, so records forged straight into the state file do not
+# count either. With no registry configured, behavior is byte-for-byte
+# the Phase 1 string behavior (the same opt-in shape as the Phase 2
+# audit signer).
+
+
+def attestation_payload_bytes(
+    package_id: str,
+    kind: str,
+    role: str,
+    by: str,
+    note: Optional[str],
+) -> bytes:
+    """Canonical bytes an operator signs to attest a decision.
+
+    Binds the decision to exactly one package, kind, role, identity,
+    and note — a signature captured for one attestation cannot be
+    replayed for another package, kind, or role.
+    """
+    return _canonical_record_bytes(
+        {
+            "attestation": "escalation-decision/1.0",
+            "package_id": str(package_id),
+            "kind": str(kind),
+            "role": str(role),
+            "by": str(by),
+            "note": note,
+        }
+    )
+
+
+def _normalize_operator_keys(operator_keys: Optional[dict]) -> Optional[dict]:
+    """Validate/normalize an operator registry mapping.
+
+    Shape: ``{identity: {"pubkey": <hex>, "roles": [<role>, ...]}}``.
+    Returns None for None (binding off). Raises ValueError on a
+    malformed registry — a half-configured registry must fail closed
+    at setup time, never silently degrade to string identity.
+    """
+    if operator_keys is None:
+        return None
+    normalized: dict = {}
+    for identity, spec in dict(operator_keys).items():
+        ident = str(identity).strip()
+        if not ident:
+            raise ValueError("operator registry: empty identity")
+        spec = dict(spec or {})
+        pubkey = str(spec.get("pubkey") or "").strip().lower()
+        roles = [
+            str(r).strip().lower() for r in (spec.get("roles") or []) if str(r).strip()
+        ]
+        if not pubkey or not roles:
+            raise ValueError(
+                f"operator registry: identity {ident!r} needs a pubkey "
+                "and at least one authorized role"
+            )
+        normalized[ident] = {"pubkey": pubkey, "roles": roles}
+    return normalized
+
+
+def load_operator_keys_from_env(
+    env_var: str = OPERATOR_KEYS_ENV_VAR,
+) -> Optional[dict]:
+    """Load the operator registry JSON from the file the env var names.
+
+    Returns None when the env var is unset (identity binding stays
+    off). The variable carries a file path, never key material; the
+    file holds public keys and role authorizations only.
+    """
+    path = os.environ.get(env_var)
+    if not path:
+        return None
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    return _normalize_operator_keys(data)
+
+
 def _verify_record_signature(record: dict) -> bool:
     """True iff the record's ``signature`` block verifies.
 
@@ -1054,8 +1159,17 @@ class EscalationStore:
     AUDIT_FILENAME = "escalation_audit.jsonl"
     LOCK_FILENAME = ".escalation_store.lock"
 
-    def __init__(self, base_dir: str, signer: Optional[AuditSigner] = None):
+    def __init__(
+        self,
+        base_dir: str,
+        signer: Optional[AuditSigner] = None,
+        operator_keys: Optional[dict] = None,
+    ):
         self._signer = signer
+        #: W-122 identity binding: None = Phase 1 string identity;
+        #: a registry dict = every decision must be a verified
+        #: Ed25519 attestation by a registered operator identity.
+        self._operator_keys = _normalize_operator_keys(operator_keys)
         self.base_dir = str(base_dir)
         os.makedirs(self.base_dir, exist_ok=True)
         self.state_path = os.path.join(self.base_dir, self.STATE_FILENAME)
@@ -1404,6 +1518,62 @@ class EscalationStore:
             self._save_state()
         return self._copy(package)
 
+    def _verify_decision_attestation(
+        self,
+        package_id: str,
+        kind: str,
+        role: str,
+        by: str,
+        note: Optional[str],
+        signature: Optional[str],
+    ) -> None:
+        """W-122: verify one decision attestation against the registry.
+
+        No-op when no operator registry is configured (Phase 1 string
+        identity). Otherwise raises ValueError unless ``by`` is a
+        registered identity, ``role`` is authorized for it, and
+        ``signature`` is a valid Ed25519 signature by its key over
+        :func:`attestation_payload_bytes`.
+        """
+        registry = self._operator_keys
+        if registry is None:
+            return
+        _require_cryptography()
+        spec = registry.get(str(by))
+        if spec is None:
+            raise ValueError(
+                f"decide: identity {by!r} is not a registered operator "
+                "(W-122 identity binding)"
+            )
+        if role not in spec["roles"]:
+            raise ValueError(
+                f"decide: identity {by!r} is not authorized for role "
+                f"{role!r} (W-122 identity binding)"
+            )
+        if not signature:
+            raise ValueError(
+                "decide: an Ed25519 attestation signature is required "
+                "when operator identity binding is configured (W-122)"
+            )
+        try:
+            public_key = _Ed25519PublicKey.from_public_bytes(
+                bytes.fromhex(spec["pubkey"])
+            )
+            public_key.verify(
+                bytes.fromhex(str(signature)),
+                attestation_payload_bytes(package_id, kind, role, by, note),
+            )
+        except _InvalidSignature as exc:
+            raise ValueError(
+                "decide: attestation signature does not verify for "
+                f"identity {by!r} (W-122 identity binding)"
+            ) from exc
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                "decide: malformed attestation signature or registry "
+                f"key for identity {by!r} (W-122 identity binding)"
+            ) from exc
+
     def decide(
         self,
         package_id: str,
@@ -1412,6 +1582,8 @@ class EscalationStore:
         note: Optional[str] = None,
         role: str = "operator",
         now: Optional[str] = None,
+        signature: Optional[str] = None,
+        tenant: Optional[str] = None,
     ) -> EscalationPackage:
         """Apply an operator decision (attestation) to a PENDING package.
 
@@ -1433,6 +1605,15 @@ class EscalationStore:
         already attested raises ValueError (conflict is surfaced, not
         silently resolved). EXPIRE is administrative and transitions
         immediately regardless of quorum.
+
+        W-122: when the store carries an operator registry
+        (``operator_keys``), the decision must arrive as a verified
+        attestation — ``by`` a registered identity, ``role``
+        authorized for it, and ``signature`` a valid Ed25519 signature
+        over :func:`attestation_payload_bytes`; unverifiable
+        attestations raise ValueError and are never recorded.
+        W-129: when ``tenant`` is given it must match the package's
+        tenant, else PackageNotFoundError (no cross-tenant leak).
         """
         kind_norm = str(kind).strip().lower()
         if kind_norm not in DECISION_KINDS:
@@ -1450,14 +1631,22 @@ class EscalationStore:
             package = self._packages.get(package_id)
             if package is None:
                 raise PackageNotFoundError(f"no such package: {package_id}")
+            if tenant is not None and package.tenant != tenant:
+                # W-129: a tenant mismatch is indistinguishable from a
+                # missing package — cross-tenant existence never leaks.
+                raise PackageNotFoundError(f"no such package: {package_id}")
             if package.state != PENDING:
                 raise IllegalTransitionError(
                     f"package {package_id} is {package.state} (terminal); "
                     f"cannot apply decision {kind_norm!r}"
                 )
+            self._verify_decision_attestation(
+                package_id, kind_norm, role_norm, by, note, signature
+            )
             required = list(_normalize_risk(package.risk)["required_signers"])
             record = Decision(
-                by=by, at=decided_at, kind=kind_norm, note=note, role=role_norm
+                by=by, at=decided_at, kind=kind_norm, note=note,
+                role=role_norm, signature=signature,
             )
 
             if required and kind_norm not in ("expire",):
@@ -1526,17 +1715,31 @@ class EscalationStore:
         package.state = to_state
         package.decision = record
 
-    def get_package(self, package_id: str) -> EscalationPackage:
-        """Return a copy of the package, or raise PackageNotFoundError."""
+    def get_package(
+        self, package_id: str, tenant: Optional[str] = None
+    ) -> EscalationPackage:
+        """Return a copy of the package, or raise PackageNotFoundError.
+
+        W-129: when ``tenant`` is given, a package belonging to another
+        tenant raises the same PackageNotFoundError as a missing one.
+        """
         package = self._packages.get(package_id)
-        if package is None:
+        if package is None or (tenant is not None and package.tenant != tenant):
             raise PackageNotFoundError(f"no such package: {package_id}")
         return self._copy(package)
 
-    def find_package(self, package_id: str) -> Optional[EscalationPackage]:
-        """Return a copy of the package, or None if it does not exist."""
+    def find_package(
+        self, package_id: str, tenant: Optional[str] = None
+    ) -> Optional[EscalationPackage]:
+        """Return a copy of the package, or None if it does not exist.
+
+        W-129: when ``tenant`` is given, another tenant's package
+        returns None, exactly like a missing one.
+        """
         package = self._packages.get(package_id)
-        return self._copy(package) if package is not None else None
+        if package is None or (tenant is not None and package.tenant != tenant):
+            return None
+        return self._copy(package)
 
     def list_pending(self, tenant: Optional[str] = None) -> list:
         """All PENDING packages, oldest first (created_at, then id)."""
@@ -1579,4 +1782,26 @@ def require_decision(store: EscalationStore, package_id: Optional[str]) -> bool:
         return False
     if package.state not in (APPROVED, OVERRIDDEN):
         return False
+    if getattr(store, "_operator_keys", None):
+        # W-122: in identity-bound mode the quorum is re-verified from
+        # the attestation SIGNATURES, not just the stored by/role
+        # strings — an attestation forged into the state file (right
+        # strings, no valid signature) does not count.
+        verified = []
+        for attestation in package.attestations:
+            try:
+                store._verify_decision_attestation(
+                    package.id,
+                    attestation.kind,
+                    attestation.role,
+                    attestation.by,
+                    attestation.note,
+                    attestation.signature,
+                )
+                verified.append(attestation)
+            except (ValueError, EscalationError):
+                continue
+        bound = EscalationPackage.from_dict(package.to_dict())
+        bound.attestations = verified
+        return _quorum_satisfied(bound)
     return _quorum_satisfied(package)

@@ -801,8 +801,19 @@ class WorkflowStateStore:
         """Reconstruct run state: latest checkpoint (optionally the
         latest for ``name``) plus replay of every later event through
         ``reducer``. Safe to call from a different worker/process than
-        the one that wrote the state."""
+        the one that wrote the state.
+
+        W-131: the hash chain is verified BEFORE anything is replayed
+        or trusted — a tampered/corrupted log raises
+        :class:`WorkflowStateError` here instead of silently
+        rebuilding wrong state (``verify_chain`` used to be a separate
+        check the reconstruction path never called)."""
         self._require_run(run_id)
+        if not self.verify_chain(run_id):
+            raise WorkflowStateError(
+                f"resume: event chain for run {run_id!r} failed "
+                "verification; refusing to replay possibly-tampered "
+                "history")
         try:
             checkpoint = self.load_checkpoint(run_id, name)
             state = dict(checkpoint.state)
@@ -875,6 +886,11 @@ class WorkflowStateStore:
                      fn: Callable[[], Any]) -> Any:
         """Run ``fn`` at most once per (run, idempotency_key).
 
+        Keys are per-step, not per-run (W-130): reusing a key that is
+        already bound to a different ``step_name`` raises
+        :class:`WorkflowStateError` rather than returning that step's
+        recorded result.
+
         First call: ``fn()`` runs, its JSON-serializable result is
         recorded, and a ``step_completed`` event is appended. Any later
         call with the same key returns the recorded result WITHOUT
@@ -886,6 +902,18 @@ class WorkflowStateStore:
             self._require_run(run_id)
             existing = self._backend.get_step(run_id, idempotency_key)
             if existing is not None:
+                if existing.get("step_name") != step_name:
+                    # W-130: the key is already bound to a DIFFERENT
+                    # step. Returning that step's result here would
+                    # silently hand the caller the wrong outcome (a
+                    # "refund" that returns the "pay" result and never
+                    # runs) — refuse loudly instead.
+                    raise WorkflowStateError(
+                        f"execute_step: idempotency key "
+                        f"{idempotency_key!r} for run {run_id!r} is "
+                        f"already bound to step "
+                        f"{existing.get('step_name')!r}; refusing to "
+                        f"return its result for step {step_name!r}")
                 return existing["result"]
             result = fn()
             result_json = json.dumps(result, sort_keys=True)
@@ -894,6 +922,13 @@ class WorkflowStateStore:
                 self._clock())
             if not inserted:  # lost a race: another writer recorded it
                 recorded = self._backend.get_step(run_id, idempotency_key)
+                if recorded.get("step_name") != step_name:
+                    raise WorkflowStateError(
+                        f"execute_step: idempotency key "
+                        f"{idempotency_key!r} for run {run_id!r} is "
+                        f"already bound to step "
+                        f"{recorded.get('step_name')!r}; refusing to "
+                        f"return its result for step {step_name!r}")
                 return recorded["result"]
             self.append_event(run_id, "step_completed",
                               {"step_name": step_name,
