@@ -116,33 +116,74 @@ below. Zero untriaged findings.
 
 ### Waiver log (every finding, triaged)
 
+Waiver IDs use the `S-` prefix (Slither) so they are never confused
+with the red-team register's `W-` numbers — red-team W-8, for
+example, is a different finding from every waiver below.
+
 | # | Detector / impact | Location | Triage |
 |---|---|---|---|
-| W-01 | reentrancy-eth, High ×2 | ExecutionEscrowManager._resolveDisputeSlash → _payout | FALSE POSITIVE (mitigated). All escrow state is finalized BEFORE any payout: state=Finalized, disputeActive=false, stakes/deposits zeroed, dispute deleted (L340-346 precede payouts L347-351). _payout's only post-call write (pendingWithdrawals += amount) fires ONLY when the call FAILED, i.e. no value was delivered; reentry during a failing receive hits finalized state and reverts, and a reentrant withdraw() pays only the caller's own previously-queued balance once (zeroed before its call). Accounting stays exact. Defense-in-depth note: contract carries no ReentrancyGuard; adding nonReentrant to the resolve paths is a cheap hardening for a future TDD dispatch — not required to close this finding. |
-| W-02 | reentrancy-balance, High ×1; reentrancy-no-eth, Medium ×1 | MoebiusXSessionAccount.executeAsSession | FALSE POSITIVE as an exploit. Function is nonReentrant; cap checks are post-call but ATOMIC — any per-call/cumulative breach reverts the entire call including the token transfer. Cross-function writers (grant/revoke/allowCall) are onlyOwner; the session key is not the owner. Design note recorded: outflow accounting trusts spendToken.balanceOf deltas — sound for the owner-configured spend token (USDC/Base in the MoebiusX deployment); a fee-on-transfer or rebasing token must never be configured as spendToken. |
-| W-03 | incorrect-exp, High ×1; divide-before-multiply, Medium ×9 | OpenZeppelin Math.sol (dependency of SincorSessionValidator) | FALSE POSITIVE — dependency code, not SINCOR source. `^` in mulDiv is intentional XOR inside Hensel/Newton-Raphson inversion; divide-before-multiply hits are the published OZ mulDiv/invMod algorithms. Excluded from SINCOR findings; listed so the count is honest. |
-| W-04 | incorrect-equality, Medium ×2 | ExecutionEscrowManager._payout (amount == 0), withdraw (amount == 0) | FALSE POSITIVE. Strict equality against zero on an exact wei amount is the intended guard, not a balance/price comparison. |
-| W-05 | timestamp, Low ×22 | Auction, StakeSlash, KYA, TaskEscrow, SessionValidator, MoebiusX | ACCEPTED DESIGN. Deadlines/windows are hour-to-day scale; Base sequencer timestamp drift (seconds) cannot move an outcome. Same class as forge lint block-timestamp warnings. |
-| W-06 | reentrancy-benign ×1, reentrancy-events ×4, Low | ExecutionEscrowManager | FALSE POSITIVE / informational. Event-after-call ordering only affects log sequencing on the failure-queued path; no state depends on it. |
-| W-07 | missing-zero-check, Low ×3 | OptimisticBatchSettlement ctor (treasury_, operator_); MoebiusXSessionAccount ×1; SincorPaymaster ×1 | ACCEPTED, fix recommended (trivial). Constructor-time, deployer-supplied addresses; the deploy ceremony verifies addresses before broadcast. Adding zero checks is a safe one-line hardening for a future dispatch. |
-| W-08 | low-level-calls, Informational ×6 | StakeSlashManager._safeTransfer/_safeTransferFrom; MoebiusX | ACCEPTED. Deliberate safe-transfer wrappers that check return data / success flag; required for non-standard ERC20 compatibility. |
-| W-09 | naming-convention ×6, immutable-states ×4, pragma/solc-version ×7, assembly ×38, too-many-digits ×4 — Informational/Optimization | across core + OZ deps | COSMETIC. No security effect. immutable-states suggestions (owner, operator) noted for a future gas pass. |
+| S-01 | reentrancy-eth, High ×2 | ExecutionEscrowManager._resolveDisputeSlash → _payout | FALSE POSITIVE (mitigated). All escrow state is finalized BEFORE any payout: state=Finalized, disputeActive=false, stakes/deposits zeroed, dispute deleted (L340-346 precede payouts L347-351). _payout's only post-call write (pendingWithdrawals += amount) fires ONLY when the call FAILED, i.e. no value was delivered; reentry during a failing receive hits finalized state and reverts, and a reentrant withdraw() pays only the caller's own previously-queued balance once (zeroed before its call). Accounting stays exact. Defense-in-depth note: contract carries no ReentrancyGuard; adding nonReentrant to the resolve paths is a cheap hardening for a future TDD dispatch — not required to close this finding. |
+| S-02 | reentrancy-balance, High ×1; reentrancy-no-eth, Medium ×1 | MoebiusXSessionAccount.executeAsSession | FALSE POSITIVE as an exploit. Function is nonReentrant; cap checks are post-call but ATOMIC — any per-call/cumulative breach reverts the entire call including the token transfer. Cross-function writers (grant/revoke/allowCall) are onlyOwner; the session key is not the owner. Design note recorded: outflow accounting trusts spendToken.balanceOf deltas — sound for the owner-configured spend token (USDC/Base in the MoebiusX deployment); a fee-on-transfer or rebasing token must never be configured as spendToken. |
+| S-03 | incorrect-exp, High ×1; divide-before-multiply, Medium ×9 | OpenZeppelin Math.sol (dependency of SincorSessionValidator) | FALSE POSITIVE — dependency code, not SINCOR source. `^` in mulDiv is intentional XOR inside Hensel/Newton-Raphson inversion; divide-before-multiply hits are the published OZ mulDiv/invMod algorithms. Excluded from SINCOR findings; listed so the count is honest. |
+| S-04 | incorrect-equality, Medium ×2 | ExecutionEscrowManager._payout (amount == 0), withdraw (amount == 0) | FALSE POSITIVE. Strict equality against zero on an exact wei amount is the intended guard, not a balance/price comparison. |
+| S-05 | timestamp, Low ×22 | Auction, StakeSlash, KYA, TaskEscrow, SessionValidator, MoebiusX | ACCEPTED DESIGN. Deadlines/windows are hour-to-day scale; Base sequencer timestamp drift (seconds) cannot move an outcome. Same class as forge lint block-timestamp warnings. |
+| S-06 | reentrancy-benign ×1, reentrancy-events ×4, Low | ExecutionEscrowManager | FALSE POSITIVE / informational. Event-after-call ordering only affects log sequencing on the failure-queued path; no state depends on it. |
+| S-07 | missing-zero-check, Low ×3 | OptimisticBatchSettlement ctor (treasury_, operator_); MoebiusXSessionAccount ×1; SincorPaymaster ×1 | ACCEPTED, fix recommended (trivial). Constructor-time, deployer-supplied addresses; the deploy ceremony verifies addresses before broadcast. Adding zero checks is a safe one-line hardening for a future dispatch. |
+| S-08 | low-level-calls, Informational ×6 | StakeSlashManager._safeTransfer/_safeTransferFrom; MoebiusX | ACCEPTED. Deliberate safe-transfer wrappers that check return data / success flag; required for non-standard ERC20 compatibility. |
+| S-09 | naming-convention ×6, immutable-states ×4, pragma/solc-version ×7, assembly ×38, too-many-digits ×4 — Informational/Optimization | across core + OZ deps | COSMETIC. No security effect. immutable-states suggestions (owner, operator) noted for a future gas pass. |
 
 Slither totals by run: combined unit 39 (2 High, 2 Medium, 21 Low, 12
 Info, 2 Opt); KYARegistry 1 Low; SincorPaymaster 3 (1 Low, 1 Info, 1 Opt);
 SincorTaskEscrow 20 (3 Low, 16 Info, 1 Opt); SincorSessionValidator 44
-(1 High + 9 Medium — ALL inside OZ Math.sol, W-03; rest Info/Low);
-MoebiusXSessionAccount 8 (1 High, 1 Medium — W-02; rest Low/Info);
+(1 High + 9 Medium — ALL inside OZ Math.sol, S-03; rest Info/Low);
+MoebiusXSessionAccount 8 (1 High, 1 Medium — S-02; rest Low/Info);
 ScopedPausable 2 Info.
+
+## Known open findings in the frozen set (red-team register)
+
+This campaign's verdict covers what the campaign exercised. The
+frozen contracts also carry findings from the ongoing red-team
+register that predate this freeze and remain open. They are named
+here so the verdict below is read with them in view:
+
+- **W-8/A5 — CommitRevealAuction bidder loop (CONFIRMED, open).**
+  `vickreyResult` loops `bidders[auctionId]` uncapped; there is no
+  MAX_COMMITTERS. Gas grows linearly with committer count (gas-DoS
+  class). The committer-cap decision (500 vs 2000) is the founder's
+  and is still pending. This campaign never exercised it: the
+  auction fuzz suite uses 3 bidders and the conservation invariant
+  uses 2 workers. A post-freeze exercise test added with the W-139
+  amendment (`test_w8_manyBidders_vickreyResult_completes_at_500`
+  in `test/CommitRevealAuction.t.sol`) drives 500 committers
+  through commit + reveal + settle: `vickreyResult` completes at
+  3,594,577 gas (~7,200 gas per bidder, linear) and the settle
+  path funds the escrow at the correct second-lowest price. That
+  is evidence about the loop's cost curve, not a fix — the cap
+  decision stands.
+- **J1 — adjudicator single-key trust (CONFIRMED, open).** One
+  adjudicator signature can slash an honest worker's full stake in
+  ExecutionEscrowManager disputes. Rulings commit no evidence, and
+  there is no on-chain appeal entrypoint.
+- **J2/treasuryCut — adjudicator discretion (CONFIRMED, open).**
+  The treasury cut in dispute resolution is bounded only by
+  `treasuryCut <= amount`; the split itself is the adjudicator's
+  choice.
 
 ## Verdict
 
-- No real bug was found by this campaign. No contract code was changed.
+- No NEW bug was found by this campaign. No contract code was changed.
+  The frozen set carries the known open red-team findings named in
+  the section above (W-8/A5, J1, J2/treasuryCut); read this verdict
+  with them in view.
 - The frozen set is **exhaustively fuzz-verified (50k runs where fuzz
   tests exist), invariant-verified (funds conservation across the money
   path), and statically triaged (zero untriaged Slither findings)**.
 - It is NOT formally verified. Remaining for that claim: a symbolic /
   theorem-proving pass (e.g. Certora/Halmos-style proofs of the
   conservation invariants), fuzz suites for escrow/session/paymaster,
-  the W-01/W-07 defense-in-depth hardenings, and an independent human
-  audit. Per Execution Standard v2, none of that may be marketed as done.
+  the S-01/S-07 defense-in-depth hardenings, an independent human
+  audit, the W-8 committer cap (founder decision: 500 vs 2000) and
+  the contract change that follows it, J1 mitigations
+  (evidence-committed rulings, an on-chain appeal window, enforced
+  slash caps), and a bound on J2 treasuryCut discretion. Per
+  Execution Standard v2, none of that may be marketed as done.

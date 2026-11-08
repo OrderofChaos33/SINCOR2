@@ -452,6 +452,60 @@ contract CommitRevealAuctionTest is Test {
     }
 
     // ------------------------------------------------------------------
+    // W-8 scale exercise (red-team register W-8/A5): vickreyResult loops
+    // bidders[auctionId] uncapped and no MAX_COMMITTERS exists. This
+    // test is evidence about the loop at scale — it drives 500 distinct
+    // committers through commit + reveal, measures the gas
+    // vickreyResult consumes, and settles through selectWinnerAndFund.
+    // It does NOT fix W-8; the committer-cap decision (500 vs 2000) is
+    // the founder's and is still pending.
+    // ------------------------------------------------------------------
+
+    event W8VickreyGas(uint256 committers, uint256 gasUsed);
+
+    function test_w8_manyBidders_vickreyResult_completes_at_500() public {
+        uint256 n = 500;
+        bytes32 aid = keccak256("w8-500");
+        _open(aid, 60, 60);
+        // Distinct prices, strictly decreasing by commit order: bidder i
+        // bids (n - i) * 0.001 ether, so the LAST committer holds the
+        // lowest bid (wins at the second-lowest price, 0.002 ether).
+        for (uint256 i = 0; i < n; i++) {
+            address bidder = address(uint160(0xB000 + i));
+            uint256 bidPrice = (n - i) * 0.001 ether;
+            bytes32 salt = keccak256(abi.encodePacked("w8-salt", i));
+            bytes32 agent = keccak256(abi.encodePacked("w8-agent", i));
+            _commitAs(bidder, aid, bidPrice, salt, agent);
+        }
+        (uint64 commitD, uint64 revealD) = _deadlines(aid);
+        vm.warp(uint256(commitD) + 1);
+        for (uint256 i = 0; i < n; i++) {
+            address bidder = address(uint160(0xB000 + i));
+            uint256 bidPrice = (n - i) * 0.001 ether;
+            bytes32 salt = keccak256(abi.encodePacked("w8-salt", i));
+            bytes32 agent = keccak256(abi.encodePacked("w8-agent", i));
+            _revealAs(bidder, aid, bidPrice, salt, agent);
+        }
+        uint256 gasBefore = gasleft();
+        (address winner, uint256 price) = auction.vickreyResult(aid);
+        uint256 gasUsed = gasBefore - gasleft();
+        emit W8VickreyGas(n, gasUsed);
+        address expectedWinner = address(uint160(0xB000 + (n - 1)));
+        assertEq(winner, expectedWinner);
+        assertEq(price, 0.002 ether);
+        // Settle path at the same scale: poster funds the escrow at the
+        // second-lowest price.
+        vm.warp(uint256(revealD) + 1);
+        vm.prank(poster);
+        auction.selectWinnerAndFund{value: price}(aid, 0);
+        (, bool finalized, , , ) = auction.auctions(aid);
+        assertTrue(finalized);
+        IExecutionEscrowManager.Escrow memory e = escrow.getEscrow(aid);
+        assertEq(e.selectedAgent, expectedWinner);
+        assertEq(uint256(e.bidAmount), 0.002 ether);
+    }
+
+    // ------------------------------------------------------------------
     // selectWinnerAndFund (close/settle happy path + guards)
     // ------------------------------------------------------------------
 
