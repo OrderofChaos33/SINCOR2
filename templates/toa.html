@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Query TOA — SINCOR</title>
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; --card:rgba(255,255,255,.04); }
+    :root { --bg:#0a0c10; --gold:#d4a94e; --gold-bright:#f0c664; --text:#f1f5f9; --muted:#94a3b8; --card:rgba(255,255,255,.04); }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; padding:32px 20px 64px; }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; padding:32px 20px 64px; }
     .wrap { max-width:860px; margin:0 auto; }
-    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    a { color:var(--gold-bright); text-decoration:none; font-weight:600; }
     h1 { font-family:'Sora',sans-serif; font-size:clamp(28px,5vw,40px); margin:16px 0 8px; }
     .sub { color:var(--muted); line-height:1.6; margin-bottom:24px; }
     .row { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0 24px; }
     button, .btn { border:none; border-radius:10px; padding:12px 18px; font-weight:700; cursor:pointer; font:inherit; text-decoration:none; display:inline-block; }
-    .primary { background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; }
-    .ghost { background:transparent; border:1px solid rgba(139,92,246,.35); color:var(--text); }
-    .card { background:var(--card); border:1px solid rgba(139,92,246,.25); border-radius:16px; padding:22px; margin-top:16px; }
-    .k { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-family:'JetBrains Mono',monospace; }
+    .primary { background:linear-gradient(135deg,var(--gold),var(--gold-bright)); color:#14100a; }
+    .ghost { background:transparent; border:1px solid rgba(212,169,78,.35); color:var(--text); }
+    .card { background:var(--card); border:1px solid rgba(212,169,78,.25); border-radius:16px; padding:22px; margin-top:16px; }
+    .k { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-bright); font-family:'JetBrains Mono',monospace; }
     .val { font-size:28px; font-family:'JetBrains Mono',monospace; margin:6px 0 4px; }
     pre { white-space:pre-wrap; word-break:break-word; font-family:'JetBrains Mono',monospace; font-size:12px; color:#cbd5e1; line-height:1.6; }
     .err { color:#fca5a5; }

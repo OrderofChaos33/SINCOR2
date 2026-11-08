@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Command console — SINCOR</title>
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#0a0e27; --surface:#0f1629; --elev:#161d33; --text:#f1f5f9; --muted:#94a3b8; --cyan:#06b6d4; --purple:#8b5cf6; --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --border:rgba(139,92,246,.22); }
+    :root { --bg:#0a0c10; --surface:#10141b; --elev:#1a2230; --text:#f1f5f9; --muted:#94a3b8; --gold-bright:#f0c664; --gold:#d4a94e; --ok:#34d399; --warn:#fbbf24; --danger:#f87171; --border:rgba(212,169,78,.22); }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; }
-    a { color:var(--cyan); text-decoration:none; }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
+    a { color:var(--gold-bright); text-decoration:none; }
     header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); background:rgba(10,14,39,.88); border-bottom:1px solid var(--border); }
     .bar { max-width:1120px; margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
     .brand { display:flex; align-items:center; gap:12px; color:var(--text); font-family:'Sora',sans-serif; font-weight:700; }
-    .brand img { width:36px; height:36px; border-radius:50%; border:2px solid rgba(139,92,246,.5); }
+    .brand img { width:36px; height:36px; border-radius:50%; border:2px solid rgba(212,169,78,.5); }
     nav { display:flex; gap:8px; flex-wrap:wrap; }
     nav a, nav button { min-height:44px; padding:10px 14px; border-radius:10px; border:1px solid transparent; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; }
     nav a:hover, nav button:hover { color:var(--text); background:rgba(255,255,255,.05); }
@@ -36,7 +36,7 @@
     .agent { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06); }
     .agent:last-child { border-bottom:none; }
     .barline { height:6px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; width:88px; }
-    .barline span { display:block; height:100%; background:var(--cyan); }
+    .barline span { display:block; height:100%; background:var(--gold-bright); }
     .linkcard { display:block; color:var(--text); }
     .linkcard h2 { font-size:16px; margin:8px 0 6px; }
     .linkcard p { color:var(--muted); font-size:13px; line-height:1.45; }
