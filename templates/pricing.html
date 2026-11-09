@@ -4,31 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pricing — SINCOR</title>
-    <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --bg: #050508;
-            --surface: #0d0d15;
-            --surface2: #12121f;
+            --bg: #0a0c10;
+            --surface: #141a23;
+            --surface2: #1a2230;
             --border: rgba(255,255,255,0.08);
-            --purple: #7c3aed;
-            --purple-light: #a78bfa;
-            --blue: #2563eb;
-            --green: #10b981;
-            --gold: #f59e0b;
-            --text: #e2e8f0;
-            --muted: #64748b;
+            --gold: #d4a94e;
+            --gold-bright: #f0c664;
+            --green: #3ddc84;
+            --text: #f2f4f8;
+            --muted: #a7b0bf;
         }
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
         }
+        h1, h2 { font-family: 'Sora', sans-serif; }
         nav {
-            background: rgba(5,5,8,0.95);
+            background: rgba(10,12,16,0.95);
             border-bottom: 1px solid var(--border);
             padding: 16px 32px;
             display: flex;
@@ -42,7 +41,7 @@
             text-decoration: none;
             font-family: monospace;
         }
-        .nav-logo span { color: var(--purple-light); }
+        .nav-logo span { color: var(--gold-bright); }
         .nav-back { color: var(--muted); text-decoration: none; font-size: 14px; }
         .nav-back:hover { color: var(--text); }
 
@@ -52,9 +51,9 @@
         }
         .hero-eyebrow {
             display: inline-block;
-            background: rgba(124,58,237,0.15);
-            color: var(--purple-light);
-            border: 1px solid rgba(124,58,237,0.3);
+            background: rgba(212,169,78,0.15);
+            color: var(--gold-bright);
+            border: 1px solid rgba(212,169,78,0.3);
             padding: 6px 16px;
             border-radius: 20px;
             font-size: 13px;
@@ -69,7 +68,7 @@
             line-height: 1.15;
             margin-bottom: 20px;
         }
-        .hero h1 span { color: var(--purple-light); }
+        .hero h1 span { color: var(--gold-bright); }
         .hero p {
             font-size: 18px;
             color: var(--muted);
@@ -83,7 +82,7 @@
             color: var(--muted);
             line-height: 1.6;
         }
-        .hero-note a { color: var(--purple-light); text-decoration: none; }
+        .hero-note a { color: var(--gold-bright); text-decoration: none; }
         .hero-note a:hover { color: #fff; }
 
         .pricing-section {
@@ -132,20 +131,20 @@
             transition: border-color 0.2s, transform 0.2s;
         }
         .plan-card:hover {
-            border-color: rgba(124,58,237,0.4);
+            border-color: rgba(212,169,78,0.4);
             transform: translateY(-2px);
         }
         .plan-card.featured {
-            border-color: var(--purple);
-            background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.08));
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(212,169,78,0.12), rgba(240,198,100,0.08));
         }
         .plan-badge {
             position: absolute;
             top: -14px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--purple);
-            color: #fff;
+            background: var(--gold);
+            color: #14100a;
             padding: 4px 16px;
             border-radius: 20px;
             font-size: 12px;
@@ -219,16 +218,16 @@
             transition: all 0.2s;
         }
         .btn-plan-primary {
-            background: var(--purple);
-            color: #fff;
+            background: var(--gold);
+            color: #14100a;
         }
-        .btn-plan-primary:hover { background: #6d28d9; transform: translateY(-1px); }
+        .btn-plan-primary:hover { background: #f0c664; transform: translateY(-1px); }
         .btn-plan-outline {
             background: transparent;
-            color: var(--purple-light);
-            border: 1px solid rgba(124,58,237,0.5);
+            color: var(--gold-bright);
+            border: 1px solid rgba(212,169,78,0.5);
         }
-        .btn-plan-outline:hover { border-color: var(--purple); color: #fff; }
+        .btn-plan-outline:hover { border-color: var(--gold); color: #fff; }
 
         /* How checkout works */
         .report-detail {
@@ -289,7 +288,7 @@
             line-height: 1.7;
         }
         .faq-item.open .faq-a { display: block; }
-        .faq-icon { color: var(--purple-light); font-size: 20px; }
+        .faq-icon { color: var(--gold-bright); font-size: 20px; }
         .faq-item.open .faq-icon { transform: rotate(45deg); }
     </style>
 </head>

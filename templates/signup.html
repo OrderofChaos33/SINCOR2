@@ -4,26 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Join SINCOR — Deploy Your AI Team</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
   <meta name="description" content="Start your autonomous AI agent team today. $297/month and up.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050508;
-      --surface: #0d0d15;
+      --bg: #0a0c10;
+      --surface: #141a23;
       --border: rgba(255,255,255,0.08);
-      --purple: #7c3aed;
-      --purple-light: #a78bfa;
-      --text: #e2e8f0;
-      --muted: #64748b;
+      --gold: #d4a94e;
+      --gold-bright: #f0c664;
+      --text: #f2f4f8;
+      --muted: #a7b0bf;
     }
     html { scroll-behavior: smooth; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
       line-height: 1.6;
       min-height: 100vh;
       display: flex;
@@ -38,7 +39,7 @@
     }
     
     .card {
-      background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(59,130,246,0.05) 100%);
+      background: linear-gradient(135deg, rgba(212,169,78,0.1) 0%, rgba(240,198,100,0.05) 100%);
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 48px 32px;
@@ -46,6 +47,7 @@
     }
     
     .logo {
+      font-family: 'Sora', sans-serif;
       font-size: 32px;
       font-weight: 700;
       color: var(--text);
@@ -53,10 +55,11 @@
     }
     
     h1 {
+      font-family: 'Sora', sans-serif;
       font-size: 28px;
       font-weight: 700;
       margin-bottom: 12px;
-      background: linear-gradient(135deg, var(--purple-light), #60a5fa);
+      background: linear-gradient(135deg, var(--gold-bright), #d4a94e);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -91,15 +94,15 @@
       border-radius: 8px;
       background: rgba(255,255,255,0.02);
       color: var(--text);
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', sans-serif;
       font-size: 15px;
       transition: all 0.3s;
     }
     
     input:focus {
       outline: none;
-      border-color: var(--purple);
-      background: rgba(124,58,237,0.05);
+      border-color: var(--gold);
+      background: rgba(212,169,78,0.05);
     }
     
     input::placeholder {
@@ -112,9 +115,9 @@
       margin-top: 8px;
       border: none;
       border-radius: 8px;
-      background: var(--purple);
-      color: white;
-      font-family: 'Space Grotesk', sans-serif;
+      background: var(--gold);
+      color: #14100a;
+      font-family: 'Inter', sans-serif;
       font-weight: 600;
       font-size: 16px;
       cursor: pointer;
@@ -122,9 +125,9 @@
     }
     
     .btn:hover {
-      background: var(--purple-light);
+      background: var(--gold-bright);
       transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(124,58,237,0.3);
+      box-shadow: 0 12px 24px rgba(212,169,78,0.3);
     }
     
     .btn:disabled {
@@ -149,7 +152,7 @@
     
     .feature-icon {
       margin-right: 12px;
-      color: var(--purple-light);
+      color: var(--gold-bright);
       font-weight: 700;
     }
     
@@ -166,7 +169,7 @@
     }
     
     .legal a {
-      color: var(--purple-light);
+      color: var(--gold-bright);
       text-decoration: none;
     }
     
@@ -200,7 +203,7 @@
   <div class="container">
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;">
-        <img src="/static/sincor_nav_icon.png" alt="SINCOR" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid rgba(124,58,237,0.5);">
+        <img src="/static/sincor_nav_icon.png" alt="SINCOR" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,169,78,0.5);">
         <div class="logo" style="margin:0;">SINCOR</div>
       </div>
       <h1>Join the Revolution</h1>
