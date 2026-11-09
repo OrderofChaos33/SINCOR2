@@ -505,20 +505,40 @@ def test_renew_after_lapse_starts_new_period(sub_app, sub_env):
     _approx_days(_parse(sub["period_end"]), 30)
 
 
-def test_explicit_cancel_revokes_immediately(sub_app, sub_env):
+def test_explicit_cancel_is_paid_through_to_period_end(sub_app, sub_env):
+    # STALE update (founder-authorized 2026-11-08): this test pinned the
+    # old immediate-revocation cancel — status "canceled", access and
+    # the platform record cancelled at once, mid-period. The Terms §5
+    # paid-through fix (9018cbb3) supersedes it: a mid-period cancel
+    # records "cancel_pending", the paid plan runs to period_end, the
+    # platform mirror stays active for the same window, and only at
+    # period end does the subscription become "canceled".
     client = sub_app.test_client()
     cid = _checkout(client, "starter")
-    assert _settle(client, cid, TX_STARTER).status_code == 200
+    settled = _settle(client, cid, TX_STARTER)
+    assert settled.status_code == 200
+    period_end_before = settled.get_json()["subscription"]["period_end"]
 
     out = rs.cancel_subscription(PAYER)
-    assert out["status"] == "canceled"
-    assert rs.subscription_status(PAYER)["effective_plan"] == "none"
-    assert rs.gate(PAYER, "starter_agents").allowed is False
-    # idempotent
-    assert rs.cancel_subscription(PAYER)["status"] == "canceled"
-    # the platform record is cancelled too
+    assert out["status"] == "cancel_pending"
+    assert out["period_end"] == period_end_before
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
+    assert rs.gate(PAYER, "starter_agents").allowed is True
+    # idempotent: a re-cancel keeps the paid-through state (and stamp)
+    assert rs.cancel_subscription(PAYER)["status"] == "cancel_pending"
+    # the platform mirror agrees: still active for the paid window
     synced = pp.get_subscription(PAYER)
-    assert synced["status"] == "cancelled"
+    assert synced["status"] == "active"
+
+    # at period end the cancel takes effect: canceled, access fails,
+    # and there is no past_due/grace tail for a cancelled subscription
+    _set_period_end(PAYER, datetime.now(timezone.utc) - timedelta(days=1))
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "canceled"
+    assert status["effective_plan"] == "none"
+    assert rs.gate(PAYER, "starter_agents").allowed is False
 
 
 # ---------------------------------------------------------------------------
