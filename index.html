@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MoebiusX — Base Mainnet Signing (Real Funds) — WalletConnect</title>
+<title>MoebiusX — Signature 2 Only (Real Funds) — WalletConnect</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 16px; max-width: 680px; color: #111; }
   h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
@@ -22,10 +22,10 @@
 </style>
 </head>
 <body>
-<h1>MoebiusX — Base Mainnet signing (REAL FUNDS) — phone version (WalletConnect)</h1>
-<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose Rabby in the WalletConnect popup — Rabby opens so you can approve the connection and each signature. If this page happens to be opened inside a wallet app's built-in browser instead, Connect uses that wallet directly. Either way, the two signing payloads are byte-identical to the verified desktop page.</p>
+<h1>MoebiusX — Signature 2 only (REAL FUNDS) — phone version</h1>
+<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose Rabby in the WalletConnect popup — Rabby opens so you can approve the connection and the one remaining signature. <b>Signature 1 is already done</b> — it deployed your account onchain (see the green box below). This page asks for <b>Signature 2 only</b>, and the copy box unlocks the moment it verifies.</p>
 <p><b>Base Mainnet only (chain 8453).</b> This page works with real USDC on Base.
-Both signing payloads are embedded in this file, exactly as generated. The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to verify each signature against your wallet address on this page before the copy box unlocks. Neither can change the payloads below.</p>
+The Signature 2 payload is embedded in this file, exactly as generated — byte-identical to the packet the operator verified. The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to verify your signature against your wallet address on this page before the copy box unlocks. Neither can change the payload below.</p>
 
 <div class="card real">
   <h2>Parameter sheet — rendered from the embedded packet</h2>
@@ -56,18 +56,15 @@ Both signing payloads are embedded in this file, exactly as generated. The only 
   <div id="connStatus" class="mono"></div>
 </div>
 
-<div class="card">
-  <h2>1 · Signature 1 — deploy the account + set the allowance</h2>
-  <p>One <code>personal_sign</code> of the setup operation hash. This signature deploys your
-  smart account and sets its USDC allowance to the router at exactly the 25 USDC cap.
-  Setup operation hash:</p>
-  <div class="mono" id="setupHash"></div>
-  <button id="signSetupBtn" disabled>Sign setup operation</button>
-  <div id="setupSigStatus" class="mono"></div>
+<div class="card real">
+  <h2>✓ Signature 1 — DONE onchain, nothing to redo</h2>
+  <p>Your first signature already deployed the smart account and set its USDC allowance
+  to the router at exactly the 25 USDC cap. Confirmed on Base:</p>
+  <p class="mono">Setup tx: 0xe539ed8c18473d8684b7500b459b1ad412935e7eff1f710bb9a10d23e3373004</p>
 </div>
 
 <div class="card">
-  <h2>2 · Signature 2 — grant the session key</h2>
+  <h2>1 · Signature 2 — grant the session key (the only signature left)</h2>
   <p>One typed-data signature (<code>eth_signTypedData_v4</code>) granting the session key
   <span class="mono" id="sessionAddr"></span> the policy on the sheet above.
   Off-chain signature; nothing moves when you sign it.</p>
@@ -75,7 +72,7 @@ Both signing payloads are embedded in this file, exactly as generated. The only 
   <div id="enableSigStatus" class="mono"></div>
   <button id="downloadSigBtn" class="secondary" disabled>⬇ Download founder-signature-mainnet.json</button>
   <p>On a phone the download can be hard to retrieve — use the copy box instead:</p>
-  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Both signatures appear here after Sign 1 + Sign 2"></textarea>
+  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Your completed signature pair appears here the moment Signature 2 verifies"></textarea>
   <button id="copySigBtn" class="secondary" disabled>📋 Copy both signatures</button>
   <p>Send the downloaded file — or the copied JSON — back to the operator.</p>
 </div>
@@ -86,20 +83,25 @@ Both signing payloads are embedded in this file, exactly as generated. The only 
 <script>
 const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
 const $ = (id) => document.getElementById(id);
-const sigs = {};
-// v4: fresh storage key — earlier pages stored signatures in this browser under
-// "moebiusx-sigs" and the copy box could hand back a stale one. Old key is wiped.
-try { localStorage.removeItem("moebiusx-sigs"); } catch (e) {}
-const verified = { setup: false, enable: false };
+const sigs = { setupSignature: "0x9487765844e264e7758ce867fdafbad48c7d072faabd18c748556319f97d398a1fa838c26299b90657876d22701e7a4692b55a5f8e53e4ea88b2dab0716e1a661b" };
+// v5: Signature 1 is already signed and DEPLOYED onchain — its signature is
+// public (broadcast inside the setup transaction), so it is pre-loaded above
+// and the copy box unlocks on Signature 2 ALONE. (v4 demanded a fresh Sign 1
+// in the same session first — that was the block.) Stale keys from older
+// pages and stale WalletConnect sessions on this shared origin are wiped so
+// the connection below starts fresh; this page's own v5 key is kept.
+try {
+  const kill = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sig2-v5"))) kill.push(k); }
+  kill.forEach((k) => localStorage.removeItem(k));
+} catch (e) {}
+const verified = { setup: true, enable: false };
 function persistSigs() {
-  try { localStorage.setItem("moebiusx-sigs-v4", JSON.stringify(sigs)); } catch (e) {}
-  if (verified.setup && verified.enable && sigs.setupSignature && sigs.enableSignature) {
+  try { if (sigs.enableSignature) localStorage.setItem("moebiusx-sig2-v5", sigs.enableSignature); } catch (e) {}
+  if (verified.enable && sigs.enableSignature) {
     $("sigOut").value = JSON.stringify(sigs, null, 2);
     $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
   }
-}
-function verifySetup(sig) {
-  try { return window.ethers.verifyMessage(window.ethers.getBytes(PACKET.signature1.userOpHash), sig).toLowerCase() === PACKET.founder.toLowerCase(); } catch (e) { return false; }
 }
 function verifyEnable(sig) {
   try {
@@ -170,7 +172,6 @@ function renderSheet() {
     "<span class='mono'>" + PACKET.fundingEth.to + "</span><br>" + PACKET.fundingEth.note + "</p>" +
     "<p><b>USDC funding: DONE ✓</b> — <b>" + PACKET.fundingUsdc.amountUsdc + " USDC</b> already sits in the smart account (you sent it from Rabby; verified onchain). No further USDC transfer is needed.<br>" +
     "USDC token: <span class='mono'>" + PACKET.fundingUsdc.token + "</span><br>" + PACKET.fundingUsdc.note + "</p>";
-  $("setupHash").textContent = PACKET.signature1.userOpHash;
   $("sessionAddr").textContent = PACKET.sessionKeyAddress;
 }
 renderSheet();
@@ -213,23 +214,7 @@ $("connectBtn").addEventListener("click", async () => {
     st.innerHTML = "Connected: <span class='mono'>" + account + "</span> " +
       (okAddr ? "<span class='ok'>✓ matches the founder Rabby address</span>"
               : "<span class='bad'>✗ NOT the founder Rabby address — stop, do not sign</span>");
-    if (okAddr) { $("signSetupBtn").disabled = false; $("signEnableBtn").disabled = false; }
-  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
-});
-
-$("signSetupBtn").addEventListener("click", async () => {
-  const st = $("setupSigStatus");
-  try {
-    if (!account) { st.textContent = "Connect Rabby first."; return; }
-    const sig = await activeProvider.request({
-      method: "personal_sign", params: [PACKET.signature1.userOpHash, account],
-    });
-    if (verifySetup(sig)) {
-      sigs.setupSignature = sig; verified.setup = true;
-      st.innerHTML = "<span class='ok'>✓ Signature 1 recorded — verified against your wallet</span>"; persistSigs();
-    } else {
-      st.innerHTML = "<span class='bad'>✗ Signature 1 did NOT verify against your wallet — tap Sign 1 again, do not copy.</span>";
-    }
+    if (okAddr) { $("signEnableBtn").disabled = false; }
   } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
 });
 
@@ -262,8 +247,13 @@ $("copySigBtn").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(t.value); $("copySigBtn").textContent = "✓ Copied"; }
   catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
 });
-if (sigs.setupSignature) { $("setupSigStatus").innerHTML = "<span class='ok'>✓ Signature 1 restored from this browser</span>"; }
-if (sigs.enableSignature) { $("enableSigStatus").innerHTML = "<span class='ok'>✓ Signature 2 restored from this browser</span>"; }
+try {
+  const saved2 = localStorage.getItem("moebiusx-sig2-v5");
+  if (saved2 && verifyEnable(saved2)) {
+    sigs.enableSignature = saved2; verified.enable = true;
+    $("enableSigStatus").innerHTML = "<span class='ok'>✓ Signature 2 restored from this browser — verified against your wallet</span>";
+  }
+} catch (e) {}
 persistSigs();
 </script>
 </body>
