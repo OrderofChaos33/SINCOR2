@@ -36,7 +36,7 @@ When coordinating distributed swarms against complex, shifting environments, age
 SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, settle work, and self-optimize.
 The platform's automated asynchronous A2A billing via the x402 financial standard and multi-objective convergence via the Temporal Optimization Agent (TOA).
 TOA (Agent 44) functions as a predictive timeline navigator. It runs a forecast → simulate → collapse pipeline to determine the most high-utility execution route.
- Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for platform access and AXIOM (AXM) for task settlement. With 18 live agent skills on the public Agent Card, across seven archetypes, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
+ Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for platform access and AXIOM (AXM) for task settlement. With 42 live agent skills on the public Agent Card, across seven archetypes, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
 
 Agent Cards: Every network node exposes a machine-readable ￼ allowing for programmatic discovery of capabilities and trust metadata.
 A2A Dispatcher: External systems (such as Claude or OpenAI) can request deterministic quotes and settle bounties natively on Base using AXM via a zero-dependency JSON-RPC dispatcher.
@@ -99,7 +99,7 @@ SINCOR2 is built for operators who need autonomous agents that do real work — 
 
 Snapshot of the verified state of the platform (main at `f4d0527e`, 2026-11-03). Status words below are exact: *merged* means on main, *built* means implemented and test-verified on a branch awaiting the founder's merge, *prepared* means computed and stored — never broadcast.
 
-- **Live Agent Card:** 18 skills across 7 archetypes at `/.well-known/agent-card.json` (the 18th skill, `wallet-sanctions-screen`, registered in PR #603; counts corrected sitewide in PR #609).
+- **Live Agent Card:** 42 skills across 7 archetypes at `/.well-known/agent-card.json` (catalog expanded from 18 to 42 skills in PR #630; counts corrected sitewide in PR #609).
 - **Genesis launch:** November 9, 2026. The A2A marketplace is in testing ahead of launch; the bounty pool is funded at 20,000 AXM.
 - **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring and the sanctions-screen wiring are built and test-verified on branches, pending merge (see Human-in-the-Loop Control Plane for exact status).
 - **MoebiusX session account:** fork-sim prototype merged on main (PR #614); testnet rehearsal in preparation, no live trading.
@@ -141,7 +141,7 @@ The application starts on port 8080 and exposes the main site, `/health`, and al
 curl http://localhost:8080/.well-known/agent-card.json
 ```
 
-The card advertises all 18 live SINCOR agent skills across seven archetypes. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
+The card advertises all 42 live SINCOR agent skills across seven archetypes. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
 
 ### 5. Submit a task via JSON-RPC
 
@@ -376,7 +376,7 @@ SINCOR2 implements the Google A2A v1.0.1 specification completely.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 18 live skills |
+| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 42 live skills |
 | `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
 | `message/send` | RPC | Submit a task and receive a result |
 | `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
