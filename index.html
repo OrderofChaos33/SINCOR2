@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoebiusX — Base Mainnet Signing (Real Funds) — Mobile</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 680px; color: #111; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
+  .card { border: 1px solid #ccc; border-radius: 10px; padding: 12px; margin: 12px 0; }
+  .warn { border-color: #c00; background: #fff5f5; }
+  .real { border-color: #b8860b; background: #fffaf0; }
+  button { font-size: 16px; padding: 12px 16px; margin: 6px 0; width: 100%; border-radius: 8px; border: 1px solid #333; background: #111; color: #fff; }
+  button.secondary { background: #fff; color: #111; }
+  button:disabled { opacity: .4; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .ok { color: #087008; } .bad { color: #c00; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td { border-top: 1px solid #eee; padding: 4px 6px; vertical-align: top; }
+  td:first-child { color: #555; width: 38%; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>MoebiusX — Base Mainnet signing (REAL FUNDS) — phone version</h1>
+<p><b>Open this page inside your wallet app's built-in browser</b> (Rabby mobile or MetaMask mobile → Browser). A normal phone browser has no wallet and Connect will fail. The two signing payloads are byte-identical to the verified desktop page.</p>
+<p><b>Base Mainnet only (chain 8453).</b> This page works with real USDC on Base.
+Both signing payloads are embedded in this file — nothing is loaded from anywhere else.</p>
+
+<div class="card real">
+  <h2>Parameter sheet — rendered from the embedded packet</h2>
+  <table><tbody id="sheetBody"></tbody></table>
+  <p id="sheetNote"></p>
+  <p class="mono" id="generatedNote"></p>
+</div>
+
+<div class="card warn">
+  <h2>⚠ Do-not-sign rule</h2>
+  <p>Compare Rabby's screen against this sheet before every signature. Sign <b>only</b> if
+  every value matches:</p>
+  <ul id="checkList"></ul>
+  <p>If anything on Rabby's screen differs — <b>do not sign</b>. Stop and tell the operator.
+  That check working is the product.</p>
+</div>
+
+<div class="card">
+  <h2>Funding — do these directly in the Rabby app (read-only instructions)</h2>
+  <div id="fundingText"></div>
+  <p>These are plain transfers in Rabby, not signatures on this page. This page has no
+  funding button and cannot move funds.</p>
+</div>
+
+<div class="card">
+  <h2>0 · Connect</h2>
+  <button id="connectBtn" class="secondary">Connect wallet (Base Mainnet)</button>
+  <div id="connStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>1 · Signature 1 — deploy the account + set the allowance</h2>
+  <p>One <code>personal_sign</code> of the setup operation hash. This signature deploys your
+  smart account and sets its USDC allowance to the router at exactly the 25 USDC cap.
+  Setup operation hash:</p>
+  <div class="mono" id="setupHash"></div>
+  <button id="signSetupBtn" disabled>Sign setup operation</button>
+  <div id="setupSigStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>2 · Signature 2 — grant the session key</h2>
+  <p>One typed-data signature (<code>eth_signTypedData_v4</code>) granting the session key
+  <span class="mono" id="sessionAddr"></span> the policy on the sheet above.
+  Off-chain signature; nothing moves when you sign it.</p>
+  <button id="signEnableBtn" disabled>Sign session grant</button>
+  <div id="enableSigStatus" class="mono"></div>
+  <button id="downloadSigBtn" class="secondary" disabled>⬇ Download founder-signature-mainnet.json</button>
+  <p>On a phone the download can be hard to retrieve — use the copy box instead:</p>
+  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Both signatures appear here after Sign 1 + Sign 2"></textarea>
+  <button id="copySigBtn" class="secondary" disabled>📋 Copy both signatures</button>
+  <p>Send the downloaded file — or the copied JSON — back to the operator.</p>
+</div>
+
+<script id="packet-json" type="application/json">{"kind":"moebiusx-mainnet/founder-requests","status":"PREPARED — NOT SIGNED, NOT BROADCAST, NO FUNDS MOVED","generatedAt":"2026-11-05T21:35:21.262Z","regenerateIfOlderThan":"24h (the session validity window starts at generation time; regenerate before signing if stale)","network":{"chainId":8453,"chainIdHex":"0x2105","name":"Base","rpcUrl":"https://mainnet.base.org","explorer":"https://basescan.org","currencySymbol":"ETH"},"founder":"0x9763c76151caf39d8c33adb1ca42993eefd7599e","accountAddress":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","accountDeployedAtGeneration":false,"entryPoint":"0x0000000071727De22E5E9d8BAf0edAc6f37da032","kernel":{"version":"0.3.2","factory":"0x7a1dBAB750f12a90EB1B60D2Ae3aD17D4D81EfFe","metaFactory":"0xd703aaE79538628d27099B8c4f621bE4CCd142d5","implementation":"0xD830D15D3dc0C269F3dBAa0F3e8626d33CFdaBe1","ecdsaValidator":"0x845ADb2C711129d4f3966735eD98a9F09fC4cE57","index":0},"sessionKeyAddress":"0xCcf75952aE90742Bab2858D52592C06AD0E342eD","permissionId":"0xa3c6697a","venue":{"protocol":"Uniswap V3","router":"0x2626664c2603336E57B271c5C0b26F421741e481","routerName":"SwapRouter02","factory":"0x33128a8fC17869897dcE68Ed026d694621f6FDfD","function":"exactInputSingle","selector":"0x04e45aaf","pool":"0xd0b53D9277642d899DF5C87A3966A349A798F224","feeTier":500,"tokenIn":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","tokenOut":"0x4200000000000000000000000000000000000006"},"policySheet":{"cumulativeCapUsdc":"25.000000","perCallCapUsdc":"5.000000","validAfter":1793914460,"validUntil":1794519260,"validUntilIso":"2026-11-12T21:34:20.000Z","expiry":"7 days from grant","rateLimit":"12 ops / 3600s","gasBudgetEth":"0.005","allowedCall":"SwapRouter02.exactInputSingle(tokenIn = USDC, tokenOut = WETH, fee = 500, recipient = the account itself, amountIn <= 5 USDC, sqrtPriceLimitX96 = 0) — nothing else","nativeValue":"0","sessionApproveAllowed":false},"fundedCapReality":{"packetFigureUsdc":"25.000000","fundedUsdcAtGeneration":"23.389581","fundedUsdcRaw":"23389581","accountUsdcRaw":"23389581","founderRabbyUsdcRaw":"0","readAtBlock":"53620724","shortfallUsdc":"1.610419","statement":"The policy cap and the setup allowance are set to the packet's 25 USDC. The founder has ALREADY transferred 23.389581 USDC into the counterfactual account address (verified onchain; his Rabby USDC balance is now 0), so the account's funded balance — design layer 3 — is the binding ceiling: the session can never move more than 23.389581 USDC in total unless the founder later tops the account up (any top-up is still bounded by the 25 USDC allowance until it is exhausted)."},"fundingEth":{"to":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","valueEth":"0.0004","note":"Two figures, stated plainly: (1) REQUIRED PREFUND — at the regenerated fee caps (maxFeePerGas 0.1 gwei, 20.0x the basefee observed at generation) the setup op's worst-case prefund is 0.000295 ETH; send 0.0004 ETH to cover it with margin. Your Rabby currently holds only 0.000000506 ETH (dust — an earlier 0.000506417 ETH figure was a 1000x misread of the wei balance), so FIRST top Rabby up with at least ~0.00041 ETH of Base ETH (roughly $1.50), then make this send. (2) SESSION GAS FLOAT — the session key's lifetime gas budget is 0.005 ETH (policy sheet); top the account up by ~0.005 ETH before trading starts. That float is NOT needed to sign or deploy."},"fundingUsdc":{"to":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","token":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","amountUsdc":"23.389581","note":"This is the packet's funding step with the amount corrected to reality: the packet says 25 USDC, Rabby held 23.389581 USDC, and that exact amount is what was funded. See fundedCapReality.","alreadyFunded":true},"signature1":{"description":"personal_sign the setup UserOp hash. This ONE signature deploys your account and sets the SwapRouter02 allowance to exactly the 25 USDC cap.","userOpHash":"0x458e4184386b22dd18d453a169138e8c2ab309cc74708930a28f2edd47322645","userOp":{"sender":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","nonce":"0x845adb2c711129d4f3966735ed98a9f09fc4ce5700000000000000000000","factory":"0xd703aaE79538628d27099B8c4f621bE4CCd142d5","factoryData":"0xc5265d5d0000000000000000000000007a1dbab750f12a90eb1b60d2ae3ad17d4d81effe0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001243c3b752b01845ADb2C711129d4f3966735eD98a9F09fC4cE570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000149763c76151caf39d8c33adb1ca42993eefd7599e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","callData":"0xe9ae5c53000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000078833589fCD6eDb6E08f4c7C32D4f71b54bdA029130000000000000000000000000000000000000000000000000000000000000000095ea7b30000000000000000000000002626664c2603336e57b271c5c0b26f421741e48100000000000000000000000000000000000000000000000000000000017d78400000000000000000","callGasLimit":"0xc3500","verificationGasLimit":"0x1e8480","preVerificationGas":"0x249f0","maxFeePerGas":"0x5f5e100","maxPriorityFeePerGas":"0x989680","signature":"0x"}},"signature2":{"description":"eth_signTypedData_v4 — grants the session key the policy sheet above. Off-chain signature; nothing moves.","typedData":{"domain":{"name":"Kernel","version":"0.3.2","chainId":8453,"verifyingContract":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e"},"types":{"Enable":[{"name":"validationId","type":"bytes21"},{"name":"nonce","type":"uint32"},{"name":"hook","type":"address"},{"name":"validatorData","type":"bytes"},{"name":"hookData","type":"bytes"},{"name":"selectorData","type":"bytes"}]},"message":{"validationId":"0x02a3c6697a00000000000000000000000000000000","nonce":1,"hook":"0x0000000000000000000000000000000000000000","validatorData":"0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000068000000000000000000000000000000000000000000000000000000000000007000000000000000000000000000000000000000000000000000000000000000760000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000005b600009a52283276A0ec8740DF50bF01B28A80D880eaf200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002626664c2603336e57b271c5c0b26f421741e48104e45aaf00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000000000000000000000000000000000000000034000000000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fCD6eDb6E08f4c7C32D4f71b54bdA0291300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000004200000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000004c4b40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000560000B9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F000000000000000000000000000000000000000000000000000000006aecf65c000000000000000000000000000000000000000000000000000000006af630dc0000000000000000000000000000000000000000000000000000000000000000000000000000000000280000f63d4139B25c836334edD76641356c6b74C86873000000000e1000000000000c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000760000aeFC5AbC67FfD258abD0A3E54f65E70326F84b230000000000000000000000000000000000000000000000000011c37937e080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a00006A6F069E2a08c2468e7724Ab3250CdBFBA14D4FFCcf75952aE90742Bab2858D52592C06AD0E342eD00000000000000000000000000000000000000000000","hookData":"0x","selectorData":"0xe9ae5c5300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001FF0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000"},"primaryType":"Enable"}}}</script>
+<script>
+const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
+const $ = (id) => document.getElementById(id);
+const sigs = {};
+try { const saved = JSON.parse(localStorage.getItem("moebiusx-sigs") || "{}"); if (saved.setupSignature) sigs.setupSignature = saved.setupSignature; if (saved.enableSignature) sigs.enableSignature = saved.enableSignature; } catch (e) {}
+function persistSigs() {
+  try { localStorage.setItem("moebiusx-sigs", JSON.stringify(sigs)); } catch (e) {}
+  if (sigs.setupSignature && sigs.enableSignature) {
+    $("sigOut").value = JSON.stringify(sigs, null, 2);
+    $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
+  }
+}
+let account = null;
+const getEth = () => window.ethereum;
+
+function renderSheet() {
+  const p = PACKET.policySheet, v = PACKET.venue, f = PACKET.fundedCapReality;
+  const rows = [
+    ["Network", "Base Mainnet (chain " + PACKET.network.chainId + ")"],
+    ["Owner (you)", PACKET.founder],
+    ["Smart account", PACKET.accountAddress],
+    ["Session key", PACKET.sessionKeyAddress],
+    ["Permission ID", PACKET.permissionId],
+    ["Cumulative cap", p.cumulativeCapUsdc + " USDC"],
+    ["Binding funded ceiling", f.fundedUsdcAtGeneration + " USDC — already sitting in the smart account (you funded it from Rabby)"],
+    ["Per-call cap", p.perCallCapUsdc + " USDC"],
+    ["Grant expiry", p.validUntilIso + " (Unix " + p.validUntil + ")"],
+    ["Rate limit", p.rateLimit],
+    ["Session gas budget", p.gasBudgetEth + " ETH"],
+    ["Router", v.routerName + " (" + v.protocol + ") — " + v.router],
+    ["Allowed call", p.allowedCall],
+    ["Token in", "USDC — " + v.tokenIn],
+    ["Token out", "WETH — " + v.tokenOut],
+    ["Pool fee tier", String(v.feeTier)],
+    ["Native value on session calls", p.nativeValue + " ETH"],
+    ["Session can approve", p.sessionApproveAllowed ? "yes" : "no"],
+  ];
+  $("sheetBody").innerHTML = rows.map(([k, val]) =>
+    "<tr><td>" + k + "</td><td class='mono'>" + val + "</td></tr>").join("");
+  $("sheetNote").textContent = f.statement;
+  $("generatedNote").textContent = "Packet generated: " + PACKET.generatedAt + " · " + PACKET.regenerateIfOlderThan;
+  $("checkList").innerHTML = [
+    "Cumulative cap: " + p.cumulativeCapUsdc + " USDC total",
+    "Funded ceiling: " + f.fundedUsdcAtGeneration + " USDC (funded balance in the account) binds first",
+    "Per call: " + p.perCallCapUsdc + " USDC maximum",
+    "Expiry: " + p.validUntilIso,
+    "Rate limit: " + p.rateLimit,
+    "Router: " + v.router + " (" + v.routerName + ") — the only allowed target",
+    "Token in pinned: USDC " + v.tokenIn,
+    "Token out pinned: WETH " + v.tokenOut + ", fee tier " + v.feeTier,
+    "Recipient pinned: the smart account itself, " + PACKET.accountAddress,
+    "Native value: " + p.nativeValue + " ETH on every session call",
+  ].map((x) => "<li>" + x + "</li>").join("");
+  $("fundingText").innerHTML =
+    "<p><b>Gas funding:</b> in Rabby, send <b>" + PACKET.fundingEth.valueEth + " ETH</b> on Base Mainnet to your smart account:<br>" +
+    "<span class='mono'>" + PACKET.fundingEth.to + "</span><br>" + PACKET.fundingEth.note + "</p>" +
+    "<p><b>USDC funding: DONE ✓</b> — <b>" + PACKET.fundingUsdc.amountUsdc + " USDC</b> already sits in the smart account (you sent it from Rabby; verified onchain). No further USDC transfer is needed.<br>" +
+    "USDC token: <span class='mono'>" + PACKET.fundingUsdc.token + "</span><br>" + PACKET.fundingUsdc.note + "</p>";
+  $("setupHash").textContent = PACKET.signature1.userOpHash;
+  $("sessionAddr").textContent = PACKET.sessionKeyAddress;
+}
+renderSheet();
+
+async function ensureChain() {
+  const eth = getEth();
+  const n = PACKET.network;
+  const chainId = await eth.request({ method: "eth_chainId" });
+  if (chainId !== n.chainIdHex) {
+    try {
+      await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: n.chainIdHex }] });
+    } catch (e) {
+      await eth.request({ method: "wallet_addEthereumChain", params: [{
+        chainId: n.chainIdHex, chainName: n.name,
+        rpcUrls: [n.rpcUrl], blockExplorerUrls: [n.explorer],
+        nativeCurrency: { name: "Ether", symbol: n.currencySymbol, decimals: 18 },
+      }]});
+    }
+  }
+}
+
+$("connectBtn").addEventListener("click", async () => {
+  const st = $("connStatus");
+  try {
+    const eth = getEth();
+    if (!eth) { st.innerHTML = "<span class='bad'>✗ No wallet found in this browser — open this page inside your wallet app's built-in browser (Rabby mobile or MetaMask mobile).</span>"; return; }
+    const accts = await eth.request({ method: "eth_requestAccounts" });
+    account = accts[0];
+    await ensureChain();
+    const okAddr = account && account.toLowerCase() === PACKET.founder.toLowerCase();
+    st.innerHTML = "Connected: <span class='mono'>" + account + "</span> " +
+      (okAddr ? "<span class='ok'>✓ matches the founder Rabby address</span>"
+              : "<span class='bad'>✗ NOT the founder Rabby address — stop, do not sign</span>");
+    if (okAddr) { $("signSetupBtn").disabled = false; }
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("signSetupBtn").addEventListener("click", async () => {
+  const st = $("setupSigStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rabby first."; return; }
+    sigs.setupSignature = await getEth().request({
+      method: "personal_sign", params: [PACKET.signature1.userOpHash, account],
+    });
+    st.innerHTML = "<span class='ok'>✓ Signature 1 recorded</span>"; persistSigs();
+    $("signEnableBtn").disabled = false;
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("signEnableBtn").addEventListener("click", async () => {
+  const st = $("enableSigStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rabby first."; return; }
+    sigs.enableSignature = await getEth().request({
+      method: "eth_signTypedData_v4",
+      params: [account, JSON.stringify(PACKET.signature2.typedData)],
+    });
+    st.innerHTML = "<span class='ok'>✓ Signature 2 recorded</span>"; persistSigs();
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+function download(name, obj) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }));
+  a.download = name; a.click();
+}
+$("downloadSigBtn").addEventListener("click", () => download("founder-signature-mainnet.json", sigs));
+$("copySigBtn").addEventListener("click", async () => {
+  const t = $("sigOut"); t.select();
+  try { await navigator.clipboard.writeText(t.value); $("copySigBtn").textContent = "✓ Copied"; }
+  catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
+});
+if (sigs.setupSignature) { $("setupSigStatus").innerHTML = "<span class='ok'>✓ Signature 1 restored from this browser</span>"; }
+if (sigs.enableSignature) { $("enableSigStatus").innerHTML = "<span class='ok'>✓ Signature 2 restored from this browser</span>"; }
+persistSigs();
+</script>
+</body>
+</html>
