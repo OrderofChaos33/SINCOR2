@@ -152,7 +152,10 @@ def test_api_poc_attacker_binds_nothing_and_gets_no_cookie(
     assert genesis_cohort.get_member(VICTIM) is None
     assert genesis_cohort.get_member_by_wallet(ATTACKER_WALLET) is None
 
-    # Victim confirms via the emailed link (GET, as a mail client does).
+    # Victim confirms via the emailed link. W-138 STALE update: the
+    # link's GET used to bind directly; it now renders a neutral
+    # confirmation page (no bind, no cookie, token not consumed) and
+    # only the page's POST confirms — the flow driven here.
     token = fake_sender.last_token(to_email=VICTIM)
     # NOTE: this token is the one from the attacker's request — it was
     # emailed to the victim, so the victim confirming it with the
@@ -165,6 +168,11 @@ def test_api_poc_attacker_binds_nothing_and_gets_no_cookie(
     assert r.status_code == 200
     token = fake_sender.last_token(to_email=VICTIM)
     r = mvp_client.get(f"/api/genesis/confirm?token={token}")
+    assert r.status_code == 200
+    assert "text/html" in (r.headers.get("Content-Type") or "")
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    assert genesis_cohort.get_member(VICTIM) is None
+    r = mvp_client.post("/api/genesis/confirm", data={"token": token})
     assert r.status_code == 200
     body = r.get_json()
     assert body["ok"] is True

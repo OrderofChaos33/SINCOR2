@@ -197,6 +197,9 @@ def test_genesis_claim_flow_lifts_gate(mvp_client, monkeypatch, tmp_path):
     # claim (the squat primitive). It now lifts only after the emailed
     # confirmation token is used — the flow driven here. Original
     # intent preserved: a completed (confirmed) claim lifts the gate.
+    # W-138 STALE update: confirmation binds on POST only; the emailed
+    # link's GET renders a neutral page, sets no cookie, and does not
+    # lift the gate.
     monkeypatch.delenv("SINCOR_LAUNCH_DATE", raising=False)
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
     from sincor2 import genesis_cohort
@@ -215,8 +218,17 @@ def test_genesis_claim_flow_lifts_gate(mvp_client, monkeypatch, tmp_path):
     r = mvp_client.get("/", follow_redirects=False)
     assert r.status_code == 200
     assert GATE_MARKER in r.get_data(as_text=True)
-    # Confirmation sets the cookie.
-    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    # Opening the emailed link (GET) sets no cookie and does not lift
+    # the gate — a mail scanner prefetch must change nothing.
+    token = sender.last_token()
+    r = mvp_client.get(f"/api/genesis/confirm?token={token}")
+    assert r.status_code == 200
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.get("/", follow_redirects=False)
+    assert r.status_code == 200
+    assert GATE_MARKER in r.get_data(as_text=True)
+    # Confirmation via POST sets the cookie.
+    r = mvp_client.post("/api/genesis/confirm", data={"token": token})
     assert r.status_code == 200
     assert "sincor_genesis" in (r.headers.get("Set-Cookie") or "")
     # Cookie now lifts the gate for this browser.

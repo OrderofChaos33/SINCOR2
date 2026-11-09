@@ -76,6 +76,8 @@ def test_single_valid_claim_behaves_as_before(mvp_client, monkeypatch, tmp_path)
     # receipt (200, no allocation, no cookie); the cookie is set when
     # the emailed token is confirmed — driven here to preserve the
     # original intent (a normal valid claim flow succeeds end to end).
+    # W-138 STALE update: confirmation binds on POST only; the emailed
+    # link's GET renders a neutral page and sets no cookie.
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
     from sincor2 import genesis_cohort
 
@@ -89,7 +91,11 @@ def test_single_valid_claim_behaves_as_before(mvp_client, monkeypatch, tmp_path)
     assert r.get_json()["ok"] is True
     assert "allocation" not in r.get_json()
     assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
-    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    token = sender.last_token()
+    r = mvp_client.get(f"/api/genesis/confirm?token={token}")
+    assert r.status_code == 200
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.post("/api/genesis/confirm", data={"token": token})
     assert r.status_code == 200
     assert "sincor_genesis" in (r.headers.get("Set-Cookie") or "")
 

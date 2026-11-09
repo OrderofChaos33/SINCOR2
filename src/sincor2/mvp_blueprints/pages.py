@@ -133,12 +133,53 @@ def genesis_claim_api():
 def genesis_confirm_api():
     """Confirm a pending genesis claim via its emailed token (W-136).
 
-    Accepts the token as a ?token= query parameter (the emailed link,
-    GET), a JSON body {"token": ...}, or a form field (POST). On
-    success the wallet binds (or is replaced, for a reclaim), the
-    member's allocation is returned to the now-verified owner, and the
-    genesis cookie is set — this is the only path that sets it.
+    W-138: confirmation binds on POST ONLY. A GET — the emailed link
+    itself — renders a neutral confirmation page whose button POSTs
+    the token. Mail-security scanners and link-preview bots prefetch
+    links with GET; if the GET bound the wallet, a prefetch would
+    complete the confirmation (in a squat, binding the attacker's
+    pending wallet to the victim's email) before the owner ever
+    clicked. The GET therefore changes no state: it does not call
+    confirm_claim, does not consume or rotate the token, does not
+    reveal whether the token is valid, and sets no cookie — so a
+    prefetch leaves the owner's later POST fully functional.
+
+    POST accepts the token as a JSON body {"token": ...}, a form
+    field (the confirmation page's button), or a ?token= query
+    parameter. On success the wallet binds (or is replaced, for a
+    reclaim), the member's allocation is returned to the now-verified
+    owner, and the genesis cookie is set — POST is the only path
+    that sets it.
     """
+    if request.method == "GET":
+        from html import escape as _html_escape
+
+        from flask import Response
+
+        token = request.args.get("token") or ""
+        page = (
+            "<!DOCTYPE html>\n"
+            '<html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            "<title>Confirm your genesis claim — SINCOR</title>"
+            "<style>body{background:#0a0c10;color:#e8e6df;font-family:Inter,"
+            "system-ui,sans-serif;display:flex;min-height:100vh;margin:0;"
+            "align-items:center;justify-content:center}"
+            "main{max-width:26rem;padding:2rem;text-align:center}"
+            "h1{color:#f0c664;font-size:1.4rem}"
+            "button{background:#d4a94e;color:#0a0c10;border:0;border-radius:"
+            "0.5rem;padding:0.8rem 1.6rem;font-size:1rem;font-weight:600;"
+            "cursor:pointer}</style></head><body><main>"
+            "<h1>Confirm your genesis claim</h1>"
+            "<p>Press the button below to confirm this claim and bind "
+            "your wallet. Opening this page on its own confirms "
+            "nothing.</p>"
+            '<form method="post" action="/api/genesis/confirm">'
+            f'<input type="hidden" name="token" value="{_html_escape(token, quote=True)}">'
+            '<button type="submit">Confirm my claim</button>'
+            "</form></main></body></html>"
+        )
+        return Response(page, status=200, mimetype="text/html")
     try:
         from sincor2.genesis_cohort import confirm_claim
     except Exception:
