@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import sqlite3
 import threading
@@ -284,8 +283,9 @@ def _rail_db_path() -> Path:
     Shares the revenue ledger file (SINCOR_REVENUE_DB) with the parked
     Stripe implementation so operators keep one place to look.
     """
-    return Path(os.environ.get("SINCOR_REVENUE_DB")
-                or "data/revenue/revenue_ledger.db")
+    from sincor2.data_paths import revenue_ledger_db_path
+
+    return revenue_ledger_db_path()
 
 
 def _connect_rail() -> sqlite3.Connection:

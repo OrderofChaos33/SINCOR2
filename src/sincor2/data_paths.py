@@ -57,6 +57,26 @@ def data_dir() -> Path:
     return base
 
 
+def revenue_ledger_db_path() -> Path:
+    """Canonical revenue-ledger file, shared by every rail call site.
+
+    Resolution order (evaluated at call time, never frozen at import):
+    1. ``SINCOR_REVENUE_DB`` — explicit override, wins everywhere.
+    2. ``SINCOR_DATA_DIR`` — ``<data dir>/revenue/revenue_ledger.db``,
+       the layout ``revenue_orchestrator.DATA_DIR`` has always used, so
+       on Railway the ledger lands on the mounted volume, not the
+       ephemeral working directory.
+    3. Historical CWD-relative ``data/revenue/revenue_ledger.db``.
+    """
+    override = os.environ.get("SINCOR_REVENUE_DB")
+    if override:
+        return Path(override)
+    data_root = os.environ.get("SINCOR_DATA_DIR", "").strip()
+    if data_root:
+        return Path(data_root) / "revenue" / "revenue_ledger.db"
+    return Path("data") / "revenue" / "revenue_ledger.db"
+
+
 def orders_db_path() -> Path:
     override = os.environ.get("ORDERS_DB_PATH", "").strip()
     if override:
