@@ -23,9 +23,9 @@
 </head>
 <body>
 <h1>MoebiusX — Signature 2 only (REAL FUNDS) — phone version</h1>
-<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose Rabby in the WalletConnect popup — Rabby opens so you can approve the connection and the one remaining signature. <b>Signature 1 is already done</b> — it deployed your account onchain (see the green box below). This page asks for <b>Signature 2 only</b>, and the copy box unlocks the moment it verifies.</p>
+<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose Rabby in the WalletConnect popup — Rabby opens so you can approve the connection and the one remaining signature. <b>Signature 1 is already done</b> — it deployed your account onchain (see the green box below). This page asks for <b>Signature 2 only</b>. The copy box unlocks the moment Rabby returns your signature — verified or not, you can always copy and send it; the operator re-checks it server-side before anything is submitted.</p>
 <p><b>Base Mainnet only (chain 8453).</b> This page works with real USDC on Base.
-The Signature 2 payload is embedded in this file, exactly as generated — byte-identical to the packet the operator verified. The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to verify your signature against your wallet address on this page before the copy box unlocks. Neither can change the payload below.</p>
+The Signature 2 payload is embedded in this file, exactly as generated — byte-identical to the packet the operator verified. The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to check your signature against your wallet address on this page as a first look only. Neither can change the payload below.</p>
 
 <div class="card real">
   <h2>Parameter sheet — rendered from the embedded packet</h2>
@@ -68,11 +68,12 @@ The Signature 2 payload is embedded in this file, exactly as generated — byte-
   <p>One typed-data signature (<code>eth_signTypedData_v4</code>) granting the session key
   <span class="mono" id="sessionAddr"></span> the policy on the sheet above.
   Off-chain signature; nothing moves when you sign it.</p>
+  <p><b>Before you tap Sign:</b> in the Rabby app, make the account ending <b>…599e</b> the ACTIVE account (tap the account name at the top of Rabby and select it, then come back here). Rabby signs with its active account — if a different account is active there, the signature comes out under the wrong address and cannot be used.</p>
   <button id="signEnableBtn" disabled>Sign session grant</button>
   <div id="enableSigStatus" class="mono"></div>
   <button id="downloadSigBtn" class="secondary" disabled>⬇ Download founder-signature-mainnet.json</button>
   <p>On a phone the download can be hard to retrieve — use the copy box instead:</p>
-  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Your completed signature pair appears here the moment Signature 2 verifies"></textarea>
+  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Your completed signature pair appears here the moment Rabby returns Signature 2"></textarea>
   <button id="copySigBtn" class="secondary" disabled>📋 Copy both signatures</button>
   <p>Send the downloaded file — or the copied JSON — back to the operator.</p>
 </div>
@@ -84,30 +85,51 @@ The Signature 2 payload is embedded in this file, exactly as generated — byte-
 const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
 const $ = (id) => document.getElementById(id);
 const sigs = { setupSignature: "0x9487765844e264e7758ce867fdafbad48c7d072faabd18c748556319f97d398a1fa838c26299b90657876d22701e7a4692b55a5f8e53e4ea88b2dab0716e1a661b" };
-// v5: Signature 1 is already signed and DEPLOYED onchain — its signature is
-// public (broadcast inside the setup transaction), so it is pre-loaded above
-// and the copy box unlocks on Signature 2 ALONE. (v4 demanded a fresh Sign 1
-// in the same session first — that was the block.) Stale keys from older
+// v6: Signature 1 is already signed and DEPLOYED onchain — its signature is
+// public (broadcast inside the setup transaction), so it is pre-loaded above.
+// v6 NEVER discards a signature: whatever Rabby returns is stored, shown in
+// the copy box, and copy/download unlock immediately. The on-page check is a
+// first look only — it reports WHICH address the signature recovers to, and
+// the operator re-verifies server-side before anything is submitted. (v5
+// deleted any signature its on-page check rejected, which destroyed the
+// evidence and trapped the founder in a retry loop.) Stale keys from older
 // pages and stale WalletConnect sessions on this shared origin are wiped so
-// the connection below starts fresh; this page's own v5 key is kept.
+// the connection below starts fresh; this page's own v6 key is kept.
 try {
   const kill = [];
-  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sig2-v5"))) kill.push(k); }
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sig2-v6"))) kill.push(k); }
   kill.forEach((k) => localStorage.removeItem(k));
 } catch (e) {}
-const verified = { setup: true, enable: false };
 function persistSigs() {
-  try { if (sigs.enableSignature) localStorage.setItem("moebiusx-sig2-v5", sigs.enableSignature); } catch (e) {}
-  if (verified.enable && sigs.enableSignature) {
+  try { if (sigs.enableSignature) localStorage.setItem("moebiusx-sig2-v6", sigs.enableSignature); } catch (e) {}
+  if (sigs.enableSignature) {
     $("sigOut").value = JSON.stringify(sigs, null, 2);
     $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
   }
 }
-function verifyEnable(sig) {
+function recoverEnable(sig) {
+  // Returns the address the signature recovers to, or null when the checker
+  // library is unavailable or the signature cannot be parsed. Never throws.
   try {
+    if (!window.ethers || !window.ethers.verifyTypedData) return null;
     const td = PACKET.signature2.typedData;
-    return window.ethers.verifyTypedData(td.domain, td.types, td.message, sig).toLowerCase() === PACKET.founder.toLowerCase();
-  } catch (e) { return false; }
+    return window.ethers.verifyTypedData(td.domain, td.types, td.message, sig);
+  } catch (e) { return null; }
+}
+function reportEnableStatus(sig) {
+  const st = $("enableSigStatus");
+  const rec = recoverEnable(sig);
+  if (rec && rec.toLowerCase() === PACKET.founder.toLowerCase()) {
+    st.innerHTML = "<span class='ok'>✓ Signature 2 verified against your wallet</span> — copy it below and send it to the operator.";
+  } else if (rec) {
+    st.innerHTML = "<span class='bad'>⚠ Rabby signed from a DIFFERENT address: " + rec + "</span><br>" +
+      "Your account is " + PACKET.founder + ". Rabby signed with the account that is ACTIVE in the Rabby app, " +
+      "not the account this page connected. <b>Still copy the signature below and send it</b> — then in Rabby, switch the " +
+      "active account (top of the app) to the one ending …599e, reconnect here, and sign once more.";
+  } else {
+    st.innerHTML = "<span class='ok'>Signature 2 received.</span> The on-page checker could not run — " +
+      "<b>copy the signature below and send it anyway</b>; the operator verifies it server-side.";
+  }
 }
 let account = null;
 let activeProvider = null;
@@ -226,13 +248,10 @@ $("signEnableBtn").addEventListener("click", async () => {
       method: "eth_signTypedData_v4",
       params: [account, JSON.stringify(PACKET.signature2.typedData)],
     });
-    if (verifyEnable(sig)) {
-      sigs.enableSignature = sig; verified.enable = true;
-      st.innerHTML = "<span class='ok'>✓ Signature 2 recorded — verified against your wallet</span>"; persistSigs();
-    } else {
-      delete sigs.enableSignature; verified.enable = false; persistSigs();
-      st.innerHTML = "<span class='bad'>✗ Signature 2 did NOT verify against your wallet — the copy box stays locked. Tap Sign 2 again; if it fails again, screenshot this page and send it.</span>";
-    }
+    if (!sig) { st.innerHTML = "<span class='bad'>✗ Rabby returned no signature — nothing was signed.</span>"; return; }
+    sigs.enableSignature = sig;
+    persistSigs();
+    reportEnableStatus(sig);
   } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
 });
 
@@ -248,10 +267,10 @@ $("copySigBtn").addEventListener("click", async () => {
   catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
 });
 try {
-  const saved2 = localStorage.getItem("moebiusx-sig2-v5");
-  if (saved2 && verifyEnable(saved2)) {
-    sigs.enableSignature = saved2; verified.enable = true;
-    $("enableSigStatus").innerHTML = "<span class='ok'>✓ Signature 2 restored from this browser — verified against your wallet</span>";
+  const saved2 = localStorage.getItem("moebiusx-sig2-v6");
+  if (saved2) {
+    sigs.enableSignature = saved2;
+    reportEnableStatus(saved2);
   }
 } catch (e) {}
 persistSigs();
