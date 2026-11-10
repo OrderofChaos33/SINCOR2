@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MoebiusX — Signature 2 Only (Real Funds) — WalletConnect</title>
+<title>MoebiusX — Signature 2 (personal_sign) — Real Funds</title>
 <style>
   body { font-family: system-ui, sans-serif; margin: 16px; max-width: 680px; color: #111; }
   h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
@@ -65,10 +65,12 @@ The Signature 2 payload is embedded in this file, exactly as generated — byte-
 
 <div class="card">
   <h2>1 · Signature 2 — grant the session key (the only signature left)</h2>
-  <p>One typed-data signature (<code>eth_signTypedData_v4</code>) granting the session key
+  <p>One <code>personal_sign</code> signature — the same kind as Signature 1, which worked — granting the session key
   <span class="mono" id="sessionAddr"></span> the policy on the sheet above.
   Off-chain signature; nothing moves when you sign it.</p>
-  <p><b>Before you tap Sign:</b> in the Rabby app, make the account ending <b>…599e</b> the ACTIVE account (tap the account name at the top of Rabby and select it, then come back here). Rabby signs with its active account — if a different account is active there, the signature comes out under the wrong address and cannot be used.</p>
+  <p>Rabby will ask you to sign this exact code — the session grant, hashed. It must match letter-for-letter:</p>
+  <p class="mono" id="enableDigest" style="font-size:13px;"></p>
+  <p>If Rabby shows anything different — <b>do not sign</b>. Stop and tell the operator.</p>
   <button id="signEnableBtn" disabled>Sign session grant</button>
   <div id="enableSigStatus" class="mono"></div>
   <button id="downloadSigBtn" class="secondary" disabled>⬇ Download founder-signature-mainnet.json</button>
@@ -85,6 +87,14 @@ The Signature 2 payload is embedded in this file, exactly as generated — byte-
 const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
 const $ = (id) => document.getElementById(id);
 const sigs = { setupSignature: "0x9487765844e264e7758ce867fdafbad48c7d072faabd18c748556319f97d398a1fa838c26299b90657876d22701e7a4692b55a5f8e53e4ea88b2dab0716e1a661b" };
+// v7: Signature 2 is a personal_sign over the EIP-712 Enable digest below —
+// computed from the embedded packet and asserted byte-equal at build time.
+// Rabby's eth_signTypedData_v4 over WalletConnect deterministically returns
+// signatures that recover to an unrelated address (caught live by v6), while
+// its personal_sign path is exact (Signature 1 verified). Kernel 0.3.2
+// accepts the personal_sign-over-digest form on-chain — proven on a Base
+// Sepolia fork test 2026-11-09 (session swap executed).
+const ENABLE_DIGEST = "0x66f4575e0f560f8c5c121a6c47491173a9880df6698f6de95d31977c19cef9b2";
 // v6: Signature 1 is already signed and DEPLOYED onchain — its signature is
 // public (broadcast inside the setup transaction), so it is pre-loaded above.
 // v6 NEVER discards a signature: whatever Rabby returns is stored, shown in
@@ -97,23 +107,23 @@ const sigs = { setupSignature: "0x9487765844e264e7758ce867fdafbad48c7d072faabd18
 // the connection below starts fresh; this page's own v6 key is kept.
 try {
   const kill = [];
-  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sig2-v6"))) kill.push(k); }
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sig2-v7"))) kill.push(k); }
   kill.forEach((k) => localStorage.removeItem(k));
 } catch (e) {}
 function persistSigs() {
-  try { if (sigs.enableSignature) localStorage.setItem("moebiusx-sig2-v6", sigs.enableSignature); } catch (e) {}
+  try { if (sigs.enableSignature) localStorage.setItem("moebiusx-sig2-v7", sigs.enableSignature); } catch (e) {}
   if (sigs.enableSignature) {
     $("sigOut").value = JSON.stringify(sigs, null, 2);
     $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
   }
 }
 function recoverEnable(sig) {
-  // Returns the address the signature recovers to, or null when the checker
-  // library is unavailable or the signature cannot be parsed. Never throws.
+  // Returns the address the personal_sign signature recovers to (over the
+  // Enable digest bytes), or null when the checker library is unavailable or
+  // the signature cannot be parsed. Never throws.
   try {
-    if (!window.ethers || !window.ethers.verifyTypedData) return null;
-    const td = PACKET.signature2.typedData;
-    return window.ethers.verifyTypedData(td.domain, td.types, td.message, sig);
+    if (!window.ethers || !window.ethers.verifyMessage) return null;
+    return window.ethers.verifyMessage(window.ethers.getBytes(ENABLE_DIGEST), sig);
   } catch (e) { return null; }
 }
 function reportEnableStatus(sig) {
@@ -123,9 +133,8 @@ function reportEnableStatus(sig) {
     st.innerHTML = "<span class='ok'>✓ Signature 2 verified against your wallet</span> — copy it below and send it to the operator.";
   } else if (rec) {
     st.innerHTML = "<span class='bad'>⚠ Rabby signed from a DIFFERENT address: " + rec + "</span><br>" +
-      "Your account is " + PACKET.founder + ". Rabby signed with the account that is ACTIVE in the Rabby app, " +
-      "not the account this page connected. <b>Still copy the signature below and send it</b> — then in Rabby, switch the " +
-      "active account (top of the app) to the one ending …599e, reconnect here, and sign once more.";
+      "Your account is " + PACKET.founder + ". <b>Still copy the signature below and send it</b> — the operator will " +
+      "inspect it. Do not keep retrying.";
   } else {
     st.innerHTML = "<span class='ok'>Signature 2 received.</span> The on-page checker could not run — " +
       "<b>copy the signature below and send it anyway</b>; the operator verifies it server-side.";
@@ -195,6 +204,7 @@ function renderSheet() {
     "<p><b>USDC funding: DONE ✓</b> — <b>" + PACKET.fundingUsdc.amountUsdc + " USDC</b> already sits in the smart account (you sent it from Rabby; verified onchain). No further USDC transfer is needed.<br>" +
     "USDC token: <span class='mono'>" + PACKET.fundingUsdc.token + "</span><br>" + PACKET.fundingUsdc.note + "</p>";
   $("sessionAddr").textContent = PACKET.sessionKeyAddress;
+  $("enableDigest").textContent = ENABLE_DIGEST;
 }
 renderSheet();
 
@@ -245,8 +255,8 @@ $("signEnableBtn").addEventListener("click", async () => {
   try {
     if (!account) { st.textContent = "Connect Rabby first."; return; }
     const sig = await activeProvider.request({
-      method: "eth_signTypedData_v4",
-      params: [account, JSON.stringify(PACKET.signature2.typedData)],
+      method: "personal_sign",
+      params: [ENABLE_DIGEST, account],
     });
     if (!sig) { st.innerHTML = "<span class='bad'>✗ Rabby returned no signature — nothing was signed.</span>"; return; }
     sigs.enableSignature = sig;
@@ -267,7 +277,7 @@ $("copySigBtn").addEventListener("click", async () => {
   catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
 });
 try {
-  const saved2 = localStorage.getItem("moebiusx-sig2-v6");
+  const saved2 = localStorage.getItem("moebiusx-sig2-v7");
   if (saved2) {
     sigs.enableSignature = saved2;
     reportEnableStatus(saved2);
