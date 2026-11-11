@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sincor-x402"
+version = "0.1.0"
+description = "Verified x402 + MCP wrapper: escrowed, SIGIL-committed settlement for x402 endpoints and MCP tools (reference implementation — see README honesty notes)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "SINCOR Business Solutions" }]
+keywords = ["x402", "mcp", "escrow", "agent-payments", "base"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://getsincor.com"
+Repository = "https://github.com/OrderofChaos33/SINCOR2"
+AgentCard = "https://getsincor.com/.well-known/agent-card.json"
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.110"]
+hub = ["web3>=6.15", "eth-account>=0.11", "eth-utils>=4"]
+dev = ["pytest>=8", "web3>=6.15", "eth-account>=0.11", "eth-utils>=4",
+       "eth-tester>=0.13", "py-solc-x>=1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
