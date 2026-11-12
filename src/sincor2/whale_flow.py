@@ -45,7 +45,7 @@ MIN_WHALE_PNL_USD = float(os.getenv("WHALE_MIN_PNL_USD", "100.0"))
 FRESH_WINDOW_MIN = int(os.getenv("WHALE_FRESH_WINDOW_MIN", "60"))
 WHALE_REGISTRY_PATH = Path(os.getenv("WHALE_REGISTRY_PATH", "/data/whale_registry.json"))
 LEADERBOARD_URL = os.getenv("POLYMARKET_LEADERBOARD_URL",
-                            "https://data-api.polymarket.com/v1/leaderboard")
+                            "https://data-api.polymarket.com/v2/leaderboard")
 
 
 def _cache_path() -> str:
@@ -153,19 +153,65 @@ def _get_json(url: str, timeout: int = 15) -> Optional[Any]:
         return None
 
 
+# --- Data API v2 wire contract (v1 retired 2026-11-02, HTTP 410) ---------
+# V2 wraps rows in an envelope (``data`` + ``pagination.next_cursor``),
+# paginates by opaque cursor only (``offset`` is a 400), and serves
+# snake_case fields. Downstream consumers keep reading the internal
+# v1-era keys, so translation happens here, at the fetch boundary only.
+
+def _v2_rows(payload: Any) -> List[Dict[str, Any]]:
+    """Rows out of a v2 envelope (a bare list is tolerated)."""
+    if isinstance(payload, dict):
+        data = payload.get("data")
+        return data if isinstance(data, list) else []
+    if isinstance(payload, list):
+        return payload
+    return []
+
+
+def _v2_next_cursor(payload: Any) -> Optional[str]:
+    if isinstance(payload, dict):
+        pag = payload.get("pagination") or {}
+        return pag.get("next_cursor") or None
+    return None
+
+
+def _normalize_trade(row: Any) -> Any:
+    """Map a v2 trade row onto the internal key shape consumers read:
+    ``conditionId`` / ``asset`` / ``eventSlug`` (from ``condition_id`` /
+    ``token_id`` / ``event_slug``). Untouched fields pass through."""
+    if not isinstance(row, dict):
+        return row
+    out = dict(row)
+    if "proxy_wallet" in out:
+        out.setdefault("proxyWallet", out["proxy_wallet"])
+    if "condition_id" in out:
+        out.setdefault("conditionId", out["condition_id"])
+    if "token_id" in out:
+        out.setdefault("asset", out["token_id"])
+    if "event_slug" in out:
+        out.setdefault("eventSlug", out["event_slug"])
+    return out
+
+
 def _wallet_trades(wallet: str, limit: int = 500) -> List[Dict[str, Any]]:
-    """Full trade history for one wallet (paginated)."""
+    """Full trade history for one wallet (cursor-paginated, v2)."""
     out: List[Dict[str, Any]] = []
-    offset = 0
+    cursor: Optional[str] = None
     while len(out) < limit:
-        batch = _get_json(
-            f"{DATA_API}/trades?limit=500&offset={offset}&user={wallet}")
+        url = f"{DATA_API}/v2/trades?limit=500&user={wallet}"
+        if cursor:
+            url += f"&cursor={urllib.parse.quote(cursor, safe='')}"
+        payload = _get_json(url)
+        if payload is None:
+            break
+        batch = _v2_rows(payload)
         if not batch:
             break
-        out.extend(batch)
-        if len(batch) < 500:
+        out.extend(_normalize_trade(r) for r in batch)
+        cursor = _v2_next_cursor(payload)
+        if not cursor:
             break
-        offset += 500
     return out[:limit]
 
 
@@ -466,18 +512,24 @@ def discover_candidates_from_flow(limit: int = 5000) -> List[str]:
     """High-volume wallets from recent public trade flow (discovery seeds)."""
     from collections import Counter
     counts: Counter = Counter()
-    offset = 0
     pulled = 0
+    cursor: Optional[str] = None
     while pulled < limit:
-        batch = _get_json(f"{DATA_API}/trades?limit=500&offset={offset}")
+        url = f"{DATA_API}/v2/trades?limit=500"
+        if cursor:
+            url += f"&cursor={urllib.parse.quote(cursor, safe='')}"
+        payload = _get_json(url)
+        if payload is None:
+            break
+        batch = _v2_rows(payload)
         if not batch:
             break
         for t in batch:
-            counts[t.get("proxyWallet", "")] += 1
+            counts[t.get("proxy_wallet") or t.get("proxyWallet") or ""] += 1
         pulled += len(batch)
-        if len(batch) < 500:
+        cursor = _v2_next_cursor(payload)
+        if not cursor:
             break
-        offset += 500
     # Wallets with 25+ trades in the window are worth scoring
     return [w for w, n in counts.most_common(60) if w and n >= 25]
 
@@ -490,12 +542,15 @@ def discover_candidates_from_leaderboard(limit: int = 50) -> List[str]:
     unrealized/mark-to-market on open positions. These seeds are far more
     likely than recent-flow volume to have deep resolved history.
     """
-    data = _get_json(f"{LEADERBOARD_URL}?limit=100")
+    # V2: envelope response, wallet field is ``user_id``, and the board
+    # defaults to the DAY window — ``time_period=all`` is the all-time
+    # board this seed logic has always assumed.
+    data = _get_json(f"{LEADERBOARD_URL}?time_period=all&limit=100")
     if not data:
         return []
     out: List[str] = []
-    for entry in data[:limit]:
-        w = (entry or {}).get("proxyWallet")
+    for entry in _v2_rows(data)[:limit]:
+        w = (entry or {}).get("user_id") or (entry or {}).get("proxyWallet")
         if w and w not in out:
             out.append(str(w))
     logger.info("leaderboard seeds: %d wallets", len(out))

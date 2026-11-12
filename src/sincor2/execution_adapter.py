@@ -10,9 +10,11 @@ Replaces the three disconnected Polyclaw implementations
 - **Capital caps enforced upstream** by ``bankroll.py``.
 - **Kill switch.** A tripped switch (DB flag or ``/data/POLYCLAW_HALT`` file)
   blocks every order until manually cleared.
-- **EOA allowances.** On first live client init, approve USDC.e + CTF for the
-  Polymarket exchange contracts and refresh the CLOB balance/allowance cache.
-  Without this, funded wallets still cannot trade.
+- **EOA allowances.** On first live client init, refresh the CLOB
+  balance/allowance cache and record whether the trading address already
+  holds a positive collateral allowance. This module never submits on-chain
+  approvals — a funded wallet still needs its USDC.e/CTF approvals set by
+  the founder before live orders can settle.
 - **Fill reconciliation** against the CLOB REST API — no phantom PnL.
 
 Nothing here signs anything without an explicit private key from the
@@ -136,9 +138,46 @@ class PolymarketAdapter:
         self._key = _resolve_private_key()
         self._client = None
         self._client_error = ""
+        self._allowances_ready = False
 
     def is_live(self) -> bool:
         return bool(self._live_requested and self._key and not self._client_error)
+
+    def key_error(self) -> Optional[str]:
+        """Last client-init error, or None. Read by the status endpoint."""
+        return self._client_error or None
+
+    def trading_address(self) -> Optional[str]:
+        """Address orders are funded from, or None when no key is set.
+
+        The funder env wins when configured (proxy/Magic accounts);
+        otherwise the signing EOA — derived locally from the key or read
+        off the warmed client. Never touches the network.
+        """
+        funder = os.getenv("POLYMARKET_FUNDER", "").strip()
+        if funder:
+            return funder
+        if self._client is not None:
+            try:
+                return self._client.get_address()
+            except Exception:
+                pass
+        if not self._key:
+            return None
+        try:
+            from eth_account import Account
+            return Account.from_key(self._key).address
+        except Exception:
+            return None
+
+    def ensure_client(self):
+        """Public warm-up hook for the scheduler bootstrap.
+
+        Forces the lazy CLOB client init (API creds + allowance cache) at
+        startup instead of on the first order path. Returns the client,
+        or None in dry-run / on failure (see :meth:`key_error`).
+        """
+        return self._ensure_client()
 
     def _ensure_client(self):
         """Lazy ClobClient init. Returns None (dry-run) on any failure."""
@@ -169,6 +208,7 @@ class PolymarketAdapter:
                     creds=derived, signature_type=sig_type, funder=funder,
                 )
             self._client = client
+            self._warm_allowances(client)
             logger.info("CLOB client initialized (live mode armed)")
             return client
         except Exception as exc:
@@ -176,6 +216,33 @@ class PolymarketAdapter:
             logger.error("CLOB client init failed - falling back to dry-run: %s",
                          self._client_error)
             return None
+
+    def _warm_allowances(self, client) -> None:
+        """Refresh the CLOB balance/allowance cache and record readiness.
+
+        Read-only: this never approves on-chain allowances (that stays a
+        founder-armed action); it only asks the CLOB what allowance the
+        trading address already has. ``_allowances_ready`` is True iff the
+        CLOB reports a positive collateral allowance. A failed warm-up
+        leaves the flag False so the scheduler retries next cycle; it
+        must never break client init.
+        """
+        try:
+            from py_clob_client.clob_types import BalanceAllowanceParams
+            params = BalanceAllowanceParams()
+            try:
+                client.update_balance_allowance(params)
+            except Exception:
+                pass  # the read below still refreshes server-side state
+            bal = client.get_balance_allowance(params) or {}
+            allowance = bal.get("allowance", 0)
+            if isinstance(allowance, dict):
+                allowance = max(
+                    (float(v) for v in allowance.values()), default=0.0)
+            self._allowances_ready = float(allowance) > 0
+        except Exception as exc:
+            self._allowances_ready = False
+            logger.debug("allowance warm-up failed: %s", exc)
 
     def place_market_buy(self, token_id: str, size_usd: float) -> OrderResult:
         """Buy ``size_usd`` of ``token_id`` at market (FOK when live)."""
