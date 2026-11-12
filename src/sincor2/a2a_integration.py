@@ -2287,6 +2287,56 @@ def build_marketplace_manifest() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# AP2 discovery factory (/.well-known/ap2.json)
+# ---------------------------------------------------------------------------
+
+def build_ap2_discovery_document() -> Dict[str, Any]:
+    """Return the SINCOR AP2 discovery document for /.well-known/ap2.json.
+
+    Content is the staged document from the ap2-seal-adapter package
+    (``src/ap2_seal_adapter/well-known/ap2.json``), served verbatim with
+    exactly one founder-approved change: per that package's
+    INTEGRATION.md, ``status`` is flipped from DRAFT/staged as part of
+    the deploy itself (founder greenlight, 2026-11-11). Every honesty
+    field is preserved exactly — in particular
+    ``settlement.hub_deployed_on_mainnet`` stays False: no
+    SincorSettlementHub contract is deployed on Base mainnet, and
+    settlement is proven locally (eth-tester) only.
+    """
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "ap2_concepts_version": "v0.1 mandate names (IntentMandate / CartMandate / PaymentMandate) as public AP2 concepts; v0.2 renamed these to open/closed Checkout and Payment Mandates",
+        "discovery_url_intended": "https://getsincor.com/.well-known/ap2.json",
+        "input_format": " mandate-shaped JSON objects (dicts / VC-like wrappers with contents or credentialSubject); SD-JWT verification not yet supported",
+        "issuer": "SINCOR Business Solutions",
+        "mandates_accepted": ["IntentMandate", "CartMandate", "PaymentMandate"],
+        "market_claims": "none — third-party market figures circulating in planning documents are UNVERIFIED and are not SINCOR claims",
+        "protocol": "ap2",
+        "settlement": {
+            "asset": "USDC",
+            "asset_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "chain_id": 8453,
+            "eip712_domain": {"name": "SINCOR_SEAL", "version": "1"},
+            "fee_bps": 500,
+            "fee_bps_is_canon": True,
+            "fee_note": "500 bps (5%) is the locked SINCOR fee canon. A 0.5-1% AP2-rail take (50-100 bps) exists only as an unapproved pricing proposal — FOUNDER PRICING DECISION required before any change.",
+            "hub_deployed_on_mainnet": False,
+            "hub_note": "No SincorSettlementHub contract is deployed on Base mainnet. Settlement is proven locally (eth-tester) only.",
+            "network": "base",
+            "rail": "SINCOR SEAL via SincorSettlementHub interface (EIP-712 SealAuthorization)",
+            "scheme": "sincor-seal-v1",
+        },
+        "sigil": {
+            "commitment": "keccak256(taskId || canonical-JSON output)",
+            "expected_schema_hash": "keccak256(canonical-JSON cart contents)",
+        },
+        "status": "LIVE — AP2 discovery document served at https://getsincor.com/.well-known/ap2.json (founder-approved deploy, 2026-11-11); the settlement hub's deployment state is stated in settlement.hub_deployed_on_mainnet.",
+        "verification_enforced_offchain": True,
+        "verification_note": "The Hub records any sigilCommitment it is handed and never checks expectedSchemaHash on-chain; verification is enforced by the settling engine before submission, as in sincor-x402.",
+    }
+
+
+# ---------------------------------------------------------------------------
 # In-memory stores (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
 # NOTE: this store is process-local and non-persistent. All tasks are lost on
@@ -3553,6 +3603,18 @@ class A2ARouter:
             plus the MCP server entry point. jsonify → application/json."""
             from flask import jsonify
             return jsonify(build_marketplace_manifest())
+
+        # ── Discovery — AP2 document (canonical .json + bare alias) ─────────
+        @bp.route("/.well-known/ap2.json", methods=["GET"])
+        @bp.route("/.well-known/ap2", methods=["GET"])
+        def ap2_discovery():
+            """AP2 discovery document: mandates accepted + SEAL settlement
+            terms for AP2 routers. Same pattern as the agent card above —
+            jsonify(factory) → application/json. The bare path is the
+            founder-greenlit alias; the .json path is the canonical one
+            named in the document itself (discovery_url_intended)."""
+            from flask import jsonify
+            return jsonify(build_ap2_discovery_document())
 
         @bp.route("/docs/a2a", methods=["GET"])
         def a2a_docs():
