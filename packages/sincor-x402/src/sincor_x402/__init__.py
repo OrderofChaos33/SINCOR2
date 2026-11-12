@@ -7,11 +7,12 @@ runs through a pluggable PlatformClient whose only implementation in this
 package is a labelled local reference; no Base-mainnet contract is
 deployed by this package.
 """
-from .buyer import VerifiedBuyer, VelocityCap
+from .buyer import VerifiedBuyer, VelocityCap, default_journal_path
 from .errors import (AcceptsMismatch, AllowanceInsufficient, AmbiguousPayment,
-                     EscrowTimeout, IdempotencyConflict, MalformedChallenge,
-                     PaymentCapExceeded, SettlementReverted, SincorX402Error,
-                     UnsupportedPayment, VelocityCapExceeded, VerificationFailed)
+                     DuplicatePaymentRef, EscrowTimeout, IdempotencyConflict,
+                     MalformedChallenge, MissingPaymentRef, PaymentCapExceeded,
+                     SettlementReverted, SincorX402Error, UnsupportedPayment,
+                     VelocityCapExceeded, VerificationFailed)
 from .facilitator import FacilitatorClient, FacilitatorResult, LocalFacilitator
 from .hub_engine import (SEAL_SCHEME, HubSettlementEngine,
                          HubSettlementReceipt, SealEnvelope,
@@ -23,12 +24,12 @@ from .types import (USDC_BASE_ADDRESS, EscrowTerms, PaymentRequirement,
                     sha256_hex)
 from .verifier import ReferenceVerifier, VerificationResult, Verifier
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "VerifiedEndpoint", "verified_function", "HandlerResponse",
     "VerifiedTool", "verified_tool",
-    "VerifiedBuyer", "VelocityCap",
+    "VerifiedBuyer", "VelocityCap", "default_journal_path",
     "PaymentRequirement", "EscrowTerms", "USDC_BASE_ADDRESS", "sha256_hex",
     "PlatformClient", "LocalReferencePlatform", "EscrowRecord",
     "FacilitatorClient", "LocalFacilitator", "FacilitatorResult",
@@ -37,6 +38,7 @@ __all__ = [
     "SEAL_SCHEME", "compute_sigil_commitment", "to_bytes32",
     "SincorX402Error", "PaymentCapExceeded", "UnsupportedPayment",
     "MalformedChallenge", "AmbiguousPayment", "IdempotencyConflict",
+    "DuplicatePaymentRef", "MissingPaymentRef",
     "VelocityCapExceeded", "AcceptsMismatch", "VerificationFailed",
     "EscrowTimeout", "AllowanceInsufficient", "SettlementReverted",
 ]

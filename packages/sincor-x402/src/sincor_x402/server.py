@@ -24,7 +24,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from .errors import AcceptsMismatch, MalformedChallenge
+from .errors import (AcceptsMismatch, DuplicatePaymentRef, MalformedChallenge,
+                     MissingPaymentRef)
 from .facilitator import FacilitatorClient, LocalFacilitator
 from .platform import LocalReferencePlatform, PlatformClient
 from .types import EscrowTerms, PaymentRequirement
@@ -146,9 +147,31 @@ class VerifiedEndpoint:
                 402, {"ok": False, "error": "payment_verification_failed",
                       "detail": fac.error}, {})
 
-        escrow_id = self.platform.open_escrow(
-            requirement=requirement, payer=fac.payer,
-            payment_ref=fac.payment_ref)
+        # Fail closed (W-146): a facilitator that reports success without
+        # a consumable payment_ref has not actually consumed anything —
+        # treat it as an error, never open an escrow against an empty ref.
+        if not isinstance(fac.payment_ref, str) or not fac.payment_ref.strip():
+            return HandlerResponse(
+                502, {"ok": False, "error": "missing_payment_ref",
+                      "detail": "facilitator returned success with an "
+                                "empty payment_ref; refusing to open an "
+                                "escrow without a consumable reference"}, {})
+
+        # The platform consumes the payment_ref here (W-146): a replayed
+        # payment is rejected before any work executes or funds move, and
+        # exactly one escrow can ever exist for one authorization.
+        try:
+            escrow_id = self.platform.open_escrow(
+                requirement=requirement, payer=fac.payer,
+                payment_ref=fac.payment_ref)
+        except DuplicatePaymentRef as exc:
+            return HandlerResponse(
+                409, {"ok": False, "error": "payment_ref_consumed",
+                      "detail": str(exc)}, {})
+        except MissingPaymentRef as exc:
+            return HandlerResponse(
+                502, {"ok": False, "error": "missing_payment_ref",
+                      "detail": str(exc)}, {})
 
         # Execute the work, timeout-bounded. A timeout refunds — the seller
         # never keeps funds for work that did not deliver in time.

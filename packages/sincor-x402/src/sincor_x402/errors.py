@@ -39,6 +39,27 @@ class VelocityCapExceeded(SincorX402Error):
     """
 
 
+class DuplicatePaymentRef(SincorX402Error):
+    """A payment reference was presented for a second escrow (W-146).
+
+    Each payment authorizes exactly one escrow: the reference (which, for
+    a production facilitator, is bound to the EIP-3009 authorization
+    nonce) is consumed the first time an escrow opens against it and can
+    never be spent again — not after release, and not after refund.
+    """
+
+
+class MissingPaymentRef(SincorX402Error, ValueError):
+    """An escrow was requested without a consumable payment reference.
+
+    Fail-closed companion to :class:`DuplicatePaymentRef` (W-146): an
+    empty/missing ref cannot be consumed or deduped, so opening an
+    escrow against one would bypass replay protection entirely. It also
+    subclasses ``ValueError`` — refusing an empty argument is the
+    ordinary Python contract for a bad value.
+    """
+
+
 class AcceptsMismatch(SincorX402Error):
     """Client-claimed accepted terms do not exactly match the server's own
     retained accepts[] entry (scheme/network/amount/asset/payTo/timeout)."""

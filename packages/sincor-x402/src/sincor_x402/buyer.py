@@ -10,6 +10,14 @@ signing a *fresh* authorization). Defences, in order:
    Repeating a call with the same instruction_id and the same request
    returns the recorded outcome and NEVER signs again. Reusing the id with
    a *different* request raises IdempotencyConflict instead of paying.
+   The journal is DURABLE (W-147): it is file-backed (``journal_path``,
+   a sensible per-user default), every state change is persisted
+   atomically before the buyer acts on it, and the instruction is
+   claimed — and the claim persisted — BEFORE anything is signed. A
+   fresh buyer instance (a process restart) therefore sees the prior
+   instance's payments, outcomes and ambiguity locks, and the claim is
+   held under a lock across the whole check-then-sign sequence so two
+   concurrent calls for one instruction cannot both sign.
 2. **One signature per instruction, reused verbatim.** HTTP-level retries
    resend the SAME signed payload (same EIP-3009 nonce), which the chain /
    facilitator can only settle once — a resend is not a new payment.
@@ -27,12 +35,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import secrets
 import threading
 import time
 import urllib.error
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from .errors import (AmbiguousPayment, IdempotencyConflict, MalformedChallenge,
@@ -65,6 +76,42 @@ class _JournalEntry:
     payment_payload: dict[str, Any] | None = None
     outcome: dict[str, Any] | None = None
     ambiguous: bool = False
+    # Set (and persisted) before signing starts (W-147 claim-then-sign):
+    # a claimed entry with no payload and no outcome means a previous
+    # attempt died mid-flight — fail closed (ambiguous), never re-sign.
+    claimed: bool = False
+
+
+def default_journal_path() -> Path:
+    """Sensible default for the durable instruction journal (W-147).
+
+    ``$SINCOR_X402_BUYER_JOURNAL_PATH`` wins; otherwise an XDG-style
+    per-user data file. The journal must outlive the process, so it
+    never lives in a temp directory.
+    """
+    env = os.environ.get("SINCOR_X402_BUYER_JOURNAL_PATH")
+    if env:
+        return Path(env).expanduser()
+    base = os.environ.get("XDG_DATA_HOME")
+    root = Path(base).expanduser() if base else Path.home() / ".local" / "share"
+    return root / "sincor-x402" / "buyer-journal.json"
+
+
+# One re-entrant lock per journal path, shared by every buyer instance in
+# this process: two instances pointing at the same journal must not be
+# able to claim-and-sign the same instruction concurrently either.
+_PATH_LOCKS: dict[str, threading.RLock] = {}
+_PATH_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for_path(path: Path | None) -> threading.RLock:
+    key = str(path) if path is not None else "<memory>"
+    with _PATH_LOCKS_GUARD:
+        lock = _PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _PATH_LOCKS[key] = lock
+        return lock
 
 
 @dataclass
@@ -106,6 +153,7 @@ class VerifiedBuyer:
         max_payment_usd: float = 1.00,
         velocity_cap: VelocityCap | None = None,
         transport: TransportFn | None = None,
+        journal_path: str | Path | None = None,
     ) -> None:
         if not wallet_address.startswith("0x"):
             raise ValueError("wallet_address must be a 0x address")
@@ -114,9 +162,127 @@ class VerifiedBuyer:
         self.max_payment_usd = max_payment_usd
         self.velocity_cap = velocity_cap or VelocityCap()
         self._transport = transport or _urllib_transport
+        # Durable journal (W-147). ``journal_path=None`` selects the
+        # sensible default (see default_journal_path()); pass a path to
+        # isolate a journal, or ":memory:" for a volatile in-memory
+        # journal (tests / ephemeral callers that accept restart re-pay
+        # risk — never the default).
+        if journal_path is None:
+            self.journal_path: Path | None = default_journal_path()
+        elif str(journal_path) == ":memory:":
+            self.journal_path = None
+        else:
+            self.journal_path = Path(journal_path).expanduser()
         self._journal: dict[str, _JournalEntry] = {}
-        self._lock = threading.Lock()
+        # Re-entrant + shared per journal path: fetch() holds this lock
+        # across check-claim-sign-send, and the helpers it calls re-enter.
+        self._lock = _lock_for_path(self.journal_path)
         self.signatures_created = 0   # observability: tests assert == 1 in storms
+        with self._lock:
+            self._load_journal()
+
+    # -- durable journal (W-147) ------------------------------------------
+
+    def _load_journal(self) -> None:
+        """(Re)read the journal file into memory. Caller holds the lock.
+
+        A corrupt journal fails closed: overwriting unreadable payment
+        history could silently re-enable a second payment, so a journal
+        that cannot be parsed raises instead of being discarded.
+        """
+        if self.journal_path is None or not self.journal_path.exists():
+            return
+        try:
+            raw = json.loads(self.journal_path.read_text(encoding="utf-8"))
+            entries = raw["entries"]
+            loaded: dict[str, _JournalEntry] = {}
+            for instruction_id, data in entries.items():
+                loaded[instruction_id] = _JournalEntry(
+                    fingerprint=str(data["fingerprint"]),
+                    payment_payload=data.get("payment_payload"),
+                    outcome=data.get("outcome"),
+                    ambiguous=bool(data.get("ambiguous", False)),
+                    claimed=bool(data.get("claimed", False)))
+        except Exception as exc:
+            raise SincorX402Error(
+                f"buyer journal at {self.journal_path} is unreadable; "
+                "refusing to pay with no idempotency history") from exc
+        self._journal = loaded
+
+    def _persist_journal(self) -> None:
+        """Atomically write the journal. Caller holds the lock.
+
+        Write-to-temp + os.replace in the same directory: a crash leaves
+        either the old or the new journal, never a torn one.
+        """
+        if self.journal_path is None:
+            return
+        data = {"version": 1, "entries": {
+            instruction_id: {
+                "fingerprint": entry.fingerprint,
+                "payment_payload": entry.payment_payload,
+                "outcome": entry.outcome,
+                "ambiguous": entry.ambiguous,
+                "claimed": entry.claimed,
+            } for instruction_id, entry in self._journal.items()}}
+        path = self.journal_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + f".tmp-{os.getpid()}")
+        # No sort_keys: the signed payload is stored and resent VERBATIM,
+        # so its key order must survive the round-trip byte-for-byte.
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(data))
+            fh.flush()
+            # fsync before replace: os.replace alone survives a process
+            # crash but not OS crash / power loss — a persisted claim
+            # must be durable before the buyer acts on it.
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+        # fsync the directory so the rename itself is durable too.
+        try:
+            dir_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
+
+    @contextmanager
+    def _journal_guard(self):
+        """Serialize check-claim-sign-send for this journal (W-147).
+
+        Holds the per-path lock for the whole fetch, and — for a
+        file-backed journal — an OS file lock as well, so the atomicity
+        also holds between processes sharing the journal file. The file
+        lock is best-effort (POSIX ``flock``); where it is unavailable
+        the persisted claim-then-sign ordering still fails closed after
+        a crash.
+        """
+        with self._lock:
+            fh = None
+            try:
+                if self.journal_path is not None:
+                    try:
+                        import fcntl
+                        lock_path = self.journal_path.with_name(
+                            self.journal_path.name + ".lock")
+                        lock_path.parent.mkdir(parents=True, exist_ok=True)
+                        fh = open(lock_path, "a+")  # noqa: SIM115
+                        fcntl.flock(fh, fcntl.LOCK_EX)
+                    except (ImportError, OSError):
+                        if fh is not None:
+                            fh.close()
+                        fh = None
+                yield
+            finally:
+                if fh is not None:
+                    try:
+                        import fcntl
+                        fcntl.flock(fh, fcntl.LOCK_UN)
+                    except (ImportError, OSError):
+                        pass
+                    fh.close()
 
     # -- challenge handling -------------------------------------------------
 
@@ -201,7 +367,14 @@ class VerifiedBuyer:
         if not instruction_id:
             raise ValueError("instruction_id is required (idempotency scope)")
         fingerprint = self._fingerprint(url, method, body)
-        with self._lock:
+        # W-147: the journal guard is held across the ENTIRE
+        # check-claim-sign-send sequence — there is no window in which a
+        # second caller (thread, instance, or process sharing this
+        # journal) can observe "no payment yet" and sign its own.
+        with self._journal_guard():
+            # Pick up claims/outcomes persisted by other instances or
+            # processes since this instance was constructed.
+            self._load_journal()
             entry = self._journal.get(instruction_id)
             if entry is not None:
                 if entry.fingerprint != fingerprint:
@@ -214,44 +387,77 @@ class VerifiedBuyer:
                     raise AmbiguousPayment(
                         f"instruction {instruction_id!r} already paid with "
                         "an ambiguous outcome; refusing to pay again")
+                if entry.payment_payload is None:
+                    # Claimed but no payload was ever persisted: a prior
+                    # attempt died between claim and signing. Whether a
+                    # signature escaped is unknowable — fail closed.
+                    raise AmbiguousPayment(
+                        f"instruction {instruction_id!r} was claimed by an "
+                        "earlier attempt that never recorded a payment; "
+                        "refusing to sign a second one")
                 # A signed payload exists but no outcome (transport died
                 # mid-flight): fall through and RESEND THE SAME PAYLOAD.
                 signed_payload = entry.payment_payload
             else:
                 signed_payload = None
-                self._journal[instruction_id] = _JournalEntry(fingerprint)
+                # Claim-then-sign: the claim is persisted BEFORE any
+                # transport or signing, so a crash/restart after this
+                # point can never lead a fresh instance to sign anew for
+                # this instruction (see the claimed-with-no-payload case
+                # above).
+                self._journal[instruction_id] = _JournalEntry(
+                    fingerprint, claimed=True)
+                self._persist_journal()
 
-        headers = {"Idempotency-Key": instruction_id}
-        if signed_payload is None:
-            status, _, raw = self._transport(method, url, body, headers)
-            if status == 200:
-                outcome = {"ok": True, "paid": False,
-                           "data": json.loads(raw or b"{}")}
-                with self._lock:
-                    self._journal[instruction_id].outcome = outcome
-                return outcome
-            if status != 402:
-                raise SincorX402Error(f"unexpected status {status} unpaid")
-            challenge = json.loads(raw or b"{}")
-            requirement = self._select_requirement(challenge)
-            signed_payload = self._build_signed_payload(requirement)
-            with self._lock:
+            headers = {"Idempotency-Key": instruction_id}
+            if signed_payload is None:
+                try:
+                    status, _, raw = self._transport(method, url, body,
+                                                     headers)
+                    if status == 200:
+                        outcome = {"ok": True, "paid": False,
+                                   "data": json.loads(raw or b"{}")}
+                        self._journal[instruction_id].outcome = outcome
+                        self._persist_journal()
+                        return outcome
+                    if status != 402:
+                        raise SincorX402Error(
+                            f"unexpected status {status} unpaid")
+                    challenge = json.loads(raw or b"{}")
+                    requirement = self._select_requirement(challenge)
+                    signed_payload = self._build_signed_payload(requirement)
+                except Exception:
+                    # Everything above happens BEFORE a signed payload
+                    # exists, so no payment can have been created (cap /
+                    # malformed challenge / signer failure / unpaid
+                    # transport error): release the claim so the
+                    # instruction is not locked by an attempt that
+                    # provably never paid, and let the caller retry.
+                    self._journal.pop(instruction_id, None)
+                    self._persist_journal()
+                    raise
+                # The payload is durable BEFORE it is ever sent: a crash
+                # after this point retries by resending this exact
+                # payload (same nonce), never by signing a new one.
                 self._journal[instruction_id].payment_payload = signed_payload
+                self._persist_journal()
 
-        payment_header = json.dumps(signed_payload)
-        status2, _, raw2 = self._transport(
-            method, url, body,
-            {**headers, "X-PAYMENT": payment_header,
-             "PAYMENT-SIGNATURE": payment_header})
-        if status2 == 200:
-            outcome = {"ok": True, "paid": True,
-                       "data": json.loads(raw2 or b"{}")}
-            with self._lock:
+            payment_header = json.dumps(signed_payload)
+            status2, _, raw2 = self._transport(
+                method, url, body,
+                {**headers, "X-PAYMENT": payment_header,
+                 "PAYMENT-SIGNATURE": payment_header})
+            if status2 == 200:
+                outcome = {"ok": True, "paid": True,
+                           "data": json.loads(raw2 or b"{}")}
                 self._journal[instruction_id].outcome = outcome
-            return outcome
-        # Anything else is ambiguous for payment purposes: the payment may
-        # have settled. Lock the instruction; NEVER sign a second one.
-        with self._lock:
+                self._persist_journal()
+                return outcome
+            # Anything else is ambiguous for payment purposes: the payment
+            # may have settled. Lock the instruction — durably; NEVER sign
+            # a second one.
             self._journal[instruction_id].ambiguous = True
-        raise AmbiguousPayment(
-            f"paid retry returned {status2}; instruction locked, no re-pay")
+            self._persist_journal()
+            raise AmbiguousPayment(
+                f"paid retry returned {status2}; instruction locked, "
+                "no re-pay")
