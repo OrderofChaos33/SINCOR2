@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoebiusX v4 — Two Signatures (personal_sign) — Real Funds</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 680px; color: #111; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
+  .card { border: 1px solid #ccc; border-radius: 10px; padding: 12px; margin: 12px 0; }
+  .warn { border-color: #c00; background: #fff5f5; }
+  .real { border-color: #b8860b; background: #fffaf0; }
+  button { font-size: 16px; padding: 12px 16px; margin: 6px 0; width: 100%; border-radius: 8px; border: 1px solid #333; background: #111; color: #fff; }
+  button.secondary { background: #fff; color: #111; }
+  button:disabled { opacity: .4; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .ok { color: #087008; } .bad { color: #c00; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td { border-top: 1px solid #eee; padding: 4px 6px; vertical-align: top; }
+  td:first-child { color: #555; width: 38%; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>MoebiusX v4 — two signatures (REAL FUNDS) — phone version</h1>
+<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose <b>Rainbow</b> in the WalletConnect popup — Rainbow opens so you can approve the connection and the two signatures. Both signatures are <code>personal_sign</code> — the same kind that worked for your v1 Signature 1 and Signature 2. This page <b>never</b> asks for the typed-data signing route. Both payloads are embedded in this file, exactly as generated — byte-identical to the packet the operator verified. <b>Nothing moves when you sign</b> — both signatures are off-chain; the operator submits the operations afterwards and every cap below is enforced onchain.</p>
+<p><b>Base Mainnet only (chain 8453).</b> This page works with real USDC on Base.
+The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to check your signatures against your wallet address on this page as a first look only. Neither can change the payloads below. <b>Whatever Rainbow returns is kept</b> — this page never deletes a signature; the copy box unlocks the moment any signature comes back, and the operator re-checks everything server-side before anything is submitted.</p>
+
+<p><b>What changed in v4:</b> this is the <b>$1,000-pool size-up</b> of the v4-generation grant (v3). Exactly two caps grow, both from the sizing law (half-Kelly × TOA, max 15% of pool per trade): the <b>per-call cap is now 150 USDC</b> (v3 was 40 — 15% of a $1,000 pool), and the <b>cumulative cage is now 7,500 USDC</b> (v3 was 250 — about 50 max-size buys). Everything else — account, rate limit 48 operations per hour refilling hourly, session gas budget 0.05 ETH, Treasury cap 50 USDC — is identical to v3. <b>The 7,500 USDC figure is an authorization ceiling, not a funding requirement:</b> you fund the pool separately, at your own pace, and trades size off the balance the account actually holds. There is also <b>no minimum trade size</b> anymore (your 2026-11-12 rule — the old $1 minimum is gone). The full values are on the sheet below, rendered from the embedded v4 packet.</p>
+<div class="card real">
+  <h2>Parameter sheet — rendered from the embedded packet</h2>
+  <table><tbody id="sheetBody"></tbody></table>
+  <p id="sheetNote"></p>
+  <p class="mono" id="generatedNote"></p>
+</div>
+
+<div class="card warn">
+  <h2>⚠ Do-not-sign rule</h2>
+  <p>Compare Rainbow's screen against this sheet before every signature. Sign <b>only</b> if
+  every value matches:</p>
+  <ul id="checkList"></ul>
+  <p>If anything on Rainbow's screen differs — <b>do not sign</b>. Stop and tell the operator.
+  That check working is the product.</p>
+</div>
+
+<div class="card">
+  <h2>Funding — no action needed for v4 (read-only information)</h2>
+  <div id="fundingText"></div>
+  <p>This is a plain transfer in Rainbow, not a signature on this page. This page has no
+  funding button and cannot move funds.</p>
+</div>
+
+<div class="card">
+  <h2>0 · Connect</h2>
+  <button id="connectBtn" class="secondary">Connect wallet (Base Mainnet)</button>
+  <div id="connStatus" class="mono"></div>
+</div>
+
+<div class="card real">
+  <h2>✓ Already done onchain — nothing to redo</h2>
+  <p>Your smart account is <b>already deployed</b> (your v1 Signature 1 did that — confirmed on Base,
+  setup tx <span class="mono">0xe539ed8c18473d8684b7500b459b1ad412935e7eff1f710bb9a10d23e3373004</span>).
+  This page does <b>not</b> ask you to sign the deployment again. The two signatures below are the
+  only ones v4 needs.</p>
+</div>
+
+<div class="card">
+  <h2>1 · Signature 1 — set the v4 allowances</h2>
+  <p>One <code>personal_sign</code> of the v4 setup operation hash. This signature authorizes ONE
+  operation that sets your smart account's SwapRouter02 allowances for the v4 cage:
+  <b>USDC exactly 7,500</b> (the cumulative swap cap — an authorization ceiling, not a funding requirement) and <b>WETH 10</b> (a sell backstop that cannot
+  bind in practice — see the sheet). The account is already deployed; this operation deploys nothing.
+  Setup operation hash — Rainbow must show exactly this:</p>
+  <p class="mono" id="setupHash" style="font-size:13px;"></p>
+  <button id="signSetupBtn" disabled>Sign setup operation</button>
+  <div id="setupSigStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>2 · Signature 2 — grant the v4 session key</h2>
+  <p>One <code>personal_sign</code> signature — the same kind as Signature 1 — granting the v4 session key
+  <span class="mono" id="sessionAddr"></span> the policy on the sheet above
+  (two-way swaps inside the cage + Treasury transfers of at most 50 USDC, nothing else).
+  Off-chain signature; nothing moves when you sign it.</p>
+  <p>Rainbow will ask you to sign this exact code — the session grant, hashed. It must match letter-for-letter:</p>
+  <p class="mono" id="enableDigest" style="font-size:13px;"></p>
+  <p>If Rainbow shows anything different — <b>do not sign</b>. Stop and tell the operator.</p>
+  <button id="signEnableBtn" disabled>Sign session grant</button>
+  <div id="enableSigStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>3 · Send both signatures to the operator</h2>
+  <button id="downloadSigBtn" class="secondary" disabled>⬇ Download founder-signature-v4.json</button>
+  <p>On a phone the download can be hard to retrieve — use the copy box instead:</p>
+  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Your signatures appear here the moment Rainbow returns them — Signature 1 and Signature 2, as you complete each one"></textarea>
+  <button id="copySigBtn" class="secondary" disabled>📋 Copy signatures</button>
+  <p>Send the downloaded file — or the copied JSON — back to the operator once <b>both</b> signatures are in the box.</p>
+</div>
+
+<script id="packet-json" type="application/json">{"kind":"moebiusx-v4/founder-requests","status":"PREPARED — NOT SIGNED, NOT BROADCAST, NO FUNDS MOVED","rebuildNote":"V4 PACKET (2026-11-12) — the $1,000-POOL SIZE-UP of the v3 grant (permissionId 0x56066a14). EXACTLY TWO cap changes vs v3, both derived from the founder's sizing law at the $1,000 target pool (half-Kelly x TOA confidence, max 15% of pool per trade): (1) per-call ceiling 40 -> 150 USDC (15% of $1,000), pinned onchain in the Call Policy (buy amountIn LTE 150; sell amountOut LTE 150); (2) cumulative cage 250 -> 7,500 USDC (the setup op's USDC->SwapRouter02 allowance; ~50 max-size buys gross over the window). THE 7,500 USDC CAGE IS AN AUTHORIZATION CEILING, NOT A FUNDING REQUIREMENT: the founder funds the pool separately, at his own pace, and every trade sizes off the account's ACTUAL balance under the 15% rule. SIZING LAW AMENDMENT (founder directive 2026-11-12, 'No minimums'): the $1 minimum trade size carried by v2/v3 is REMOVED — sizing is half-Kelly x TOA with the 15% cap and no minimum of any kind (trader-sizing-v4.mjs). Everything else is IDENTICAL to v3: same account, same founder EOA root ownership, same venue and two-way encodings, RateLimitPolicy WITH_RESET (0x6a06358e6b283921deceabe7e8a3741d506cca9b) at 48 ops / 3600s, GasPolicy 0.05 ETH, Treasury transfer LTE 50 USDC to the Treasury only, WETH backstop 10 WETH, 30-day window. Fresh v4 session key; fresh 30-day window from generation. The v4 policy set was proven on a Base-mainnet fork BEFORE this packet was finalized (49/49 rate-limit/gas session ops through the real EntryPoint plus cap-boundary checks at 150 / 7,500 — see fork-proof-v4.mjs results in this kit). The v3 grant stays live until the v4 setup op confirms; once it does, the v4 setup op's absolute approves replace the v3 allowances and the first v4 session op installs the v4 validator, superseding v3. Never sign both packets' pages after v4 is signed.","generatedAt":"2026-11-12T16:24:22.806Z","regenerateIfOlderThan":"the v4 window is derived at generation time (validAfter = generation, validUntil = +30 days). If the founder has not signed within a few days, regenerate so the signed window starts near the signing date. Always sign before validUntil","network":{"chainId":8453,"chainIdHex":"0x2105","name":"Base","rpcUrl":"https://mainnet.base.org","explorer":"https://basescan.org","currencySymbol":"ETH"},"founder":"0x9763c76151caf39d8c33adb1ca42993eefd7599e","accountAddress":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","accountDeployedAtGeneration":true,"entryPoint":"0x0000000071727De22E5E9d8BAf0edAc6f37da032","kernel":{"version":"0.3.2","factory":"0x7a1dBAB750f12a90EB1B60D2Ae3aD17D4D81EfFe","metaFactory":"0xd703aaE79538628d27099B8c4f621bE4CCd142d5","implementation":"0xD830D15D3dc0C269F3dBAa0F3e8626d33CFdaBe1","ecdsaValidator":"0x845ADb2C711129d4f3966735eD98a9F09fC4cE57","index":0},"sessionKeyAddress":"0x6082071eb378440826307Dd9615Ed02736c84efa","sessionKeyNote":"Generated fresh for v4 on 2026-11-12. Private key lives ONLY in v4-kit/session_key (0600). Neither the v1, v2, nor v3 session key is used here.","permissionId":"0x3123c1d8","treasury":"0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac","venue":{"protocol":"Uniswap V3","router":"0x2626664c2603336E57B271c5C0b26F421741e481","routerName":"SwapRouter02","factory":"0x33128a8fC17869897dcE68Ed026d694621f6FDfD","buyFunction":"exactInputSingle","buySelector":"0x04e45aaf","sellFunction":"exactOutputSingle","sellSelector":"0x5023b4df","pool":"0xd0b53D9277642d899DF5C87A3966A349A798F224","feeTier":500,"directions":[{"tokenIn":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","tokenOut":"0x4200000000000000000000000000000000000006","label":"buy","function":"exactInputSingle","selector":"0x04e45aaf"},{"tokenIn":"0x4200000000000000000000000000000000000006","tokenOut":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","label":"sell","function":"exactOutputSingle","selector":"0x5023b4df"}]},"transferPermission":{"target":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","function":"transfer","selector":"0xa9059cbb","to":"0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac","perCallCapUsdc":"50.000000","purpose":"Treasury skim: forward 50 USDC to the Treasury per $100 account-value crossing (runner logic is agent-side; this is only the onchain permission). No other address is payable by the session."},"policySheet":{"cumulativeCapUsdc":"7500.000000","perCallCapUsdc":"150.000000","treasuryTransferCapUsdc":"50.000000","sellEncoding":"exactOutputSingle — amountOut (USDC received) LTE 150 USDC pinned ONCHAIN (the binding sell-side per-call ceiling; the Kelly+TOA 15%-of-actual-pool rule governs inside it agent-side); amountInMaximum LTE the WETH backstop below","wethPerCallBackstop":"10 WETH (exactOutputSingle amountInMaximum pin — hard ceiling only, cannot bind in practice; see capLayers)","validAfter":1794500662,"validUntil":1797092662,"validUntilIso":"2026-12-12T16:24:22.000Z","expiry":"30 days from grant","rateLimit":"48 ops / 3600s","gasBudgetEth":"0.05","allowedCalls":"SwapRouter02.exactInputSingle(USDC -> WETH, fee = 500, recipient = the account itself, amountIn <= 150 USDC, sqrtPriceLimitX96 = 0) + SwapRouter02.exactOutputSingle(WETH -> USDC, fee = 500, recipient = the account itself, amountOut <= 150 USDC, amountInMaximum <= 10 WETH, sqrtPriceLimitX96 = 0) + USDC.transfer(TREASURY, amount <= 50 USDC) — nothing else","nativeValue":"0","sessionApproveAllowed":false},"capLayers":{"layer1_policyAccountingOnOutflow":"MISSING (same as v1/v3) — the stock ZeroDev policy set in this grant (Call/Timestamp/RateLimit/Gas) has no cumulative-spend counter and no Spending Limit Hook is included. The Call Policy bounds each call (buy amountIn <= 150 USDC; sell amountOut <= 150 USDC with amountInMaximum <= 10 WETH; transfer amount <= 50 USDC) but does not sum across calls. The Kelly+TOA 15%-of-pool sizing rule is enforced agent-side in trader-sizing-v4.mjs, inside this onchain ceiling.","layer2a_standingUsdcAllowanceEqualsCap":"PRESENT — the owner-signed v4 setup op sets the account's USDC allowance to SwapRouter02 to exactly 7,500 USDC. The session's Call Policy contains no approve permission, so the session cannot raise it. Router pulls via transferFrom cannot exceed 7,500 USDC of gross USDC swap-in, ever, regardless of swap returns. This allowance is an authorization ceiling, NOT a funding requirement — it authorizes pulls UP TO that total from whatever balance the account actually holds.","layer2b_wethAllowanceBackstop":"PRESENT (non-binding backstop) — the setup op also sets the WETH allowance to SwapRouter02 to 10 WETH so sell calls can pull WETH. The account's WETH can only ever come from <= 7,500 USDC of buys (about 3.75 WETH at $2,000/ETH) plus its earlier remainders, so the balance (layer 3) binds far below this figure at any ETH price above $750.","treasuryTransfers":"No allowance is involved in a transfer (the account spends its own balance). Bounds: per-call 50 USDC pinned by the Call Policy (recipient pinned to the Treasury — no other address is payable), the account balance, and the agent-side ledger in founder-submit-v4.mjs. There is NO onchain cumulative cap on transfers; the skim rule ($50 per $100 account-value crossing) is runner logic that lives agent-side by design.","layer3_fundedBalanceBackstop":"PRESENT — buys and transfers can execute only up to the account's actual balances (live balances in chainSnapshotAtGeneration). The $1,000 pool is a TARGET the founder funds separately, at his own pace; at today's balance the 15% sizing rule produces v3-sized trades, and sizes grow automatically as the balance grows, up to the $150 onchain ceiling.","agentSideLedger":"founder-submit-v4.mjs enforces the cumulative 7,500 USDC buy cap as max(allowance-derived gross pull, local confirmed-trades ledger) before building any op — the same dual accounting as v1. Sells need no agent-side value cap since the rebuild: the target USDC out (<= 150) is the op's amountOut, pinned onchain; the script only derives amountInMaximum from the live pool quote (spot + slippage headroom), refuses if that maximum would exceed the 10 WETH backstop or the account's WETH balance/allowance, and tracks cumulative WETH-in against the 10 WETH allowance backstop.","effectiveCumulativeCeilingUsdc":"7500.000000 gross USDC into swaps (allowance-bound); sell-backs return USDC to the account but do NOT restore allowance, so gross buy volume is hard-capped at 7,500 USDC for the life of the grant"},"v3OverlapNote":"The v3 session grant (permissionId 0x56066a14) remains live inside its timestamp window until 2026-12-12T02:04:24Z and its loop keeps trading under the v3 caps until the founder signs v4. The v4 setup op replaces the router allowances with absolute approves (USDC 7,500 / WETH 10), and the first v4 session op installs the v4 validator as the account's regular plugin, superseding the v3 validator — from that confirmation on, only the v4 session can act. Because the USDC allowance is a single on-chain number set absolutely by whichever setup op confirmed last, the two grants can never stack into a 7,750 USDC cage. The v3 key never leaves its 0600 file.","chainSnapshotAtGeneration":{"block":"56551431","founderUsdcRaw":"0","founderEthWei":"419029120998606","accountUsdcRaw":"22190000","accountWethRaw":"34400833660112","accountEthWei":"3461642346764851","usdcAllowanceNowRaw":"187020000","wethAllowanceNowRaw":"9961245889179634190","sudoNonce":"913479994650515257524606220465835134743662536739504622017003723935449091","baseFeeWei":"5000000"},"priceReference":{"note":"Informational only — read from the pinned pool's slot0 at generation. The sell-side per-call ceiling (amountOut <= 150 USDC) is pinned onchain; the live quote is used when each sell op is built only to derive amountInMaximum (WETH in) with slippage headroom.","sqrtPriceX96":"3557359576287771382251520","wethRawFor150Usdc":"74403762046702832","wethRawFor7500Usdc":"3720188102335141639"},"feeCaps":{"observedBaseFeeWei":"5000000","observedBaseFeeGwei":"0.005","observedAtBlock":"56551431","maxFeePerGasWei":"100000000","maxFeePerGasGwei":"0.1","maxPriorityFeePerGasWei":"10000000","maxPriorityFeePerGasGwei":"0.01","headroomVsBaseFee":"20.0x","totalGasLimit":"2950000","requiredPrefundWei":"295000000000000","requiredPrefundEth":"0.000295","accountEthWei":"3461642346764851","accountEthCoversPrefund":true,"note":"Same derivation as the v1 packet: >=10x headroom over the observed basefee while bounding the worst-case prefund to <= 0.0004 ETH at the unchanged gas limits. Unlike v1 no send-ahead is needed — the deployed account already holds its ETH float."},"steps":{"step0_prefundTransfer":{"description":"NO ACTION NEEDED — no ETH send-ahead is required: the deployed account already holds an ETH float that covers the setup op's worst-case prefund at the fee caps below. (Session gas over the 30-day window draws on the same float; the v4 session gas policy budget is 0.05 ETH lifetime.)","to":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","accountEthWei":"3461642346764851","requiredPrefundEth":"0.000295"},"step0b_usdcFunding":{"description":"NO FUNDING ACTION IS REQUIRED BY THIS PACKET — signing is off-chain and the setup op only sets allowances. The $1,000 pool is a TARGET the founder funds separately, at his own pace, whenever he chooses; it is not a precondition and the 7,500 USDC cage is an authorization ceiling, not an amount owed or required. At the account's current balance (see chainSnapshotAtGeneration) trades simply size under the same 15%-of-actual-pool rule (no minimum trade size — founder directive 2026-11-12), growing automatically toward the $150 per-call ceiling as the balance grows. The v4 setup op sets the SwapRouter02 allowances absolutely: USDC exactly 7,500 (the cumulative cage) and WETH 10 (backstop), replacing the v3 session's partially-spent remainder.","to":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","token":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","amountUsdc":"0 (no funding transfer required by the v4 packet; pool funding is the founder's separate, optional, at-his-own-pace act)","executed":false,"required":false},"step1_setupSignature":{"description":"personal_sign the v4 setup UserOp hash (Signature 1). This ONE signature sets the account's SwapRouter02 allowances for the v4 cage: USDC exactly 7,500 (the cumulative swap cap, design layer 2a — an authorization ceiling, not a funding requirement) and WETH 10 (non-binding sell backstop, layer 2b). The account is already deployed — the op carries no initCode and deploys nothing.","userOpHash":"0xac7d478c8b3ee8dcb24aeb27d409e381574466f8d9f366b4da5140873d9263d7","userOp":{"sender":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","nonce":"0x845adb2c711129d4f3966735ed98a9f09fc4ce5700000000000000000003","callData":"0xe9ae5c530100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000002400000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000120000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000002626664c2603336e57b271c5c0b26f421741e48100000000000000000000000000000000000000000000000000000001bf08eb00000000000000000000000000000000000000000000000000000000000000000000000000000000004200000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044095ea7b30000000000000000000000002626664c2603336e57b271c5c0b26f421741e4810000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000","callGasLimit":"0xc3500","verificationGasLimit":"0x1e8480","preVerificationGas":"0x249f0","maxFeePerGas":"0x5f5e100","maxPriorityFeePerGas":"0x989680","signature":"0x"}},"step2_enableSignature":{"description":"Signature 2 — grants the v4 session key the policy sheet above. The founder signs it as a personal_sign over the Enable digest (the digest field) — the form proven onchain for this account (Kernel 0.3.2 accepts it; the eth_signTypedData_v4 route is abandoned). Off-chain signature; nothing moves. The typedData is embedded for independent verification — hashTypedData(typedData) must equal the digest.","digest":"0xf58eb16c09f9677a9f3e7f341fc038c75f117e915bba08d1c1ccfd83d21f711a","typedData":{"domain":{"name":"Kernel","version":"0.3.2","chainId":8453,"verifyingContract":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e"},"types":{"Enable":[{"name":"validationId","type":"bytes21"},{"name":"nonce","type":"uint32"},{"name":"hook","type":"address"},{"name":"validatorData","type":"bytes"},{"name":"hookData","type":"bytes"},{"name":"selectorData","type":"bytes"}]},"message":{"validationId":"0x023123c1d800000000000000000000000000000000","nonce":1,"hook":"0x0000000000000000000000000000000000000000","validatorData":"0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000f000000000000000000000000000000000000000000000000000000000000000f800000000000000000000000000000000000000000000000000000000000000fe000000000000000000000000000000000000000000000000000000000000010800000000000000000000000000000000000000000000000000000000000000e3600009a52283276A0ec8740DF50bF01B28A80D880eaf200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000005a00000000000000000000000000000000000000000000000000000000000000ba000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002626664c2603336e57b271c5c0b26f421741e48104e45aaf00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000000000000000000000000000000000000000034000000000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fCD6eDb6E08f4c7C32D4f71b54bdA0291300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000004200000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e00000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000008f0d180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002626664c2603336e57b271c5c0b26f421741e4815023b4df00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000002c00000000000000000000000000000000000000000000000000000000000000360000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000004a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000042000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000833589fCD6eDb6E08f4c7C32D4f71b54bdA02913000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e00000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000008f0d180000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000008ac7230489e80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913a9059cbb00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000009E2891432827D8835d2E9b83B25e2a5ba9612Ac00000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000002faf0800000000000000000000000000000000000000000000000000000000000000000000000000000000000560000B9f8f524bE6EcD8C945b1b87f9ae5C192FdCE20F000000000000000000000000000000000000000000000000000000006af5e836000000000000000000000000000000000000000000000000000000006b1d753600000000000000000000000000000000000000000000000000000000000000000000000000000000002200006a06358e6b283921deceabe7e8a3741d506cca9b000000000e1000000000003000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000760000aeFC5AbC67FfD258abD0A3E54f65E70326F84b2300000000000000000000000000000000000000000000000000b1a2bc2ec500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a00006A6F069E2a08c2468e7724Ab3250CdBFBA14D4FF6082071eb378440826307Dd9615Ed02736c84efa00000000000000000000000000000000000000000000","hookData":"0x","selectorData":"0xe9ae5c5300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001FF0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000"},"primaryType":"Enable"}}}}</script>
+<script src="https://unpkg.com/@walletconnect/ethereum-provider@2.21.1/dist/index.umd.js"></script>
+<script src="https://unpkg.com/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+<script>
+const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
+const $ = (id) => document.getElementById(id);
+// v4: BOTH signatures are personal_sign — Signature 1 over the setup op hash
+// (the pattern that worked in v1), Signature 2 over the EIP-712 Enable
+// digest (computed from the embedded packet and asserted byte-equal at
+// build time; Kernel 0.3.2 accepts this form onchain — proven on a fork
+// test and live in the v1 grant). The typed-data signing route is
+// abandoned and is never requested by this page.
+// This page NEVER discards a signature: whatever Rainbow returns is
+// stored, shown in the copy box, and copy/download unlock immediately.
+// The on-page check is a first look only — it reports WHICH address each
+// signature recovers to, and the operator re-verifies server-side before
+// anything is submitted.
+const SETUP_HASH = "0xac7d478c8b3ee8dcb24aeb27d409e381574466f8d9f366b4da5140873d9263d7";
+const ENABLE_DIGEST = "0xf58eb16c09f9677a9f3e7f341fc038c75f117e915bba08d1c1ccfd83d21f711a";
+const sigs = {};
+// Stale keys from older pages and stale WalletConnect sessions on this
+// shared origin are wiped so the connection below starts fresh; this
+// page's own v4 key is kept (and restored below).
+try {
+  const kill = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== "moebiusx-sigs-v4"))) kill.push(k); }
+  kill.forEach((k) => localStorage.removeItem(k));
+} catch (e) {}
+function persistSigs() {
+  try { localStorage.setItem("moebiusx-sigs-v4", JSON.stringify(sigs)); } catch (e) {}
+  if (sigs.setupSignature || sigs.enableSignature) {
+    $("sigOut").value = JSON.stringify(sigs, null, 2);
+    $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
+  }
+}
+function recoverOver(hashBytes, sig) {
+  // Returns the address the personal_sign signature recovers to (over the
+  // given 32-byte hash), or null when the checker library is unavailable or
+  // the signature cannot be parsed. Never throws.
+  try {
+    if (!window.ethers || !window.ethers.verifyMessage) return null;
+    return window.ethers.verifyMessage(window.ethers.getBytes(hashBytes), sig);
+  } catch (e) { return null; }
+}
+function reportSigStatus(el, label, sig, hashBytes) {
+  const rec = recoverOver(hashBytes, sig);
+  if (rec && rec.toLowerCase() === PACKET.founder.toLowerCase()) {
+    el.innerHTML = "<span class='ok'>✓ " + label + " verified against your wallet</span> — it is in the copy box below.";
+  } else if (rec) {
+    el.innerHTML = "<span class='bad'>⚠ Rainbow signed from a DIFFERENT address: " + rec + "</span><br>" +
+      "Your account is " + PACKET.founder + ". <b>The signature is still kept in the copy box below — send it to the operator</b>, " +
+      "who will inspect it. Do not keep retrying.";
+  } else {
+    el.innerHTML = "<span class='ok'>" + label + " received.</span> The on-page checker could not run — " +
+      "<b>it is kept in the copy box below; send it anyway</b>; the operator verifies it server-side.";
+  }
+}
+let account = null;
+let activeProvider = null;
+let wcProvider = null;
+const getEth = () => window.ethereum;
+const WC_PROJECT_ID = "9c4b700dd46cd03cabd4ccf6f61acbce";
+async function getWcProvider() {
+  if (wcProvider) return wcProvider;
+  const ns = window["@walletconnect/ethereum-provider"];
+  const EP = (ns && ns.EthereumProvider) || window.EthereumProvider;
+  if (!EP || !EP.init) throw new Error("WalletConnect library failed to load — check your connection and reload the page.");
+  wcProvider = await EP.init({
+    projectId: WC_PROJECT_ID,
+    chains: [PACKET.network.chainId],
+    showQrModal: true,
+    methods: ["personal_sign"],
+    events: ["chainChanged", "accountsChanged"],
+  });
+  return wcProvider;
+}
+
+function renderSheet() {
+  const p = PACKET.policySheet, v = PACKET.venue, t = PACKET.transferPermission, snap = PACKET.chainSnapshotAtGeneration;
+  const rows = [
+    ["Network", "Base Mainnet (chain " + PACKET.network.chainId + ")"],
+    ["Owner (you)", PACKET.founder],
+    ["Smart account", PACKET.accountAddress + " (already deployed)"],
+    ["Session key (v4)", PACKET.sessionKeyAddress],
+    ["Permission ID", PACKET.permissionId],
+    ["Cumulative cap", p.cumulativeCapUsdc + " USDC gross into swaps (enforced by the allowance the setup op sets)"],
+    ["Per-call cap", p.perCallCapUsdc + " USDC per swap"],
+    ["Treasury transfer", "up to " + t.perCallCapUsdc + " USDC per transfer, ONLY to " + t.to],
+    ["Grant expiry", p.validUntilIso + " (Unix " + p.validUntil + ") — 30 days"],
+    ["Rate limit", p.rateLimit],
+    ["Session gas budget", p.gasBudgetEth + " ETH"],
+    ["Router", v.routerName + " (" + v.protocol + ") — " + v.router],
+    ["Allowed calls", p.allowedCalls],
+    ["Native value on session calls", p.nativeValue + " ETH"],
+    ["Session can approve", p.sessionApproveAllowed ? "yes" : "no"],
+    ["Account USDC right now", (Number(snap.accountUsdcRaw) / 1e6).toFixed(6) + " USDC — no funding transfer is required by this packet; the $1,000 pool is a target you fund separately, at your own pace, and trades size off the actual balance"],
+  ];
+  $("sheetBody").innerHTML = rows.map(([k, val]) =>
+    "<tr><td>" + k + "</td><td class='mono'>" + val + "</td></tr>").join("");
+  $("sheetNote").textContent = PACKET.capLayers.effectiveCumulativeCeilingUsdc + ".";
+  $("generatedNote").textContent = "Packet generated: " + PACKET.generatedAt + " · " + PACKET.regenerateIfOlderThan;
+  $("checkList").innerHTML = [
+    "Cumulative cap: " + p.cumulativeCapUsdc + " USDC total into swaps",
+    "Per call: " + p.perCallCapUsdc + " USDC maximum per swap",
+    "Treasury transfers: at most " + t.perCallCapUsdc + " USDC each, only ever to " + t.to,
+    "Expiry: " + p.validUntilIso,
+    "Rate limit: " + p.rateLimit,
+    "Router: " + v.router + " (" + v.routerName + ") — the only swap target",
+    "Tokens pinned: USDC " + v.directions[0].tokenIn + " and WETH " + v.directions[0].tokenOut + ", fee tier " + v.feeTier + ", both directions",
+    "Recipient pinned on swaps: the smart account itself, " + PACKET.accountAddress,
+    "Native value: " + p.nativeValue + " ETH on every session call",
+  ].map((x) => "<li>" + x + "</li>").join("");
+  $("fundingText").innerHTML =
+    "<p><b>USDC funding — NO ACTION NEEDED for v4:</b> " + PACKET.steps.step0b_usdcFunding.description + "</p>" +
+    "<p><b>Gas funding: nothing to send.</b> " + PACKET.steps.step0_prefundTransfer.description + "</p>";
+  $("sessionAddr").textContent = PACKET.sessionKeyAddress;
+  $("setupHash").textContent = SETUP_HASH;
+  $("enableDigest").textContent = ENABLE_DIGEST;
+}
+renderSheet();
+
+async function ensureChain() {
+  const eth = activeProvider || getEth();
+  const n = PACKET.network;
+  const chainId = await eth.request({ method: "eth_chainId" });
+  if (chainId !== n.chainIdHex) {
+    try {
+      await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: n.chainIdHex }] });
+    } catch (e) {
+      await eth.request({ method: "wallet_addEthereumChain", params: [{
+        chainId: n.chainIdHex, chainName: n.name,
+        rpcUrls: [n.rpcUrl], blockExplorerUrls: [n.explorer],
+        nativeCurrency: { name: "Ether", symbol: n.currencySymbol, decimals: 18 },
+      }]});
+    }
+  }
+}
+
+$("connectBtn").addEventListener("click", async () => {
+  const st = $("connStatus");
+  try {
+    let accts;
+    if (getEth()) {
+      activeProvider = getEth();
+      accts = await activeProvider.request({ method: "eth_requestAccounts" });
+    } else {
+      st.textContent = "Opening WalletConnect — choose Rainbow in the popup and approve the connection in Rainbow…";
+      const p = await getWcProvider();
+      await p.connect();
+      activeProvider = p;
+      accts = p.accounts;
+    }
+    account = accts && accts[0];
+    if (!account) { st.innerHTML = "<span class='bad'>✗ The wallet returned no account — stop, do not sign.</span>"; return; }
+    await ensureChain();
+    const okAddr = account && account.toLowerCase() === PACKET.founder.toLowerCase();
+    st.innerHTML = "Connected: <span class='mono'>" + account + "</span> " +
+      (okAddr ? "<span class='ok'>✓ matches the founder wallet address</span>"
+              : "<span class='bad'>✗ NOT the founder wallet address — stop, do not sign</span>");
+    if (okAddr) { $("signSetupBtn").disabled = false; $("signEnableBtn").disabled = false; }
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("signSetupBtn").addEventListener("click", async () => {
+  const st = $("setupSigStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rainbow first."; return; }
+    const sig = await activeProvider.request({
+      method: "personal_sign",
+      params: [SETUP_HASH, account],
+    });
+    if (!sig) { st.innerHTML = "<span class='bad'>✗ Rainbow returned no signature — nothing was signed.</span>"; return; }
+    sigs.setupSignature = sig;
+    persistSigs();
+    reportSigStatus(st, "Signature 1", sig, SETUP_HASH);
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("signEnableBtn").addEventListener("click", async () => {
+  const st = $("enableSigStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rainbow first."; return; }
+    const sig = await activeProvider.request({
+      method: "personal_sign",
+      params: [ENABLE_DIGEST, account],
+    });
+    if (!sig) { st.innerHTML = "<span class='bad'>✗ Rainbow returned no signature — nothing was signed.</span>"; return; }
+    sigs.enableSignature = sig;
+    persistSigs();
+    reportSigStatus(st, "Signature 2", sig, ENABLE_DIGEST);
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+function download(name, obj) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }));
+  a.download = name; a.click();
+}
+$("downloadSigBtn").addEventListener("click", () => download("founder-signature-v4.json", sigs));
+$("copySigBtn").addEventListener("click", async () => {
+  const t = $("sigOut"); t.select();
+  try { await navigator.clipboard.writeText(t.value); $("copySigBtn").textContent = "✓ Copied"; }
+  catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
+});
+try {
+  const saved = JSON.parse(localStorage.getItem("moebiusx-sigs-v4") || "{}");
+  if (saved.setupSignature) { sigs.setupSignature = saved.setupSignature; reportSigStatus($("setupSigStatus"), "Signature 1 (restored from this browser)", saved.setupSignature, SETUP_HASH); }
+  if (saved.enableSignature) { sigs.enableSignature = saved.enableSignature; reportSigStatus($("enableSigStatus"), "Signature 2 (restored from this browser)", saved.enableSignature, ENABLE_DIGEST); }
+} catch (e) {}
+persistSigs();
+</script>
+</body>
+</html>
