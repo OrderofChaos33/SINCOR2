@@ -1,5 +1,8 @@
 """AP2 discovery document — GET /.well-known/ap2.json (and /.well-known/ap2).
 
+The bare root alias GET /ap2 serves the exact same document (verified
+byte-identical) so resolvers that try the short path do not hit a 404.
+
 Mirrors the agent-card pattern in test_a2a_smoke.py: the document is
 served by the A2A Flask blueprint (a2a_integration.A2ARouter) as
 jsonify(factory()) and must return HTTP 200 with a JSON content type.
@@ -73,3 +76,18 @@ def test_ap2_discovery_factory_matches_served_document(client):
 
     served = client.get("/.well-known/ap2.json").get_json()
     assert build_ap2_discovery_document() == served
+
+
+def test_ap2_bare_root_alias_serves_identical_document(client):
+    """GET /ap2 serves the same document as GET /.well-known/ap2.
+
+    Byte-identical body (not just equal JSON) so the alias cannot drift
+    from the canonical document it mirrors.
+    """
+    canonical = client.get("/.well-known/ap2")
+    assert canonical.status_code == 200
+    alias = client.get("/ap2")
+    assert alias.status_code == 200
+    assert alias.mimetype == "application/json"
+    assert alias.data == canonical.data
+    _assert_ap2_document(alias.get_json())
