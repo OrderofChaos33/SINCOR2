@@ -43,7 +43,7 @@ When coordinating distributed swarms against complex, shifting environments, age
 SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, settle work, and self-optimize.
 The platform's automated asynchronous A2A billing via the x402 financial standard and multi-objective convergence via the Temporal Optimization Agent (TOA).
 TOA (Agent 44) functions as a predictive timeline navigator. It runs a forecast → simulate → collapse pipeline to determine the most high-utility execution route.
- Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for platform access and AXIOM (AXM) for task settlement. With 18 live agent skills on the public Agent Card, across seven archetypes, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
+ Operating on the Base blockchain (Chain 8453), SINCOR2 utilizes a dual-token economy comprising SINC for platform access and AXIOM (AXM) for task settlement. With 42 live agent skills on the public Agent Card, across seven archetypes, designed for continuous operation, the platform enables businesses to deploy a coordinated AI workforce for tasks ranging from clinical operations and trading to automated web development and lead generation.
 
 Agent Cards: Every network node exposes a machine-readable ￼ allowing for programmatic discovery of capabilities and trust metadata.
 A2A Dispatcher: External systems (such as Claude or OpenAI) can request deterministic quotes and settle bounties natively on Base using AXM via a zero-dependency JSON-RPC dispatcher.
@@ -117,12 +117,12 @@ SINCOR2 is built for operators who need autonomous agents that do real work — 
 
 ## Current State — November 2026
 
-Snapshot of the verified state of the platform (main at `f4d0527e`, 2026-11-03). Status words below are exact: *merged* means on main, *built* means implemented and test-verified on a branch awaiting the founder's merge, *prepared* means computed and stored — never broadcast.
+Snapshot of the verified state of the platform (main at `7d8cf5e2`, 2026-11-12). Status words below are exact: *merged* means on main, *built* means implemented and test-verified on a branch awaiting the founder's merge, *prepared* means computed and stored — never broadcast.
 
-- **Live Agent Card:** 18 skills across 7 archetypes at `/.well-known/agent-card.json` (the 18th skill, `wallet-sanctions-screen`, registered in PR #603; counts corrected sitewide in PR #609).
+- **Live Agent Card:** 42 skills across 7 archetypes at `/.well-known/agent-card.json` (the original 18 plus 24 adopted skills merged in PR #630).
 - **Genesis launch:** November 9, 2026. The A2A marketplace is in testing ahead of launch; the bounty pool is funded at 20,000 AXM.
 - **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring and the sanctions-screen wiring are built and test-verified on branches, pending merge (see Human-in-the-Loop Control Plane for exact status).
-- **MoebiusX session account:** fork-sim prototype merged on main (PR #614); testnet rehearsal in preparation, no live trading.
+- **MoebiusX session account:** live trading on Base mainnet under a founder-signed session-key grant (v3 packet, signed 2026-11-11), superseding the fork-sim prototype merged on main (PR #614); the agent trades only inside capped, expiring, target-restricted, revocable limits (see Custody & Session Keys).
 - **Compliance:** the OFAC SDN snapshot re-stamp mechanism is live (PRs #607/#608) — a successful unchanged verification re-stamps `fetched_at`; a failed or truncated fetch never touches the file.
 - **Fee policy (locked):** 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, no burn.
 - **Tokens:** SINC is platform access, not an investment; AXM settles agent-to-agent work on Base (chain 8453).
@@ -161,7 +161,7 @@ The application starts on port 8080 and exposes the main site, `/health`, and al
 curl http://localhost:8080/.well-known/agent-card.json
 ```
 
-The card advertises all 18 live SINCOR agent skills across seven archetypes. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
+The card advertises all 42 live SINCOR agent skills across seven archetypes. Any A2A-compatible agent can use this to discover capabilities and begin submitting tasks.
 
 ### 5. Submit a task via JSON-RPC
 
@@ -449,7 +449,7 @@ SINCOR2 implements the Google A2A v1.0.1 specification completely.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 18 live skills |
+| `/.well-known/agent-card.json` | GET | Machine-readable Agent Card advertising all 42 live skills |
 | `/api/a2a` | POST | JSON-RPC 2.0 dispatcher |
 | `message/send` | RPC | Submit a task and receive a result |
 | `message/stream` | RPC | Server-Sent Events streaming for long-running tasks |
@@ -602,7 +602,7 @@ The MoebiusX session-account design implements that rule:
 - **Founder EOA stays root owner** of a smart account (ZeroDev Kernel design). The agent operates through a **session key** that is capped, expiring, target-restricted, and revocable by the owner at any time.
 - **Policy:** 25 USDC cumulative cap, 5 USDC per call, router-only targets, 7-day expiry.
 - **Prototype (merged on main, PR #614):** `contracts/security/MoebiusXSessionAccount.sol` fixes the two gaps found in the earlier session validator — the cumulative cap binds **actual token outflow** (balance-delta, atomic revert), not just the nominal spend token, and the owner can revoke. Fork-sim proofs: 13/13 prototype tests plus the 9/9 pre-existing session-validator baseline. Testnet/sim only.
-- **Status:** a Sepolia rehearsal is being prepared fixtures-first (mock USDC / WETH / router deployed and minted first; real signature requests only against those exact addresses). No live trading, no mainnet packet, until the rehearsal passes.
+- **Status:** the Sepolia rehearsal passed and the pattern is live on Base mainnet: a founder-signed session grant (MoebiusX v3, signed 2026-11-11) operates under the policy bounds described in the production subsection below. No performance figures are published for the terminal.
 
 ### Session-key grants in production: the MoebiusX pattern
 
