@@ -6,6 +6,9 @@ after that module has finished constructing the application object.
 """
 from __future__ import annotations
 
+import hashlib as _hashlib
+import threading as _threading
+
 from flask import Blueprint
 
 bp = Blueprint("mvp_billing", __name__)
@@ -989,9 +992,6 @@ def x402_verify():
 # legitimate retry dispatches fresh (P1-1 preservation intact).
 # Different tokens hold different flights and dispatch concurrently.
 # ---------------------------------------------------------------------------
-import hashlib as _hashlib
-import threading as _threading
-
 _PAID_FLIGHT_GUARD = _threading.Lock()
 # flight key -> [lock, refcount]; entries are dropped at refcount 0.
 _PAID_TOKEN_FLIGHTS: dict = {}

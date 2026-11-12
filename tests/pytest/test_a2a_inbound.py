@@ -5,8 +5,6 @@ from __future__ import annotations
 from conftest import hb_headers, signed_task_auth
 
 import json
-import time
-import uuid
 
 import pytest
 from flask import Flask
@@ -17,7 +15,6 @@ from sincor2.contract_net import (
     calculate_bid_score,
 )
 from sincor2.a2a_inbound import (
-    MERIT_THRESHOLD_AXM,
     register as register_inbound,
     reset_fabric,
 )
