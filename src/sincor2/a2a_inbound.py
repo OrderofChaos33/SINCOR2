@@ -10,12 +10,11 @@ import os
 import re
 import threading
 import time
-import uuid
 from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from flask import Blueprint, Flask, Response, jsonify, request, stream_with_context
+from flask import Flask, jsonify
 
 from sincor2.card_sanitize import (
     AGENT_ID_MAX_LEN,
@@ -30,10 +29,6 @@ from sincor2.card_sanitize import (
 )
 from sincor2.contract_net import (
     BASE_CHAIN_ID,
-    ESCROW_ADDRESS,
-    calculate_bid_score,
-    probe_base_chain,
-    stage_payout,
 )
 
 logger = logging.getLogger("sincor.a2a.inbound")

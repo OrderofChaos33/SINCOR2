@@ -11,12 +11,15 @@ import logging
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from urllib import error as urllib_error
-from urllib import request as urllib_request
+# NOTE: Path, urllib_error, urllib_request, send_file, jwt_required and
+# get_jwt_identity are unused in this module but are re-exported to the mvp
+# blueprints, which bind mvp_app globals via _bind_mvp(). Do not remove.
+from pathlib import Path  # noqa: F401
+from urllib import error as urllib_error  # noqa: F401
+from urllib import request as urllib_request  # noqa: F401
 
-from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for  # noqa: F401
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity  # noqa: F401
 from werkzeug.middleware.proxy_fix import ProxyFix
 try:
     from authlib.integrations.flask_client import OAuth
@@ -31,6 +34,9 @@ from sincor2.data_paths import data_dir, migrate_legacy_orders_db
 from sincor2.pdf_loader import get_pdf_generator
 from sincor2.email_sender import get_email_sender
 from sincor2.shadow_monitor.runtime import build_shadow_runtime
+# Runtime secret resolver (from #223): no committed fallbacks, fail closed in production.
+from sincor2.runtime_secrets import resolve_flask_secret, resolve_jwt_secret
+from sincor2.cookie_security import is_production_https, secure_cookie_kwargs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -110,14 +116,10 @@ def inject_auth_state():
     }
 
 
-# Runtime secret resolver (from #223): no committed fallbacks, fail closed in production.
-from sincor2.runtime_secrets import resolve_flask_secret, resolve_jwt_secret
-
 app.config['JWT_SECRET_KEY'] = resolve_jwt_secret()
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 app.config['SECRET_KEY'] = resolve_flask_secret()
-from sincor2.cookie_security import is_production_https, secure_cookie_kwargs
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # C3 (P2 audit): Secure follows the effective production-HTTPS posture, not a
@@ -523,7 +525,7 @@ limiter = Limiter(
 
 # Shared credential-verifier throttling (audit P2-A3). Imported here so the
 # mvp blueprints pick these up via _bind_mvp(); app.py imports them directly.
-from sincor2.login_throttle import (  # noqa: E402
+from sincor2.login_throttle import (  # noqa: E402, F401
     credential_rate_limits,
     note_login_failure,
     note_login_success,
@@ -540,16 +542,19 @@ except Exception as e:
     logger.warning('[SAFETY] Lock check failed: %s', e)
 
 try:
+    # These names are unused in this module but are re-exported to the
+    # billing blueprint, which binds mvp_app globals via _bind_mvp().
+    # Do not remove.
     from sincor2.platform_payments import (
-        activate_subscription,
-        create_checkout as platform_create_checkout,
+        activate_subscription,  # noqa: F401
+        create_checkout as platform_create_checkout,  # noqa: F401
         fiat_payments_enabled,
-        get_subscription,
+        get_subscription,  # noqa: F401
         init_platform_payments_db,
-        list_plans as platform_list_plans,
-        list_subscriptions,
-        mark_checkout_fulfilled as platform_mark_checkout_fulfilled,
-        verify_checkout as platform_verify_checkout,
+        list_plans as platform_list_plans,  # noqa: F401
+        list_subscriptions,  # noqa: F401
+        mark_checkout_fulfilled as platform_mark_checkout_fulfilled,  # noqa: F401
+        verify_checkout as platform_verify_checkout,  # noqa: F401
     )
     init_platform_payments_db()
     PLATFORM_PAYMENTS_AVAILABLE = True
