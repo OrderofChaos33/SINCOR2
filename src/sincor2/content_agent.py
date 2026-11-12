@@ -74,18 +74,19 @@ SINCOR_BRAND = {
     "tagline": "Autonomous AI agent swarm. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
         "SINCOR is an autonomous agent swarm on Base with verifiable on-chain inventory. "
-        "SINC is 1B supply at a $0.15 floor ($150M FDV). Pay at /buy. "
+        "SINC is the platform access token with 1B fixed supply, available at /buy. "
+        "SINCOR does not publish a token price or valuation. "
         "Agents draft proof-of-work content; contracts handle distribution."
     ),
     "features": [
         "Specialized AI agents — content, ops, on-chain stats, review queue",
-        "Self-serve checkout at /buy — SINC $0.15 floor ($150M / 1B)",
+        "Self-serve checkout at /buy — platform access in SINC, 1B fixed supply",
         "Verifiable Base contracts: SINC token, v4 hook, Sourcify-matched source",
         "Human-in-the-loop launch review (~5 min/day) — agents draft, you approve",
         "CRM sync, deduplication, lead enrichment (platform layer)",
         "A2A agent card at /.well-known/agent.json for discovery",
     ],
-    "pricing_note": "Platform from $297/mo; SINC official price $0.15 ($150M FDV / 1B tokens).",
+    "pricing_note": "Platform from $297/mo; SINC is platform access — 1B fixed supply, no published price.",
     "sinc_token": SINC_TOKEN,
 }
 
