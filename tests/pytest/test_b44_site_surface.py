@@ -113,6 +113,8 @@ def test_genesis_claim_api_works_without_password(mvp_client, monkeypatch, tmp_p
     # returns a neutral pending receipt and sets no cookie; the cookie
     # arrives only after the emailed token is confirmed — which is the
     # flow driven here. Original intent preserved: no password anywhere.
+    # W-138 STALE update: confirmation binds on POST only; the emailed
+    # link's GET renders a neutral page and binds nothing.
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
     sender = _inject_genesis_sender(monkeypatch)
     r = mvp_client.post(
@@ -123,7 +125,12 @@ def test_genesis_claim_api_works_without_password(mvp_client, monkeypatch, tmp_p
     assert r.get_json()["ok"] is True
     assert "allocation" not in r.get_json()
     assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
-    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    token = sender.last_token()
+    r = mvp_client.get(f"/api/genesis/confirm?token={token}")
+    assert r.status_code == 200
+    assert "text/html" in (r.headers.get("Content-Type") or "")
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.post("/api/genesis/confirm", data={"token": token})
     assert r.status_code == 200
     assert r.get_json()["ok"] is True
     assert r.get_json()["allocation"]
