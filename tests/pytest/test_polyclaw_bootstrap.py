@@ -27,9 +27,9 @@ TEST_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
 
 class FakeClobClient:
-    """Stand-in for py_clob_client.client.ClobClient (no network)."""
+    """Stand-in for py_clob_client_v2.client.ClobClient (no network)."""
 
-    allowance = "1000000"  # raw units (1 USDC) unless a test overrides
+    allowance = "1000000"  # raw units (1 pUSD) unless a test overrides
     instances = []
 
     def __init__(self, host, chain_id=None, key=None, creds=None,
@@ -39,9 +39,12 @@ class FakeClobClient:
         self.creds = creds
         FakeClobClient.instances.append(self)
 
-    def create_or_derive_api_creds(self):
-        from py_clob_client.clob_types import ApiCreds
+    def create_or_derive_api_key(self):
+        from py_clob_client_v2 import ApiCreds
         return ApiCreds(api_key="k", api_secret="s", api_passphrase="p")
+
+    def set_api_creds(self, creds):
+        self.creds = creds
 
     def get_address(self):
         return TEST_ADDRESS
@@ -57,7 +60,7 @@ class FakeClobClient:
 def live_env(monkeypatch):
     """Env that takes the bootstrap down its live branch, SDK mocked."""
     # Import the adapter first: it sanitizes the bracketed-IPv6 NO_PROXY
-    # entries that otherwise crash httpx inside py_clob_client at import.
+    # entries that otherwise crash httpx inside py_clob_client_v2 at import.
     import sincor2.execution_adapter  # noqa: F401
     from sincor2 import polyclaw_scheduler as ps
 
@@ -67,7 +70,7 @@ def live_env(monkeypatch):
     monkeypatch.setenv("POLYMARKET_API_SECRET", "test-api-secret")
     monkeypatch.setenv("POLYMARKET_API_PASSPHRASE", "test-passphrase")
     monkeypatch.setattr(
-        "py_clob_client.client.ClobClient", FakeClobClient)
+        "py_clob_client_v2.client.ClobClient", FakeClobClient)
     FakeClobClient.instances = []
     FakeClobClient.allowance = "1000000"
     monkeypatch.setattr(ps, "_live_adapter", None)
