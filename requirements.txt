@@ -45,8 +45,10 @@ resend==2.7.0
 anthropic==0.39.0
 aiohttp==3.14.3
 
-# Polyclaw live trading (Polymarket CLOB + on-chain EOA approvals)
-py-clob-client>=0.17.0
+# Polyclaw live trading (Polymarket CLOB V2 + on-chain EOA approvals).
+# CLOB V2 cutover (2026-04-28): the V1 py-clob-client cannot sign valid
+# production orders; py-clob-client-v2 is the official successor SDK.
+py-clob-client-v2==1.2.1
 web3>=6.0.0
 eth-account>=0.10.0
 # Keccak backend for eth-hash (money path: marketplace/contract_net/keccak.py).
