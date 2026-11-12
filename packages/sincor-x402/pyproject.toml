@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sincor-x402"
-version = "0.1.0"
+version = "0.1.1"
 description = "Verified x402 + MCP wrapper: escrowed, SIGIL-committed settlement for x402 endpoints and MCP tools (reference implementation — see README honesty notes)"
 readme = "README.md"
 requires-python = ">=3.10"
