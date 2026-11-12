@@ -45,6 +45,8 @@ jobs:
       - name: Install pinned forge-std for P24 local safety test
         working-directory: onchain
         run: forge install foundry-rs/forge-std@v1.9.7 --no-git
+      - name: Make vendored solc executable
+        run: chmod +x onchain/tools/solc-0.8.26
       - name: P24 local simulation safety regression (required)
         working-directory: onchain
         run: FOUNDRY_PROFILE=p24 forge test --offline --match-path test/p24/P24Deploy.t.sol -vv
