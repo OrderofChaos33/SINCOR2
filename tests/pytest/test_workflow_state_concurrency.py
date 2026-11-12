@@ -95,10 +95,18 @@ def test_fresh_store_per_save_threaded(tmp_path):
     try:
         assert store.verify_chain(RUN) is True
         checkpoints = store.list_checkpoints(RUN, NAME)
-        assert len(checkpoints) == 40
-        assert [c.version for c in checkpoints] == list(range(1, 41))
+        # Retention keeps only the latest 3 versions (keep-latest-3,
+        # PR #646); the thread-safety contract is unchanged — all 40
+        # racing saves landed exactly once, so the retained tail is
+        # the final three versions, each bound to its own event.
+        assert len(checkpoints) == 3
+        versions = [c.version for c in checkpoints]
+        assert versions == sorted(versions) and len(set(versions)) == 3
+        assert versions[-1] == 40
+        assert all(c.event_seq == c.version for c in checkpoints)
+        assert checkpoints[-1].state in ({"a": 19}, {"b": 19})
         state = load_state_snapshot(store, RUN, NAME)
-        assert state is not None and len(state) == 1
+        assert state == checkpoints[-1].state
     finally:
         store.close()
 
@@ -125,9 +133,18 @@ def test_single_shared_instance_threaded_saves(tmp_path):
     assert errors == []
     assert store.verify_chain(RUN) is True
     checkpoints = store.list_checkpoints(RUN, NAME)
-    assert len(checkpoints) == 80
+    # Retention keeps only the latest 3 versions (keep-latest-3,
+    # PR #646); the atomicity contract is unchanged — all 80 racing
+    # saves landed exactly once, so the retained tail is the final
+    # three versions, each bound to its own writer's event.
+    assert len(checkpoints) == 3
+    versions = [c.version for c in checkpoints]
+    assert versions == sorted(versions) and len(set(versions)) == 3
+    assert versions[-1] == 80
+    assert all(c.event_seq == c.version for c in checkpoints)
+    assert checkpoints[-1].state in ({"a": 39}, {"b": 39})
     state = load_state_snapshot(store, RUN, NAME)
-    assert state is not None and len(state) == 1
+    assert state == checkpoints[-1].state
     store.close()
 
 
