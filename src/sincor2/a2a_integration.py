@@ -3604,15 +3604,18 @@ class A2ARouter:
             from flask import jsonify
             return jsonify(build_marketplace_manifest())
 
-        # ── Discovery — AP2 document (canonical .json + bare alias) ─────────
+        # ── Discovery — AP2 document (canonical .json + aliases) ────────────
         @bp.route("/.well-known/ap2.json", methods=["GET"])
         @bp.route("/.well-known/ap2", methods=["GET"])
+        @bp.route("/ap2", methods=["GET"])
         def ap2_discovery():
             """AP2 discovery document: mandates accepted + SEAL settlement
             terms for AP2 routers. Same pattern as the agent card above —
-            jsonify(factory) → application/json. The bare path is the
-            founder-greenlit alias; the .json path is the canonical one
-            named in the document itself (discovery_url_intended)."""
+            jsonify(factory) → application/json. The bare /.well-known/ap2
+            path is the founder-greenlit alias and /ap2 is the bare root
+            alias; the .json path is the canonical one named in the
+            document itself (discovery_url_intended). All three paths are
+            served by this one view so the document can never drift."""
             from flask import jsonify
             return jsonify(build_ap2_discovery_document())
 
