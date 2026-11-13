@@ -21,7 +21,7 @@ We prioritize contributions that improve:
 ## Local validation
 
 ```bash
-ruff check src/sincor2/app.py src/sincor2/mvp_app.py src/sincor2/settings.py src/sincor2/startup.py src/sincor2/error_handling.py src/sincor2/blueprints tests/pytest
+ruff check src/sincor2/app.py src/sincor2/mvp_app.py src/sincor2/settings.py src/sincor2/error_handling.py src/sincor2/blueprints tests/pytest
 pytest
 ```
 

@@ -202,29 +202,37 @@ def optional_login():
 
 # Test function
 def test_auth():
-    """Test authentication system"""
+    """Test authentication system.
+
+    Diagnostics report credential PRESENCE only (SET/UNSET sentinels).
+    No password, secret, or fallback value is ever printed here.
+    """
     print("Testing SINCOR Authentication System...")
 
-    # Check if JWT secret is set
+    # Check if JWT secret is set (presence + length only — never the value)
     jwt_secret = os.environ.get('JWT_SECRET_KEY')
     if jwt_secret:
-        print(f"[OK] JWT_SECRET_KEY configured (length: {len(jwt_secret)})")
+        print(f"[OK] JWT_SECRET_KEY: SET (length: {len(jwt_secret)})")
     else:
-        print("[WARNING] JWT_SECRET_KEY not set - using default (INSECURE)")
+        print("[WARNING] JWT_SECRET_KEY: UNSET - using default (INSECURE)")
 
-    # Check if admin credentials are set
-    admin_user = os.environ.get('ADMIN_USERNAME', 'admin')
+    # Check if admin credentials are set (presence only — never values)
+    admin_user = os.environ.get('ADMIN_USERNAME')
     admin_pass = os.environ.get('ADMIN_PASSWORD')
 
-    if admin_pass and admin_pass != 'changeme123':
-        print(f"[OK] Admin credentials configured: {admin_user}")
+    if admin_user:
+        print("[OK] ADMIN_USERNAME: SET")
     else:
-        print("[WARNING] Using default admin password (INSECURE)")
+        print("[WARNING] ADMIN_USERNAME: UNSET")
+
+    if admin_pass and admin_pass != 'changeme123':
+        print("[OK] ADMIN_PASSWORD: SET")
+    else:
+        print("[WARNING] ADMIN_PASSWORD: UNSET or default (INSECURE)")
 
     print("\n[OK] Authentication system ready")
-    print("\nDefault credentials:")
-    print(f"  Username: {admin_user}")
-    print(f"  Password: {admin_pass or 'changeme123'}")
+    print("\nAdmin credentials are configured via environment variables")
+    print("(ADMIN_USERNAME / ADMIN_PASSWORD) - values are never displayed.")
     print("\n[WARNING] CHANGE THESE IN PRODUCTION!")
 
 

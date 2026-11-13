@@ -8,6 +8,7 @@ heartbeat message, or the operator heartbeat token. Unsigned heartbeats get
 from __future__ import annotations
 
 import time
+import uuid
 
 import pytest
 from eth_account import Account
@@ -24,25 +25,37 @@ SPOOF = "hbauth-victim"
 NOWALLET = "hbauth-nowallet"
 
 
-def _register(client, agent_id, wallet):
+def _register(client, agent_id, acct=None):
+    # Use unique agent_id per registration to avoid re-registration 403
+    # (re-registration requires EIP-191 signature by registered wallet).
+    # First-time wallet claims require a valid EIP-191 proof (C3
+    # fail-closed), so the helper signs with the claimed wallet's key.
+    unique_id = f"{agent_id}-{uuid.uuid4().hex[:8]}"
     body = {
-        "agent_id": agent_id,
+        "agent_id": unique_id,
         "capability_tags": ["auth-test"],
         "rpc_callback": "https://auth.example/rpc",
     }
-    if wallet:
-        body["wallet"] = wallet
+    if acct is not None:
+        from sincor2.a2a_identity import register_message
+        ts = int(time.time() * 1000)
+        body["wallet"] = acct.address
+        body["registration_wallet"] = acct.address
+        body["registration_ts"] = ts
+        sig = acct.sign_message(
+            encode_defunct(text=register_message(unique_id, ts))).signature
+        body["registration_signature"] = "0x" + bytes(sig).hex()
     r = client.post("/v1/a2a/register", json=body)
     assert r.status_code in (200, 201), r.get_json()
-    return r
+    return r, unique_id
 
 
 @pytest.fixture()
 def authed_agent(client):
     """Registered agent holding a real key; returns (agent_id, account)."""
     acct = Account.create()
-    _register(client, AID, acct.address)
-    return AID, acct
+    _, unique_id = _register(client, AID, acct)
+    return unique_id, acct
 
 
 def _sig(acct, agent_id, ts):
@@ -111,7 +124,7 @@ def test_spoofed_agent_id_liveness_impossible(client, authed_agent):
     the attacker's wallet, which != the victim's registered wallet."""
     victim_id, victim_acct = authed_agent
     attacker = Account.create()
-    _register(client, "hbauth-attacker", attacker.address)
+    _register(client, "hbauth-attacker", attacker)
     ts = int(time.time() * 1000)
     # Attacker signs the *victim's* heartbeat message with their own key.
     sig = _sig(attacker, victim_id, ts)
@@ -124,9 +137,9 @@ def test_spoofed_agent_id_liveness_impossible(client, authed_agent):
 
 
 def test_walletless_agent_cannot_self_authenticate(client):
-    _register(client, NOWALLET, None)
+    _, unique_id = _register(client, NOWALLET)
     acct = Account.create()
-    r = _beat(client, NOWALLET, acct=acct)
+    r = _beat(client, unique_id, acct=acct)
     assert r.status_code == 401  # fail closed: no bound identity to prove
 
 

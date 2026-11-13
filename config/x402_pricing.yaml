@@ -34,3 +34,140 @@ resources:
     amount_usdc: 5.0
     description: "Paid healthcare credential verification on Base with AgentKit/x402 settlement"
     skill_id: healthcare-credential-check
+
+  # B2B skill packs (zero-to-revenue rail rework): bought via x402 USDC on
+  # Base. amount_usdc MUST equal PACK_SKUS[sku].price_cents / 100 in
+  # src/sincor2/rail_routes.py — the rail checkout route refuses to mint a
+  # challenge when the two disagree (fail closed on price config drift).
+  rail-pack-credentialing_launch:
+    label: "Credentialing Launch (B2B skill pack)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "B2B skill pack: Credentialing Launch — x402 USDC payment on Base"
+  rail-pack-chroma_compliance:
+    label: "Compliance Operations (B2B skill pack)"
+    token: USDC
+    amount_usdc: 997.0
+    description: "B2B skill pack: Compliance Operations — x402 USDC payment on Base"
+  rail-pack-sadas_execution:
+    label: "SADAS Execution (B2B skill pack)"
+    token: USDC
+    amount_usdc: 2997.0
+    description: "B2B skill pack: SADAS Execution — x402 USDC payment on Base"
+
+  # Subscription plans (rail rework of the parked Stripe subscriptions):
+  # bought via periodic x402 re-auth — one challenge per 30-day period.
+  # amount_usdc MUST equal SUB_PLANS[plan].price_cents / 100 in
+  # src/sincor2/rail_subscriptions.py — the subscription checkout refuses
+  # to mint a challenge when the two disagree (fail closed on drift).
+  rail-sub-starter:
+    label: "SINCOR Starter (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "SINCOR Starter plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-professional:
+    label: "SINCOR Professional (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 997.0
+    description: "SINCOR Professional plan — one 30-day billing period, x402 USDC payment on Base"
+  rail-sub-enterprise:
+    label: "SINCOR Enterprise (subscription, 30 days)"
+    token: USDC
+    amount_usdc: 2997.0
+    description: "SINCOR Enterprise plan — one 30-day billing period, x402 USDC payment on Base"
+  # Digital packs (zero-to-revenue rail rework w4): token-gated downloads
+  # via GET /download/<intake_id>. amount_usdc MUST equal
+  # DIGITAL_SKUS[sku].price_cents / 100 in
+  # src/sincor2/revenue_orchestrator.py — the rail checkout route refuses
+  # to mint a challenge when the two disagree (fail closed on price drift).
+  rail-pack-digital_bi_template_pack:
+    label: "Instant BI Template Pack (digital download)"
+    token: USDC
+    amount_usdc: 97.0
+    description: "Digital pack: Instant BI Template Pack — x402 USDC payment on Base; token-gated download"
+  rail-pack-digital_ai_agent_bundle:
+    label: "AI Agent Bundle (digital download)"
+    token: USDC
+    amount_usdc: 297.0
+    description: "Digital pack: AI Agent Bundle — x402 USDC payment on Base; token-gated download"
+  rail-pack-digital_growth_forecast:
+    label: "Growth Forecast Template (digital download)"
+    token: USDC
+    amount_usdc: 147.0
+    description: "Digital pack: Growth Forecast Template — x402 USDC payment on Base; token-gated download"
+  rail-pack-webbuilder_site:
+    label: "WebBuilder Site (B2B skill pack)"
+    token: USDC
+    amount_usdc: 497.0
+    description: "B2B skill pack: WebBuilder Site — x402 USDC payment on Base"
+
+  # Web Search + Page Read (skills gap G5): one sourced,
+  # timestamped search or page read served by
+  # src/sincor2/web_search_read.py after x402 settlement.
+  # Price is the winning resellers' point ($0.01, skills-gap-map
+  # 2026-10-24 §2.1/§4 item 8); the module's margin guard refuses
+  # to serve if the documented Exa provider cost reaches it.
+  web-search-read:
+    label: "Web search + page read (single read)"
+    token: USDC
+    amount_usdc: 0.01
+    description: "Single web search or page read with source URLs and fetch timestamps on Base with x402 settlement. Use when you need current web results or the extracted text of one page inside a larger workflow."
+  # Local-Business Site Check (skills gap G8): one honest site-quality
+  # read served by src/sincor2/site_check.py after x402 settlement.
+  # Price is the Bazaar median ($0.01, skills-gap-map-2026-10-24 §2.1);
+  # the read feeds the $497 rail webbuilder pack above, but returns
+  # "no build needed" — with no upsell — when the site is good.
+  local-business-site-check:
+    label: "Local business site check (single read)"
+    token: USDC
+    amount_usdc: 0.01
+    description: "Single honest site-quality read for a local business: build_recommended with evidenced deficiencies, no_build_needed, or unknown on Base with x402 settlement. Use when prospecting a local business and you need to know whether its site needs a rebuild before pitching one."
+  # Market-Data Single Read (skills gap G6): one Chainlink price read
+  # served by src/sincor2/market_data_read.py after x402 settlement.
+  # Price is AsterPay's published market-data price point ($0.0075,
+  # skills-gap-map-2026-10-24 §2.4). OHLCV/trending at $0.015 is NOT
+  # registered: the repo has no OHLCV source, so none is invented.
+  market-data-read:
+    label: "Market data price read (single Chainlink round)"
+    token: USDC
+    amount_usdc: 0.0075
+    description: "Single Chainlink price read with round provenance and staleness flag on Base with x402 settlement. Use when you need one current price with its round id and timestamp inside a larger workflow."
+  # TOA Micro-Decision (skills gap G7): single ranked-choice call
+  # served by src/sincor2/toa_micro_decision.py after x402 settlement.
+  # Price hypothesis labelled [inference] in skills-gap-map-2026-10-24
+  # §4 item 4 — no direct TOA comparator exists; anchored above a
+  # $0.005 probability read because TOA runs a Monte Carlo per call.
+  toa-micro-decision:
+    label: "TOA micro-decision (single ranked choice)"
+    token: USDC
+    amount_usdc: 0.05
+    description: "Single TOA ranked-choice decision with confidence, escalate-below-threshold, and hard-gate refusal on Base with x402 settlement. Use when you need one ranked choice with a confidence number inside a larger workflow."
+  # Polymarket Whale Signal (skills gap G3): single-read fresh tracked-
+  # whale entries served by src/sincor2/whale_signal.py after x402
+  # settlement. Price anchored to the published single-question
+  # Polymarket snapshot point ($0.02/call, Botsmith — skills-gap-map
+  # 2026-10-24 §2.5). Data read only — no profitability claim (Mission
+  # 1A whale-flow trading verdict was NO-GO).
+  polymarket-whale-signal:
+    label: "Polymarket whale signal (single read)"
+    token: USDC
+    amount_usdc: 0.02
+    description: "Single-read fresh entries from tracked Polymarket whale wallets with per-wallet resolved-market track record on Base with x402 settlement. Use when you need current tracked-whale flow as data; historical statistics only, no claim about future results."
+  # KYA Trust Score (skills gap G2): single-read agent trust score
+  # served by src/sincor2/kya_trust_score.py after x402 settlement.
+  # Price hypothesis anchored to the published KYA deep-analysis
+  # point ($0.015/call, AsterPay — skills-gap-map-2026-10-24 §2.4).
+  kya-trust-score:
+    label: "KYA agent trust score (deep read)"
+    token: USDC
+    amount_usdc: 0.015
+    description: "Single-read KYA agent trust score with auditable component breakdown from the SINCOR registry, stake ledger, and settlement history on Base with x402 settlement. Use when you need to decide whether to transact with an agent wallet."
+  # Wallet Sanctions Screen (skills gap G1): single-read OFAC SDN screen
+  # served by src/sincor2/sanctions_screen.py after x402 settlement.
+  # Price hypothesis anchored to the advertised OFAC-screen market point
+  # ($0.005/call, Verilex — skills-gap-map-2026-10-24 §2.5).
+  wallet-sanctions-screen:
+    label: "Wallet sanctions screen (single read)"
+    token: USDC
+    amount_usdc: 0.005
+    description: "Single-read OFAC SDN sanctions screen for one wallet address on Base with x402 settlement. Use when you need a pre-transaction sanctions check on an unknown wallet."

@@ -116,7 +116,13 @@ def _commit(env, aid, bidder, price):
     w3 = env["w3"]
     salt = w3.keccak(text=f"salt-{aid.hex()}-{bidder}")
     agent_id = w3.keccak(text=f"agent-{bidder}")
-    com = w3.solidity_keccak(["uint256", "bytes32", "bytes32"], [price, salt, agent_id])
+    # Keep this benchmark in sync with CommitRevealAuction.reveal:
+    # keccak256(abi.encodePacked(auctionId, chainId, bytes32(price), salt,
+    #                           agentIdHash)).
+    com = w3.solidity_keccak(
+        ["bytes32", "uint256", "uint256", "bytes32", "bytes32"],
+        [aid, w3.eth.chain_id, price, salt, agent_id],
+    )
     env["secrets"][(aid, bidder)] = (price, salt, agent_id)
     return _gas(w3, env["auction"].functions.commit(aid, com), {"from": bidder, **TX})
 

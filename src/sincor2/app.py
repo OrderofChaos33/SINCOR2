@@ -15,7 +15,7 @@ ADDED: Rate Limiting for DDoS protection
 import os
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, make_response
+from flask import Flask, render_template, request, jsonify, send_file, make_response, session
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sincor2.runtime_secrets import resolve_flask_secret
 
@@ -46,6 +46,26 @@ try:
 except ImportError as e:
     print(f"Rate limiter not available: {e}")
     RATE_LIMIT_AVAILABLE = False
+
+# Shared credential-verifier throttling (audit P2-A3): stacked IP + account
+# rate limits plus progressive backoff on the limiter's own storage backend.
+try:
+    from sincor2.login_throttle import (
+        credential_rate_limits,
+        note_login_failure,
+        note_login_success,
+    )
+    LOGIN_THROTTLE_AVAILABLE = True
+except ImportError as e:
+    print(f"Login throttle not available: {e}")
+    LOGIN_THROTTLE_AVAILABLE = False
+    credential_rate_limits = None  # type: ignore
+
+    def note_login_failure(identifier=None):  # type: ignore
+        return 0.0
+
+    def note_login_success(identifier=None):  # type: ignore
+        return None
 
 # Import security headers
 try:
@@ -231,9 +251,9 @@ else:
 # ==================== AUTHENTICATION ROUTES ====================
 
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit(AUTH_LIMITS) if limiter else lambda f: f
+@credential_rate_limits(limiter) if credential_rate_limits else (lambda f: f)
 def login():
-    """Authenticate and get access token (RATE LIMITED)"""
+    """Authenticate and get access token (RATE LIMITED + progressive backoff, P2-A3)"""
     if not AUTH_AVAILABLE:
         return jsonify({'error': 'Authentication system not available'}), 503
 
@@ -256,8 +276,10 @@ def login():
         result = sincor_auth.authenticate_user(username, password)
 
         if result['success']:
+            note_login_success(username)
             return jsonify(result), 200
         else:
+            note_login_failure(username)  # progressive backoff (P2-A3)
             return jsonify(result), 401
 
     except Exception as e:
@@ -426,6 +448,14 @@ app.register_blueprint(_defi_catalog_bp)
 if limiter:
     limiter.exempt(_defi_catalog_bp)
 
+# Human payment rail: GET /rail/pay/<sku> + GET /rail/onramp (read-only page;
+# the money movement happens client-side via the x402 challenge endpoints).
+from sincor2.blueprints.rail_pay import rail_pay_bp as _rail_pay_bp
+
+app.register_blueprint(_rail_pay_bp)
+if limiter:
+    limiter.exempt(_rail_pay_bp)
+
 
 @app.route('/health')
 @limiter.exempt if limiter else lambda f: f
@@ -460,11 +490,22 @@ def health_check():
 
 
 @app.route('/api/metrics/treasury')
-@limiter.exempt if limiter else lambda f: f
+@jwt_required()
+@limiter.limit(MONITORING_LIMITS) if limiter else lambda f: f
 def treasury_metrics():
-    """Public treasury KPI snapshot for homepage metrics."""
+    """Treasury KPI snapshot (AUTHENTICATED — audit P2-A2 remediation).
+
+    Previously public for homepage metrics; now requires a valid Bearer
+    JWT and returns an explicit field allowlist only (no raw ledger
+    internals). FOUNDER DECISION: confirm whether any subset should stay
+    intentionally public for the homepage, and if so via which surface.
+    """
     try:
-        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+        from sincor2.treasury_inflow import (
+            get_treasury_snapshot,
+            ledger_summary_24h,
+            public_treasury_dto,
+        )
     except ImportError as exc:
         logger.error("treasury_inflow import failed: %s", exc)
         return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
@@ -472,17 +513,39 @@ def treasury_metrics():
     try:
         snap = get_treasury_snapshot(include_onchain=True)
         summary = ledger_summary_24h()
-        return jsonify(
-            {
-                "status": "ok",
-                "kpi": "treasury_inflow",
-                "snapshot": snap.to_dict(),
-                "ledger_24h": summary,
-            }
-        ), 200
+        return jsonify(public_treasury_dto(snap, summary)), 200
     except Exception as exc:
         logger.exception("treasury metrics failed")
         return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
+
+
+@app.route('/api/metrics/treasury/public')
+def treasury_metrics_public():
+    """Public ledger-only treasury view (observability build #1).
+
+    Answers the P2-A2 founder-decision note above: the intentionally
+    public homepage subset is THIS surface — inflow-ledger 24h aggregates
+    plus the bounty-pool figures /v1/a2a/pool already publishes. No
+    on-chain snapshot, no balances, no address. The route above stays
+    JWT-gated. Mirrors sincor2.blueprints.monitoring.treasury_metrics_public.
+    """
+    try:
+        from sincor2.treasury_inflow import (
+            ledger_summary_24h,
+            public_treasury_public_dto,
+        )
+        from sincor2.a2a_bounty_pool import bounty_pool
+    except ImportError as exc:
+        logger.error("treasury_inflow import failed: %s", exc)
+        return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    try:
+        summary = ledger_summary_24h()
+        pool_status = bounty_pool().status()
+        return jsonify(public_treasury_public_dto(summary, pool_status)), 200
+    except Exception:
+        logger.exception("treasury public metrics failed")
+        return jsonify({"status": "error", "detail": "treasury_public_unavailable"}), 500
 
 
 # ==================== PROTECTED ADMIN ROUTES ====================
@@ -831,7 +894,7 @@ def api_hook_status():
 @app.route('/api/price/official')
 @limiter.exempt if limiter else lambda f: f
 def api_price_official():
-    """Canonical official SINC price — $0.15 floor."""
+    """Canonical official SINC price payload."""
     try:
         from launch_content_engine.onchain_stats import build_official_price_payload
         return jsonify(build_official_price_payload())
@@ -1363,6 +1426,86 @@ def internal_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
+# ---------------------------------------------------------------------------
+# Command Center admin gate (hunt-32 W-44 — Builder B bypass closure).
+#
+# create_app() mounts command_center_bp, whose routes declare no auth of
+# their own. Production (sincor2.mvp_app) runs _require_admin as a
+# before_request guard over every /api/command-center/* path, with the
+# standing rule: do not mount this blueprint on any app without an
+# equivalent guard in front of these paths. This factory mounted it
+# bare, so the killswitch POST, the grade-task POST, and the
+# roster/status GETs were anonymous here (Builder B PoC: an
+# unauthenticated kill flipped the token-budget controller to killed).
+#
+# The check below mirrors mvp_app._require_admin semantics against the
+# same credential sources (ADMIN_USERNAME / ADMIN_PASSWORD env), in the
+# same shape as the waitlist handler's _is_admin_request mirror:
+#   * admin session: session["is_admin"] set and session
+#     ["admin_username"] matching ADMIN_USERNAME, or
+#   * a Bearer JWT (or access_token cookie) whose sub is the admin
+#     username AND whose role claim is 'admin' (sub alone is never
+#     sufficient — hunt-32 W-44), or
+#   * the X-Admin-Key header matching ADMIN_PASSWORD (header ONLY —
+#     never the request body, query string, form, or cookies).
+# Fail-closed: any missing, mismatched, or un-comparable credential
+# (e.g. a non-ASCII key, which hmac.compare_digest cannot compare)
+# returns False and the gate answers 401.
+# ---------------------------------------------------------------------------
+
+def _legacy_admin_request_ok() -> bool:
+    import hmac
+
+    admin_username = (os.environ.get("ADMIN_USERNAME") or "").strip()
+    admin_password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
+
+    def _ct_eq(a: str, b: str) -> bool:
+        try:
+            return hmac.compare_digest(a, b)
+        except (TypeError, ValueError):
+            return False
+
+    if session.get("is_admin") and admin_username:
+        if _ct_eq(
+            str(session.get("admin_username") or "").lower(),
+            admin_username.lower(),
+        ):
+            return True
+
+    token = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):].strip()
+    elif request.cookies:
+        token = request.cookies.get("access_token")
+    if token and admin_username:
+        try:
+            from flask_jwt_extended import decode_token
+
+            decoded = decode_token(token)
+            if decoded.get("role") == "admin" and _ct_eq(
+                str(decoded.get("sub") or "").lower(), admin_username.lower()
+            ):
+                return True
+        except Exception:
+            pass
+
+    key = request.headers.get("X-Admin-Key", "")
+    if key and admin_password:
+        if _ct_eq(str(key), admin_password):
+            return True
+
+    return False
+
+
+@app.before_request
+def _command_center_api_admin_gate():
+    if request.path.startswith("/api/command-center/"):
+        if not _legacy_admin_request_ok():
+            return jsonify({'error': 'Unauthorized'}), 401
+    return None
+
+
 def create_app():
     """Application factory for testing and programmatic use."""
     try:
@@ -1433,6 +1576,11 @@ def create_app():
     except Exception as e:
         print(f"Waitlist blueprint not available: {e}")
     try:
+        from sincor2.mvp_blueprints.discovery import bp as discovery_bp
+        app.register_blueprint(discovery_bp)
+    except Exception as e:
+        print(f"Discovery blueprint not available: {e}")
+    try:
         from verticals.auto_detailing.blueprint import register_chroma
         register_chroma(app)
     except Exception as e:
@@ -1471,6 +1619,16 @@ def create_app():
         register_a2a_inbound(app)
     except Exception as e:
         print(f"A2A inbound not available: {e}")
+    try:
+        from sincor2.rail_routes import init_rail_routes
+        init_rail_routes(app)
+    except Exception as e:
+        print(f"Rail routes not available: {e}")
+    try:
+        from sincor2.rail_delivery import init_rail_delivery_routes
+        init_rail_delivery_routes(app)
+    except Exception as e:
+        print(f"Rail delivery routes not available: {e}")
     return app
 
 
@@ -1506,7 +1664,7 @@ if __name__ == '__main__':
             print("  Password: NOT CONFIGURED — admin auth is REJECTED in production")
             print("  ⚠️  Set ADMIN_PASSWORD env var to a strong value before launch.")
         else:
-            print("  Password: changeme123  (dev default — DO NOT use in production)")
+            print("  Password: <dev default — DO NOT use in production>")
 
     if RATE_LIMIT_AVAILABLE:
         print("\nRate Limiting Active:")

@@ -6,20 +6,20 @@
   <title>Docs & API — SINCOR</title>
   <meta name="description" content="SINCOR product documentation: dashboard, agents, billing, training vault, and A2A API.">
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#0a0e27; --surface:#0f1629; --elev:#161d33; --text:#f1f5f9; --muted:#94a3b8; --cyan:#06b6d4; --purple:#8b5cf6; --ok:#34d399; --border:rgba(139,92,246,.22); }
+    :root { --bg:#0a0c10; --surface:#141a23; --elev:#1a2230; --text:#f1f5f9; --muted:#94a3b8; --gold-bright:#f0c664; --gold:#d4a94e; --ok:#3ddc84; --border:rgba(212,169,78,.22); }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; line-height:1.65; }
-    a { color:var(--cyan); text-decoration:none; }
-    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); background:rgba(10,14,39,.9); border-bottom:1px solid var(--border); }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; line-height:1.65; }
+    a { color:var(--gold-bright); text-decoration:none; }
+    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(12px); background:rgba(10,12,16,.9); border-bottom:1px solid var(--border); }
     .bar { max-width:960px; margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
     .brand { color:var(--text); font-family:'Sora',sans-serif; font-weight:700; }
     nav { display:flex; gap:8px; flex-wrap:wrap; }
     nav a { min-height:40px; padding:8px 12px; border-radius:10px; color:var(--muted); font-weight:600; font-size:13px; }
     nav a:hover { color:var(--text); background:rgba(255,255,255,.05); }
     .wrap { max-width:960px; margin:0 auto; padding:36px 20px 80px; }
-    .kicker { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--cyan); font-weight:700; }
+    .kicker { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-bright); font-weight:700; }
     h1 { font-family:'Sora',sans-serif; font-size:clamp(1.8rem,4vw,2.6rem); letter-spacing:-.03em; margin:8px 0 12px; }
     h2 { font-family:'Sora',sans-serif; font-size:1.25rem; margin:36px 0 12px; }
     p, li { color:var(--muted); }
@@ -31,11 +31,11 @@
     .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px; color:var(--text); }
     .card h3 { font-size:16px; margin-bottom:6px; }
     .card p { font-size:13px; }
-    code, .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); }
-    .callout { background:rgba(6,182,212,.08); border:1px solid rgba(6,182,212,.28); border-radius:12px; padding:16px 18px; margin:20px 0; }
+    code, .mono { font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--gold-bright); }
+    .callout { background:rgba(212,169,78,.08); border:1px solid rgba(212,169,78,.28); border-radius:12px; padding:16px 18px; margin:20px 0; }
     table { width:100%; border-collapse:collapse; margin:12px 0 20px; font-size:14px; }
     th, td { border:1px solid var(--border); padding:10px 12px; text-align:left; }
-    th { background:rgba(139,92,246,.12); color:#c4b5fd; }
+    th { background:rgba(212,169,78,.12); color:#f0c664; }
     footer { text-align:center; padding:28px; color:var(--muted); font-size:13px; border-top:1px solid var(--border); }
   </style>
 </head>
@@ -45,8 +45,8 @@
       <a class="brand" href="/">SINCOR</a>
       <nav>
         <a href="/dashboard">Dashboard</a>
-        <a href="/buy">Plans</a>
-        <a href="/buy">SINC</a>
+        <a href="/pricing">Plans</a>
+        <a href="/products">SINC</a>
         <a href="/contact">Support</a>
       </nav>
     </div>
@@ -87,7 +87,7 @@
     <ul>
       <li><strong>SINC</strong> — monthly subscriptions. Checkout at <a href="/buy">/buy</a>.</li>
       <li><strong>AXM (AXIOM)</strong> — one-off intel and agent-to-agent settlement. See <a href="/axiom">/axiom</a>.</li>
-      <li><strong>Membership</strong> — <a href="/billing">/billing</a> for wallet-linked plan status.</li>
+      <li><strong>Membership</strong> — <a href="/my-orders">/my-orders</a> for your orders and wallet-linked plan status.</li>
     </ul>
 
     <h2 id="api">A2A API</h2>

@@ -70,7 +70,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json"
         ],
@@ -165,7 +165,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,
@@ -240,7 +240,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json"
         ],
@@ -335,7 +335,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,
@@ -412,7 +412,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json",
           "text/plain"
@@ -512,7 +512,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,
@@ -586,7 +586,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json"
         ],
@@ -680,7 +680,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,
@@ -756,7 +756,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json"
         ],
@@ -851,7 +851,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,
@@ -1045,7 +1045,7 @@
         "stateTransitionHistory": true
       },
       "metadata": {
-        "documentationUrl": "https://getsincor.com/docs/api",
+        "documentationUrl": "https://getsincor.com/docs/a2a",
         "defaultInputModes": [
           "application/json"
         ],
@@ -1177,7 +1177,7 @@
             "apiKey": []
           }
         ],
-        "documentationUrl": "https://getsincor.com/docs/api"
+        "documentationUrl": "https://getsincor.com/docs/a2a"
       },
       "sinc_price_per_call": 1,
       "sinc_price_per_minute": 0,

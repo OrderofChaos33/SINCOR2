@@ -1,102 +1,97 @@
-# Fee Conversion Executor — arming runbook
+# Fee Conversion Executor — read-only and dry-run guidance
 
-The executor (`src/sincor2/onchain/fee_conversion_executor.py`) converts
-realized AXM/SINC platform fees to USDC/WETH and forwards the output to the
-treasury. It ships **disarmed** (`armed=False`): planning, quoting, and
-dry-runs work, but `execute_plan` refuses to broadcast until every step below
-is signed off.
+**Live conversion is disabled.** The repository has no canonical release/approval
+contract for chain, allowlists, immutable manifest digest, operator approval,
+expiry, or receipt schema, and the owner decisions do not approve live treasury
+conversion. The legacy `armed` setting and `SINCOR_FEE_EXECUTOR_ARMED` variable
+cannot authorize it. `execute_plan(..., dry_run=False)` fails before invoking a
+signer or receipt callback.
 
-Fee policy (locked 2026-09-26): 5 % platform fee, 100 % to treasury, converted
-to USDC/WETH before deposit, no burn. Deflationary mechanics deferred.
+Planning, unsigned transaction construction, read-only quotes, and explicitly
+requested dry-run simulation remain available. Use only synthetic obligations
+and fake/stubbed RPC and callback dependencies in tests. Do not use a real
+forwarder, signer, wallet, broadcast, custody action, or production provider.
 
-## 0. Prerequisites
+The executor may not be live-enabled by changing configuration or following a
+previous arming procedure. Reconsideration requires a separately reviewed
+canonical authorization interface and explicit owner decisions for capability,
+chain/token/target allowlists, limits, approvers/quorum, and canonical receipt
+ownership.
 
-- A dedicated forwarder EOA. It must hold the realized fee tokens (AXM/SINC)
-  and a small ETH balance for gas. It must NOT be the treasury key and must
-  NOT hold anything else.
-- The forwarder private key lives **only** in the Secure Vault. The executor
-  never reads it; production wires a `sign_and_broadcast` callable that signs
-  through the vault with per-broadcast approval.
-- Base RPC URL with `eth_call` access (no archive needed).
+## CT-01 scope boundary
 
-## 1. Discover and pin the pool keys
+- **Fee conversion:** unconditionally denied by this executor before any
+  signer, receipt, or broadcast callback.
+- **P24:** `onchain/script/07_DeployP24.s.sol` is local simulation only. Its
+  ephemeral addresses are not on-chain deployment evidence and it emits no P24
+  deployment manifest, receipt, or verification claim.
+- **Outside this patch:** other repository deployment scripts and operational
+  workflows have not been reviewed or contained here. **CT-01 is not complete**
+  and this change does not claim repository-wide deployment safety.
 
-The executor never guesses pools. For each route you intend to run
-(`AXM->USDC`, `AXM->WETH`, and later `SINC->USDC`, `SINC->WETH`):
+## Canonical authorization interface (2026-10-14, branch xioix/fee-executor-sepolia-dryrun)
 
-```python
-from sincor2.onchain.fee_conversion_executor import (
-    FeeConversionConfig, FeeConversionExecutor, PoolKey)
+The interface the runbook required now exists: `src/sincor2/onchain/fee_authorization.py`.
 
-cfg = FeeConversionConfig(rpc_url="https://mainnet.base.org",
-                          forwarder="<FORWARDER_ADDRESS>")
-ex = FeeConversionExecutor(cfg)
-pool = ex.discover_pool("AXM", "USDC", probe_wei=10**15)  # read-only
-print(pool)  # e.g. PoolKey(currency0=..., currency1=..., fee=3000, tick_spacing=60, hooks='0x...')
-```
+- `AuthorizationRecord`: capability (`sincor.fee-conversion.v1`), chain
+  allowlist, token-in/out allowlists, treasury target, `max_wei_per_run`,
+  `max_slippage_bps`, `not_before`/`expires_at`, unique `nonce`,
+  approver set + `quorum`, `receipt_owner`.  Addresses normalized; quorum,
+  expiry ordering, and limits validated at construction.
+- Signatures are EIP-191 personal_sign over
+  `keccak256("SINCOR-FEE-AUTH/V1" || canonical_json)`.  Verification is pure
+  (no network, no keys): capability, time window, then quorum of DISTINCT
+  approver signatures.  A Safe-as-approver needs an EIP-1271 extension —
+  documented, not built.
+- `check_plan_scope` enforces the CONCRETE plan (chain, tokens, treasury,
+  amount, slippage) against the record.  `authorized_dry_run` runs
+  verify -> plan -> scope-check -> dry-run simulation -> ledger `authorized`
+  -> manifest.  It takes NO signer/broadcast callback: it cannot broadcast
+  even if called wrong.  `execute_plan(dry_run=False)` still refuses
+  unconditionally.
+- Replay: `authorized_dry_run` requires a caller-owned `used_nonces` journal;
+  the record's nonce must be unique per record and reuse fails closed
+  (AuthorizationError).  Pass a journal the caller persists across runs.
+- Clock: `authorized_dry_run`'s `now` defaults to the wall clock for
+  tests/dry-runs only.  Production callers MUST pass a trusted clock value:
+  the authorization time window (not_before / expires_at) is enforced
+  against it, and a skewed or attacker-controlled clock would widen or
+  bypass the window.
 
-Verify the discovered pool on Basescan (it must be the legitimate AXM/USDC
-V4 pool, not an impersonator): check token addresses, fee tier, and that it
-has real liquidity. Then pin it in config:
+**What this does NOT change:** no owner-signed record exists, no broadcast
+ceremony exists, nothing is armed.  Live conversion remains disabled; the
+interface only makes a future owner decision verifiable.  Tests use
+deterministic synthetic keys; no real key material anywhere.
 
-```python
-cfg.pool_keys[("AXM", "USDC")] = pool
-```
+## Base Sepolia dry-run (2026-10-14, read-only, no broadcast)
 
-Repeat for every route. SINC routes additionally need a liquidity sanity
-check — SINC liquidity is thin and the rogue V2 pool
-(`0x85372932f9b151a076815d92cf71a97980ffd667`) must never be used.
+Script: `scripts/fee_executor_sepolia_dryrun.py`.  Evidence:
+`docs/ops/forksim-evidence/sepolia_dryrun_2026-10-14.json`.  Verdict: `DRY_RUN_OK`.
 
-## 2. Fork-simulate the exact calldata
+- Live chain state via `https://sepolia.base.org` (chain 84532, block 48114000).
+  V4 infra verified present by `eth_getCode`: PoolManager
+  `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`, V4Quoter
+  `0x4a6513c898fe1B2d0E78d3b0e0A4a151589B1cBa`, UniversalRouter
+  `0x492E6456D9528771018DeB9E87ef7750EF184104`, Permit2 (canonical), WETH
+  (predeploy), Circle testnet USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e`.
+  (Sepolia V4 addresses differ from Base mainnet; verified on-chain, not
+  trusted from docs.)
+- `discover_pool` found WETH->USDC 3000/60.  Live quote: 0.01 WETH ->
+  99,697 USDC-wei.  Quote scaling probes confirm the pool holds only ~$0.10
+  of liquidity (dust pool) — sufficient to prove the machinery, useless for
+  real conversions.  **The AXM fee token is not deployed on Sepolia; the AXM
+  leg cannot be quoted there by construction.**
+- Full unsigned-tx plan built (approve_permit2, permit2_approve, swap,
+  forward_to_treasury), all targeting Sepolia addresses with chainId 84532.
+- Authorization verified end-to-end with synthetic quorum keys; tampered
+  record rejected (negative control).
+- Simulations: both approvals passed; the swap simulation failed closed on
+  the unfunded synthetic forwarder — the predicted, designed outcome (no
+  funds moved; none exist).  The swap-execution leg was previously proven on
+  a Base-mainnet fork with a funded forwarder (see FEE_EXECUTOR_FORKSIM_READINESS.md).
 
-1. `plan = ex.plan(obligation_id)` for a real (or synthetic) obligation.
-2. Replay every unsigned tx in `plan["txs"]` against a Base mainnet fork
-   (Anvil/Hardhat) with the forwarder funded and holding the fee tokens.
-3. Confirm: Permit2 approval lands, the `execute()` swap fills within the
-   quoted `amountOutMinimum`, and the forward moves the full output balance
-   to `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`.
-4. Record the fork block number, the tx hashes, and the realized slippage in
-   the PR or ops log that arms the executor.
-
-If the Universal Router build changes upstream, re-run this step before
-re-arming.
-
-See `docs/ops/FEE_EXECUTOR_FORKSIM_READINESS.md` for the Wave 53 fork-sim
-record: executor defects found and fixed (EIP-55 checksums, single-struct V4
-params, Permit2 internal allowance, no-SWEEP), the passing WETH/USDC control
-replay, and the honest `NO_POOL` blocker for AXM routes.
-
-## 3. Dust-amount live test
-
-- Set `min_swap_wei` low, `slippage_bps` to 50 (0.5 %), `target="USDC"`.
-- Record a synthetic obligation for a dust amount of AXM (a few cents).
-- Run `execute_plan(plan, sign_and_broadcast, wait_for_receipt, dry_run=True)`
-  first: every step must simulate clean via `eth_call`.
-- Then run it live. Verify on Basescan: swap tx, output balance, forward tx
-  to the treasury. Confirm the ledger shows `executed` with both tx hashes.
-
-## 4. Arm
-
-Only after steps 1–3 are green:
-
-```python
-cfg.armed = True
-```
-
-Operational notes:
-
-- `slippage_bps` default is 100 (1 %). Lower it for large conversions.
-- `min_swap_wei` should exceed ~2x the expected gas cost in output terms;
-  dust stays queued in the ledger rather than being swapped at a loss.
-- `target` is `"USDC"` by default (treasury stability). `"WETH"` is one
-  flag away; per-obligation override is supported in `plan()`.
-- The ledger (`~/workspace/ops/fee_conversion_ledger.json`) is the audit
-  trail: obligation -> quote -> approve/swap/forward tx hashes -> executed.
-  Back it up; it is append-mostly and tiny.
-- Failure handling: any reverted step marks the obligation `failed` with the
-  reason and stops the plan. Partially completed plans (e.g. swap confirmed,
-  forward reverted) keep their tx history — re-plan the obligation after
-  fixing the cause; already-confirmed steps are not repeated blindly.
-- The Basescan fee watcher (`~/workspace/ops/basescan_fee_watcher.py`)
-  covers AXM transfers into the treasury; extend it to USDC/WETH once the
-  first live conversion lands.
+**Still founder-gated before any real movement:** a real owner-signed
+AuthorizationRecord with real quorum keys; a broadcast ceremony (does not
+exist in this repo); real V4 liquidity for the fee token; reconciliation of
+queued obligations against receipts.  None of these are created or implied
+by this work.

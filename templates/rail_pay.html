@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pay with USDC on Base — SINCOR</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #0b0e14; color: #e8ecf1; margin: 0; padding: 24px; }
+  .card { max-width: 560px; margin: 0 auto; background: #121722; border: 1px solid #232b3d;
+          border-radius: 12px; padding: 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #9aa4b8; font-size: 14px; margin-bottom: 20px; }
+  .amount { font-size: 34px; font-weight: 700; margin: 8px 0; }
+  .meta { font-size: 13px; color: #9aa4b8; word-break: break-all; margin-bottom: 6px; }
+  .meta b { color: #cfd6e4; font-weight: 600; }
+  button { display: block; width: 100%; margin-top: 12px; padding: 13px;
+           font-size: 15px; font-weight: 600; border: 0; border-radius: 8px;
+           background: #2f6df6; color: #fff; cursor: pointer; }
+  button.secondary { background: #1d2433; color: #cfd6e4; border: 1px solid #2c364c; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  #msg { margin-top: 16px; font-size: 14px; min-height: 20px; white-space: pre-wrap;
+         word-break: break-word; }
+  #msg.err { color: #ff9d9d; }
+  #msg.ok { color: #8fe3a8; }
+  .step { margin-top: 18px; padding-top: 16px; border-top: 1px solid #1e2637; }
+  #afterPay ol { margin: 6px 0 0; padding-left: 20px; font-size: 14px;
+                 color: #cfd6e4; line-height: 1.6; }
+  .step h2 { font-size: 14px; margin: 0 0 8px; color: #9aa4b8;
+             text-transform: uppercase; letter-spacing: .06em; }
+  .done { color: #8fe3a8; }
+  #tokenBox { margin-top: 10px; }
+  #tokenBox input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 12px;
+                    background: #0b0e14; color: #cfd6e4; border: 1px solid #2c364c;
+                    border-radius: 8px; }
+  .capture label { display: block; font-size: 13px; color: #9aa4b8; margin-top: 10px; }
+  .capture input, .capture select { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 4px;
+                   font-size: 14px; background: #0b0e14; color: #cfd6e4;
+                   border: 1px solid #2c364c; border-radius: 8px; }
+  #fulfillmentLinks a { display: block; margin-top: 10px; padding: 13px; text-align: center;
+                        font-size: 15px; font-weight: 600; border-radius: 8px;
+                        background: #1d7a3d; color: #fff; text-decoration: none; }
+  #fulfillmentLinks a.secondary { background: #1d2433; color: #cfd6e4;
+                                  border: 1px solid #2c364c; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #2c364c;
+             border-top-color: #2f6df6; border-radius: 50%; animation: spin 1s linear infinite;
+             vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Pay with USDC on Base</h1>
+  <div class="sub">x402 micropayment &mdash; real onchain transfer to the SINCOR treasury.</div>
+
+  <div id="checkoutArea">
+    <div class="spinner" aria-hidden="true"></div> Loading payment details&hellip;
+  </div>
+
+  <div id="payArea" hidden>
+    <div class="amount" id="amountLine"></div>
+    <div class="meta">Merchant <b id="merchantLine"></b></div>
+    <div class="meta">Network <b id="networkLine"></b></div>
+    <div class="meta" id="expiryLine"></div>
+
+    <div class="step">
+      <h2>1 &middot; Connect wallet</h2>
+      <button id="btnConnect" type="button">Connect wallet</button>
+      <div class="meta" id="walletLine"></div>
+    </div>
+
+    <div class="step" id="bindStep" hidden>
+      <h2>2 &middot; Prove wallet ownership</h2>
+      <div class="sub">Sign a free message so the payment can be matched to your wallet.</div>
+      <button id="btnBind" type="button" disabled>Sign ownership message</button>
+    </div>
+
+    <div class="step capture" id="buyerDetailsStep">
+      <h2 id="buyerDetailsHeading">Buyer details (optional)</h2>
+      <div class="sub">Used for delivery and attribution only &mdash; email gets your download / intake link.</div>
+      <div class="sub" id="detailsRequiredNote" hidden>For this pack these details are
+        required before paying &mdash; they open your intake so work can start right away.</div>
+      <label>Email
+        <input id="buyerEmail" name="buyer_email" type="email" autocomplete="email" placeholder="you@example.com">
+      </label>
+      <div id="sharedPackFields" hidden>
+        <label>Business name
+          <input id="businessName" name="business_name" type="text" autocomplete="organization" placeholder="Acme Dental">
+        </label>
+        <label>Contact name
+          <input id="contactName" name="contact_name" type="text" autocomplete="name" placeholder="Your name">
+        </label>
+        <label>Website (or &lsquo;none&rsquo;)
+          <input id="buyerWebsite" name="website_or_none" type="text" placeholder="https://&hellip; or none">
+        </label>
+      </div>
+      <div id="webbuilderFields" hidden>
+        <label>Phone
+          <input id="buyerPhone" name="phone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567">
+        </label>
+        <label>Niche
+          <input id="buyerNiche" name="niche" type="text" placeholder="dental">
+        </label>
+        <label>Territory
+          <input id="buyerTerritory" name="territory" type="text" placeholder="Clinton, IA">
+        </label>
+        <label>What should the site say and do?
+          <input id="buyerPrompt" name="prompt" type="text" placeholder="Online booking, services, reviews">
+        </label>
+      </div>
+      <div id="credentialingFields" hidden>
+        <label>Practice type
+          <input id="practiceType" name="practice_type" type="text" placeholder="dental practice">
+        </label>
+        <label>State
+          <input id="practiceState" name="state" type="text" placeholder="IA">
+        </label>
+        <label>Specialties
+          <input id="specialties" name="specialties" type="text" placeholder="general dentistry, implants">
+        </label>
+        <label>Current payers
+          <input id="currentPayerList" name="current_payer_list" type="text" placeholder="Delta Dental, Cigna">
+        </label>
+      </div>
+      <div id="chromaFields" hidden>
+        <label>Repository or product URL
+          <input id="repoUrl" name="repo_or_product_url" type="text" placeholder="https://github.com/you/product">
+        </label>
+        <label>SBOM format needed
+          <select id="sbomFormat" name="sbom_format_needed">
+            <option value="">Select&hellip;</option>
+            <option value="CycloneDX">CycloneDX</option>
+            <option value="SPDX">SPDX</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </label>
+        <label>Compliance target
+          <input id="complianceTarget" name="compliance_target" type="text" placeholder="SOC 2">
+        </label>
+      </div>
+      <div id="sadasFields" hidden>
+        <label>Goal
+          <input id="sadasGoal" name="goal" type="text">
+        </label>
+        <label>Systems in scope
+          <input id="systemsInScope" name="systems_in_scope" type="text">
+        </label>
+        <label>Success metric
+          <input id="successMetric" name="success_metric" type="text">
+        </label>
+        <label>Timeline
+          <input id="sadasTimeline" name="timeline" type="text">
+        </label>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><span id="payStepNum">2</span> &middot; Pay</h2>
+      <button id="btnPay" type="button" disabled>Pay with USDC</button>
+      <button id="btnOnramp" type="button" class="secondary" hidden>Don&rsquo;t have USDC? Buy with card</button>
+    </div>
+
+    <div id="tokenBox" hidden>
+      <h2>Access token</h2>
+      <input id="tokenField" readonly aria-label="access token">
+    </div>
+
+    <div id="fulfillmentLinks" hidden>
+      <h2>Your fulfillment</h2>
+      <a id="downloadLink" href="#" hidden>Download your pack &rarr;</a>
+      <a id="intakeLink" href="#" class="secondary" hidden>Complete your intake &rarr;</a>
+    </div>
+  </div>
+
+  <div class="step" id="recoverStep">
+    <h2>Already paid?</h2>
+    <div class="sub">If your payment went through but this page closed before
+      your download / intake link appeared, recover your delivery here.
+      You&rsquo;ll sign a free message with the wallet you paid from &mdash;
+      no new payment, and the links are only ever shown to that wallet.</div>
+    <button id="btnRecover" type="button" class="secondary">Recover my delivery</button>
+  </div>
+
+  {% if bootstrap.resource_id in ["rail-pack-credentialing_launch", "rail-pack-chroma_compliance", "rail-pack-sadas_execution"] %}
+  <div class="step" id="afterPay">
+    <h2>What happens after you pay</h2>
+    <ol>
+      <li>You complete the intake form for your pack.</li>
+      <li>The owner reviews your intake.</li>
+      <li>You receive a human-reviewed deliverable prepared from your intake.</li>
+    </ol>
+  </div>
+  {% endif %}
+
+  <div id="msg" role="status"></div>
+</div>
+
+<script type="application/json" id="rail-bootstrap">{{ bootstrap|tojson }}</script>
+<script>
+(function () {
+  "use strict";
+  var boot = JSON.parse(document.getElementById("rail-bootstrap").textContent);
+  var resourceId = boot.resource_id;
+  var onrampConfigured = !!boot.onramp_configured;
+
+  var BASE_CHAIN_ID = 8453;
+  var BASE_CHAIN_HEX = "0x2105"; // Base mainnet
+  var ERC20_TRANSFER_SELECTOR = "a9059cbb";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg"), checkoutArea = $("checkoutArea"), payArea = $("payArea");
+
+  var challenge = null;      // full /rail/checkout response
+  var payment = null;        // challenge.payment
+  var wallet = null;         // connected address
+  var bound = false;         // ownership signature accepted
+  var busy = false;
+
+  function setMsg(text, cls) {
+    msg.textContent = text || "";
+    msg.className = cls || "";
+  }
+  function trunc(addr) {
+    return addr && addr.length > 12 ? addr.slice(0, 6) + "\u2026" + addr.slice(-4) : addr;
+  }
+
+  async function postJSON(url, body) {
+    var r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    var data = null;
+    try { data = await r.json(); } catch (e) { /* non-JSON: fall through */ }
+    if (!r.ok) {
+      // Keep the parsed body on the thrown error: some refusals carry
+      // state the caller can act on (e.g. a 409 challenge_already_bound
+      // flagged bound_to_you is a success state for the bind step, not
+      // a failure — Wren PR 5).
+      var err = new Error(
+        (data && data.error) ? String(data.error) : ("HTTP " + r.status));
+      err.data = data;
+      err.status = r.status;
+      throw err;
+    }
+    return data;
+  }
+
+  // Checkout is special: /rail/checkout answers a successful challenge
+  // mint with HTTP 402 (x402 Payment Required) and the challenge in the
+  // JSON body. That is NOT an error — parse and return the body. Any
+  // other non-2xx keeps postJSON's throw-on-error behavior.
+  async function postCheckoutJSON(url, body) {
+    var r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    var data = null;
+    try { data = await r.json(); } catch (e) { /* non-JSON: fall through */ }
+    if (r.status === 402 && data && (data.payment || data.accepts)) {
+      return data;
+    }
+    if (!r.ok) {
+      var err = (data && data.error) ? String(data.error) : ("HTTP " + r.status);
+      throw new Error(err);
+    }
+    return data;
+  }
+
+  // Map the page's resource id to the checkout payload the server
+  // expects. /rail/pay/<id> is addressed by x402 resource id
+  // (rail-pack-<sku> / rail-sub-<plan>), but /rail/checkout keys packs by
+  // bare SKU (PACK_SKUS.get(raw)) and subscriptions by plan + wallet —
+  // sending the resource id verbatim as pack_sku 400s.
+  function checkoutBody() {
+    if (resourceId.indexOf("rail-sub-") === 0) {
+      var sub = { subscription_plan: resourceId.slice("rail-sub-".length) };
+      if (wallet) sub.payer_wallet = wallet;
+      return sub;
+    }
+    if (resourceId.indexOf("rail-pack-") === 0) {
+      var body = { pack_sku: resourceId.slice("rail-pack-".length) };
+      // Pre-payment intake details ride along when the buyer has
+      // already filled them (the challenge is minted on page load,
+      // before the form — the settle body below is the authoritative
+      // carrier; this keeps a post-connect re-mint consistent).
+      var details = detailValues();
+      for (var k in details) body[k] = details[k];
+      if (wallet) body.payer_wallet = wallet;
+      return body;
+    }
+    return { pack_sku: resourceId };
+  }
+
+  // ---- pre-payment intake details (Wren PR 1) --------------------------
+  // Non-digital packs collect their intake details BEFORE paying: the
+  // Pay button stays disabled until every required field for the SKU
+  // is filled, and the values ride the settle into the intake record.
+  // Field name -> input element id; the shared four apply to every
+  // pack, each SKU adds its own set. Mirrors the server-side allowlist
+  // in sincor2/blueprints/intake.py.
+  var SHARED_DETAIL_IDS = {
+    business_name: "businessName", contact_name: "contactName",
+    contact_email: "buyerEmail", website_or_none: "buyerWebsite"
+  };
+  var SKU_DETAIL_IDS = {
+    credentialing_launch: {
+      practice_type: "practiceType", state: "practiceState",
+      specialties: "specialties", current_payer_list: "currentPayerList"
+    },
+    chroma_compliance: {
+      repo_or_product_url: "repoUrl", sbom_format_needed: "sbomFormat",
+      compliance_target: "complianceTarget"
+    },
+    sadas_execution: {
+      goal: "sadasGoal", systems_in_scope: "systemsInScope",
+      success_metric: "successMetric", timeline: "sadasTimeline"
+    },
+    webbuilder_site: {
+      phone: "buyerPhone", niche: "buyerNiche",
+      territory: "buyerTerritory", prompt: "buyerPrompt"
+    }
+  };
+  var SKU_DETAIL_GROUPS = {
+    credentialing_launch: "credentialingFields",
+    chroma_compliance: "chromaFields",
+    sadas_execution: "sadasFields",
+    webbuilder_site: "webbuilderFields"
+  };
+
+  function packSku() {
+    return resourceId.indexOf("rail-pack-") === 0
+      ? resourceId.slice("rail-pack-".length) : null;
+  }
+
+  function detailFieldMap() {
+    var sku = packSku();
+    if (!sku || !SKU_DETAIL_IDS[sku]) return null;
+    var map = {};
+    var field;
+    for (field in SHARED_DETAIL_IDS) map[field] = SHARED_DETAIL_IDS[field];
+    for (field in SKU_DETAIL_IDS[sku]) map[field] = SKU_DETAIL_IDS[sku][field];
+    return map;
+  }
+
+  function detailValues() {
+    var map = detailFieldMap();
+    var out = {};
+    if (!map) return out;
+    for (var field in map) {
+      var el = $(map[field]);
+      if (el) out[field] = el.value.trim();
+    }
+    return out;
+  }
+
+  function detailsComplete() {
+    if (!detailFieldMap()) return true;
+    var values = detailValues();
+    for (var field in values) {
+      if (!values[field]) return false;
+    }
+    return true;
+  }
+
+  function revealDetailFields() {
+    var sku = packSku();
+    if (!sku || !SKU_DETAIL_IDS[sku]) return;
+    $("sharedPackFields").hidden = false;
+    var group = $(SKU_DETAIL_GROUPS[sku]);
+    if (group) group.hidden = false;
+    $("detailsRequiredNote").hidden = false;
+    $("buyerDetailsHeading").textContent = "Buyer details (required)";
+  }
+
+  function isValidAddress(a) {
+    return typeof a === "string" && /^0x[0-9a-fA-F]{40}$/.test(a) &&
+      a.toLowerCase() !== "0x0000000000000000000000000000000000000000";
+  }
+
+  function provider() { return window.ethereum || null; }
+
+  async function ensureBase() {
+    var eth = provider();
+    var current = await eth.request({ method: "eth_chainId" });
+    if (parseInt(current, 16) === BASE_CHAIN_ID) return;
+    try {
+      await eth.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BASE_CHAIN_HEX }]
+      });
+    } catch (e) {
+      if (e && e.code === 4902) {
+        await eth.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: BASE_CHAIN_HEX,
+            chainName: "Base",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"]
+          }]
+        });
+      } else {
+        throw e;
+      }
+    }
+  }
+
+  function erc20TransferData(to, amountAtomic) {
+    var toHex = to.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+    var amtHex = BigInt(amountAtomic).toString(16).padStart(64, "0");
+    return "0x" + ERC20_TRANSFER_SELECTOR + toHex + amtHex;
+  }
+
+  async function waitForReceipt(eth, txHash) {
+    for (var i = 0; i < 120; i++) {
+      var receipt = await eth.request({
+        method: "eth_getTransactionReceipt", params: [txHash]
+      });
+      if (receipt && receipt.blockNumber) return receipt;
+      await new Promise(function (res) { setTimeout(res, 2000); });
+    }
+    throw new Error("timed out waiting for the transaction receipt; " +
+      "check Basescan for " + txHash + " before retrying");
+  }
+
+  // ---- step 0: fetch the challenge ---------------------------------------
+  async function loadCheckout() {
+    setMsg("");
+    try {
+      challenge = await postCheckoutJSON("/rail/checkout", checkoutBody());
+    } catch (e) {
+      if (String(e.message).indexOf("subscription_wallet_required") !== -1) {
+        // Subscriptions bind the challenge to the buyer's wallet, so the
+        // mint cannot happen before connect: reveal the connect step and
+        // re-mint once a wallet is connected (see the connect handler).
+        checkoutArea.innerHTML = "";
+        payArea.hidden = false;
+        setMsg("Connect your wallet to start the subscription.");
+        return;
+      }
+      checkoutArea.innerHTML = "";
+      setMsg("Could not start the payment: " + e.message, "err");
+      return;
+    }
+    if (!challenge || !challenge.payment || !challenge.challenge_id) {
+      checkoutArea.innerHTML = "";
+      setMsg("Could not start the payment: malformed checkout response", "err");
+      return;
+    }
+    payment = challenge.payment;
+    stashRecovery(challenge.challenge_id, null);
+    var extra = payment.extra || {};
+    $("amountLine").textContent =
+      (extra.amount_display != null ? extra.amount_display : "?") + " " +
+      (extra.token || "USDC");
+    $("merchantLine").textContent = trunc(payment.payTo);
+    var netName = payment.chainId === BASE_CHAIN_ID
+      ? "Base (chain " + payment.chainId + ")"
+      : "chain " + payment.chainId;
+    $("networkLine").textContent = netName;
+    if (challenge.expires_at) {
+      $("expiryLine").innerHTML = "";
+      $("expiryLine").appendChild(document.createTextNode("Challenge expires "));
+      var b = document.createElement("b");
+      b.textContent = new Date(challenge.expires_at).toUTCString();
+      $("expiryLine").appendChild(b);
+    }
+    // Bind step only when the server says ownership proof is required.
+    if (challenge.bind && challenge.bind.bind_url) {
+      $("bindStep").hidden = false;
+      $("payStepNum").textContent = "3";
+    }
+    if (onrampConfigured) $("btnOnramp").hidden = false;
+    checkoutArea.innerHTML = "";
+    payArea.hidden = false;
+  }
+
+  // ---- step 1: connect ----------------------------------------------------
+  $("btnConnect").addEventListener("click", async function () {
+    var eth = provider();
+    if (!eth) {
+      setMsg("No Ethereum wallet found. Install MetaMask or Coinbase Wallet, " +
+        "then reload this page.", "err");
+      return;
+    }
+    setMsg("");
+    try {
+      var accounts = await eth.request({ method: "eth_requestAccounts" });
+      if (!accounts || !accounts.length) throw new Error("no accounts returned");
+      wallet = accounts[0];
+      $("walletLine").textContent = "Connected: " + trunc(wallet);
+      if (!challenge) {
+        // Subscription challenges are wallet-bound and could not be
+        // minted before connect; mint now that the wallet is known.
+        await loadCheckout();
+      }
+      if (challenge) setMsg("Wallet connected.", "ok");
+      refreshButtons();
+    } catch (e) {
+      if (e && e.code === 4001) setMsg("Connection rejected in wallet.", "err");
+      else setMsg("Could not connect wallet: " + (e && e.message || e), "err");
+    }
+  });
+
+  // ---- step 2: ownership bind (only when the challenge requires it) -------
+  $("btnBind").addEventListener("click", async function () {
+    if (!challenge.bind || !challenge.bind.bind_url || !wallet) return;
+    var eth = provider();
+    setMsg("");
+    try {
+      // Canonical bind message (server rebuilds it byte-identically from its
+      // own stored challenge_id / resource_id / wallet).
+      var message = ["SINCOR-X402-CHALLENGE-BIND",
+        challenge.challenge_id,
+        challenge.resource_id || resourceId,
+        wallet.toLowerCase()].join("|");
+      var signature = await eth.request({
+        method: "personal_sign",
+        params: [message, wallet]
+      });
+      var res = await postJSON(challenge.bind.bind_url, {
+        challenge_id: challenge.challenge_id,
+        payer_wallet: wallet,
+        signature: signature
+      });
+      if (res && res.ok === false) throw new Error(res.error || "bind rejected");
+      bound = true;
+      $("btnBind").disabled = true;
+      $("btnBind").textContent = "\u2713 Wallet verified";
+      setMsg("Wallet ownership verified.", "ok");
+    } catch (e) {
+      if (e && e.code === 4001) setMsg("Signature rejected in wallet.", "err");
+      else if (e && e.data && e.data.error === "challenge_already_bound" &&
+               e.data.bound_to_you === true) {
+        // The challenge is already bound to THIS wallet (an earlier
+        // bind whose response never reached the page, or an already
+        // fulfilled challenge): that IS the verified state — treat it
+        // as success instead of "Wallet verification failed" (PR 5).
+        bound = true;
+        $("btnBind").disabled = true;
+        $("btnBind").textContent = "\u2713 Wallet verified";
+        setMsg("Wallet ownership verified.", "ok");
+      }
+      else setMsg("Wallet verification failed: " + (e && e.message || e), "err");
+    }
+    refreshButtons();
+  });
+
+  function needsBind() {
+    return !!(challenge && challenge.bind && challenge.bind.bind_url) && !bound;
+  }
+  function refreshButtons() {
+    var canPay = !!wallet && !needsBind() && !busy && detailsComplete();
+    $("btnPay").disabled = !canPay;
+    $("btnBind").disabled = !(wallet && needsBind() && !busy);
+  }
+
+  // ---- step 3: pay --------------------------------------------------------
+  $("btnPay").addEventListener("click", async function () {
+    if (busy || !wallet || !payment) return;
+    var eth = provider();
+    if (!eth) { setMsg("No Ethereum wallet found.", "err"); return; }
+    busy = true;
+    refreshButtons();
+    setMsg("");
+    try {
+      await ensureBase();
+      // Guard: the transfer recipient is the treasury (payment.payTo),
+      // NEVER the token contract (payment.asset) — tokens sent to the
+      // USDC contract itself are locked there forever. Abort before
+      // eth_sendTransaction if the challenge's addresses look wrong.
+      var recipientSafe = isValidAddress(payment.payTo) &&
+        isValidAddress(payment.asset) &&
+        (payment.payTo.toLowerCase() !== payment.asset.toLowerCase());
+      if (!recipientSafe) {
+        throw new Error("invalid payment addresses in the challenge " +
+          "(payTo must be a valid address distinct from the token contract)");
+      }
+      var data = erc20TransferData(payment.payTo, payment.maxAmountRequired);
+      setMsg("Confirm the USDC transfer in your wallet\u2026");
+      var txHash = await eth.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: wallet,
+          to: payment.asset,
+          data: data,
+          chainId: BASE_CHAIN_HEX
+        }]
+      });
+      stashRecovery(challenge.challenge_id, txHash);
+      setMsg("Transaction sent (" + trunc(txHash) + "). Waiting for confirmation\u2026");
+      await waitForReceipt(eth, txHash);
+      setMsg("Payment confirmed onchain. Finalizing with SINCOR\u2026");
+      var settleBody = {
+        challenge_id: challenge.challenge_id,
+        tx_hash: txHash,
+        payer_wallet: wallet,
+        buyer_email: $("buyerEmail").value.trim(),
+        business_name: $("businessName").value.trim(),
+        niche: $("buyerNiche").value.trim(),
+        phone: $("buyerPhone").value.trim()
+      };
+      // The full pre-payment intake detail set rides the settle into
+      // the intake record (detailValues covers the shared four plus
+      // this SKU's fields; empty for non-pack resources).
+      var dv = detailValues();
+      for (var dk in dv) settleBody[dk] = dv[dk];
+      var settle = await postJSON("/rail/settle", settleBody);
+      if (settle && settle.ok) {
+        setMsg("Payment complete.", "ok");
+        $("btnPay").disabled = true;
+        $("btnPay").textContent = "\u2713 Paid";
+        renderFulfillment(settle);
+      } else {
+        throw new Error((settle && settle.error) || "settle rejected the payment");
+      }
+    } catch (e) {
+      // User rejection: surface once, never retry-spam.
+      if (e && e.code === 4001) setMsg("Transaction rejected in wallet.", "err");
+      else setMsg("Payment failed: " + (e && e.message || e), "err");
+    }
+    busy = false;
+    refreshButtons();
+  });
+
+  // ---- onramp --------------------------------------------------------------
+  $("btnOnramp").addEventListener("click", async function () {
+    setMsg("");
+    try {
+      var params = new URLSearchParams();
+      var extra = (payment && payment.extra) || {};
+      if (extra.amount_display != null) params.set("amount_usd", extra.amount_display);
+      if (wallet) params.set("destination_address", wallet);
+      var r = await fetch("/rail/onramp?" + params.toString());
+      var data = await r.json();
+      if (!r.ok || !data.ok) {
+        throw new Error((data && data.error) || ("HTTP " + r.status));
+      }
+      window.location.href = data.url;
+    } catch (e) {
+      setMsg("Card purchase unavailable: " + (e && e.message || e), "err");
+    }
+  });
+
+  // ---- fulfillment rendering (shared by Pay and Recover) -------------
+  // Completion-screen token + links, from a settle response's
+  // fulfillment object (digital packs carry a token-gated
+  // download_url; B2B packs carry an intake_url).
+  function renderFulfillment(settle) {
+    if (settle.access_token) {
+      $("tokenBox").hidden = false;
+      $("tokenField").value = settle.access_token;
+    }
+    var fulfillment = settle.fulfillment || {};
+    var hasLink = false;
+    if (fulfillment.download_url) {
+      var dl = $("downloadLink");
+      dl.href = fulfillment.download_url;
+      dl.hidden = false;
+      hasLink = true;
+    }
+    if (fulfillment.intake_url) {
+      var il = $("intakeLink");
+      il.href = fulfillment.intake_url;
+      il.hidden = false;
+      hasLink = true;
+    }
+    if (hasLink) $("fulfillmentLinks").hidden = false;
+    return hasLink;
+  }
+
+  // ---- delivery recovery (Wren PR 2) -----------------------------------
+  // If the buyer's session drops after the onchain payment but before
+  // the fulfillment links render, the order is fulfilled server-side
+  // with nobody holding the token-gated links. The settle endpoint's
+  // duplicate/retry paths are payer-gated (W-115): the links are
+  // re-issued ONLY to a caller who proves control of the recorded
+  // payer wallet with the W-103 EIP-191 replay signature
+  // (personal_sign of build_replay_message(challenge_id, ts_ms)).
+  // The pay flow stashes challenge_id + tx_hash in sessionStorage so a
+  // dropped session in the SAME browser can recover here; support can
+  // also hand the buyer this page's URL with ?challenge_id=..&tx_hash=..
+  var RECOVERY_CHALLENGE_KEY = "sincor_rail_challenge_id";
+  var RECOVERY_TX_KEY = "sincor_rail_tx_hash";
+
+  function stashRecovery(challengeId, txHash) {
+    try {
+      if (challengeId) {
+        sessionStorage.setItem(RECOVERY_CHALLENGE_KEY, challengeId);
+      }
+      if (txHash) sessionStorage.setItem(RECOVERY_TX_KEY, txHash);
+    } catch (e) { /* storage unavailable: recovery via URL params only */ }
+  }
+
+  function recoveryIds() {
+    var params = new URLSearchParams(window.location.search);
+    var cid = params.get("challenge_id");
+    var tx = params.get("tx_hash");
+    try {
+      if (!cid) cid = sessionStorage.getItem(RECOVERY_CHALLENGE_KEY);
+      if (!tx) tx = sessionStorage.getItem(RECOVERY_TX_KEY);
+    } catch (e) { /* fall through with whatever the URL carried */ }
+    return { challenge_id: cid || "", tx_hash: tx || "" };
+  }
+
+  $("btnRecover").addEventListener("click", async function () {
+    if (busy) return;
+    var eth = provider();
+    if (!eth) {
+      setMsg("No Ethereum wallet found. Install MetaMask or Coinbase Wallet, " +
+        "then reload this page.", "err");
+      return;
+    }
+    var ids = recoveryIds();
+    if (!ids.challenge_id || !ids.tx_hash) {
+      setMsg("No earlier payment was found for this browser. Recovery needs " +
+        "the challenge and transaction from your purchase: reopen this page " +
+        "in the browser you paid with, or use the recovery link from your " +
+        "delivery email.", "err");
+      return;
+    }
+    busy = true;
+    setMsg("");
+    try {
+      if (!wallet) {
+        var accounts = await eth.request({ method: "eth_requestAccounts" });
+        if (!accounts || !accounts.length) throw new Error("no accounts returned");
+        wallet = accounts[0];
+        $("walletLine").textContent = "Connected: " + trunc(wallet);
+      }
+      // The server stamps the canonical replay message (and its
+      // timestamp) so the signature below binds exactly what the
+      // settle will check.
+      var hr = await fetch("/rail/replay-message?challenge_id=" +
+        encodeURIComponent(ids.challenge_id));
+      var hint = null;
+      try { hint = await hr.json(); } catch (e) { /* non-JSON: fall through */ }
+      if (!hr.ok || !hint || !hint.ok) {
+        throw new Error((hint && hint.error) || ("HTTP " + hr.status));
+      }
+      setMsg("Sign the free recovery message in your wallet\u2026");
+      var signature = await eth.request({
+        method: "personal_sign",
+        params: [hint.replay_message, wallet]
+      });
+      setMsg("Verifying your signature\u2026");
+      var settle = await postJSON("/rail/settle", {
+        challenge_id: ids.challenge_id,
+        tx_hash: ids.tx_hash,
+        payer_wallet: wallet,
+        replay_signature: signature,
+        replay_ts_ms: hint.replay_ts_ms
+      });
+      var fulfillment = (settle && settle.fulfillment) || {};
+      if (settle && settle.ok &&
+          (fulfillment.download_url || fulfillment.intake_url)) {
+        renderFulfillment(settle);
+        setMsg("Delivery recovered \u2014 your links are above.", "ok");
+      } else if (settle && settle.status === "already_fulfilled") {
+        // Status-only ack: the signature did not prove the payer
+        // wallet (the server never reveals links without that proof).
+        setMsg("That signature did not match the wallet that paid for this " +
+          "order. Connect the wallet you paid with and try again.", "err");
+      } else {
+        throw new Error((settle && settle.error) || "recovery rejected");
+      }
+    } catch (e) {
+      if (e && e.code === 4001) setMsg("Signature rejected in wallet.", "err");
+      else if (e && e.message === "payer_proof_required") {
+        setMsg("That signature did not match the wallet that paid for this " +
+          "order. Connect the wallet you paid with and try again.", "err");
+      } else {
+        setMsg("Recovery failed: " + (e && e.message || e), "err");
+      }
+    }
+    busy = false;
+    refreshButtons();
+  });
+
+  // ---- detail fields: reveal per-SKU groups + live Pay gating --------
+  revealDetailFields();
+  var detailInputs = document.querySelectorAll(
+    "#buyerDetailsStep input, #buyerDetailsStep select");
+  for (var di = 0; di < detailInputs.length; di++) {
+    detailInputs[di].addEventListener("input", refreshButtons);
+    detailInputs[di].addEventListener("change", refreshButtons);
+  }
+
+  loadCheckout();
+})();
+</script>
+</body>
+</html>

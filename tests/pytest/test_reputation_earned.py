@@ -15,7 +15,7 @@ still rewards reputation — but only earned.
 
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 import pytest
 from eth_account import Account
@@ -70,8 +70,9 @@ _REGISTER_KEYS = {}
 
 def _register(client, agent_id, **extra):
     # Each test agent gets a real key: first registration uses its address
-    # as the wallet; re-registration is proof-gated (G2.2), so the helper
-    # attaches an EIP-191 signature by the registered wallet.
+    # as the wallet with a valid EIP-191 proof (C3 fail-closed); 
+    # re-registration is proof-gated (G2.2), so the helper attaches an
+    # EIP-191 signature by the registered wallet.
     key = _REGISTER_KEYS.setdefault(agent_id, Account.create())
     body = {
         "agent_id": agent_id,
@@ -87,6 +88,14 @@ def _register(client, agent_id, **extra):
         sig = key.sign_message(encode_defunct(text=message)).signature
         body["registration_ts"] = ts
         body["registration_signature"] = "0x" + bytes(sig).hex()
+    else:
+        from sincor2.a2a_identity import register_message
+        ts = _now_ms()
+        message = register_message(agent_id, ts)
+        sig = key.sign_message(encode_defunct(text=message)).signature
+        body["registration_wallet"] = key.address
+        body["registration_ts"] = ts
+        body["registration_signature"] = "0x" + bytes(sig).hex()
     r = client.post("/v1/a2a/register", json=body)
     assert r.status_code in (200, 201), r.get_json()
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
@@ -95,10 +104,15 @@ def _register(client, agent_id, **extra):
 
 
 def _sealed_task(client, poster_id="poster-p"):
+    # Signed: the anti-gaming guards reject bids on anonymous (unsigned)
+    # bounty tasks; client-supplied poster_id is ignored server-side, so
+    # bind the poster with a real EIP-191 signature instead.
+    skill = "lead-enrichment"
     r = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"],
-              "bounty_axm": BOUNTY, "sealed": True, "poster_id": poster_id},
+        json={"skill": skill, "tags": ["lead-enrichment"],
+              "bounty_axm": BOUNTY, "sealed": True,
+              **signed_task_auth(skill)},
     )
     assert r.status_code == 201, r.get_json()
     return r.get_json()["task_id"]
@@ -111,10 +125,25 @@ def _commitment(bid_axm, nonce_hex, agent_id):
 
 
 def _commit(client, task_id, agent_id, bid_axm=1.0, nonce_hex="aa" * 32):
+    # W-77: bids bind to the agent's registered wallet (keys in _REGISTER_KEYS).
+    from bid_testkit import signed_commit_body, signed_reveal_body
     return client.post(
         "/v1/a2a/bids/commit",
-        json={"task_id": task_id, "agent_id": agent_id,
-              "commitment": _commitment(bid_axm, nonce_hex, agent_id)},
+        json=signed_commit_body(
+            _REGISTER_KEYS[agent_id], task_id, agent_id,
+            _commitment(bid_axm, nonce_hex, agent_id)),
+    )
+
+
+def _reveal(client, task_id, agent_id, bid_axm=1.0, nonce_hex="aa" * 32,
+            est=300):
+    # W-77: reveals bind to the agent's registered wallet too.
+    from bid_testkit import signed_reveal_body
+    return client.post(
+        "/v1/a2a/bids/reveal",
+        json=signed_reveal_body(
+            _REGISTER_KEYS[agent_id], task_id, agent_id,
+            bid_axm, nonce_hex, est),
     )
 
 
@@ -140,9 +169,7 @@ def _run_auction_to_winner(client, agent_id="winner-a"):
     r = _commit(client, task_id, agent_id)
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    r = client.post("/v1/a2a/bids/reveal", json={
-        "task_id": task_id, "agent_id": agent_id, "bid_axm": 1.0,
-        "nonce": "aa" * 32, "estimated_seconds": 300})
+    r = _reveal(client, task_id, agent_id)
     assert r.status_code == 201, r.get_json()
     get_fabric().tasks[task_id]["reveal_deadline"] = _now_ms() - 1
     r = client.post(f"/v1/a2a/tasks/{task_id}/close")
@@ -159,7 +186,7 @@ def test_registration_ignores_declared_reputation(client):
     r = client.post("/v1/a2a/register", json={
         "agent_id": "evil-1", "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://evil.example/rpc",
-        "wallet": "0x" + "22" * 20, "reputation": 1.0})
+        "reputation": 1.0})
     assert r.status_code in (200, 201), r.get_json()
     agent = get_fabric().agents["evil-1"]
     assert agent["reputation"] == 0.0
@@ -177,7 +204,7 @@ def test_platform_agent_id_reserved_over_http(client):
     r = client.post("/v1/a2a/register", json={
         "agent_id": PLATFORM_AGENT_ID, "capability_tags": ["x"],
         "rpc_callback": "https://evil.example/rpc",
-        "wallet": "0x" + "33" * 20, "reputation": 1.0})
+        "reputation": 1.0})
     assert r.status_code == 400, r.get_json()
     after = get_fabric().agents[PLATFORM_AGENT_ID]
     assert after["wallet"] == before["wallet"]
@@ -236,9 +263,7 @@ def test_ghosting_resets_reputation_to_zero(client):
     assert _commit(client, task_id, "ghost-1", nonce_hex="aa" * 32).status_code == 201
     assert _commit(client, task_id, "winner-1", nonce_hex="bb" * 32).status_code == 201
     fabric.tasks[task_id]["commit_deadline"] = _now_ms() - 1000
-    r = client.post("/v1/a2a/bids/reveal", json={
-        "task_id": task_id, "agent_id": "winner-1", "bid_axm": 1.0,
-        "nonce": "bb" * 32, "estimated_seconds": 300})
+    r = _reveal(client, task_id, "winner-1", nonce_hex="bb" * 32)
     assert r.status_code == 201, r.get_json()
     fabric.tasks[task_id]["reveal_deadline"] = _now_ms() - 1
     r = client.post(f"/v1/a2a/tasks/{task_id}/close")

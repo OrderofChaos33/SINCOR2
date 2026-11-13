@@ -40,6 +40,8 @@ def standing_order() -> dict:
         "lifted_at": HOLD_LIFTED_AT,
         "treasury": TREASURY,
         "H1_platform_fee_bps": PLATFORM_FEE_BPS,
+        "H2_morpho_pct": MORPHO_ALLOCATION_PCT,
+        "H4_vault_before_conversion_pct": VAULT_INTAKE_PCT_BEFORE_CONVERSION,
         "H7_execute_live_default": EXECUTE_LIVE_DEFAULT,
         "axm_settlement_live": AXM_SETTLEMENT_AUTHORIZED_LIVE,
         "polyclaw_authorized_live": POLYCLAW_AUTHORIZED_LIVE,

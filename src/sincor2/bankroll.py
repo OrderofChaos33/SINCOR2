@@ -132,11 +132,16 @@ class Bankroll:
                 )
                 return
             closed = self.clear_open_dry_runs()
-            if self.kill_switch_active():
-                self.clear_kill_switch()
+            # W-104: a tripped kill switch is NEVER cleared automatically.
+            # The documented contract is "blocks every order until manually
+            # cleared" — a restart must not silently undo the operator's
+            # halt. Stuck dry-run exposure is still recovered above; trading
+            # resumes only via the manual clear (monitoring endpoint).
             logger.info(
-                "auto-cleared %d stuck dry-run trades (exposure $%.2f → available restored)",
+                "auto-cleared %d stuck dry-run trades (exposure $%.2f → available restored); "
+                "kill switch left %s — clear it manually when ready",
                 closed, exp,
+                "TRIPPED" if self.kill_switch_active() else "clear",
             )
         except Exception as exc:
             logger.warning("auto-clear dry-runs failed: %s", exc)

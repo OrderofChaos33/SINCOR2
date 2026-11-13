@@ -73,13 +73,16 @@ def sla_sub():
 @kya_stack_bp.post("/v1/sla/ping")
 def sla_ping():
     body = request.get_json(silent=True) or {}
-    return jsonify(
-        get_sla().ping(
-            str(body.get("kya_id") or ""),
-            ok=bool(body.get("ok", True)),
-            latency_ms=int(body.get("latency_ms") or 0),
+    try:
+        return jsonify(
+            get_sla().ping(
+                str(body.get("kya_id") or ""),
+                ok=bool(body.get("ok", True)),
+                latency_ms=int(body.get("latency_ms") or 0),
+            )
         )
-    )
+    except KeyError:
+        return jsonify({"error": "not subscribed"}), 404
 
 
 @kya_stack_bp.get("/v1/sla/receipts")

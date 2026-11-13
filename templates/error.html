@@ -1,34 +1,109 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ code }} - {{ title }} | SINCOR</title>
-    <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        body { background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #0c0c0c 100%); }
-        .glass { background: rgba(255,255,255,0.05); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        :root {
+            --bg: #0a0c10;
+            --bg-card: #141a23;
+            --line: rgba(255, 255, 255, 0.08);
+            --gold: #d4a94e;
+            --gold-bright: #f0c664;
+            --text: #f2f4f8;
+            --text-dim: #a7b0bf;
+            --text-faint: #6b7484;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+            padding: 48px 40px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+        }
+        .brand img {
+            height: 72px;
+            width: auto;
+            background: #000;
+            border-radius: 10px;
+            border: 1px solid rgba(212, 169, 78, 0.4);
+            box-shadow: 0 0 20px rgba(212, 169, 78, 0.22);
+        }
+        .code {
+            font-family: 'Sora', 'Inter', sans-serif;
+            font-size: 88px;
+            font-weight: 800;
+            line-height: 1;
+            margin: 28px 0 12px;
+            background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        h1 {
+            font-family: 'Sora', 'Inter', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .message { color: var(--text-dim); line-height: 1.65; margin-bottom: 32px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+        .btn {
+            display: inline-block;
+            padding: 13px 26px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 15px;
+            text-decoration: none;
+            border: 1px solid transparent;
+        }
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+            color: #14100a;
+            box-shadow: 0 8px 24px rgba(212, 169, 78, 0.28);
+        }
+        .btn-outline {
+            background: transparent;
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.14);
+        }
+        .btn-outline:hover { border-color: var(--gold); color: var(--gold-bright); }
+        .support { color: var(--text-faint); font-size: 14px; margin-top: 32px; }
+        .support a { color: var(--gold-bright); text-decoration: none; font-weight: 600; }
+        .support a:hover { text-decoration: underline; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center text-white p-6">
-    <div class="glass rounded-3xl p-12 max-w-lg w-full text-center">
-        <div class="text-8xl font-black mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            {{ code }}
+<body>
+    <main class="card">
+        <a class="brand" href="/"><img src="/static/sincor_hornet_logo.jpg" alt="SINCOR Business Solutions"></a>
+        <div class="code">{{ code }}</div>
+        <h1>{{ title }}</h1>
+        <p class="message">{{ message }}</p>
+        <div class="actions">
+            <a href="/" class="btn btn-gold">Go Home</a>
+            <a href="/products" class="btn btn-outline">Browse Products</a>
         </div>
-        <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
-        <p class="text-gray-400 mb-8 leading-relaxed">{{ message }}</p>
-        <div class="flex flex-col sm:flex-row gap-3 justify-center">
-            <a href="/" class="bg-gradient-to-r from-purple-600 to-blue-500 px-8 py-3 rounded-xl font-bold hover:opacity-90 transition">
-                Go Home
-            </a>
-            <a href="/buy" class="glass px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition border border-white/20">
-                Browse Products
-            </a>
-        </div>
-        <p class="text-gray-600 text-sm mt-8">Need help? <a href="mailto:support@getsincor.com" class="text-purple-400 hover:underline">support@getsincor.com</a></p>
-    </div>
+        <p class="support">Need help? <a href="mailto:support@getsincor.com">support@getsincor.com</a></p>
+    </main>
 </body>
 </html>

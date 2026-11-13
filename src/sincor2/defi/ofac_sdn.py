@@ -10,9 +10,9 @@ Snapshot schema (``src/sincor2/defi/data/p20_ofac_sdn.json``)::
     {
       "source": "OFAC SDN List",
       "source_url": "https://www.treasury.gov/ofac/downloads/sdn.xml",
-      "publication_date": "2026-09-23",      # from publshInformation
-      "record_count": 19391,                 # from publshInformation
-      "fetched_at": "2026-09-29T16:30:00+00:00",
+      "publication_date": "2026-10-01",      # from publshInformation
+      "record_count": 19483,                 # from publshInformation
+      "fetched_at": "2026-10-01T21:57:58+00:00",
       "entries": [
         {"uid": "36", "name": "AEROCARIBBEAN AIRLINES", "type": "Entity",
          "programs": ["CUBA"], "aliases": ["AERO CARIBBEAN"],

@@ -109,6 +109,20 @@ def _topic_address(addr: str) -> str:
     return "0x" + addr.lower().replace("0x", "").rjust(64, "0")
 
 
+def _ck(addr: str) -> str:
+    """Checksum-normalize an address (mirrors fee_conversion_executor._ck).
+
+    web3.py v8 validates EIP-55 checksums on every address in RPC params
+    before any network I/O, and in-repo constants / env values are not
+    guaranteed checksummed (AXIOM_TOKEN is lowercase).  Normalize at the
+    RPC boundary; idempotent on already-checksummed input.  Raises on
+    malformed input, which run_once() turns into a fail-closed cycle.
+    """
+    from web3 import Web3
+
+    return Web3.to_checksum_address(addr)
+
+
 def _hex(value: Any) -> str:
     if value is None:
         return ""
@@ -263,8 +277,12 @@ class FeeEventListener:
         """
         if to_block < from_block:
             return []
-        recipient_topic = _topic_address(self.config.fee_recipient)
-        token = self.config.token
+        # RPC boundary: web3.py v8 rejects non-checksum addresses, so the
+        # token and the fee recipient are normalized here regardless of
+        # how they were configured (in-repo constant, env, or caller).
+        token = _ck(self.config.token)
+        recipient = _ck(self.config.fee_recipient)
+        recipient_topic = _topic_address(recipient)
         logs = w3.eth.get_logs(
             {
                 "fromBlock": from_block,
@@ -275,13 +293,13 @@ class FeeEventListener:
         )
         events: List[Dict[str, Any]] = []
         for log in logs:
-            parsed = self._parse_log(log, token, recipient_topic)
+            parsed = self._parse_log(log, token, recipient_topic, recipient)
             if parsed is not None:
                 events.append(parsed)
         return events
 
     def _parse_log(
-        self, log: Any, token: str, recipient_topic: str
+        self, log: Any, token: str, recipient_topic: str, recipient: str = ""
     ) -> Optional[Dict[str, Any]]:
         get = (lambda k: log[k]) if isinstance(log, dict) else (lambda k: getattr(log, k))
         try:
@@ -314,7 +332,7 @@ class FeeEventListener:
             "block_hash": _hex(get("blockHash")),
             "log_index": log_index,
             "from": from_addr,
-            "to": self.config.fee_recipient,
+            "to": recipient or self.config.fee_recipient,
             "value_wei": value_wei,
             "token": token,
         }

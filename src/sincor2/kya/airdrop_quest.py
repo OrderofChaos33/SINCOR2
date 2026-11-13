@@ -34,6 +34,39 @@ def _now() -> int:
     return int(time.time())
 
 
+def _claim_window() -> tuple[Optional[int], Optional[int]]:
+    """Optional claim window from env, read at call time (no caching).
+
+    KYA_QUEST_START_TS / KYA_QUEST_END_TS are unix seconds; unset (or empty
+    or unparsable) means that bound is open. Read fresh on every call so
+    ops can set or change the window without restarting the process.
+    """
+
+    def _parse(name: str) -> Optional[int]:
+        raw = os.environ.get(name, "").strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    return _parse("KYA_QUEST_START_TS"), _parse("KYA_QUEST_END_TS")
+
+
+def _window_open(now: int, start: Optional[int], end: Optional[int]) -> bool:
+    return (start is None or now >= start) and (end is None or now <= end)
+
+
+def _assert_claim_window_open(now: int) -> None:
+    """Fail fast and cheap: runs FIRST in claim(), before the identity lookup."""
+    start, end = _claim_window()
+    if start is not None and now < start:
+        raise PermissionError("quest not open")
+    if end is not None and now > end:
+        raise PermissionError("quest closed")
+
+
 def _manifest_path() -> Path:
     override = os.environ.get("KYA_AIRDROP_MANIFEST", "").strip()
     if override:
@@ -197,6 +230,12 @@ class AirdropQuest:
         agent_id: str,
         proof: Optional[Sequence[str]] = None,
     ) -> Dict[str, Any]:
+        # Order: window check FIRST (before _identity() and any merkle/proof
+        # work), then identity/KYA verification, then root binding, then
+        # merkle eligibility. Window check is cheap and fail-fast.
+        now = _now()
+        _assert_claim_window_open(now)
+
         wallet = (wallet or "").strip().lower()
         rec = _identity(agent_id)
         if not rec:
@@ -237,6 +276,8 @@ class AirdropQuest:
     def stats(self) -> Dict[str, Any]:
         with self.lock:
             claimed = len(self.claims)
+            start, end = _claim_window()
+            now = _now()
             return {
                 "eligible": self.count,
                 "claimed": claimed,
@@ -249,6 +290,11 @@ class AirdropQuest:
                 "chain_id": CHAIN_ID,
                 "replica": self._is_replica(),
                 "bound_root": _committed_root() or None,
+                "window": {
+                    "start": start,
+                    "end": end,
+                    "open": _window_open(now, start, end),
+                },
             }
 
 

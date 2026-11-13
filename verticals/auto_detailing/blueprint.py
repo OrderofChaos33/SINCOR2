@@ -32,7 +32,15 @@ from .config import (
 from .pipeline import health_payload, run_pipeline
 from .protocols import PACKAGES
 from .seed import ensure_demo
-from .send_gate import approve, edit, enqueue, kill
+from .send_gate import (
+    APPROVED_DRY_RUN,
+    NOT_SENT,
+    SENT,
+    approve,
+    edit,
+    enqueue,
+    kill,
+)
 from .store import get_store
 
 bp = Blueprint(
@@ -474,10 +482,14 @@ def outreach():
 def outreach_approve(item_id: str):
     try:
         result = approve(item_id, store=_store())
-        if result["status"] == "approved_dry_run":
+        if result["status"] == APPROVED_DRY_RUN:
             flash("Approved — held. Flip CHROMA_LIVE_SEND to actually send.", "ok")
+        elif result["status"] == SENT:
+            flash("Approved and sent.", "ok")
+        elif result["status"] == NOT_SENT:
+            flash("Approved but NOT sent — no provider wired (log-only).", "warning")
         else:
-            flash("Approved and logged as sent.", "ok")
+            flash("Approved, but delivery failed.", "error")
     except ValueError as exc:
         flash(str(exc), "error")
     return redirect(url_for("chroma.outreach"))

@@ -1,6 +1,35 @@
-"""A2A task auctions, bids, proofs. Mounted from a2a_inbound_ext.mount."""
+"""A2A task auctions, bids, proofs. Mounted from a2a_inbound_ext.mount.
+
+Admin credential surface (G2.13 — single unified credential)
+------------------------------------------------------------
+Every admin-gated route in the A2A surface uses ONE credential: the
+operator's ``ADMIN_PASSWORD`` environment variable, presented ONLY via
+the ``X-Admin-Key`` request header. Credentials are never accepted in
+request bodies and the expected value is never logged. An unset
+``ADMIN_PASSWORD`` disables the admin surface (deny-by-default: 503).
+
+Routes gated by ``_require_pool_admin`` (this module):
+* ``DELETE /v1/a2a/tasks/<task_id>`` — task-board admin delete (also
+  releases pool allocations; release failures surface, G2.12)
+* ``POST /v1/a2a/pool/fund`` / ``/v1/a2a/pool/allocate`` /
+  ``/v1/a2a/pool/release`` — bounty-pool writes
+* ``GET /v1/a2a/pool`` — public status, intentionally unauthenticated
+
+Routes gated by ``sponsored_stake._admin_key_ok`` (same credential):
+* ``POST /v1/a2a/admin/sponsored-stake``,
+  ``GET /v1/a2a/admin/sponsored-stake/<agent_id>``
+* ``POST /v1/a2a/admin/recovery/sponsor``,
+  ``GET /v1/a2a/admin/recovery/status`` (recovery.py)
+
+Error contract (G2.11): JSON errorhandlers are registered on the
+``a2a_inbound`` blueprint at mount time (see ``a2a_errors``), so every
+error is a ``{"error", "status"}`` JSON envelope — never an HTML page.
+Numeric query params (``page``/``per_page``/``min_bounty``) are validated
+to 400 JSON on garbage input.
+"""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -27,12 +56,31 @@ from sincor2.a2a_inbound import (
     _apply_reputation,
     get_fabric,
 )
+from sincor2.a2a_rate_limits import (
+    STREAM_IDLE_TIMEOUT_S,
+    STREAM_KEEPALIVE_S,
+    STREAM_MAX_PER_CALLER,
+    check_stream_auth,
+)
 from sincor2.a2a_timeouts import assignment_deadline_ms
 from sincor2.a2a_idempotency import idempotent
+from sincor2.dispute_evidence import (
+    DisputeEvidence,
+    build_evidence,
+    evidence_to_dict,
+    validate_dispute_evidence,
+    verify_content_binding_sig,
+)
 # Grandfathered plaintext scoring for non-sealed tasks (pre-shim clients).
 # Canonical money path is marketplace.contract_net — see
 # docs/architecture/CANONICAL_PATHS.md §1.
-from sincor2.contract_net import calculate_bid_score, stage_payout
+from sincor2.contract_net import calculate_bid_score, payout_broadcast_status, stage_payout
+from sincor2.sig_canonical import require_low_s
+
+# Anti-gaming guards for the AXM Activity Engine loop (Stream B):
+# self-bid rejection, participation rate limits, and anti-collusion
+# rotation caps. All checks fail closed (PermissionError -> HTTP 403).
+from sincor2 import axm_antigaming
 
 logger = logging.getLogger("sincor.a2a.inbound")
 
@@ -87,6 +135,25 @@ COMMIT_WINDOW_MS = _sealed_window_ms(
 REVEAL_WINDOW_MS = _sealed_window_ms(
     "SINCOR_SEALED_REVEAL_WINDOW_MS", 5 * 60 * 1000)
 UINT96_MAX = 2**96 - 1
+
+
+# --- Hunt-15 W-78: per-agent open-escrow concentration cap ----------------------
+# A fully veteran agent's reputation discount (COLLATERAL_ALPHA = 0.8 in
+# onchain/stake_ledger.py) cuts effective collateral to ~10 % of bid value,
+# so without a cap one veteran could hold UNBOUNDED simultaneous winning
+# escrows.  The cap is an ABSOLUTE aggregate (AXM) over the agent's OPEN
+# winning escrows and binds at WIN / escrow-open time (close_auction), never
+# at bid commit: bidding breadth stays unlimited, only realized exposure is
+# bounded.  Governance-tunable: change this number; do NOT touch the
+# reputation-discount parameter or any slash math.
+MAX_AGENT_OPEN_ESCROW_AXM = 50.0
+
+# Task states in which the winner's escrow counts as open.  `settled` and
+# `expired` are terminal (lock released or obligation dead).  `failed`
+# counts only while the winner's stake lock is still held — see
+# _open_escrows_locked: a failed task whose lock was slashed or released by
+# adjudication no longer encumbers capital and drops out.
+_OPEN_ESCROW_STATES = frozenset({"assigned", "proof_submitted", "failed"})
 
 
 def listing_ttl_ms() -> int:
@@ -187,18 +254,61 @@ def _dispute_message(task_id: str, agent_id: str, upheld: bool,
     ])
 
 
-def _recover_dispute_signer(message: str, signature: str) -> str:
-    """Recover the signer address of a dispute authorization (EIP-191)."""
+def _recover_eip191(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 personal signature."""
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except Exception as exc:
         raise ValueError("signature verification unavailable") from exc
     try:
+        require_low_s(signature)
         return str(Account.recover_message(
             encode_defunct(text=message), signature=signature))
     except Exception as exc:
         raise ValueError("bad signature") from exc
+
+
+# Alias kept for the dispute route's historical name.
+_recover_dispute_signer = _recover_eip191
+
+
+# Stake-deposit identity binding -------------------------------------------
+#
+# POST /v1/a2a/stake/deposit is fail-closed: the deposit must carry an
+# EIP-191 signature over stake_deposit_message() produced by the wallet
+# registered on the agent record. The canonical message is built ONLY from
+# server-side values (registered wallet, parsed amount, agent_id, expiry),
+# so a caller cannot substitute a different wallet, amount, or agent into
+# a signature obtained elsewhere. Consumed signatures are recorded on the
+# deposit event (stake_ledger.signature_hash) and rejected on replay, so
+# each authorization credits stake exactly once inside the expiry window.
+STAKE_DEPOSIT_MAX_SKEW_MS = DISPUTE_MAX_SKEW_MS  # 15 minutes
+
+
+def stake_deposit_message(agent_id: str, amount_wei: int,
+                          wallet: str, expires_at_ms: int) -> str:
+    """Canonical EIP-191 message an agent's wallet signs for a deposit.
+
+    Public so the reference SDK can build byte-identical messages; the
+    server always rebuilds it from its own registered-wallet record.
+    """
+    return "|".join([
+        "SINCOR-STAKE-DEPOSIT",
+        str(agent_id),
+        str(int(amount_wei)),
+        str(wallet).strip().lower(),
+        str(int(expires_at_ms)),
+    ])
+
+
+def _is_ethereum_address(value: Any) -> bool:
+    raw = str(value or "").strip()
+    if raw[:2].lower() == "0x":
+        raw = raw[2:]
+    return len(raw) == 40 and all(
+        c in "0123456789abcdefABCDEF" for c in raw)
 
 
 def _keccak256(data: bytes) -> bytes:
@@ -264,6 +374,53 @@ def _sealed_agent_checks(fabric: Any, task: Dict[str, Any], agent_id: str) -> Di
     if task.get("requires_merit") and float(agent.get("reputation") or 0) < 0.15:
         raise PermissionError("merit required")
     return agent
+
+
+def _require_bid_auth(agent_id: str, body: Dict[str, Any], *, purpose: str,
+                      task_id: str, payload: str) -> None:
+    """Fail-closed bidder authentication for sealed-bid commit/reveal (W-77).
+
+    A commit locks the named agent's stake, and an unrevealed commit lets
+    ``close_auction`` ghost-slash 100% of it to the poster fund — so the
+    caller must prove control of the agent.  Accepts either the operator
+    heartbeat token (first-party ops, e.g. the liveness runner, mirroring
+    heartbeat auth) or an EIP-191 ``personal_sign`` signature by the
+    agent's REGISTERED wallet over the exact bid message
+    (purpose/task/agent/payload/timestamp/nonce, with freshness and
+    single-use replay guards).  A bare client-supplied ``agent_id`` is
+    NEVER trusted for attribution — that was the W-77 spoofed-commit
+    hole (zero-cost griefing: lock a victim's stake in their name, then
+    let the ghost-slash take it).
+
+    Raises PermissionError (-> HTTP 403) on any failure.
+    """
+    from sincor2.a2a_inbound_ext import _operator_heartbeat_token_ok
+    if _operator_heartbeat_token_ok():
+        return
+    from sincor2.a2a_integration import _server_bound_bidder_wallet
+    wallet = _server_bound_bidder_wallet(
+        body, purpose=purpose, task_id=task_id, agent_id=agent_id,
+        payload=payload,
+    )
+    if not wallet:
+        raise PermissionError(
+            "bid commit/reveal requires an EIP-191 signature from the agent's "
+            "registered wallet (authSignature + authTimestamp + authNonce), "
+            "or the operator heartbeat token"
+        )
+    fabric = get_fabric()
+    with fabric.lock:
+        agent = fabric.agents.get(agent_id)
+    registered = str((agent or {}).get("wallet") or "").strip().lower()
+    if not registered:
+        raise PermissionError(
+            "agent has no registered wallet; bid commit/reveal requires "
+            "the operator token"
+        )
+    if wallet != registered:
+        raise PermissionError(
+            "bid signature is not from the agent's registered wallet"
+        )
 
 
 def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float = 1.5,
@@ -342,6 +499,50 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
         with fabric.lock:
             snap = dict(fabric.tasks[task_id])
     _save_tasks(fabric)
+    # Wire-up: back the bounty from the ledger-only launch pool.
+    # W-81 finding 1: pool backing is gated on poster standing. The pool
+    # subsidizes bounties; a dust-farmed poster (marketplace rep 1.0 for
+    # ~zero cost, reviewer-executed) must not unlock pool extraction.
+    # Without pool backing the self-deal loop loses the 5% platform fee
+    # per cycle — unprofitable by construction. The task still posts
+    # self-funded: pool backing is a funding upgrade, never a creation
+    # gate. Fail-open by design on the other pool failure modes: if the
+    # pool is unconfigured or short on funds, the task still posts
+    # (unbacked). Never bricks task creation on accounting.
+    from sincor2.sybil_defense import poster_pool_eligible
+    pool_ok, pool_gate_reason = poster_pool_eligible(poster_id)
+    if not pool_ok:
+        logger.warning("pool backing skipped for task %s: %s",
+                       task_id, pool_gate_reason)
+        snap["pool_backed"] = False
+        snap["pool_backing_skipped_reason"] = pool_gate_reason
+    else:
+        try:
+            from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
+            alloc = bounty_pool().allocate(
+                task_id, bounty, reason="task bounty backing")
+            snap["pool_backed"] = True
+            snap["pool_allocation_id"] = alloc.get("allocation_id")
+        except PoolNotConfigured:
+            snap["pool_backed"] = False
+        except Exception as err:  # insufficient funds, ledger write failure, ...
+            logger.warning("pool backing failed for task %s: %s", task_id, err)
+            snap["pool_backed"] = False
+    # W-92: the pool-backing fields above were set on the returned snapshot
+    # only. The task was already persisted before allocation, so the stored
+    # record was missing pool_backed/pool_allocation_id (API said backed,
+    # DB said nothing). Write the result back to the persisted task and
+    # save again, mirroring the save pattern above (mutate under lock,
+    # _save_tasks outside the lock).
+    with fabric.lock:
+        stored_task = fabric.tasks.get(task_id)
+        if stored_task is not None:
+            stored_task["pool_backed"] = snap.get("pool_backed", False)
+            stored_task["pool_allocation_id"] = snap.get("pool_allocation_id")
+            if "pool_backing_skipped_reason" in snap:
+                stored_task["pool_backing_skipped_reason"] = snap[
+                    "pool_backing_skipped_reason"]
+    _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
     return snap
 
@@ -377,6 +578,171 @@ def _anchor_onchain_auction(fabric: Any, task_id: str) -> None:
             task["onchain_open_tx"] = opened["tx_hash"]
 
 
+def _reset_ghost_settlement_reputation(fabric, ghosts) -> int:
+    """Zero ghosted wallets' settlement-ledger reputation (ghost penalty).
+
+    The agent-registry reset (``_apply_reputation(agent, 0.0)``) covers
+    earned-reputation; this covers the settlements-count ledger behind the
+    priority flag, keyed on the ghost's *verified* wallet. Never raises —
+    accounting must never brick auction close. Returns rows removed.
+    """
+    removed_total = 0
+    try:
+        from sincor2.a2a_integration import _reputation_ledger
+    except Exception as err:
+        logger.warning("ghost settlement reputation reset unavailable: %s", err)
+        return 0
+    try:
+        with fabric.lock:
+            for agent_id in ghosts:
+                agent = fabric.agents.get(agent_id)
+                wallet = agent.get("wallet") if agent else None
+                if wallet:
+                    removed = _reputation_ledger.reset(
+                        "wallet:" + str(wallet).lower()
+                    )
+                    removed_total += removed
+                    logger.info(
+                        "ghost settlement reputation reset  agent=%s wallet=%s removed=%d",
+                        agent_id, wallet, removed,
+                    )
+    except Exception as err:  # never brick auction close on accounting
+        logger.warning("ghost settlement reputation reset failed: %s", err)
+    return removed_total
+
+
+def _open_escrows_locked(fabric: Any, agent_id: str) -> List[Dict[str, Any]]:
+    """The agent's open winning escrows.  Caller must hold fabric.lock.
+
+    A task counts when the agent is the assigned winner, the task is in an
+    open state (see _OPEN_ESCROW_STATES), and the escrow is unreleased:
+    for sealed-bid tasks the winner's stake lock must still be held in the
+    stake ledger (a `failed` task whose lock was slashed or released by
+    adjudication drops out); legacy plaintext tasks never lock stake, so
+    the assignment itself is the escrow.  Exposure is measured in WINNING
+    BID AXM — the escrowed value at risk — falling back to bounty_axm when
+    the winning bid is not recorded.  Pure read: never mutates fabric or
+    the ledger.  (Ledger reads here are safe under fabric.lock:
+    stake_ledger never takes fabric.lock, so no lock-order inversion.)
+    """
+    from sincor2.onchain.stake_ledger import stake_ledger
+    ledger = stake_ledger()
+    open_escrows: List[Dict[str, Any]] = []
+    for task in fabric.tasks.values():
+        if task.get("assigned_to") != agent_id:
+            continue
+        if task.get("state") not in _OPEN_ESCROW_STATES:
+            continue
+        if task.get("sealed"):
+            try:
+                if ledger.locked_for(agent_id, task.get("task_id")) <= 0:
+                    continue
+            except Exception:
+                # Fail closed on ledger unreadability: count the escrow.
+                pass
+        amount = task.get("winning_bid_axm")
+        if amount is None:
+            amount = task.get("bounty_axm") or 0
+        try:
+            amount_f = float(amount)
+        except (TypeError, ValueError):
+            continue
+        open_escrows.append({
+            "task_id": task.get("task_id"),
+            "winning_bid_axm": amount_f,
+            "state": task.get("state"),
+        })
+    return open_escrows
+
+
+def _open_exposure_locked(fabric: Any, agent_id: str) -> float:
+    """Aggregate AXM over the agent's open winning escrows (fabric.lock held)."""
+    return sum(e["winning_bid_axm"] for e in _open_escrows_locked(fabric, agent_id))
+
+
+def open_escrow_exposure_axm(agent_id: str) -> float:
+    """Public read path: the agent's current open winning-escrow exposure.
+
+    Returns aggregate AXM (see _open_escrows_locked).  Backs the
+    GET /v1/a2a/escrow-exposure/<agent_id> monitoring endpoint.
+    """
+    fabric = get_fabric()
+    with fabric.lock:
+        return _open_exposure_locked(fabric, agent_id)
+
+
+def _kya_effective_score(score: Any, multiplier: Any) -> float:
+    """Apply a KYA allocation multiplier without reversing bid order.
+
+    Production bid scores can be negative, so a plain multiplication
+    would move a throttled negative score toward zero and promote the
+    throttled bidder. Scale the score's magnitude instead: positive
+    scores are multiplied by ``m`` and negative scores are divided by
+    ``m``. For every valid ``0 < m <= 1``, the result is <= the raw
+    score and the transform is strictly increasing in the raw score
+    (slopes ``m`` and ``1 / m`` on the two sides of zero, joined at 0).
+    Invalid multipliers fail open to the raw score.
+    """
+    raw = float(score)
+    try:
+        mult = float(multiplier)
+    except (TypeError, ValueError):
+        return raw
+    if not (0.0 < mult <= 1.0):
+        return raw
+    return raw * mult if raw >= 0 else raw / mult
+
+
+def _kya_telemetry_adjustments(
+        agent_ids: Any, fabric: Any = None) -> Dict[str, Dict[str, Any]]:
+    """KYA telemetry verdicts for winner-selection ranking.
+
+    Returns ``{agent_id: verdict}`` for the candidates that HAVE
+    recorded telemetry. Marketplace candidates are resolved through
+    their registered wallet — the binding enforced for bid auth — and
+    looked up only in telemetry's ``wallet:`` namespace. The
+    unauthenticated ``id:`` namespace is never consulted here.
+
+    Fail-open: any telemetry failure yields {} (raw-score ranking —
+    byte-for-byte the pre-wiring behaviour). Verdicts that actually
+    throttle (multiplier < 1.0) are logged with their evidence so the
+    adjustment is observable in ops logs as well as in the
+    ``telemetry_throttle`` audit fields stamped on the task at
+    assignment.
+    """
+    try:
+        from sincor2 import kya_telemetry
+
+        if fabric is None:
+            fabric = get_fabric()
+        agents = getattr(fabric, "agents", {}) or {}
+        adjustments: Dict[str, Dict[str, Any]] = {}
+        for agent_id in agent_ids:
+            agent = agents.get(agent_id) or {}
+            registered_wallet = str(agent.get("wallet") or "").strip().lower()
+            if not registered_wallet:
+                continue
+            telemetry_key = "wallet:" + registered_wallet
+            verdict = kya_telemetry.throttle_verdict(telemetry_key)
+            if verdict is None:
+                continue
+            adjustments[agent_id] = verdict
+            if verdict["allocation_multiplier"] < 1.0:
+                logger.info(
+                    "kya telemetry throttle: agent %s (%s) multiplier %.4f "
+                    "(attempts=%d errors=%d timeouts=%d)",
+                    agent_id, telemetry_key,
+                    verdict["allocation_multiplier"],
+                    verdict["evidence"]["attempts"],
+                    verdict["evidence"]["errors"],
+                    verdict["evidence"]["timeouts"],
+                )
+        return adjustments
+    except Exception as err:  # telemetry must never brick auction close
+        logger.warning("kya telemetry adjustments failed: %s", err)
+        return {}
+
+
 def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
     expire_stale_assignments()
     fabric = get_fabric()
@@ -410,6 +776,30 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 return dict(task)
         cands = [b for b in fabric.bids.values()
                  if b.get("task_id") == task_id and b.get("revealed", True)]
+        close_blocked = False
+        # Anti-gaming re-validation at winner selection (fail closed): a
+        # bid committed while eligible must not win after a cap trips
+        # (consecutive-win / pair / window caps, self-bid, anonymous
+        # bounty task). Each candidate is re-checked NOW; ineligible bids
+        # are excluded from selection. Never bricks the close — a guard
+        # failure excludes the bid rather than raising. Excluded bids are
+        # simply losers (stake released by the normal loser path below);
+        # if none remain eligible the auction expires with no winner.
+        # (Rebased onto W-78: runs BEFORE the escrow-cap walk below, so
+        # the cap walk only ever sees eligible candidates.)
+        eligible_cands: List[Dict[str, Any]] = []
+        for _bid in cands:
+            try:
+                axm_antigaming.check_bid_eligibility(
+                    task, str(_bid.get("agent_id")))
+            except Exception as _err:
+                logger.warning("antigaming: bid %s by %s excluded at "
+                               "winner selection: %s",
+                               _bid.get("bid_id"), _bid.get("agent_id"),
+                               _err)
+            else:
+                eligible_cands.append(_bid)
+        cands = eligible_cands
         if not cands:
             task["state"] = "expired"
             task["expired_reason"] = "auction_timeout"
@@ -417,26 +807,121 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 task["ghosted_commits"] = ghosted
             snap = dict(task)
             tags = list(task.get("tags") or [])
+            # Wire-up: release the pool backing — no winner, no payout.
+            # Fail-safe: never bricks the close on accounting.
+            try:
+                from sincor2.a2a_bounty_pool import bounty_pool
+                for alloc in bounty_pool().allocations_for_task(task_id):
+                    bounty_pool().release(alloc["allocation_id"])
+            except Exception as err:
+                logger.warning("pool release failed for expired task %s: %s",
+                               task_id, err)
         else:
-            winner = sorted(cands, key=lambda b: (-float(b["score"]), int(b["received_at"]), b["bid_id"]))[0]
-            losers = [b["agent_id"] for b in cands
-                      if b["agent_id"] != winner["agent_id"]]
-            task.update({
-                "state": "assigned",
-                "assigned_to": winner["agent_id"],
-                "winner_score": winner["score"],
-                "winning_bid_axm": winner["bid_axm"],
-                "time_est_ms": winner.get("time_est_ms"),
-                "assigned_at": ts,
-            })
-            if task.get("sealed"):
-                task["ghosted_commits"] = ghosted
-            snap = dict(task)
-            tags = list(task.get("tags") or [])
+            # KYA telemetry throttle (recommendation #2 wiring): rank
+            # on each candidate's magnitude-scaled score, using the
+            # live-reliability multiplier for its registered wallet.
+            # Fail-open and neutral by default — candidates with no
+            # recorded telemetry (or any telemetry failure) rank on
+            # their raw score exactly as before, and a throttled
+            # candidate is scaled, never excluded. Magnitude scaling
+            # keeps the adjustment rank-monotonic for negative as
+            # well as positive production scores. Raw bid scores are
+            # never rewritten; the adjustment lives only in this
+            # ranking plus the audit fields stamped at assignment.
+            telemetry_adj = _kya_telemetry_adjustments(
+                {str(b.get("agent_id")) for b in cands}, fabric=fabric)
+
+            def _effective_score(b: Dict[str, Any]) -> float:
+                verdict = telemetry_adj.get(str(b.get("agent_id")))
+                if not verdict:
+                    return float(b["score"])
+                return _kya_effective_score(
+                    b["score"], verdict["allocation_multiplier"])
+
+            ranked = sorted(cands, key=lambda b: (-_effective_score(b), int(b["received_at"]), b["bid_id"]))
+            # Hunt-15 W-78: the concentration cap binds at WIN time, never at
+            # bid commit.  Walk the ranking; the first candidate whose win
+            # would keep the agent's aggregate open exposure within
+            # MAX_AGENT_OPEN_ESCROW_AXM takes the auction.  Over-cap
+            # candidates are skipped (they become ordinary losers).
+            winner = None
+            for cand in ranked:
+                try:
+                    cand_bid_axm = float(cand.get("bid_axm") or 0)
+                except (TypeError, ValueError):
+                    cand_bid_axm = 0.0
+                exposure = _open_exposure_locked(fabric, cand["agent_id"])
+                if exposure + cand_bid_axm <= MAX_AGENT_OPEN_ESCROW_AXM:
+                    winner = cand
+                    break
+                logger.info(
+                    "w78 escrow cap: skipping candidate %s on task %s "
+                    "(open exposure %.4f AXM + bid %.4f AXM > cap %.1f AXM)",
+                    cand["agent_id"], task_id, exposure, cand_bid_axm,
+                    MAX_AGENT_OPEN_ESCROW_AXM,
+                )
+            if winner is None:
+                # Fail closed: every revealed bidder is over the cap.  Do NOT
+                # assign — leave the task open so a later close (after
+                # settlements free capacity) processes the auction normally.
+                # Ghost/loser settlement is deferred to that close so each
+                # is processed exactly once (see close_blocked guard below).
+                task["close_blocked_reason"] = "escrow_cap"
+                task["close_blocked_at"] = ts
+                snap = dict(task)
+                tags = list(task.get("tags") or [])
+                close_blocked = True
+            else:
+                close_blocked = False
+                losers = [b["agent_id"] for b in cands
+                          if b["agent_id"] != winner["agent_id"]]
+                task.update({
+                    "state": "assigned",
+                    "assigned_to": winner["agent_id"],
+                    "winner_score": winner["score"],
+                    "winning_bid_axm": winner["bid_axm"],
+                    "time_est_ms": winner.get("time_est_ms"),
+                    "assigned_at": ts,
+                })
+                # Audit: when the winner has a telemetry verdict, stamp
+                # the applied multiplier and its evidence basis onto the
+                # task record (persisted by _save_tasks below). Winners
+                # with no recorded telemetry get no stamp — the record
+                # stays exactly as it was before this wiring.
+                _winner_verdict = telemetry_adj.get(
+                    str(winner["agent_id"]))
+                if _winner_verdict:
+                    task["telemetry_throttle"] = {
+                        "agent_id": winner["agent_id"],
+                        "multiplier":
+                            _winner_verdict["allocation_multiplier"],
+                        "status": _winner_verdict["status"],
+                        "rate_limit_tier":
+                            _winner_verdict["rate_limit_tier"],
+                        "raw_score": winner["score"],
+                        "effective_score": _effective_score(winner),
+                        "evidence": {
+                            "attempts":
+                                _winner_verdict["evidence"]["attempts"],
+                            "errors":
+                                _winner_verdict["evidence"]["errors"],
+                            "timeouts":
+                                _winner_verdict["evidence"]["timeouts"],
+                        },
+                    }
+                task.pop("close_blocked_reason", None)
+                task.pop("close_blocked_at", None)
+                if task.get("sealed"):
+                    task["ghosted_commits"] = ghosted
+                snap = dict(task)
+                tags = list(task.get("tags") or [])
     # Stake settlement (outside the fabric lock; separate ledger).
     # Ghosting => 100 % slash of the locked stake -> poster re-auction credit.
     # Losers are released; the winner's lock stays until proof settlement.
-    if ghosts or losers:
+    # W-78: when the close was blocked by the escrow cap, NOTHING is settled
+    # here — the task stays open and the next close processes ghosts/losers
+    # exactly once.
+    if not close_blocked and (ghosts or losers):
         from sincor2.onchain.stake_ledger import stake_ledger
         ledger = stake_ledger()
         for agent_id in ghosts:
@@ -449,34 +934,83 @@ def close_auction(task_id: str) -> Optional[Dict[str, Any]]:
                 ledger.release(agent_id, task_id)
             except Exception as err:
                 logger.warning("stake release failed for %s: %s", agent_id, err)
+    # Anti-gaming rotation accounting (outside the fabric lock; never
+    # bricks the close). Records the winner for the rolling win cap and
+    # updates consecutive-win / pair streaks. A close with no winner
+    # resets all streaks (anti-brick: caps can never deadlock the loop).
+    try:
+        axm_antigaming.record_auction_close(
+            poster_id, snap.get("assigned_to"), task_id=task_id)
+    except Exception as err:  # never brick auction close on accounting
+        logger.warning("antigaming close record failed for %s: %s",
+                       task_id, err)
     # Ghosting zeroes earned reputation and restores probation. This is the
     # behavior penalty for committing without revealing; it applies to every
     # detected ghost independent of ledger accounting, and never bricks
     # the close. The wallet+card behind each ghost is tombstoned so a rebirth
-    # under a new agent_id is flagged as a probable whitewash.
-    if ghosts:
-        try:
-            with fabric.lock:
-                for agent_id in ghosts:
-                    agent = fabric.agents.get(agent_id)
-                    if agent is not None:
-                        _apply_reputation(agent, 0.0)
-            _save_agents(fabric)
-        except Exception as err:
-            logger.warning("ghost reputation reset failed: %s", err)
+    # under a new agent_id is flagged as a probable whitewash. Shared with
+    # expire_stale_assignments() so plaintext no-shows cost exactly the same.
+    # (Deferred with the rest of settlement when the close was cap-blocked.)
+    if not close_blocked and ghosts:
         for agent_id in ghosts:
-            try:
-                from sincor2.a2a_inbound_ext import _kya_flag_ghost
-
-                _kya_flag_ghost(agent_id)
-            except Exception as err:
-                logger.warning("ghost KYA flag failed for %s: %s", agent_id, err)
+            _apply_no_show_penalty(fabric, agent_id)
+        # Zero the ghost wallet's settlement-ledger reputation as well, so a
+        # ghost cannot keep the priority flag earned under its verified wallet
+        # (the agent registry reset inside _apply_no_show_penalty only covers
+        # earned-reputation). Never bricks the close on accounting.
+        _reset_ghost_settlement_reputation(fabric, ghosts)
     if snap["state"] == "assigned":
         fabric.publish("task.assigned", tags, {"task_id": task_id, "assigned_agent": snap["assigned_to"], "bid_axm": snap["winning_bid_axm"]})
         if snap.get("auction_id"):
             _fund_onchain_escrow(fabric, task_id)
     _save_tasks(fabric)
     return snap
+
+
+def _apply_no_show_penalty(fabric: Any, agent_id: str) -> Dict[str, Any]:
+    """Apply the ghost penalty to an agent that no-showed on an assignment.
+
+    Red-team 2026-10-08: a plaintext execution_timeout used to be
+    penalty-free while sealed-commit ghosts lost reputation and got
+    tombstoned. Both are now the same event — reputation reset to 0.0
+    (probation restored) and the wallet tombstoned via KYA so a rebirth
+    under a new agent_id is flagged as a probable whitewash. Never raises:
+    penalty accounting must not brick the caller.
+
+    Returns the penalty outcome dict (published on the task.expired event
+    and recorded on the task for audit).
+    """
+    outcome: Dict[str, Any] = {
+        "agent_id": agent_id,
+        "reputation_reset": False,
+        "wallet_tombstoned": False,
+    }
+    agent_wallet = ""
+    try:
+        with fabric.lock:
+            agent = fabric.agents.get(agent_id)
+            if agent is not None:
+                agent_wallet = str(agent.get("wallet") or "")
+                _apply_reputation(agent, 0.0)
+                outcome["reputation_reset"] = True
+        _save_agents(fabric)
+    except Exception as err:
+        logger.warning("ghost reputation reset failed for %s: %s", agent_id, err)
+    try:
+        from sincor2 import kya_registry
+
+        tomb = kya_registry.flag_ghost(agent_id)
+        if tomb is not None:
+            outcome["wallet_tombstoned"] = True
+        elif agent_wallet:
+            # No KYA record existed for this agent (the listing hook may have
+            # been skipped); write the tombstone directly from the registered
+            # wallet so the shed is still visible rather than free.
+            kya_registry._write_tombstone(agent_wallet, agent_id, "", "ghosting")
+            outcome["wallet_tombstoned"] = True
+    except Exception as err:
+        logger.warning("ghost KYA flag failed for %s: %s", agent_id, err)
+    return outcome
 
 
 def _fund_onchain_escrow(fabric: Any, task_id: str) -> None:
@@ -514,7 +1048,13 @@ def _fund_onchain_escrow(fabric: Any, task_id: str) -> None:
 
 
 def expire_stale_assignments() -> List[Dict[str, Any]]:
-    """Auto-cancel assigned tasks whose execution window has elapsed."""
+    """Auto-cancel assigned tasks whose execution window has elapsed.
+
+    A no-show is ghosting: the assigned agent takes the SAME penalty as a
+    sealed-commit ghost — reputation reset to 0.0 (probation restored) and
+    the wallet tombstoned — and the penalty is recorded on the task and
+    published on the task.expired event.
+    """
     fabric = get_fabric()
     ts = _now_ms()
     expired: List[Dict[str, Any]] = []
@@ -531,10 +1071,53 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
                 task["expired_at"] = ts
                 expired.append(dict(task))
     for snap in expired:
+        ghost_agent = snap.get("assigned_to")
+        # Ghost slash wiring (Stream B): a winner that never performs is
+        # slashed under the EXISTING stake_ledger ghost rule — 100 % of the
+        # locked stake via the protocol path (no adjudicator needed, same
+        # as a commit-without-reveal ghost). This codebase already treats a
+        # no-show as ghosting (see _apply_no_show_penalty); no new slash
+        # economics are invented here. Never bricks expiry on accounting.
+        ghost_slash: Dict[str, Any] = {}
+        if ghost_agent:
+            try:
+                from sincor2.onchain.stake_ledger import stake_ledger
+                ghost_slash = stake_ledger().slash_ghost(
+                    ghost_agent, snap["task_id"],
+                    poster_id=snap.get("poster_id"))
+            except Exception as err:
+                logger.warning("ghost stake slash failed for %s: %s",
+                               ghost_agent, err)
+        snap["ghost_slash"] = ghost_slash
+        penalty = (
+            _apply_no_show_penalty(fabric, ghost_agent)
+            if ghost_agent
+            else {"agent_id": None, "reputation_reset": False,
+                  "wallet_tombstoned": False}
+        )
+        snap["ghost_penalty"] = penalty
+        # Pool backing: a ghosted assignment never pays out, so the
+        # task's bounty allocation returns to available (allocated ->
+        # released). Without this, ghosted allocations sit "allocated"
+        # forever and the pool drains monotonically. Never bricks
+        # expiry on accounting.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(snap["task_id"]):
+                pool.release(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool release failed for ghosted task %s: %s",
+                           snap["task_id"], err)
+        with fabric.lock:
+            task = fabric.tasks.get(snap["task_id"])
+            if task is not None:
+                task["ghost_penalty"] = penalty
         fabric.publish(
             "task.expired",
             list(snap.get("tags") or []),
-            {"task_id": snap["task_id"], "reason": "execution_timeout"},
+            {"task_id": snap["task_id"], "reason": "execution_timeout",
+             "ghost_penalty": penalty},
         )
     if expired:
         _save_tasks(fabric)
@@ -572,6 +1155,9 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             raise PermissionError("capability mismatch")
         if task.get("requires_merit") and float(agent.get("reputation") or 0) < 0.15:
             raise PermissionError("merit required")
+        # Anti-gaming gate (fail closed): self-bid, participation windows,
+        # consecutive-win and pair rotation caps. Raises PermissionError.
+        axm_antigaming.check_bid_eligibility(task, agent_id)
         score = calculate_bid_score(float(bid_axm), int(time_est_sec), float(agent.get("reputation") or 0))
         bid_id = "bid_" + uuid.uuid4().hex[:10]
         bid = {
@@ -590,6 +1176,8 @@ def place_bid(task_id: str, agent_id: str, bid_axm: float, time_est_sec: int) ->
             "via": "legacy-plaintext",
         }
         fabric.bids[bid_id] = bid
+        # The bid is stored: consume participation quota now. Never raises.
+        axm_antigaming.record_bid_entry(agent_id, task_id)
         task["state"] = "auction"
         start = task.get("auction_closes_at") is None
         if start:
@@ -633,6 +1221,18 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
         if commit_deadline is not None and ts > int(commit_deadline):
             raise PermissionError("commit window closed")
         _sealed_agent_checks(fabric, task, agent_id)
+        key = _commit_key(task_id, agent_id)
+        if key in fabric.commits:
+            # Idempotent retry: already committed — return the existing
+            # record WITHOUT re-locking stake. lock_for_commit is additive,
+            # so a headerless retry must not lock twice (VERIFIED-2: a
+            # double-lock would let a later ghost-slash take 100% of the
+            # doubled amount).
+            return dict(fabric.commits[key])
+        # Anti-gaming gate (fail closed): self-bid, participation windows,
+        # consecutive-win and pair rotation caps. Runs BEFORE the stake
+        # lock so a rejected bid never touches stake accounting.
+        axm_antigaming.check_bid_eligibility(task, agent_id)
         # Stake enforcement (ratified minStakeBps=5000): the bid value is
         # still sealed, so the commit locks stake against the public bounty.
         # Insufficient stake => the commit itself is rejected.
@@ -642,9 +1242,6 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
             stake_ledger().lock_for_commit(agent_id, task_id, bounty_wei)
         except InsufficientStake as err:
             raise PermissionError(str(err))
-        key = _commit_key(task_id, agent_id)
-        if key in fabric.commits:
-            raise RuntimeError("already committed")
         record = {
             "task_id": task_id,
             "agent_id": agent_id,
@@ -655,6 +1252,9 @@ def commit_bid(task_id: str, agent_id: str, commitment: Any) -> Dict[str, Any]:
             "price_wei": None,
         }
         fabric.commits[key] = record
+        # The commit is stored: consume participation quota now. Never
+        # raises. (Idempotent retries return above without re-recording.)
+        axm_antigaming.record_bid_entry(agent_id, task_id)
         task["state"] = "auction"
         snap = dict(record)
         tags = list(task.get("tags") or [])
@@ -717,6 +1317,9 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
                 raise PermissionError("reveal window closed")
         if task["state"] not in ("open", "auction"):
             raise RuntimeError("auction closed")
+        # Defense in depth: the commit was already gated, but a reveal must
+        # never materialize a self-bid even if the commit path is bypassed.
+        axm_antigaming.check_self_bid(task, agent_id)
         expected = sealed_commitment(price_wei, salt, agent_id)
         if not _hmac.compare_digest(expected, bytes.fromhex(commit["commitment"][2:])):
             raise ValueError("commitment mismatch: wrong bid_axm or nonce")
@@ -758,11 +1361,75 @@ def reveal_bid(task_id: str, agent_id: str, bid_axm: float, nonce: Any,
     return snap
 
 
-def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, Any]:
+# Sentinel distinguishing "no deliverable argument passed" from an
+# explicitly-passed falsy deliverable (e.g. empty dict), which still
+# binds and hashes.
+_UNSET: Any = object()
+
+
+def submit_proof(task_id: str, agent_id: str, receipt_hash: str,
+                 *,
+                 deliverable: Any = _UNSET,
+                 evidence: Optional[Dict[str, Any]] = None,
+                 deliverable_uri: str = "",
+                 content_binding_sig: str = "") -> Dict[str, Any]:
+    """Winner's proof of completion; stages the payout and settles the task.
+
+    Receipt-content binding (dev-watch item 77): a receipt proves money
+    moved, never that the deliverable has content.  Bind the deliverable
+    with one of:
+
+    * ``deliverable`` -- raw deliverable content (any JSON-safe value,
+      str, or bytes); the content hash is computed from it, so the
+      caller cannot claim a hash that mismatches the bytes;
+    * ``evidence`` -- a pre-built evidence mapping with
+      ``payment_receipt_hash``, ``deliverable_hash``, ``deliverable_uri``
+      and optional ``content_binding_sig``.  If both forms are given,
+      ``deliverable`` wins (the server computes the hash itself, so a
+      claimed hash can never drift from the content).
+
+    Either form is validated by :func:`validate_dispute_evidence`,
+    which FAILS CLOSED: evidence carrying a payment receipt but no
+    deliverable binding is rejected, and a tampered deliverable fails
+    hash verification.  The bound evidence is stored on the proof and
+    the task so the adjudicator can retrieve the deliverable and
+    recompute the hash when a quality dispute is filed.
+
+    ``receipt_hash`` alone is still accepted (legacy callers), but such
+    proofs are marked ``content_bound: False``: a bare receipt settles
+    the payout yet leaves the deliverable unattributable, and the
+    adjudicator will treat a later quality dispute accordingly.
+    """
     receipt_hash = str(receipt_hash or "").strip()
     if not receipt_hash.startswith("0x") or len(receipt_hash) < 10:
         raise ValueError("receipt_hash must be 0x-prefixed")
+    bound: Optional[DisputeEvidence] = None
+    if deliverable is not _UNSET:
+        bound = build_evidence(
+            receipt_hash, deliverable, deliverable_uri,
+            content_binding_sig=content_binding_sig)
+    elif evidence is not None:
+        bound = validate_dispute_evidence(evidence)
+        if bound.payment_receipt_hash != receipt_hash:
+            raise ValueError(
+                "evidence payment_receipt_hash does not match receipt_hash")
     fabric = get_fabric()
+    # Anti-sybil payout gate (2026-10-08, W-81 rework): a shared-wallet
+    # cluster of >= 3 identities, any tombstoned cluster member, or a
+    # newborn burst paid by a newborn poster blocks the payout entirely
+    # (fail closed) — checked BEFORE any state is mutated. A newborn
+    # burst winning a platform-posted (or poster-unknown) task is HELD
+    # for manual review instead of staged. Smaller clusters and
+    # established-poster ring shapes are flagged on the staged receipt
+    # below (audit telemetry, not a control).
+    from sincor2.sybil_defense import quarantine_check
+    qcheck = quarantine_check(agent_id, task_id=task_id)
+    if qcheck["quarantined"]:
+        raise PermissionError("payout quarantined: %s" % qcheck["reason"])
+    if qcheck.get("held"):
+        return _hold_payout_for_review(
+            task_id=task_id, agent_id=agent_id, receipt_hash=receipt_hash,
+            bound=bound, qcheck=qcheck)
     close_auction(task_id)
     ts = _now_ms()
     with fabric.lock:
@@ -776,16 +1443,56 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         agent = fabric.agents.get(agent_id) or {}
         amount = float(task.get("winning_bid_axm") or task.get("bounty_axm") or 0)
         wallet = str(agent.get("wallet") or agent_id)
+        if bound is not None and bound.content_binding_sig:
+            # Fail closed on forged attribution: a bound signature must
+            # recover to the agent's registered wallet.
+            verify_content_binding_sig(bound, wallet)
         proof_id = "prf_" + uuid.uuid4().hex[:10]
         task["state"] = "proof_submitted"
         task["proof_id"] = proof_id
         tags = list(task.get("tags") or [])
     receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount, task_id=task_id, receipt_hash=receipt_hash)
+    # Honest payout surface: only a real broadcast earns "paid"/payout_tx.
+    payout = payout_broadcast_status(receipt)
+    # Funding-graph linkage: a shared-wallet cluster (>1 identity on the
+    # payout wallet) is flagged on the payout record itself. Clusters at
+    # quarantine size never reach here — they were blocked above.
+    if qcheck["flagged"]:
+        receipt["sybil"] = {
+            "flagged": True,
+            "wallet": qcheck["wallet"],
+            "cluster_size": qcheck["cluster_size"],
+            "cluster": qcheck["cluster"],
+        }
+        ring = qcheck.get("ring") or {}
+        if ring.get("ring_shaped"):
+            receipt["sybil"]["ring"] = {
+                "cohort_size": ring["cohort_size"],
+                "cohort": ring["cohort"],
+                "winner_low_reputation": ring["winner_low_reputation"],
+                "poster_id": ring["poster_id"],
+                "poster_origin": ring["poster_origin"],
+                "poster_low_reputation": ring["poster_low_reputation"],
+                # Audit telemetry only: an established poster paying a
+                # newborn burst is legitimate shape. Held/quarantined
+                # verdicts never reach this line.
+                "note": "flag only — not a control",
+            }
     with fabric.lock:
         task = fabric.tasks.get(task_id) or {}
         task["state"] = "settled" if receipt.get("ok") else "failed"
         task["payout_axm"] = amount
-        task["payout_tx"] = receipt.get("staged_tx_digest")
+        if payout["broadcasted"]:
+            task["payout_tx"] = payout["tx_hash"]
+            task.pop("payout_staged_digest", None)
+        else:
+            # Claim-honesty: a staged digest is not a tx hash — never store
+            # it under the tx-shaped "payout_tx" field name.
+            task.pop("payout_tx", None)
+            if payout["staged_digest"]:
+                task["payout_staged_digest"] = payout["staged_digest"]
+            else:
+                task.pop("payout_staged_digest", None)
         task["settled_at"] = ts
         if receipt.get("ok") and fabric.agents.get(agent_id):
             ag = fabric.agents[agent_id]
@@ -795,13 +1502,20 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             "task_id": task_id,
             "agent_id": agent_id,
             "receipt_hash": receipt_hash,
-            "status": "paid" if receipt.get("ok") else "rejected",
+            "status": payout["proof_status"],
             "http_status": 202,
             "submitted_at": ts,
             "settled_at": ts,
             "payout": receipt,
+            # Receipt-content binding (item 77): None when the winner
+            # submitted a bare receipt; the adjudicator then has no
+            # deliverable to recompute against.
+            "content_bound": bound is not None,
+            "evidence": evidence_to_dict(bound) if bound else None,
         }
         fabric.proofs[proof_id] = proof
+        if bound is not None:
+            task["deliverable_evidence"] = evidence_to_dict(bound)
         snap = dict(proof)
     # The winner's stake lock survives the auction; it releases here on
     # successful settlement.  A failed settlement keeps the lock so the
@@ -812,6 +1526,20 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
             stake_ledger().release(agent_id, task_id)
         except Exception as err:
             logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Bounty-pool settlement: the allocation backing this task's
+        # bounty is consumed (allocated -> spent) now that the payout
+        # staged. Distinct from release (unspent -> available): spent
+        # funds left the pool. Without this, settled allocations sit
+        # "allocated" forever and available drains monotonically.
+        # Never bricks settlement on accounting.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(task_id):
+                pool.spend(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool spend failed for settled task %s: %s",
+                           task_id, err)
         # Reputation-weighted collateral: a dispute-free settlement is the
         # veteran-building event.  Recorded against the task's poster so
         # wash-trading with a sock-puppet poster cannot inflate R_i.
@@ -833,10 +1561,370 @@ def submit_proof(task_id: str, agent_id: str, receipt_hash: str) -> Dict[str, An
         except Exception as err:
             logger.warning(
                 "sponsored-stake recoup skipped for %s: %s", agent_id, err)
+    # W-89 wash-anomaly guard: detect-only, never bricks settlement.  A
+    # flagged settlement still completes and the payout still stages; what
+    # changes is revenue recognition (no realized fee) plus a structured
+    # anomaly stamp for the adjudicator and future fee rails.
+    try:
+        from sincor2.wash_guard import assess_settlement
+        _wash_verdict = assess_settlement(
+            task, agent_id,
+            content_bound=(bound is not None),
+            receipt_hash=receipt_hash,
+            fabric=fabric, now_ms=ts,
+        )
+        proof["wash_anomaly"] = _wash_verdict
+        snap["wash_anomaly"] = _wash_verdict
+        with fabric.lock:
+            _t = fabric.tasks.get(task_id)
+            if _t is not None:
+                _t["wash_anomaly"] = _wash_verdict
+        if _wash_verdict.get("anomalous"):
+            logger.error(
+                "[WASH-GUARD] anomalous settlement: task=%s winner=%s "
+                "signals=%s",
+                task_id, agent_id,
+                [s["name"] for s in _wash_verdict["signals"]])
+    except Exception as err:  # guard must never brick settlement
+        logger.warning("[WASH-GUARD] guard failed for %s: %s", task_id, err)
     fabric.publish("proof.settled", tags, snap)
     _save_agents(fabric)
     _save_tasks(fabric)
     snap["http_status"] = 202
+    return snap
+
+
+def _hold_payout_for_review(*, task_id: str, agent_id: str, receipt_hash: str,
+                            bound, qcheck: Dict[str, Any]) -> Dict[str, Any]:
+    """W-81: park a ring-shaped payout for manual review (hold, not block).
+
+    Called from :func:`submit_proof` when the sybil verdict is ``held``:
+    a newborn registration burst won a platform-posted (or
+    poster-unknown) task. The proof IS accepted — the work happened and
+    the deliverable evidence is preserved — but the payout is NOT
+    staged, no reputation is granted, and the winner's stake lock is NOT
+    released. The task moves to state ``"held"`` with the full release
+    context in ``task["sybil_hold"]``; an admin releases or rejects it
+    via the ``/v1/a2a/sybil/holds`` endpoints.
+
+    Fail-closed: the same task/agent/state checks as ``submit_proof``
+    run here, so a hold cannot be manufactured for a task that isn't
+    assigned to the caller.
+
+    REVIEW SLA: a hold that no admin decides within ``sybil_hold_ttl_ms()``
+    (default 72h) auto-rejects on the next release attempt or sweep —
+    money never moves without a human, and the winner's stake is not
+    hostage forever. The auto-rejection preserves the proof record for
+    adjudication, exactly like a manual reject.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task:
+            raise KeyError("unknown task")
+        if task.get("state") != "assigned":
+            raise RuntimeError("task is not assigned")
+        if task.get("assigned_to") != agent_id:
+            raise PermissionError("only the assigned agent may submit proof")
+        agent = fabric.agents.get(agent_id) or {}
+        amount = float(task.get("winning_bid_axm") or task.get("bounty_axm") or 0)
+        wallet = str(agent.get("wallet") or agent_id)
+        if bound is not None and bound.content_binding_sig:
+            # Same forged-attribution gate as the normal path.
+            verify_content_binding_sig(bound, wallet)
+        proof_id = "prf_" + uuid.uuid4().hex[:10]
+        tags = list(task.get("tags") or [])
+        evidence_dict = evidence_to_dict(bound) if bound is not None else None
+        ring = qcheck.get("ring") or {}
+        hold = {
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "wallet": wallet,
+            "amount_axm": amount,
+            "receipt_hash": receipt_hash,
+            "proof_id": proof_id,
+            "reason": qcheck.get("reason"),
+            "ring": {
+                "cohort_size": ring.get("cohort_size"),
+                "cohort": ring.get("cohort"),
+                "winner_low_reputation": ring.get("winner_low_reputation"),
+                "poster_id": ring.get("poster_id"),
+                "poster_origin": ring.get("poster_origin"),
+                "poster_low_reputation": ring.get("poster_low_reputation"),
+            },
+            "held_at": ts,
+            "evidence": evidence_dict,
+            "tags": tags,
+            "status": "held",
+        }
+        try:
+            from sincor2.sybil_defense import sybil_hold_ttl_ms
+            hold["expires_at"] = ts + sybil_hold_ttl_ms()
+        except Exception:
+            pass
+        task["state"] = "held"
+        task["proof_id"] = proof_id
+        task["sybil_hold"] = hold
+        if evidence_dict is not None:
+            task["deliverable_evidence"] = evidence_dict
+        proof = {
+            "proof_id": proof_id,
+            "task_id": task_id,
+            "agent_id": agent_id,
+            "receipt_hash": receipt_hash,
+            "status": "held",
+            "http_status": 202,
+            "submitted_at": ts,
+            "settled_at": None,
+            "payout": None,
+            "content_bound": bound is not None,
+            "evidence": evidence_dict,
+            "sybil_hold": {"reason": hold["reason"], "held_at": ts},
+        }
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    logger.warning("sybil hold: payout for task %s (agent %s) held: %s",
+                   task_id, agent_id, hold["reason"])
+    fabric.publish("proof.held", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 202
+    return snap
+
+
+def _expire_sybil_hold_if_due(task_id: str,
+                            decided_by: str = "admin") -> Optional[Dict[str, Any]]:
+    """Auto-reject a sybil hold past its TTL (fail closed).
+
+    A held payout with no admin decision inside ``sybil_hold_ttl_ms()``
+    (default 72h) is rejected: money never moves without a human, and
+    the winner's stake is not hostage forever. The rejection preserves
+    the proof record for adjudication, exactly like a manual reject.
+    Returns the rejection snap when the hold expired, else None.
+    Race-safe: if a concurrent admin action decided the hold first, the
+    reject raises KeyError and None is returned ("already decided").
+    """
+    from sincor2.sybil_defense import sybil_hold_ttl_ms
+    fabric = get_fabric()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id) or {}
+        hold = task.get("sybil_hold")
+        if not hold or task.get("state") != "held":
+            return None
+        try:
+            age_ms = _now_ms() - int(hold.get("held_at") or 0)
+        except (TypeError, ValueError):
+            age_ms = 0
+        if age_ms < sybil_hold_ttl_ms():
+            return None
+    try:
+        snap = _reject_sybil_hold(task_id, decided_by=decided_by)
+    except KeyError:
+        # Lost the race: a concurrent release/reject decided it first.
+        return None
+    try:
+        with fabric.lock:
+            t = fabric.tasks.get(task_id) or {}
+            dec = dict(t.get("sybil_hold_decision") or {})
+            dec["ttl_expired"] = True
+            dec["ttl_ms"] = sybil_hold_ttl_ms()
+            t["sybil_hold_decision"] = dec
+        snap["sybil_hold_decision"] = dec
+    except Exception:
+        pass
+    logger.warning("sybil hold TTL expired: task %s auto-rejected", task_id)
+    return snap
+
+
+def _release_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any]:
+    """Release a held payout: stage it and run settlement bookkeeping.
+
+    Mirrors the settlement tail of :func:`submit_proof` (staged receipt,
+    task settlement fields, +0.2 reputation, stake release,
+    completion record, sponsored-stake recoup). The hold context stored
+    at hold time is the single source of truth — nothing is
+    re-derived from mutable task state except the task record itself.
+
+    Settles EXACTLY ONCE: the hold state is re-verified under the
+    second lock (W-81 finding 2) — a concurrent release/reject that
+    decided the hold while ``stage_payout`` ran returns the
+    already-recorded outcome instead of settling twice. An expired hold
+    auto-rejects (TTL, fail closed) instead of releasing.
+    """
+    # TTL first: an expired hold auto-rejects (fail closed) — money never
+    # moves on a hold no human reviewed in time.
+    expired_snap = _expire_sybil_hold_if_due(task_id, decided_by=decided_by)
+    if expired_snap is not None:
+        return expired_snap
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task or task.get("state") != "held" or not task.get("sybil_hold"):
+            raise KeyError("no held payout for task %s" % task_id)
+        hold = dict(task["sybil_hold"])
+    agent_id = hold["agent_id"]
+    wallet = hold["wallet"]
+    amount = float(hold["amount_axm"])
+    receipt_hash = hold["receipt_hash"]
+    proof_id = hold["proof_id"]
+    tags = list(hold.get("tags") or [])
+    receipt = stage_payout(agent_id=agent_id, wallet=wallet, amount_axm=amount,
+                           task_id=task_id, receipt_hash=receipt_hash)
+    # Honest payout surface (#465): only a real broadcast earns
+    # "paid"/payout_tx — mirrors submit_proof exactly. A staged digest is
+    # never stored under the tx-shaped payout_tx field.
+    payout = payout_broadcast_status(receipt)
+    receipt["sybil"] = {
+        "held": True,
+        "released_by": decided_by,
+        "released_at": ts,
+        "hold_reason": hold.get("reason"),
+        "ring": hold.get("ring"),
+    }
+    with fabric.lock:
+        task = fabric.tasks.get(task_id) or {}
+        # W-81 finding 2: re-verify under this lock. A concurrent
+        # release/reject may have decided the hold while stage_payout
+        # ran outside the first lock — settle exactly once. If the hold
+        # is gone, return the already-recorded outcome and discard the
+        # staged receipt (stage_payout is side-effect-free: it only
+        # builds a receipt dict).
+        if task.get("state") != "held" or not task.get("sybil_hold"):
+            proof = fabric.proofs.get(proof_id) or {}
+            snap = dict(proof)
+            hold_snap = dict(proof.get("sybil_hold") or {})
+            hold_snap["race_noop"] = (
+                "hold already decided by a concurrent admin action; "
+                "this release staged nothing")
+            snap["sybil_hold"] = hold_snap
+            snap["http_status"] = 200
+            return snap
+        task["state"] = "settled" if receipt.get("ok") else "failed"
+        task["payout_axm"] = amount
+        if payout["broadcasted"]:
+            task["payout_tx"] = payout["tx_hash"]
+            task.pop("payout_staged_digest", None)
+        else:
+            # Claim-honesty (#465): a staged digest is not a tx hash —
+            # never store it under the tx-shaped "payout_tx" field name.
+            task.pop("payout_tx", None)
+            if payout["staged_digest"]:
+                task["payout_staged_digest"] = payout["staged_digest"]
+            else:
+                task.pop("payout_staged_digest", None)
+        task["settled_at"] = ts
+        task["sybil_hold_decision"] = {
+            "decision": "released", "at": ts, "by": decided_by,
+        }
+        task.pop("sybil_hold", None)
+        if receipt.get("ok") and fabric.agents.get(agent_id):
+            ag = fabric.agents[agent_id]
+            _apply_reputation(ag, float(ag.get("reputation") or 0) + 0.2)
+        proof = fabric.proofs.get(proof_id) or {}
+        proof.update({
+            "status": payout["proof_status"],
+            "settled_at": ts,
+            "payout": receipt,
+            "sybil_hold": {"decision": "released", "at": ts, "by": decided_by},
+        })
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    if receipt.get("ok"):
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            stake_ledger().release(agent_id, task_id)
+        except Exception as err:
+            logger.warning("winner stake release failed for %s: %s", agent_id, err)
+        # Bounty-pool spend (W-99): the allocation backing this held
+        # task's bounty is consumed (allocated -> spent) now that the
+        # released payout staged — mirrors the submit_proof settlement
+        # tail. Without this the pool ledger drifts: money paid on
+        # release but the allocation stays "allocated" forever.
+        # Never bricks settlement on accounting. spend() is a terminal
+        # allocated->spent transition (raises unless allocated) and
+        # allocations_for_task() returns only live allocations, so a
+        # retry or a concurrent release cannot double-spend.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            pool = bounty_pool()
+            for alloc in pool.allocations_for_task(task_id):
+                pool.spend(alloc["allocation_id"])
+        except Exception as err:
+            logger.warning("pool spend failed for released held task %s: %s",
+                           task_id, err)
+        try:
+            from sincor2.onchain.stake_ledger import stake_ledger
+            _task = get_fabric().tasks.get(task_id) or {}
+            stake_ledger().record_completion(
+                agent_id, task_id, poster_id=_task.get("poster_id"))
+        except Exception as err:
+            logger.warning("reputation record failed for %s: %s", agent_id, err)
+        try:
+            from sincor2.sponsored_stake import recoup_sponsored_stake
+            recoup_sponsored_stake(
+                agent_id, int(round(amount * 1e18)), task_id=task_id)
+        except Exception as err:
+            logger.warning(
+                "sponsored-stake recoup skipped for %s: %s", agent_id, err)
+    logger.warning("sybil hold released: task %s paid %.4f AXM to %s (by %s)",
+                   task_id, amount, agent_id, decided_by)
+    fabric.publish("proof.settled", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 200
+    return snap
+
+
+def _reject_sybil_hold(task_id: str, decided_by: str = "admin") -> Dict[str, Any]:
+    """Reject a held payout: no money moves, the task is marked rejected.
+
+    The winner's stake lock is deliberately NOT released here — same as
+    a failed settlement in :func:`submit_proof`, the lock survives so the
+    adjudicator can rule. The proof record is preserved with the
+    rejection decision for audit.
+    """
+    fabric = get_fabric()
+    ts = _now_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if not task or task.get("state") != "held" or not task.get("sybil_hold"):
+            raise KeyError("no held payout for task %s" % task_id)
+        hold = dict(task["sybil_hold"])
+        proof_id = hold["proof_id"]
+        tags = list(hold.get("tags") or [])
+        task["state"] = "rejected"
+        task["sybil_hold_decision"] = {
+            "decision": "rejected", "at": ts, "by": decided_by,
+            "reason": hold.get("reason"),
+        }
+        task.pop("sybil_hold", None)
+        proof = fabric.proofs.get(proof_id) or {}
+        proof.update({
+            "status": "rejected",
+            "sybil_hold": {"decision": "rejected", "at": ts, "by": decided_by},
+        })
+        fabric.proofs[proof_id] = proof
+        snap = dict(proof)
+    # W-98: release the pool backing — rejected payout, no money moves,
+    # so the task's allocation returns to available unspent. Mirrors the
+    # expiry path exactly: only live ("allocated") allocations are picked
+    # up, so an already-released/spent allocation is never
+    # double-released. Fail-safe: never bricks the reject on accounting.
+    try:
+        from sincor2.a2a_bounty_pool import bounty_pool
+        for alloc in bounty_pool().allocations_for_task(task_id):
+            bounty_pool().release(alloc["allocation_id"])
+    except Exception as err:
+        logger.warning("pool release failed for rejected sybil hold %s: %s",
+                       task_id, err)
+    logger.warning("sybil hold rejected: task %s payout to %s denied (by %s)",
+                   task_id, hold.get("agent_id"), decided_by)
+    fabric.publish("proof.rejected", tags, snap)
+    _save_agents(fabric)
+    _save_tasks(fabric)
+    snap["http_status"] = 200
     return snap
 
 
@@ -867,24 +1955,70 @@ def seed_probation_tasks() -> List[Dict[str, Any]]:
 
 
 def _require_pool_admin():
-    """Admin gate for bounty-pool write endpoints.
+    """Admin gate for bounty-pool write endpoints and task-board admin.
+
+    Single unified credential (G2.13): ``ADMIN_PASSWORD`` from the
+    environment, presented ONLY via the ``X-Admin-Key`` request header.
+    Credentials are never accepted in request bodies (secret-persistence
+    risk in logs), and the expected value is never logged. Comparison is
+    constant-time.
 
     Returns ``None`` when authorized, otherwise an error response tuple.
-    Deny-by-default: an unset ``SINCOR_BOUNTY_POOL_ADMIN_KEY`` disables the
-    admin surface (503). Key accepted via ``X-Admin-Key`` header or the
-    ``admin_key`` body field, mirroring the mvp_app admin-key pattern.
+    Deny-by-default: an unset ``ADMIN_PASSWORD`` disables the admin
+    surface (503).
     """
     from sincor2.a2a_bounty_pool import ADMIN_KEY_ENV, pool_admin_configured
     if not pool_admin_configured():
         return _http_error("bounty pool admin not configured", 503)
     key = request.headers.get("X-Admin-Key", "") or ""
-    if not key:
-        body = request.get_json(silent=True) or {}
-        key = str(body.get("admin_key") or "")
     expected = os.environ.get(ADMIN_KEY_ENV, "")
-    if not key or not _hmac.compare_digest(str(key), expected):
+    if not key or not expected or not _hmac.compare_digest(str(key), str(expected)):
         return _http_error("admin authorization required", 401)
     return None
+
+
+# ---------------------------------------------------------------------------
+# SSE stream slot accounting (G2.10)
+# ---------------------------------------------------------------------------
+# Each open stream holds a worker thread for up to STREAM_IDLE_TIMEOUT_S, so
+# unauthenticated / unbounded streams are a worker-exhaustion vector. Slots
+# are tracked per authenticated caller key (see check_stream_auth) under one
+# lock; the generator releases its slot in a finally block so disconnects,
+# timeouts, and errors all free the slot. Test hook: reset_stream_slots().
+
+_STREAM_SLOTS: Dict[str, int] = {}
+_STREAM_LOCK = threading.Lock()
+
+
+def acquire_stream_slot(caller_key: str) -> bool:
+    """Take one stream slot for caller_key. False when the caller is at cap."""
+    with _STREAM_LOCK:
+        n = _STREAM_SLOTS.get(caller_key, 0)
+        if n >= STREAM_MAX_PER_CALLER:
+            return False
+        _STREAM_SLOTS[caller_key] = n + 1
+        return True
+
+
+def release_stream_slot(caller_key: str) -> None:
+    """Release one stream slot. Safe to call more often than acquire."""
+    with _STREAM_LOCK:
+        n = _STREAM_SLOTS.get(caller_key, 0)
+        if n <= 1:
+            _STREAM_SLOTS.pop(caller_key, None)
+        else:
+            _STREAM_SLOTS[caller_key] = n - 1
+
+
+def stream_slot_count(caller_key: str) -> int:
+    with _STREAM_LOCK:
+        return _STREAM_SLOTS.get(caller_key, 0)
+
+
+def reset_stream_slots() -> None:
+    """Clear all stream slots. Test isolation hook — call between tests."""
+    with _STREAM_LOCK:
+        _STREAM_SLOTS.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -897,6 +2031,86 @@ class _IssueAuthError(ValueError):
 
 class _IssueLiveBlocked(RuntimeError):
     """Live issuance attempted while P24 is live-blocked -> 403."""
+
+
+class _IssueBindingError(RuntimeError):
+    """Caller/creator_id binding violation -> 403."""
+
+
+# ---------------------------------------------------------------------------
+# W-38 creator-ID binding, screening, idempotency (pre-live hardening).
+#
+# The pre-hardening route let a free-registered agent dry-run issuance under
+# an ARBITRARY creator_id: no caller/KYA binding, no creator-ID screening,
+# no idempotency — so the first squatter to register a creator_id blocked
+# the legitimate creator with a 409. Three rules close the gap (issuance
+# itself stays live-blocked by catalog design; this is pre-live hardening
+# only):
+#
+# 1. BINDING: creator_id must equal the caller's registered agent_id. The
+#    route's verified identity is fabric membership (agent_id in
+#    fabric.agents) — the same identity the registration KYA hook binds to
+#    wallet/card in kya_registry.list_from_inbound. A creator_id that does
+#    not belong to the caller is REJECTED with 403 (never force-overridden:
+#    a silent rewrite would corrupt the idempotency fingerprint and hide
+#    caller intent from the audit trail).
+# 2. SCREENING: creator_id must be 1-64 chars, start with a letter/digit,
+#    and contain only [A-Za-z0-9._-] (whitespace, control characters and
+#    unicode confusables are rejected by the charset whitelist); it must
+#    not be a reserved platform identity, and must not use a deceptive
+#    official/platform prefix. Violations -> 400.
+# 3. IDEMPOTENCY: the view carries @idempotent("socialfi.issue"), so a
+#    retried request replays the original 201 instead of executing again —
+#    no duplicate registrations, no new squat windows.
+# ---------------------------------------------------------------------------
+
+CREATOR_ID_MAX_LEN = 64
+CREATOR_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+# Reserved platform identities (exact, case-insensitive): no caller may
+# claim these as their creator_id.
+CREATOR_ID_RESERVED = frozenset({
+    "sincor", "sincor2", "official", "admin", "administrator", "system",
+    "support", "treasury", "foundation", "staff", "moderator", "root",
+    "official-team", "sincor-team",
+})
+
+# Deceptive prefixes (case-insensitive): e.g. "official-team",
+# "sincor-support", "admin-help" would read as platform-endorsed.
+CREATOR_ID_IMPERSONATION_PREFIXES = (
+    "sincor-", "sincor_", "sincor.",
+    "official-", "official_", "official.",
+    "admin-", "admin_",
+)
+
+
+def _validate_creator_id(creator_id, agent_id):
+    """Enforce the creator-ID screening + caller-binding rules (W-38).
+
+    ``creator_id`` must be a screened value AND equal to the caller's
+    registered ``agent_id``. Raises _IssueBindingError (403) when the
+    creator_id does not belong to the caller; ValueError (400) on screened
+    values (empty, overlong, bad charset, reserved, or impersonating).
+    """
+    if not isinstance(creator_id, str) or not creator_id:
+        raise ValueError("creator_id must be 1-64 characters")
+    if len(creator_id) > CREATOR_ID_MAX_LEN:
+        raise ValueError("creator_id must be 1-64 characters")
+    if not CREATOR_ID_RE.fullmatch(creator_id):
+        raise ValueError(
+            "creator_id must start with a letter or digit and contain only "
+            "letters, digits, '.', '_' or '-'")
+    lowered = creator_id.lower()
+    if lowered in CREATOR_ID_RESERVED:
+        raise ValueError("creator_id is a reserved platform identity")
+    if lowered.startswith(CREATOR_ID_IMPERSONATION_PREFIXES):
+        raise ValueError(
+            "creator_id is deceptive: must not impersonate an official or "
+            "platform identity")
+    if creator_id != agent_id:
+        raise _IssueBindingError(
+            "creator_id does not belong to the caller: issuance is bound "
+            "to the caller's registered agent_id")
 
 
 _socialfi_onboarding_agent = None
@@ -961,26 +2175,56 @@ def attach_market_routes(bp: Blueprint) -> None:
             if any(b.get("task_id") == task_id for b in fabric.bids.values()):
                 return _http_error("task has bids; close the auction instead", 409)
             released = []
+            release_failures = []
             try:
                 from sincor2.a2a_bounty_pool import bounty_pool
                 pool = bounty_pool()
-                for alloc in pool.allocations_for_task(task_id):
-                    try:
-                        pool.release(alloc["allocation_id"])
-                        released.append(alloc["allocation_id"])
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+                allocations = pool.allocations_for_task(task_id)
+            except Exception as err:
+                # G2.12: a pool failure must surface, never vanish. Log it
+                # loudly and record it for the response below.
+                logger.exception(
+                    "pool lookup failed during task delete task_id=%s", task_id)
+                allocations = []
+                release_failures.append({
+                    "allocation_id": None,
+                    "error": f"pool lookup failed: {err}",
+                })
+            for alloc in allocations:
+                alloc_id = alloc.get("allocation_id")
+                try:
+                    pool.release(alloc_id)
+                    released.append(alloc_id)
+                except Exception as err:
+                    # G2.12: never swallow a release failure — the funds
+                    # stay allocated to a deleted task, which is a
+                    # money-path inconsistency the operator must repair.
+                    logger.exception(
+                        "pool release failed during task delete "
+                        "task_id=%s allocation_id=%s", task_id, alloc_id)
+                    release_failures.append({
+                        "allocation_id": alloc_id,
+                        "error": str(err),
+                    })
             fabric.tasks.pop(task_id, None)
             snap = dict(task)
         _save_tasks(fabric)
         try:
             fabric.publish("task.deleted", snap.get("tags") or [],
                            {"task_id": task_id, "seed_key": snap.get("seed_key"),
-                            "released_allocations": released})
+                            "released_allocations": released,
+                            "release_failures": release_failures})
         except Exception:
             pass
+        if release_failures:
+            # The task row is deleted, but pool money did not move back.
+            # Surface it as an error (never a clean 200) so no caller or
+            # operator can mistake this for a fully clean delete.
+            return _http_error(
+                "task deleted but pool release failed", 500,
+                deleted=task_id,
+                released_allocations=released,
+                release_failures=release_failures)
         return jsonify({"deleted": task_id, "released_allocations": released}), 200
 
     @bp.get("/v1/a2a/tasks/<task_id>")
@@ -1069,17 +2313,47 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/bids/commit")
     @idempotent("bids.commit", error=_http_error)
     def v1_bids_commit():
-        """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}.
+        """Sealed-bid commit phase. Body: {task_id, agent_id, commitment}
+        plus bidder auth (authSignature + authTimestamp + authNonce).
 
         commitment = keccak256(abi.encodePacked(bytes32(price_wei), salt,
         keccak256(agent_id))) as 0x hex — the OFFCHAIN shim preimage. It is
         NOT an onchain commitment: the onchain scheme additionally binds
         auctionId and chainId, so shim hashes must never be submitted to
         CommitRevealAuction.commit().
+
+        W-77: the commit locks the named agent's stake, so the caller must
+        prove control of the agent — an EIP-191 signature by the agent's
+        registered wallet over the exact bid message, or the operator
+        heartbeat token.  Unsigned commits are rejected (403).
         """
         body = request.get_json(silent=True) or {}
         try:
-            record = commit_bid(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), body.get("commitment"))
+            task_id = str(body.get("task_id") or "")
+            agent_id = str(body.get("agent_id") or "")
+            commitment = body.get("commitment")
+            # VERIFIED-2 / W-77 idempotent retry: a byte-identical re-POST
+            # of an already-recorded commit returns the existing record
+            # WITHOUT re-authenticating and WITHOUT re-locking stake.  No
+            # new authorization is created — only the identical existing
+            # record is returned — so the single-use signature guarantee
+            # for fresh authorizations is unaffected.
+            try:
+                _commit_hex = "0x" + _parse_bytes32_hex(commitment, "commitment").hex()
+            except ValueError:
+                _commit_hex = None
+            if _commit_hex and _commit_hex != "0x" + "00" * 32:
+                _fabric = get_fabric()
+                with _fabric.lock:
+                    _existing = _fabric.commits.get(_commit_key(task_id, agent_id))
+                if _existing is not None and str(
+                    _existing.get("commitment") or ""
+                ).lower() == _commit_hex.lower():
+                    return jsonify(dict(_existing)), 201
+            _require_bid_auth(agent_id, body, purpose="commit",
+                              task_id=task_id,
+                              payload=str(commitment or ""))
+            record = commit_bid(task_id, agent_id, commitment)
             return jsonify(record), 201
         except ValueError as err:
             return _http_error(str(err), 400)
@@ -1094,15 +2368,28 @@ def attach_market_routes(bp: Blueprint) -> None:
     @idempotent("bids.reveal", error=_http_error)
     def v1_bids_reveal():
         """Sealed-bid reveal phase. Body: {task_id, agent_id, bid_axm, nonce}
-        (+ optional estimated_seconds). The commitment is recomputed and
-        compared in constant time; only valid reveals become bids."""
+        (+ optional estimated_seconds) plus bidder auth (authSignature +
+        authTimestamp + authNonce). The commitment is recomputed and
+        compared in constant time; only valid reveals become bids.
+
+        W-77: the reveal must come from the same wallet that committed —
+        the caller proves control of the agent's registered wallet (or the
+        operator token), same as the commit phase.
+        """
         body = request.get_json(silent=True) or {}
         try:
+            task_id = str(body.get("task_id") or "")
+            agent_id = str(body.get("agent_id") or "")
+            bid_axm = float(body.get("bid_axm") or 0)
+            nonce = body.get("nonce")
+            _require_bid_auth(agent_id, body, purpose="reveal",
+                              task_id=task_id,
+                              payload=f"{bid_axm}:{nonce}")
             bid = reveal_bid(
-                str(body.get("task_id") or ""),
-                str(body.get("agent_id") or ""),
-                float(body.get("bid_axm") or 0),
-                body.get("nonce"),
+                task_id,
+                agent_id,
+                bid_axm,
+                nonce,
                 int(body.get("estimated_seconds") or DEFAULT_REVEAL_TIME_EST_SEC),
             )
             return jsonify(bid), 201
@@ -1212,9 +2499,27 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.post("/v1/a2a/proofs")
     @bp.post("/api/v1/proofs")
     def v1_proofs():
+        # Body: {task_id, agent_id, receipt_hash} plus optional
+        # receipt-content binding (item 77): either `deliverable` (raw
+        # content; hash is computed server-side) or a pre-built
+        # `evidence` mapping {payment_receipt_hash, deliverable_hash,
+        # deliverable_uri, content_binding_sig?}.  Receipt-only evidence
+        # is rejected fail-closed by validate_dispute_evidence.
         body = request.get_json(silent=True) or {}
+        kwargs: Dict[str, Any] = {}
+        if "deliverable" in body:
+            kwargs["deliverable"] = body.get("deliverable")
+            kwargs["deliverable_uri"] = body.get("deliverable_uri") or ""
+            kwargs["content_binding_sig"] = body.get("content_binding_sig") or ""
+        if body.get("evidence") is not None:
+            kwargs["evidence"] = body.get("evidence")
+        # W-100: poster_acceptance_sig is NOT accepted here.  The
+        # proof_id is minted server-side inside submit_proof, so no poster
+        # could sign the canonical acceptance beforehand — the parameter
+        # was unverifiable dead code.  Clearance happens post-settle via
+        # POST /v1/a2a/proofs/clear-wash-flag.
         try:
-            proof = submit_proof(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), str(body.get("receipt_hash") or ""))
+            proof = submit_proof(str(body.get("task_id") or ""), str(body.get("agent_id") or ""), str(body.get("receipt_hash") or ""), **kwargs)
             return jsonify(proof), 202
         except ValueError as err:
             return _http_error(str(err), 400)
@@ -1224,6 +2529,70 @@ def attach_market_routes(bp: Blueprint) -> None:
             return _http_error(str(err), 403)
         except RuntimeError as err:
             return _http_error(str(err), 409)
+
+    @bp.post("/v1/a2a/proofs/clear-wash-flag")
+    @bp.post("/api/v1/proofs/clear-wash-flag")
+    def v1_clear_wash_flag():
+        # Body: {task_id, proof_id, poster_acceptance_sig}.  Poster-initiated
+        # clearance of a W-89 wash-anomaly flag: the acceptance is verified
+        # against the POSTER's registered wallet (EIP-191 over the canonical
+        # task_id/proof_id/receipt_hash message).  Never raises; a rejected
+        # acceptance keeps the flag and is logged loudly.
+        body = request.get_json(silent=True) or {}
+        try:
+            from sincor2.wash_guard import clear_wash_anomaly
+            result = clear_wash_anomaly(
+                str(body.get("task_id") or ""),
+                str(body.get("proof_id") or ""),
+                str(body.get("poster_acceptance_sig") or ""),
+            )
+            return jsonify(result), 200
+        except Exception as err:  # clearance must never brick the API
+            logger.warning("[WASH-GUARD] clear-wash-flag failed: %s", err)
+            return jsonify({"cleared": False, "reason": "internal error"}), 200
+
+    @bp.get("/v1/a2a/sybil/holds")
+    def v1_sybil_holds():
+        """List payouts held for manual sybil review (W-81).
+
+        Admin-gated. Each hold carries the ring details the reviewer
+        needs: cohort size/members, winner/poster standing, and the
+        reason the payout was parked instead of staged.
+        """
+        err = _require_pool_admin()
+        if err:
+            return err
+        fabric = get_fabric()
+        with fabric.lock:
+            holds = [
+                dict(t.get("sybil_hold") or {})
+                for t in fabric.tasks.values()
+                if t.get("state") == "held" and t.get("sybil_hold")
+            ]
+        holds.sort(key=lambda h: h.get("held_at") or 0)
+        return jsonify({"holds": holds, "count": len(holds)}), 200
+
+    @bp.post("/v1/a2a/sybil/holds/<task_id>/release")
+    def v1_sybil_hold_release(task_id):
+        """Release a held payout: stage it and settle (W-81). Admin-gated."""
+        err = _require_pool_admin()
+        if err:
+            return err
+        try:
+            return jsonify(_release_sybil_hold(task_id)), 200
+        except KeyError as exc:
+            return _http_error(str(exc), 404)
+
+    @bp.post("/v1/a2a/sybil/holds/<task_id>/reject")
+    def v1_sybil_hold_reject(task_id):
+        """Reject a held payout: no money moves (W-81). Admin-gated."""
+        err = _require_pool_admin()
+        if err:
+            return err
+        try:
+            return jsonify(_reject_sybil_hold(task_id)), 200
+        except KeyError as exc:
+            return _http_error(str(exc), 404)
 
     @bp.get("/v1/a2a/auctions")
     def v1_auctions():
@@ -1297,7 +2666,7 @@ def attach_market_routes(bp: Blueprint) -> None:
                 "vickreyResult(bytes32 auctionId) -> (address winner, "
                 "uint256 price)",
             ],
-            "docs": "/docs/a2a/bidder-wallet-flow",
+            "docs": "/docs/a2a",
         }
         agent_id = request.args.get("agent_id")
         if agent_id:
@@ -1332,10 +2701,11 @@ def attach_market_routes(bp: Blueprint) -> None:
     def v1_stake_deposit():
         """Self-service stake deposit (offchain AXM ledger — Pool 1).
 
-        Body: {agent_id, amount_axm, tx_hash?}. Records stake in the
-        process-wide stake-ledger singleton, so the deposit is visible to
-        commit_bid immediately (no reload; the flip side is that a
-        deposit is only visible to the process that received it).
+        Body: {agent_id, amount_axm, tx_hash?, expires_at_ms, signature}.
+        Records stake in the process-wide stake-ledger singleton, so the
+        deposit is visible to commit_bid immediately (no reload; the flip
+        side is that a deposit is only visible to the process that received
+        it).
 
         Currency note: this moves offchain AXM-denominated ledger
         accounting only. It does not move funds on any chain. The optional
@@ -1345,6 +2715,23 @@ def attach_market_routes(bp: Blueprint) -> None:
         The agent must be registered (unknown agent -> 404). A fresh
         heartbeat is NOT required: an agent with an expired heartbeat may
         still top up stake; the heartbeat gate applies at commit time.
+
+        Idempotent on tx_hash: a retry of the same deposit (same tx_hash,
+        agent, amount) returns the existing record with ``duplicate=true``
+        (HTTP 200) and credits nothing further.  A tx_hash bound to a
+        different agent or amount is rejected (HTTP 400).
+
+        Identity binding (fail-closed): the deposit must carry an EIP-191
+        signature over the canonical message
+            SINCOR-STAKE-DEPOSIT|<agent_id>|<amount_wei>|<wallet>|<expires_at_ms>
+        produced by the wallet registered on the agent record, plus
+        ``expires_at_ms`` bounding replay to a 15-minute window. Unsigned
+        deposits are rejected (403): an unattributed deposit can never
+        touch the stake ledger, so attacker-controlled attribution — e.g.
+        topping up a target's stake to shift slash economics — is
+        impossible. Each signature is single-use; in-window replays are
+        rejected (403). An agent with no (or a malformed) registered
+        wallet cannot self-deposit: re-register with a wallet address.
         """
         body = request.get_json(silent=True) or {}
         try:
@@ -1353,8 +2740,10 @@ def attach_market_routes(bp: Blueprint) -> None:
                 raise ValueError("agent_id is required")
             fabric = get_fabric()
             with fabric.lock:
-                if agent_id not in fabric.agents:
+                agent = fabric.agents.get(agent_id)
+                if agent is None:
                     raise KeyError("unknown agent")
+                wallet = str(agent.get("wallet") or "").strip()
             raw_amount = body.get("amount_axm")
             if raw_amount is None:
                 raise ValueError("amount_axm is required")
@@ -1378,18 +2767,81 @@ def attach_market_routes(bp: Blueprint) -> None:
                 except ValueError:
                     raise ValueError(
                         "tx_hash must be 0x-prefixed 32-byte hex")
+            if not _is_ethereum_address(wallet):
+                raise PermissionError(
+                    "agent has no verifiable wallet; re-register with a "
+                    "wallet address before depositing")
+            signature = str(body.get("signature") or "").strip()
+            if not signature:
+                # Fail-closed: an unsigned deposit is rejected as
+                # unauthorized, not as a malformed request.
+                raise PermissionError(
+                    "signature required: deposits must be authorized by "
+                    "the agent's registered wallet")
+            raw_expires = body.get("expires_at_ms")
+            if raw_expires is None:
+                raise ValueError("expires_at_ms is required")
+            try:
+                expires_at_ms = int(raw_expires)
+            except (TypeError, ValueError):
+                raise ValueError("expires_at_ms must be an integer")
+            now_ms = _now_ms()
+            if expires_at_ms <= now_ms:
+                raise PermissionError("deposit authorization expired")
+            if expires_at_ms - now_ms > STAKE_DEPOSIT_MAX_SKEW_MS:
+                raise ValueError("expires_at_ms too far in the future")
+            # The message is rebuilt from server-side values only: the
+            # registered wallet, the parsed amount, agent_id and expiry.
+            # A signature obtained for any other agent/amount/wallet can
+            # never satisfy this message, and caller-supplied identity
+            # fields cannot override the recovered signer.
+            message = stake_deposit_message(
+                agent_id, amount_wei, wallet, expires_at_ms)
+            try:
+                signer = _recover_eip191(message, signature)
+            except Exception:  # noqa: BLE001 - any recovery failure rejects
+                raise PermissionError("bad signature")
+            if signer.lower() != wallet.lower():
+                # Deliberately opaque: do not reveal which check failed.
+                raise PermissionError(
+                    "deposit not authorized by the registered wallet")
+            # W-40: normalize the signature to canonical bytes BEFORE
+            # hashing. eth_account recovery accepts the same 65 signature
+            # bytes in many encodings (lower/UPPER hex, with/without the
+            # 0x prefix), and the v byte itself is malleable: v in
+            # {0, 1, 27, 28} with 0==27 and 1==28 recover to the identical
+            # signer. Hashing the raw caller-supplied string (or the raw
+            # 65 bytes) let one signing operation credit stake N times.
+            # require_low_s parses every encoding eth_account accepts,
+            # enforces low-s, maps v 0->27 and 1->28, rejects any other v,
+            # and returns the single canonical 65 bytes. It already ran
+            # inside _recover_eip191 above, so this cannot raise here.
+            sig_hash = hashlib.sha256(
+                require_low_s(signature)).hexdigest()
             from sincor2.onchain.stake_ledger import stake_ledger
-            summary = stake_ledger().deposit(
-                agent_id, amount_wei, reference=tx_hash)
+            ledger = stake_ledger()
+            # W-41: the single-use check-and-record is atomic inside
+            # ledger.deposit() (instance lock + POSIX exclusive file
+            # lock, after a fresh reload). The old route-level pre-check
+            # raced across worker processes (in-memory scan under a
+            # process-local lock), so it is gone: the ledger owns it.
+            summary = ledger.deposit(
+                agent_id, amount_wei, reference=tx_hash,
+                signature_hash=sig_hash)
             result = dict(summary)
-            result["deposit_wei"] = str(amount_wei)
+            result["deposit_wei"] = summary["credited_wei"]
             result["tx_hash"] = tx_hash
             result["ledger"] = "offchain-axm"
-            return jsonify(result), 201
+            # Honest retries of the same deposit get 200 + duplicate=true;
+            # fresh deposits get 201.  Neither is an error.
+            status = 200 if summary.get("duplicate") else 201
+            return jsonify(result), status
         except (ValueError, OverflowError) as err:
             return _http_error(str(err), 400)
         except KeyError as err:
             return _http_error(str(err), 404)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
 
     @bp.get("/v1/a2a/stake/<agent_id>")
     def v1_stake_balance(agent_id):
@@ -1408,6 +2860,31 @@ def attach_market_routes(bp: Blueprint) -> None:
         summary["ledger"] = "offchain-axm"
         return jsonify(summary), 200
 
+    @bp.get("/v1/a2a/escrow-exposure/<agent_id>")
+    def v1_escrow_exposure(agent_id):
+        """Per-agent open winning-escrow exposure (W-78 concentration cap).
+
+        Returns the agent's aggregate open escrow exposure in AXM, the
+        absolute cap (MAX_AGENT_OPEN_ESCROW_AXM), remaining headroom, and
+        the open escrow task list.  Unknown agent -> 404 (same convention
+        as /v1/a2a/stake/<agent_id>).  Pure read: never mutates fabric or
+        the ledger.
+        """
+        agent_id = str(agent_id or "").strip()
+        fabric = get_fabric()
+        with fabric.lock:
+            if agent_id not in fabric.agents:
+                return _http_error("unknown agent", 404)
+            escrows = _open_escrows_locked(fabric, agent_id)
+        exposure = sum(e["winning_bid_axm"] for e in escrows)
+        return jsonify({
+            "agent_id": agent_id,
+            "open_exposure_axm": exposure,
+            "cap_axm": MAX_AGENT_OPEN_ESCROW_AXM,
+            "headroom_axm": max(0.0, MAX_AGENT_OPEN_ESCROW_AXM - exposure),
+            "open_escrows": escrows,
+        }), 200
+
     # -- P24 SocialFi issuance -------------------------------------------
     # Agent-triggered creator-token issuance. This route is a CALLER of the
     # P24 issuance flow: content-policy enforcement stays in
@@ -1416,15 +2893,21 @@ def attach_market_routes(bp: Blueprint) -> None:
     # is served until the founder releases the live block.
 
     @bp.post("/v1/a2a/socialfi/issue")
+    @idempotent("socialfi.issue", error=_http_error)
     def v1_socialfi_issue():
         """Issue a P24 creator token for a registered agent (dry-run only).
 
         Body: {agent_id, name, symbol, creator_id?, description?, bio?,
         dry_run?}. The agent must be registered (unknown agent -> 401);
-        this is membership auth, not cryptographic proof. Metadata is
+        this is membership auth, not cryptographic proof. creator_id is
+        bound to the caller's registered agent_id (mismatch -> 403), and
+        is content-screened (empty/overlong/bad charset/reserved/
+        impersonating -> 400); see the W-38 block above. Metadata is
         screened against the content-policy deny-list (violation -> 400
-        with the ruleset version); duplicate creator -> 409. Live issuance
-        is refused with 403 while P24 is live-blocked; dry_run=true
+        with the ruleset version); duplicate creator -> 409. The route is
+        idempotency-keyed ("socialfi.issue" scope): a retry with the same
+        key replays the original response instead of re-executing. Live
+        issuance is refused with 403 while P24 is live-blocked; dry_run=true
         (default) exercises the full screened issuance path without
         broadcasting.
         """
@@ -1440,9 +2923,12 @@ def attach_market_routes(bp: Blueprint) -> None:
             with fabric.lock:
                 if agent_id not in fabric.agents:
                     raise _IssueAuthError("agent authentication required")
-            creator_id = str(body.get("creator_id") or agent_id).strip()
-            if not creator_id or len(creator_id) > 64:
-                raise ValueError("creator_id must be 1-64 characters")
+            # creator_id defaults to the caller's own agent_id when omitted;
+            # an explicitly empty value is rejected (no silent fallback).
+            raw_creator = body.get("creator_id")
+            creator_id = (agent_id if raw_creator is None
+                          else str(raw_creator).strip())
+            _validate_creator_id(creator_id, agent_id)
             name = str(body.get("name") or "").strip()
             if not name or len(name) > 64:
                 raise ValueError("name must be 1-64 characters")
@@ -1484,6 +2970,8 @@ def attach_market_routes(bp: Blueprint) -> None:
             }), 201
         except _IssueAuthError as err:
             return _http_error(str(err), 401)
+        except _IssueBindingError as err:
+            return _http_error(str(err), 403)
         except _IssueLiveBlocked as err:
             return _http_error(str(err), 403)
         except policy.PolicyViolation as err:
@@ -1503,15 +2991,22 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     # -- Launch bounty pool -------------------------------------------
     # Offchain AXM reservation ledger for external-agent launch bounties.
-    # Writes are admin-gated (SINCOR_BOUNTY_POOL_ADMIN_KEY); the reserve is
+    # Writes are admin-gated (unified ADMIN_PASSWORD via X-Admin-Key
+    # header — see module docstring); the reserve is
     # operator-configured via SINCOR_LAUNCH_BOUNTY_AXM (default 0 = pool
     # unconfigured, fund() refuses). Ledger-only: moves no funds on-chain.
 
     @bp.get("/v1/a2a/pool")
     def v1_pool_status():
-        """Public pool status: reserve / funded / allocated / available."""
+        """Public pool status: reserve / funded / allocated / available,
+        plus aggregate ledger verification (W-101 wiring: verify_ledger()
+        previously had no production caller, so ledger drift sat
+        undetected at runtime)."""
         from sincor2.a2a_bounty_pool import bounty_pool
-        return jsonify(bounty_pool().status()), 200
+        pool = bounty_pool()
+        data = pool.status()
+        data["ledger_verification"] = pool.verify_ledger()
+        return jsonify(data), 200
 
     @bp.post("/v1/a2a/pool/fund")
     def v1_pool_fund():
@@ -1581,36 +3076,81 @@ def attach_market_routes(bp: Blueprint) -> None:
     @bp.get("/v1/a2a/stream")
     @bp.get("/api/v1/stream")
     def v1_stream():
+        # G2.10: the stream is authenticated and concurrency-capped. Each
+        # open connection holds a worker thread for up to
+        # STREAM_IDLE_TIMEOUT_S, so without the cap a single caller opening
+        # ~100 connections could starve the worker pool.
+        authed, caller_key = check_stream_auth()
+        if not authed:
+            return _http_error(
+                "unauthorized: stream requires the operator token "
+                "(X-Sincor-Heartbeat header or Authorization: Bearer) or a "
+                "registered agent_id (agent_id query param / X-Agent-Id header)",
+                401,
+            )
+        if not acquire_stream_slot(caller_key):
+            resp = jsonify({
+                "error": "stream_busy",
+                "status": 503,
+                "detail": (
+                    "too many concurrent streams for this caller "
+                    f"(max {STREAM_MAX_PER_CALLER})"
+                ),
+            })
+            resp.status_code = 503
+            resp.headers["Retry-After"] = "5"
+            return resp
+
         wanted = {t.strip().lower() for t in (request.args.get("tags") or "").split(",") if t.strip()}
 
-        def _gen():
-            fabric = get_fabric()
-            last = 0
-            idle = 0
-            yield ": inbound stream\n\n"
-            while idle < 120:
-                batch = []
-                with fabric.lock:
-                    for ev in fabric.events:
-                        if ev["seq"] > last:
-                            tags = {x.lower() for x in ev.get("tags") or []}
-                            if not wanted or wanted.intersection(tags):
-                                batch.append(ev)
-                            last = max(last, ev["seq"])
-                if batch:
-                    idle = 0
-                    for ev in batch:
-                        yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
-                else:
-                    idle += 1
-                    yield ": keepalive\n\n"
-                time.sleep(2)
+        # Exactly-once slot release. The generator's finally covers the
+        # normal path (server iterates to idle-timeout / disconnect), but if
+        # the WSGI server closes the response without ever iterating the
+        # generator (client gone before the first byte), the finally never
+        # runs — call_on_close covers that path. The guard prevents a
+        # double release from freeing another connection's slot.
+        stream_state = {"released": False}
 
-        return Response(
+        def _release_once() -> None:
+            if not stream_state["released"]:
+                stream_state["released"] = True
+                release_stream_slot(caller_key)
+
+        def _gen():
+            try:
+                fabric = get_fabric()
+                last = 0
+                idle = 0
+                yield ": inbound stream\n\n"
+                while idle < STREAM_IDLE_TIMEOUT_S // STREAM_KEEPALIVE_S:
+                    batch = []
+                    with fabric.lock:
+                        for ev in fabric.events:
+                            if ev["seq"] > last:
+                                tags = {x.lower() for x in ev.get("tags") or []}
+                                if not wanted or wanted.intersection(tags):
+                                    batch.append(ev)
+                                last = max(last, ev["seq"])
+                    if batch:
+                        idle = 0
+                        for ev in batch:
+                            yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
+                    else:
+                        idle += 1
+                        yield ": keepalive\n\n"
+                    time.sleep(STREAM_KEEPALIVE_S)
+            finally:
+                # Always free the slot: client disconnect, idle timeout,
+                # generator close, or an error mid-stream.
+                _release_once()
+
+        resp = Response(
             stream_with_context(_gen()),
             mimetype="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
         )
+        resp.call_on_close(_release_once)
+        return resp
 
     # Sponsored stake (genesis cohort): admin-gated, default off. The
     # mechanism lives in sincor2.sponsored_stake; the routes are attached
@@ -1618,6 +3158,12 @@ def attach_market_routes(bp: Blueprint) -> None:
     from sincor2.sponsored_stake import attach_sponsored_stake_routes
 
     attach_sponsored_stake_routes(bp)
+
+    # Honest activity metrics (AXM activity engine, stream C): every figure
+    # labeled ledger/onchain, computed from real store state.
+    from sincor2.a2a_activity import attach_activity_routes
+
+    attach_activity_routes(bp)
 
     # Bankruptcy recovery track: admin-gated, default off. Deterministic
     # eligibility (honest-fail only, tombstoned wallets excluded) with a

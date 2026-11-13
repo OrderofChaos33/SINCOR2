@@ -364,9 +364,10 @@ class OrderLifecycleManager:
             raise ValueError("already resolved")
         won = (pos.side == "YES") == outcome_yes
         if won:
-            # shares bought = size / entry_price, each redeeming 100 cents
-            shares = pos.size_cents / pos.entry_price
-            payout = int(round(shares * 100))
+            # CTF: 1 winning share redeems exactly 100 cents.
+            # shares bought = (size_cents / 100) / entry_price, so
+            # payout_cents = shares * 100 = size_cents / entry_price.
+            payout = int(round(pos.size_cents / pos.entry_price))
         else:
             payout = 0
         pos.resolved = True
@@ -530,3 +531,22 @@ def run_backtest(markets: List[Tuple[MarketSnapshot, float, int]],
         "markets_traded": len(per_market),
         "per_market": per_market,
     }
+
+
+# -- shared price-oracle wiring ------------------------------------------------
+# Declares this product's external price needs against the shared oracle
+# (sincor2.defi.price_oracle). Reference-backed until live feeds are wired;
+# never treated as a live integration.
+
+PRICE_ASSETS = ['ETH/USD', 'BTC/USD']
+
+
+def price_feed_for(oracle):
+    """Bind the shared price oracle to this product's declared assets.
+
+    Returns a ProductPriceFeed; ``feed.price(asset, now)`` raises on any
+    oracle failure (fail-closed). Live Chainlink/Pyth feeds are NOT wired —
+    production must inject real adapters (see price_oracle module docs).
+    """
+    from .price_oracle import wiring_for
+    return wiring_for("P14_PREDICTION", oracle)

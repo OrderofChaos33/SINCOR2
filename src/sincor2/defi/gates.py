@@ -203,9 +203,18 @@ def find_spec_text(protocol_id: str, root: str) -> Tuple[str, str]:
         return "", "unverified"
 
 
+def _is_superseded(entry: Dict[str, Any]) -> bool:
+    """An entry marked superseded is dead evidence: it must never count
+    toward any gate, no matter how it is queried. Supersede markings are
+    applied by ledger-hygiene waves (see docs/DEFI_LEDGER_SKU_CANON.md)."""
+    return entry.get("details", {}).get("status") == "superseded"
+
+
 def _passing_entries(ledger: ProofLedger, sku: str, kind: str) -> List[Dict[str, Any]]:
     out = []
     for e in ledger.read(sku=sku, kind=kind):
+        if _is_superseded(e):
+            continue
         d = e.get("details", {})
         if d.get("failed", 0) == 0 and d.get("passed", 0) > 0:
             out.append(e)
@@ -273,7 +282,8 @@ def _check_fork_sim(product: Dict[str, Any], root: str,
 
 def _check_audit_report(product: Dict[str, Any], root: str,
                          ledger: ProofLedger) -> CheckResult:
-    reports = ledger.read(sku=product["sku"], kind=KIND_AUDIT_REPORT)
+    reports = [e for e in ledger.read(sku=product["sku"], kind=KIND_AUDIT_REPORT)
+               if not _is_superseded(e)]
     if not reports:
         return CheckResult("audit_report", False,
                            "no audit report in proof ledger", "unverified")

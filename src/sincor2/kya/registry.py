@@ -23,6 +23,11 @@ def _now() -> int:
     return int(time.time())
 
 
+def _effective_wallet(rec: Dict[str, Any]) -> str:
+    """Wallet key used for indexing/lookup: wallet, falling back to principal."""
+    return str(rec.get("wallet") or rec.get("principal") or "").lower()
+
+
 def record_hash(obj: Any) -> str:
     blob = json.dumps(obj, separators=(",", ":"), sort_keys=True, default=str)
     return "0x" + hashlib.sha256(blob.encode()).hexdigest()
@@ -35,9 +40,33 @@ class KYARegistry:
         self.lock = threading.Lock()
         self.records: Dict[str, Dict[str, Any]] = raw.get("records") or {}
         self.by_agent: Dict[str, str] = raw.get("by_agent") or {}
+        self.by_wallet: Dict[str, str] = raw.get("by_wallet") or {}
+        if self.records and not self.by_wallet:
+            # Backfill the wallet index for stores that predate it.
+            for kid, rec in self.records.items():
+                w = _effective_wallet(rec)
+                if w:
+                    self.by_wallet[w] = kid
 
     def _persist(self) -> None:
-        self.store.save({"records": self.records, "by_agent": self.by_agent, "saved_at": _now()})
+        self.store.save(
+            {
+                "records": self.records,
+                "by_agent": self.by_agent,
+                "by_wallet": self.by_wallet,
+                "saved_at": _now(),
+            }
+        )
+
+    def _reindex_wallet(self, kya_id: str) -> None:
+        """Move the wallet index entry for kya_id. Caller must hold self.lock."""
+        for key in [k for k, v in self.by_wallet.items() if v == kya_id]:
+            del self.by_wallet[key]
+        rec = self.records.get(kya_id)
+        if rec:
+            w = _effective_wallet(rec)
+            if w:
+                self.by_wallet[w] = kya_id
 
     def lookup(
         self,
@@ -54,8 +83,12 @@ class KYARegistry:
                     return dict(self.records[kid])
             if wallet:
                 w = wallet.lower()
+                kid = self.by_wallet.get(w)
+                if kid and kid in self.records:
+                    return dict(self.records[kid])
+                # Fallback scan for records the index may have missed.
                 for rec in self.records.values():
-                    if (rec.get("wallet") or rec.get("principal") or "").lower() == w:
+                    if _effective_wallet(rec) == w:
                         return dict(rec)
         return None
 
@@ -64,6 +97,7 @@ class KYARegistry:
         if not agent_id:
             raise ValueError("agent_id required")
         wallet = str(body.get("wallet") or body.get("principal") or "").strip().lower()
+        now = _now()
         rec = {
             "kya_id": "kya_" + hashlib.sha256(agent_id.encode()).hexdigest()[:16],
             "agent_id": agent_id,
@@ -74,14 +108,30 @@ class KYARegistry:
             "verified": False,
             "stake_axm_wei": "0",
             "heartbeat_ts": 0,
-            "created_at": _now(),
-            "updated_at": _now(),
+            "created_at": now,
+            "updated_at": now,
             "chain_id": CHAIN_ID,
         }
-        rec["record_hash"] = record_hash(rec)
         with self.lock:
+            existing = self.records.get(rec["kya_id"])
+            if existing is not None:
+                # Preserve the audit trail across re-lists; the overwrite is
+                # idempotent for everything else (same-wallet = current behavior).
+                history = list(existing.get("history") or [])
+                old_wallet = _effective_wallet(existing)
+                if old_wallet != wallet:
+                    # Identity change: a new wallet is a new attestation. Reset
+                    # the record to fresh-listed state and keep the trace.
+                    history.append(
+                        {"event": "identity_changed", "old_wallet": old_wallet, "at": now}
+                    )
+                    rec["created_at"] = existing.get("created_at") or now
+                if history:
+                    rec["history"] = history
+            rec["record_hash"] = record_hash(rec)
             self.records[rec["kya_id"]] = rec
             self.by_agent[agent_id] = rec["kya_id"]
+            self._reindex_wallet(rec["kya_id"])
             self._persist()
         return dict(rec)
 
@@ -96,6 +146,7 @@ class KYARegistry:
         rec["record_hash"] = record_hash(rec)
         with self.lock:
             self.records[rec["kya_id"]] = rec
+            self._reindex_wallet(rec["kya_id"])
             self._persist()
         return dict(rec)
 
@@ -142,14 +193,24 @@ class KYARegistry:
             self._persist()
         return dict(rec)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        verified_only: bool = False,
+    ) -> Dict[str, Any]:
         with self.lock:
             recs = list(self.records.values())
+        if verified_only:
+            recs = [r for r in recs if r.get("verified")]
+        recs.sort(key=lambda r: r.get("kya_id") or "")
+        page = recs[offset : offset + limit] if limit > 0 else []
         return {
             "token": AXM,
             "chain_id": CHAIN_ID,
-            "listed": len(recs),
-            "verified": sum(1 for r in recs if r.get("verified")),
+            "listed": len(self.records),
+            "verified": sum(1 for r in self.records.values() if r.get("verified")),
+            "records": [dict(r) for r in page],
         }
 
 

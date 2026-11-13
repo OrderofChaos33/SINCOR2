@@ -9,6 +9,7 @@ network access (fetch is monkeypatched).
 import json
 import os
 import time
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -25,7 +26,10 @@ from sincor2.defi.ofac_sdn import (
     snapshot_path,
 )
 
-# Entries verified present in the vendored snapshot (OFAC SDN, pub 09/23/2026).
+# Entries verified present in the vendored snapshot (OFAC SDN). The
+# snapshot's publication date is always read dynamically (see
+# _vendored_publication_date) so a snapshot refresh never re-stales
+# these tests.
 KNOWN_EVM_ADDR = "0x252a8bd2319d8a555b872990601221b3a2053bce"  # MESRI, Behzad
 KNOWN_TRX_ADDR = "TNiq9AXBp9EjUqhDhrwrfvAA8U3GUQZH81"  # BANK MARKAZI (uid 4632)
 KNOWN_NAME = "BANK MARKAZI JOMHOURI ISLAMI IRAN"
@@ -35,6 +39,19 @@ CLEAN_ADDR = "0x000000000000000000000000000000000000dEaD"
 
 NS = ("https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview"
       "/exports/XML")
+
+
+def _vendored_publication_date() -> str:
+    """The vendored snapshot's own declared publication date, read from
+    the raw file on disk. Provenance assertions compare against this —
+    never a hardcoded date — so the next snapshot refresh stays green."""
+    with open(snapshot_path(), encoding="utf-8") as f:
+        return json.load(f)["publication_date"]
+
+
+def _shift_publication_date(pub_date: str, days: int) -> str:
+    shifted = datetime.strptime(pub_date, "%m/%d/%Y") + timedelta(days=days)
+    return shifted.strftime("%m/%d/%Y")
 
 
 def _fake_sdn_xml(pub_date: str, record_count: int = 15000) -> bytes:
@@ -54,7 +71,7 @@ def test_snapshot_loads_with_provenance():
     assert snap["source"] == "OFAC SDN List"
     assert snap["source_url"] == \
         "https://www.treasury.gov/ofac/downloads/sdn.xml"
-    assert snap["publication_date"] == "09/23/2026"
+    assert snap["publication_date"] == _vendored_publication_date()
     assert snap["entry_count"] == len(snap["entries"]) >= 15000
     assert snap["fetched_at"]  # ISO timestamp present
 
@@ -80,38 +97,50 @@ def oracle():
 
 
 def test_known_evm_address_is_hit(oracle):
-    res = screen_wallet_address(oracle, KNOWN_EVM_ADDR.upper(), now=time.time())
+    now = time.time()
+    # Screening accuracy only: freshness has its own tests below. Without
+    # the pin this test decays to STALE 48h after the snapshot refresh.
+    oracle.aml.list_updated_at = now
+    res = screen_wallet_address(oracle, KNOWN_EVM_ADDR.upper(), now=now)
     # uppercased input must still match: canonical lowercase comparison
     assert res.verdict == Verdict.FAIL
     assert "sanctions list" in res.detail
 
 
 def test_known_trx_address_is_hit(oracle):
-    res = screen_wallet_address(oracle, KNOWN_TRX_ADDR, now=time.time())
+    now = time.time()
+    oracle.aml.list_updated_at = now  # screening accuracy, not freshness
+    res = screen_wallet_address(oracle, KNOWN_TRX_ADDR, now=now)
     assert res.verdict == Verdict.FAIL
 
 
 def test_known_name_is_hit(oracle):
+    now = time.time()
+    oracle.aml.list_updated_at = now  # screening accuracy, not freshness
     res = screen_legal_name(oracle, "bank markazi jomhouri islami iran",
-                            now=time.time())
+                            now=now)
     assert res.verdict == Verdict.FAIL
 
 
 def test_known_alias_is_hit(oracle):
-    res = screen_legal_name(oracle, KNOWN_ALIAS, now=time.time())
+    now = time.time()
+    oracle.aml.list_updated_at = now  # screening accuracy, not freshness
+    res = screen_legal_name(oracle, KNOWN_ALIAS, now=now)
     assert res.verdict == Verdict.FAIL
 
 
 def test_clean_name_and_address_pass(oracle):
+    now = time.time()
+    oracle.aml.list_updated_at = now  # screening accuracy, not freshness
     assert screen_legal_name(oracle, CLEAN_NAME,
-                             now=time.time()).verdict == Verdict.PASS
+                             now=now).verdict == Verdict.PASS
     assert screen_wallet_address(oracle, CLEAN_ADDR,
-                                 now=time.time()).verdict == Verdict.PASS
+                                 now=now).verdict == Verdict.PASS
 
 
 def test_oracle_carries_provenance_not_reference_only(oracle):
     assert oracle.reference_only is False
-    assert oracle.ofac_publication_date == "09/23/2026"
+    assert oracle.ofac_publication_date == _vendored_publication_date()
     assert oracle.ofac_entry_count >= 15000
     assert oracle.ofac_screening_addresses >= 1000
 
@@ -153,20 +182,39 @@ def _patch_fetch(monkeypatch, payload: bytes):
 
 
 def test_updater_idempotent_on_same_publication_date(workdir, monkeypatch):
-    _patch_fetch(monkeypatch, _fake_sdn_xml("09/23/2026"))
-    before = os.path.getmtime(workdir)
-    result = ofac_sdn_updater.update_snapshot(out_path=workdir)
+    _patch_fetch(monkeypatch, _fake_sdn_xml(_vendored_publication_date()))
+    before_snap = load_snapshot(workdir)
+    # Age the file so the re-stamp rewrite is observable via mtime.
+    aged = time.time() - 3600
+    os.utime(workdir, (aged, aged))
+    verify_time = (datetime.fromisoformat(before_snap["fetched_at"])
+                   + timedelta(days=3)).isoformat()
+    result = ofac_sdn_updater.update_snapshot(out_path=workdir,
+                                              now=verify_time)
     assert result["status"] == "unchanged"
-    assert os.path.getmtime(workdir) == before  # untouched
+    # W-35 (founder ruling 2026-11-02): a successful verification with an
+    # unchanged publication date re-stamps fetched_at — the entries and
+    # publication date stay identical, but the file IS rewritten, so the
+    # 48h freshness guards measure the last verification, not the last
+    # list change.
+    assert result["restamped"] is True
+    assert result["fetched_at"] == verify_time
+    assert os.path.getmtime(workdir) > aged  # rewritten (re-stamped)
+    after_snap = load_snapshot(workdir)
+    assert after_snap["entries"] == before_snap["entries"]
+    assert after_snap["publication_date"] == before_snap["publication_date"]
+    assert after_snap["fetched_at"] == verify_time
 
 
 def test_updater_installs_new_publication(workdir, monkeypatch):
-    _patch_fetch(monkeypatch, _fake_sdn_xml("09/30/2026"))
+    vendored = _vendored_publication_date()
+    newer = _shift_publication_date(vendored, 1)
+    _patch_fetch(monkeypatch, _fake_sdn_xml(newer))
     result = ofac_sdn_updater.update_snapshot(out_path=workdir)
     assert result["status"] == "updated"
-    assert result["publication_date"] == "09/30/2026"
-    assert result["previous_publication_date"] == "09/23/2026"
-    assert load_snapshot(workdir)["publication_date"] == "09/30/2026"
+    assert result["publication_date"] == newer
+    assert result["previous_publication_date"] == vendored
+    assert load_snapshot(workdir)["publication_date"] == newer
 
 
 def test_updater_rejects_garbage_atomically(workdir, monkeypatch):

@@ -32,7 +32,7 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PIP_NO_CACHE_DIR=1
 
 COPY --chown=appuser:appuser . .
-RUN mkdir -p /data && chown -R appuser:appuser /data /home/appuser/.local
+RUN mkdir -p /data /app/logs /app/data && chown -R appuser:appuser /data /app /home/appuser/.local
 
 USER appuser
 

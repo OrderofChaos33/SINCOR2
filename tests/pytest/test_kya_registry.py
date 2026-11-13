@@ -55,9 +55,16 @@ class KyaFabricTests(unittest.TestCase):
         self.assertIsNone(kya.hook_listed({}))
 
     def test_bind_stake_verify_needs_heartbeat(self):
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+
         rec = kya.list_from_inbound(FABRIC_AGENT)
-        principal = FABRIC_AGENT["wallet"]
-        bound = kya.bind(rec["agent_id"], principal, "0xsig", "SINCOR KYA bind", recovered=principal)
+        acct = Account.create()
+        principal = acct.address
+        sig = "0x" + acct.sign_message(
+            encode_defunct(text="SINCOR KYA bind")).signature.hex()
+        bound = kya.bind(rec["agent_id"], principal, sig, "SINCOR KYA bind",
+                         recovered=principal)
         self.assertEqual(bound["status"], "bound")
         staked = kya.apply_stake(rec["kya_id"], str(kya.MIN_STAKE_WEI), "0x" + "ab" * 32)
         self.assertEqual(staked["status"], "staked")
@@ -77,3 +84,38 @@ class KyaFabricTests(unittest.TestCase):
     def test_dead_token_not_in_module(self):
         self.assertEqual(kya.AXM.lower(), "0x4c3fb66f14fbaa2088c9ae91017ba770da53715a")
         self.assertNotIn("ff7af6ffca25a9dc0fc990d998acf24cc60b7822", kya.AXM.lower())
+
+    def test_bind_rejects_garbage_signature_despite_recovered(self):
+        """Fail-closed voucher: a malformed signature is rejected even when
+        the caller vouches for the address via `recovered`. A real signature
+        that recovers to a *different* address than the voucher is also
+        rejected. The legit signed path still binds."""
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+
+        rec = kya.list_from_inbound(FABRIC_AGENT)
+        principal = FABRIC_AGENT["wallet"]
+
+        # Garbage signature + matching voucher: REJECTED (was trusted before).
+        with self.assertRaises(ValueError):
+            kya.bind(rec["agent_id"], principal, "0xgarbage", "SINCOR KYA bind",
+                     recovered=principal)
+
+        # Real signature by a different key + voucher for principal: REJECTED.
+        other = Account.create()
+        other_sig = "0x" + other.sign_message(
+            encode_defunct(text="SINCOR KYA bind")).signature.hex()
+        with self.assertRaises(ValueError):
+            kya.bind(rec["agent_id"], principal, other_sig, "SINCOR KYA bind",
+                     recovered=principal)
+
+        # Legit path: real signature from principal, voucher matching: binds.
+        legit = Account.create()
+        msg = "SINCOR KYA bind legit"
+        legit_sig = "0x" + legit.sign_message(
+            encode_defunct(text=msg)).signature.hex()
+        bound = kya.bind(rec["agent_id"], legit.address, legit_sig, msg,
+                         recovered=legit.address)
+        self.assertEqual(bound["status"], "bound")
+        self.assertEqual(bound["attestation"]["recovered"].lower(),
+                         legit.address.lower())

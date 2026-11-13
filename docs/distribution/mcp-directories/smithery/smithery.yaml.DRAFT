@@ -1,0 +1,35 @@
+# Smithery configuration for SINCOR Marketplace MCP
+# DRAFT — prepared 2026-10-12. NOT yet committed to the repo root.
+# To use: copy to SINCOR2 repo root as `smithery.yaml` (founder decision),
+# then follow SUBMIT.md in this folder.
+#
+# References:
+# - https://smithery.ai/docs/build/deployments (verified 2026-10-12:
+#   stdio is supported but deprecated; Smithery wraps it and proxies over HTTP)
+# - Server: src/sincor2/mcp_server.py — stdlib-only, `python -m sincor2.mcp_server`
+#
+# Assumptions to re-verify at submit time:
+# - Smithery runs the command with the repo root as cwd (so PYTHONPATH=src resolves).
+# - `python` on PATH is Python 3.9+ (stdlib-only server; no third-party deps).
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      baseUrl:
+        type: string
+        default: "https://getsincor.com"
+        description: "SINCOR platform base URL (sets SINCOR_MCP_BASE_URL). Use http://127.0.0.1:5000 for a local dev app."
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: "python",
+      args: ["-m", "sincor2.mcp_server"],
+      env: {
+        PYTHONPATH: "src",
+        SINCOR_MCP_BASE_URL: config.baseUrl || "https://getsincor.com"
+      }
+    })
+  exampleConfig:
+    baseUrl: "https://getsincor.com"

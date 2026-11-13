@@ -1,0 +1,486 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-10-09 (branch xioix/auditph13-batch-C)",
+  "scope": [
+    "README.md",
+    "templates/**/*.html",
+    "data/sku_catalog.json",
+    "config/x402_pricing.yaml"
+  ],
+  "blocking_patterns": [
+    "24/7",
+    "zero-human",
+    "certified",
+    "guaranteed",
+    "hipaa",
+    "soc2",
+    "audited",
+    "adgm"
+  ],
+  "kinds": [
+    "assertion",
+    "disclaimer",
+    "policy",
+    "roadmap"
+  ],
+  "verdicts": [
+    "substantiated",
+    "unproven",
+    "downgrade_recommended"
+  ],
+  "notes": "kind=assertion entries with verdict != substantiated are BLOCKED by test_marketing_claims.py until the founder substantiates (add evidence, flip verdict) or rewords the copy (remove claim, drop/retire the entry). disclaimer/policy/roadmap entries are informational, not assertions of fact.",
+  "entries": [
+    {
+      "claim_id": "CR-004",
+      "pattern": "hipaa",
+      "kind": "disclaimer",
+      "category": "regulated",
+      "verdict": "substantiated",
+      "locations": [
+        "README.md:373",
+        "README.md:376",
+        "README.md:458"
+      ],
+      "claim_text": "HIPAA-aware handling is applied on these paths; no HIPAA compliance attestation is claimed.",
+      "evidence": {
+        "code_refs": [
+          "README.md:373",
+          "README.md:376",
+          "README.md:458"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "Reword to 'HIPAA-aware handling'; do not imply a HIPAA compliance attestation.",
+      "notes": "Downgraded per 2026-10-17 decision sheet: reworded to HIPAA-aware handling with explicit no-attestation disclaimer; not a compliance attestation.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-010",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/axiom.html:293"
+      ],
+      "claim_text": "Past performance does not guarantee future results.",
+      "evidence": {
+        "code_refs": [
+          "templates/axiom.html:293"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-011",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy.html:405"
+      ],
+      "claim_text": "30-Day Money-Back Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-013",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy_converting.html:404",
+        "templates/buy_converting.html:542"
+      ],
+      "claim_text": "30-day money-back guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-016",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/buy_stripe.html:51",
+        "templates/buy_stripe.html:320"
+      ],
+      "claim_text": "Satisfaction Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-018",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/compelling_demo.html:172"
+      ],
+      "claim_text": "30-day money-back guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-021",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/holy_grail_demo.html:330"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-022",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home.html:352"
+      ],
+      "claim_text": "Propose, never certify",
+      "evidence": {
+        "code_refs": [
+          "templates/home.html:352"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: the page explicitly disclaims certification.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-025",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home_old.html:938",
+        "templates/home_old.html:951",
+        "templates/home_old.html:1028",
+        "templates/home_old.html:1284",
+        "templates/home_old.html:1562"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-027",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/home_old_v2.html:366"
+      ],
+      "claim_text": "30-day money-back guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-028",
+      "pattern": "hipaa",
+      "kind": "disclaimer",
+      "category": "regulated",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/index.html:252"
+      ],
+      "claim_text": "Healthcare credentialing + RCM automation (HIPAA compliance not attested)",
+      "evidence": {
+        "code_refs": [
+          "templates/index.html:252"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "Remove 'HIPAA-compliant'; say 'Healthcare credentialing + RCM automation (HIPAA compliance not attested)'.",
+      "notes": "Downgraded per 2026-10-17 decision sheet: explicit \"(HIPAA compliance not attested)\" disclaimer; not a compliance attestation.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-030",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/payment_cancel.html:38"
+      ],
+      "claim_text": "30-day money-back guarantee - zero risk",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-032",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/pricing.html:383",
+        "templates/pricing.html:428"
+      ],
+      "claim_text": "We offer a Satisfaction Guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Backed by the stated refund terms.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-036",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/products/drafts/aud-02-compliance-pack.html:77"
+      ],
+      "claim_text": "Is this a certification? The pack is evidence assembly and review support done properly — your auditor still audits.",
+      "evidence": {
+        "code_refs": [
+          "templates/products/drafts/aud-02-compliance-pack.html:77"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: explicitly disclaims certification. Draft copy.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-042",
+      "pattern": "certified",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/products/sku-aud-02-compliance-pack.html:69"
+      ],
+      "claim_text": "Is this a certification? The pack is evidence assembly and review support done properly — your auditor still audits.",
+      "evidence": {
+        "code_refs": [
+          "templates/products/sku-aud-02-compliance-pack.html:69"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: explicitly disclaims certification.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-048",
+      "pattern": "soc2",
+      "kind": "roadmap",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/security.html:7"
+      ],
+      "claim_text": "SOC 2 documentation (roadmap — no SOC 2 attestation claimed)",
+      "evidence": {
+        "code_refs": [
+          "templates/security.html:7"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "Clarify whether this claims SOC 2 attestation (needs an audit) or merely SOC 2 documentation on the roadmap.",
+      "notes": "Clarified per 2026-10-17 decision sheet: SOC 2 documentation on the roadmap; no SOC 2 attestation claimed.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-051",
+      "pattern": "guaranteed",
+      "kind": "policy",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/terms.html:83",
+        "templates/terms.html:84"
+      ],
+      "claim_text": "6.1 Subscriptions — 30-Day Money-Back Guarantee",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:83"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Includes 'This guarantee applies once per customer per subscription tier.' Policy terms, not an outcome claim.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-052",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/terms.html:120"
+      ],
+      "claim_text": "We do not guarantee any specific business outcomes, revenue increases, or ROI from use of the Service.",
+      "evidence": {
+        "code_refs": [
+          "templates/terms.html:120"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-055",
+      "pattern": "certified",
+      "kind": "roadmap",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/whitepaper.html:169"
+      ],
+      "claim_text": "Blockscout / Superchain token list certification",
+      "evidence": {
+        "code_refs": [
+          "templates/whitepaper.html:169"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Roadmap list item — future intent, not a present-tense claim. Informational.",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-056",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/whitepaper.html:174"
+      ],
+      "claim_text": "Disclaimer: Technology in development. No income guarantees. DYOR before on-chain transactions.",
+      "evidence": {
+        "code_refs": [
+          "templates/whitepaper.html:174"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "",
+      "owner": "founder"
+    }
+  ]
+}

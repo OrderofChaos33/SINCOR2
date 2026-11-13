@@ -70,7 +70,9 @@ def test_verify_already_completed_is_idempotent(tmp_path, monkeypatch):
         conn.commit()
     result = pp.verify_checkout(created["payment_id"], tx)
     assert result["ok"] is True
-    assert result["status"] == "already_completed"
+    # B1 (auditp2 batch B): legacy 'completed' rows migrate to 'fulfilled'.
+    assert result["status"] == "already_fulfilled"
+    assert pp._load_checkout(created["payment_id"])["status"] == "fulfilled"
 
 
 def test_verify_in_progress_blocks_race(tmp_path, monkeypatch):

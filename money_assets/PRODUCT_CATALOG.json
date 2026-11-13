@@ -8,9 +8,8 @@
       "price": "$97",
       "file": "instant_bi_template_pack.md",
       "sell_on": [
-        "Gumroad",
-        "Etsy",
-        "Your website"
+        "SINCOR platform-native checkout (x402/USDC rail)",
+        "Etsy"
       ]
     },
     {
@@ -18,8 +17,7 @@
       "price": "$297",
       "file": "ai_agent_bundle.md",
       "sell_on": [
-        "Gumroad",
-        "Your website"
+        "SINCOR platform-native checkout (x402/USDC rail)"
       ]
     },
     {
@@ -27,16 +25,15 @@
       "price": "$147",
       "file": "growth_forecast_template.md",
       "sell_on": [
-        "Gumroad",
-        "Etsy",
-        "Your website"
+        "SINCOR platform-native checkout (x402/USDC rail)",
+        "Etsy"
       ]
     }
   ],
   "next_steps": [
     "1. Review all product files in money_assets/ folder",
-    "2. Create Gumroad account (gumroad.com)",
-    "3. List each product with descriptions provided",
+    "2. Sell through SINCOR's own x402 checkout (zero-to-revenue rail rework — NO Gumroad)",
+    "3. Digital delivery: token-gated download link issued at rail settle fulfillment",
     "4. Share links on social media / email list",
     "5. Make first sale within 48 hours"
   ]

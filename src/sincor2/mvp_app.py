@@ -10,13 +10,16 @@ import time
 import logging
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
-from pathlib import Path
-from urllib import error as urllib_error
-from urllib import request as urllib_request
+from datetime import datetime, timedelta, timezone
+# NOTE: Path, urllib_error, urllib_request, send_file, jwt_required and
+# get_jwt_identity are unused in this module but are re-exported to the mvp
+# blueprints, which bind mvp_app globals via _bind_mvp(). Do not remove.
+from pathlib import Path  # noqa: F401
+from urllib import error as urllib_error  # noqa: F401
+from urllib import request as urllib_request  # noqa: F401
 
-from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask import Flask, render_template, request, jsonify, g, make_response, send_file, redirect, session, url_for  # noqa: F401
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity  # noqa: F401
 from werkzeug.middleware.proxy_fix import ProxyFix
 try:
     from authlib.integrations.flask_client import OAuth
@@ -30,6 +33,10 @@ from dotenv import load_dotenv
 from sincor2.data_paths import data_dir, migrate_legacy_orders_db
 from sincor2.pdf_loader import get_pdf_generator
 from sincor2.email_sender import get_email_sender
+from sincor2.shadow_monitor.runtime import build_shadow_runtime
+# Runtime secret resolver (from #223): no committed fallbacks, fail closed in production.
+from sincor2.runtime_secrets import resolve_flask_secret, resolve_jwt_secret
+from sincor2.cookie_security import is_production_https, secure_cookie_kwargs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,6 +65,11 @@ template_dir = os.path.join(project_root, 'templates')
 static_dir = os.path.join(project_root, 'static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 
+# Agent-facing effects are proposal-only in this process. This registry does
+# not convert legacy customer-facing billing/outreach routes; those callsites
+# must be migrated separately before claiming app-wide side-effect isolation.
+app.extensions['sincor_shadow_runtime'] = build_shadow_runtime()
+
 if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('TRUST_PROXY', '').lower() in ('1', 'true', 'yes'):
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     app.config['PREFERRED_URL_SCHEME'] = 'https'
@@ -80,6 +92,21 @@ def inject_onchain_addresses():
 
 
 @app.context_processor
+def inject_build_stamp():
+    # Observability build #5: templates (shared footer) can render the
+    # deployed commit's short SHA. build_info() never raises and degrades
+    # to "unknown" off-Railway; the footer hides the stamp in that case.
+    from sincor2.build_info import build_info
+
+    info = build_info()
+    return {
+        'build_sha': info['sha'],
+        'build_sha_short': info['short'],
+        'build_time': info['time'],
+    }
+
+
+@app.context_processor
 def inject_auth_state():
     return {
         'is_admin': bool(session.get('is_admin')),
@@ -89,15 +116,17 @@ def inject_auth_state():
     }
 
 
-# Runtime secret resolver (from #223): no committed fallbacks, fail closed in production.
-from sincor2.runtime_secrets import resolve_flask_secret, resolve_jwt_secret
-
 app.config['JWT_SECRET_KEY'] = resolve_jwt_secret()
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
 app.config['SECRET_KEY'] = resolve_flask_secret()
+
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
+# C3 (P2 audit): Secure follows the effective production-HTTPS posture, not a
+# single provider's environment label.
+app.config['SESSION_COOKIE_SECURE'] = is_production_https()
+logger.info('[COOKIE] SESSION_COOKIE_SECURE=%s (production_https=%s)',
+            app.config['SESSION_COOKIE_SECURE'], is_production_https())
 jwt = JWTManager(app)
 
 try:
@@ -122,12 +151,50 @@ try:
 except Exception as _q_exc:
     logger.warning('[QUEUE] poll routes not registered: %s', _q_exc)
 
+# Liveness disclosure (observability build #7): the cohort disclosure at
+# /.well-known/liveness-agents.json was previously attached only in the
+# legacy sincor2.app module, so the production app 404'd it. Attach it
+# here, on the app production actually runs, exactly as legacy did.
+try:
+    from sincor2.liveness import attach_liveness
+    attach_liveness(app)
+    logger.info('[LIVENESS] disclosure route registered')
+except Exception as _liveness_exc:
+    logger.warning('[LIVENESS] disclosure not registered: %s', _liveness_exc)
+
+# OFAC freshness badge (observability build #6): provenance-only readout
+# of the active sanctions snapshot at /api/compliance/ofac-status.
+try:
+    from sincor2.ofac_status import attach_ofac_status
+    attach_ofac_status(app)
+    logger.info('[OFAC] freshness badge route registered')
+except Exception as _ofac_exc:
+    logger.warning('[OFAC] freshness badge not registered: %s', _ofac_exc)
+
+# C2 (P2 audit): boot-time queue readiness gate. A configured-but-unreachable
+# broker or a celery backend without shared job storage fails boot fast with
+# a clear error instead of booting a half-working queue. Degraded (no-broker)
+# mode is allowed but loudly logged — never silent.
+try:
+    from sincor2.task_queue import verify_queue_readiness
+    _queue_report = verify_queue_readiness()
+    if _queue_report.get("degraded"):
+        logger.warning('[QUEUE] DEGRADED mode at boot: %s',
+                       _queue_report.get("degraded_reason"))
+    else:
+        logger.info('[QUEUE] ready: backend=%s job_store=%s',
+                    _queue_report.get("backend"), _queue_report.get("job_store"))
+except Exception as _qgate_exc:
+    logger.error('[QUEUE] readiness gate failed — refusing to boot: %s', _qgate_exc)
+    raise
+
 oauth = None
 OAUTH_REDIRECT_BASE = _env_first('OAUTH_REDIRECT_BASE_URL', 'PUBLIC_BASE_URL', 'SITE_URL', default='').rstrip('/')
 OAUTH_ERROR_MESSAGES = {
     'oauth_unavailable': 'Social login is temporarily unavailable. Please use email signup.',
     'oauth_failed': 'Social login failed. Please try again or use email signup.',
     'no_email': 'We could not get your email from that provider. Try another method.',
+    'email_unverified': 'That provider account has an unverified email. Verify it with the provider, then try again.',
 }
 
 
@@ -151,9 +218,8 @@ def _auth_cookie_response(email: str, redirect_url: str = '/dashboard'):
         redirect_url = f'{redirect_url}{sep}email={email}'
     resp = make_response(redirect(redirect_url))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 
@@ -359,10 +425,27 @@ def _google_userinfo(token: dict):
     return resp.json()
 
 
-def _github_primary_email() -> str:
+def _github_email_entries() -> list:
+    """Raw /user/emails entries for the GitHub OAuth session (may be [])."""
     resp = oauth.github.get('user/emails')
     emails = resp.json() if resp.ok else []
-    if not isinstance(emails, list):
+    return emails if isinstance(emails, list) else []
+
+
+def _github_primary_email(verified_only: bool = False, _entries: list | None = None) -> str:
+    """Return the GitHub account's primary email.
+
+    With verified_only=True, only an email the provider marks verified is
+    returned (audit P1: never link an account on an unverified address).
+    """
+    emails = _entries if _entries is not None else _github_email_entries()
+    if verified_only:
+        for entry in emails:
+            if entry.get('primary') and entry.get('verified'):
+                return entry.get('email', '')
+        for entry in emails:
+            if entry.get('verified'):
+                return entry.get('email', '')
         return ''
     for entry in emails:
         if entry.get('primary') and entry.get('verified'):
@@ -374,6 +457,26 @@ def _github_primary_email() -> str:
         if entry.get('verified'):
             return entry.get('email', '')
     return emails[0].get('email', '') if emails else ''
+
+
+def _request_jwt_identity():
+    """Resolve the JWT identity (sub) for this request.
+
+    Accepts the standard Authorization: Bearer header and the httponly
+    ``access_token`` cookie the app sets on login. Returns None when no
+    usable token is present.
+    """
+    from flask_jwt_extended import decode_token
+    auth = request.headers.get('Authorization', '')
+    token = auth[7:] if auth.startswith('Bearer ') else ''
+    if not token:
+        token = request.cookies.get('access_token', '')
+    if not token:
+        return None
+    try:
+        return decode_token(token).get('sub')
+    except Exception:
+        return None
 
 
 if OAUTH_AVAILABLE:
@@ -406,6 +509,11 @@ if OAUTH_AVAILABLE:
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
+    # Base44 review (2026-11-06): limit refusals existed but were
+    # invisible — no X-RateLimit-* / Retry-After headers on any
+    # response. headers_enabled makes every limited response carry its
+    # limit / remaining / reset, and 429s carry Retry-After.
+    headers_enabled=True,
     default_limits=["10000 per day", "1000 per hour"],
     # SINCOR_LIMITER_STORAGE_URI=redis://... shares the app-wide limiter
     # across gunicorn workers (G2.8). Default memory:// preserves dev/test
@@ -415,22 +523,38 @@ limiter = Limiter(
     storage_uri=os.environ.get("SINCOR_LIMITER_STORAGE_URI", "memory://"),
 )
 
+# Shared credential-verifier throttling (audit P2-A3). Imported here so the
+# mvp blueprints pick these up via _bind_mvp(); app.py imports them directly.
+from sincor2.login_throttle import (  # noqa: E402, F401
+    credential_rate_limits,
+    note_login_failure,
+    note_login_success,
+)
+
 try:
-    from sincor2.safety_locks import assert_production_safety
+    from sincor2.safety_locks import ProductionSafetyError, assert_production_safety
     assert_production_safety()
+except ProductionSafetyError:
+    # Fail-closed: a dangerous production config must crash startup, not
+    # just log. Re-raise so the process does not serve traffic.
+    raise
 except Exception as e:
     logger.warning('[SAFETY] Lock check failed: %s', e)
 
 try:
+    # These names are unused in this module but are re-exported to the
+    # billing blueprint, which binds mvp_app globals via _bind_mvp().
+    # Do not remove.
     from sincor2.platform_payments import (
-        activate_subscription,
-        create_checkout as platform_create_checkout,
+        activate_subscription,  # noqa: F401
+        create_checkout as platform_create_checkout,  # noqa: F401
         fiat_payments_enabled,
-        get_subscription,
+        get_subscription,  # noqa: F401
         init_platform_payments_db,
-        list_plans as platform_list_plans,
-        list_subscriptions,
-        verify_checkout as platform_verify_checkout,
+        list_plans as platform_list_plans,  # noqa: F401
+        list_subscriptions,  # noqa: F401
+        mark_checkout_fulfilled as platform_mark_checkout_fulfilled,  # noqa: F401
+        verify_checkout as platform_verify_checkout,  # noqa: F401
     )
     init_platform_payments_db()
     PLATFORM_PAYMENTS_AVAILABLE = True
@@ -453,6 +577,202 @@ if fiat_payments_enabled():
         logger.warning('[STRIPE] %s', e)
         STRIPE_AVAILABLE = False
 
+# x402/USDC pack rail (B2B skill packs) — always mounted; the rail is the
+# human-payments rail, independent of the Stripe fiat path above.
+# Mount outcomes are tracked in RAIL_MOUNT_STATUS and surfaced on /health
+# (see _expose_rail_mount_status below): a failed mount must be loud —
+# full traceback in the boot log AND visible in the health payload —
+# never a one-line warning that leaves the rail silently absent.
+RAIL_MOUNT_STATUS = {
+    'rail_routes': False,
+    'rail_delivery': False,
+    'rail_pay': False,
+    'rail_intake': False,
+}
+try:
+    from sincor2.rail_routes import init_rail_routes
+    init_rail_routes(app)
+    RAIL_MOUNT_STATUS['rail_routes'] = True
+except Exception:
+    logger.exception('[RAIL] init_rail_routes failed — /rail/checkout and '
+                     '/rail/settle are NOT mounted')
+
+# Token-gated digital-pack downloads (rail rework w4) — mounted next to
+# the rail routes; this is the route the buyer email's download link
+# points at.
+try:
+    from sincor2.rail_delivery import init_rail_delivery_routes
+    init_rail_delivery_routes(app)
+    RAIL_MOUNT_STATUS['rail_delivery'] = True
+except Exception:
+    logger.exception('[RAIL-DELIVERY] init_rail_delivery_routes failed — '
+                     'token-gated /download/<id> is NOT mounted')
+
+# Token-gated pack intake pages (Wren PR 1) — mounted next to the rail
+# delivery routes; this is the route the B2B / WebBuilder buyer email's
+# intake link points at.
+try:
+    from sincor2.blueprints.intake import init_intake_routes
+    init_intake_routes(app)
+    RAIL_MOUNT_STATUS['rail_intake'] = True
+except Exception:
+    logger.exception('[RAIL-INTAKE] init_intake_routes failed — '
+                     'token-gated /intake/<id> is NOT mounted')
+
+# Human payment pages: GET /rail/pay/<resource_id> + GET /rail/onramp.
+# This blueprint was previously registered only in the legacy
+# sincor2.app module, so the production app never served the pay pages
+# that the checkout flow depends on.
+try:
+    from sincor2.blueprints.rail_pay import rail_pay_bp
+    app.register_blueprint(rail_pay_bp)
+    RAIL_MOUNT_STATUS['rail_pay'] = True
+except Exception:
+    logger.exception('[RAIL-PAY] rail_pay_bp failed to mount — '
+                     '/rail/pay/<id> pages are NOT served')
+
+# WREN PR 4: per-route rate limits on the money rail. The wraps are
+# applied HERE — after every rail blueprint is registered — because the
+# limiter decorator must replace the registered view function, and
+# importing the limiter into the route modules would be circular. Keys
+# are the limiter default (get_remote_address, i.e. the ProxyFix-derived
+# client address) — never free_ration.abuse_client_ip, which without a
+# pinned trusted proxy collapses every client into the edge peer's one
+# bucket. If a mount failed above, its endpoint is absent and skipped.
+#
+# Trusted-edge assumption (explicit): production runs behind Railway's
+# single appending edge proxy, and ProxyFix above is enabled with
+# x_for=1 (only when TRUST_PROXY / RAILWAY_ENVIRONMENT is set). With
+# exactly one trusted hop, get_remote_address is the LAST
+# X-Forwarded-For entry — the address the edge itself observed — and
+# client-supplied prefix entries are ignored for keying, so rotating
+# them cannot mint a fresh bucket. If the proxy chain ever grows
+# beyond one appending hop this keying must be revisited; the app-wide
+# trusted-proxy treatment is a separate standing item, not handled here.
+for _endpoint, _limit in (
+    ('rail.rail_checkout', '30 per hour'),
+    ('rail_digital_delivery.download_digital_pack', '30 per hour'),
+):
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit(_limit)(_view)
+
+
+def _settle_request_challenge_id() -> str:
+    """challenge_id from the in-flight /rail/settle JSON body.
+
+    Mirrors the settle view's extraction exactly: rail_settle reads
+    request.get_json(force=True, silent=True) and never touches form
+    data, so this helper force-parses too and has NO form fallback. A
+    mimetype-gated parse keys the same body into the plain-address
+    bucket whenever the Content-Type is not JSON — exhaust the
+    per-challenge bucket, resend as text/plain, and the cap is diluted
+    2x (B delta re-check F2). Absent, malformed, or non-string ids
+    return '' — the caller falls back to the plain address bucket.
+    Never raises.
+    """
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not isinstance(data, dict):
+            return ""
+        cid = data.get("challenge_id")
+        if not isinstance(cid, str):
+            return ""
+        return cid.strip()
+    except Exception:
+        return ""
+
+
+def _settle_limit_key() -> str:
+    """Per-(client, challenge) settle bucket (WREN PR 4 repair).
+
+    Junk settles against OTHER challenge ids must not burn a given
+    challenge's settle budget: the challenge TTL is 900s but the
+    limiter window is 1h, so a shared per-address bucket lets 60 junk
+    settles strand a paid buyer past expiry. A body with no
+    challenge_id falls back to the plain address bucket.
+    """
+    addr = get_remote_address() or ""
+    cid = _settle_request_challenge_id()
+    return f"{addr}:{cid}" if cid else addr
+
+
+def _settle_limit() -> str:
+    """60/hour per (client, challenge); 600/hour once fulfilled.
+
+    A settle against an already-fulfilled challenge is the W-115
+    proven-duplicate ack — a paid buyer re-asking for their delivery.
+    Recovering a delivery takes dozens of retries at most, so fulfilled
+    challenges get a bounded but generous ceiling (600/hour per
+    (client, challenge)): far beyond any real retry pattern, yet finite
+    on trees where the ack path is not yet proof-gated (PR #577) — an
+    unbounded exemption there would let anyone who learns a fulfilled
+    challenge_id harvest its ack at full rate (B delta re-check F1).
+    Once #577 lands in the same tree this bound is belt-and-braces.
+    The status lookup is read-only; ANY failure applies the normal
+    limit (fail toward limiting, never toward crashing).
+    """
+    cid = _settle_request_challenge_id()
+    if cid:
+        try:
+            from sincor2.x402_payments import challenge_status
+            if challenge_status(cid) == "fulfilled":
+                return "600 per hour"
+        except Exception:
+            logger.warning(
+                "[RAIL] settle-limit status lookup failed for %s; "
+                "applying the normal limit", cid)
+    return "60 per hour"
+
+
+# /rail/settle gets its own wrap: per-(client, challenge) keying plus
+# the dynamic fulfilled-challenge limit above.
+_view = app.view_functions.get('rail.rail_settle')
+if _view is not None:
+    app.view_functions['rail.rail_settle'] = limiter.limit(
+        _settle_limit, key_func=_settle_limit_key)(_view)
+
+# The intake route (WREN PR 1) is built on a sibling branch and may land
+# before or after this one: wrap any registered /intake POST view at
+# 20/hour, and skip silently when none exists yet.
+_intake_endpoints = {
+    rule.endpoint
+    for rule in app.url_map.iter_rules()
+    if rule.rule.startswith('/intake') and 'POST' in (rule.methods or set())
+}
+for _endpoint in _intake_endpoints:
+    _view = app.view_functions.get(_endpoint)
+    if _view is not None:
+        app.view_functions[_endpoint] = limiter.limit('20 per hour')(_view)
+
+
+@app.errorhandler(429)
+def _rate_limited_json(_error):
+    """Rate-limit refusals answer the shared JSON shape, never HTML."""
+    return jsonify({'error': 'rate_limited'}), 429
+
+
+@app.after_request
+def _expose_rail_mount_status(response):
+    """Attach the rail mount status to the /health payload.
+
+    /health itself is served by sincor2.mvp_blueprints.health; this hook,
+    registered where the rail mounts happen, adds a 'rail' section so an
+    unmounted rail is visible in the health surface, not only in logs.
+    """
+    if request.path == '/health' and response.is_json:
+        try:
+            payload = json.loads(response.get_data(as_text=True))
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            payload['rail'] = {
+                'mounted': all(RAIL_MOUNT_STATUS.values()),
+                **RAIL_MOUNT_STATUS,
+            }
+            response.set_data(json.dumps(payload))
+    return response
+
 pdf_guides_dir = str(data_dir() / 'files' / 'guides')
 try:
     pdf_generator = get_pdf_generator(pdf_guides_dir)
@@ -466,85 +786,23 @@ except Exception as e:
     logger.warning('[EMAIL] %s', e)
     email_sender = None
 
+# One-scheduler consolidation (2026-10-11): exactly ONE BackgroundScheduler for
+# the whole app, owned by the central registry in sincor2.scheduler. The 8
+# standalone *_scheduler modules are job-function libraries now — they no
+# longer create schedulers of their own. Canonical job IDs and defaults live
+# in sincor2.scheduler.SCHEDULER_DEFAULTS.
 try:
-    from sincor2.outreach_scheduler import start_outreach_scheduler, stop_outreach_scheduler
-    import atexit
-    outreach_scheduler = start_outreach_scheduler(app)
-    if outreach_scheduler:
-        atexit.register(stop_outreach_scheduler)
+    from sincor2.scheduler import start_central_scheduler, stop_central_scheduler
+    import atexit as _atexit_central
+    central_scheduler = start_central_scheduler(app)
+    if central_scheduler:
+        _atexit_central.register(stop_central_scheduler)
+        logger.info('[SCHEDULER] central scheduler started')
+    else:
+        logger.info('[SCHEDULER] central scheduler not started (no jobs enabled)')
 except Exception as e:
-    logger.warning('[OUTREACH] %s', e)
-    outreach_scheduler = None
-
-try:
-    from sincor2.content_scheduler import start_content_scheduler, stop_content_scheduler
-    import atexit as _atexit
-    content_scheduler = start_content_scheduler(app)
-    if content_scheduler:
-        _atexit.register(stop_content_scheduler)
-except Exception as e:
-    logger.warning('[CONTENT] %s', e)
-    content_scheduler = None
-
-try:
-    from sincor2.launch_ops_scheduler import start_launch_ops_scheduler, stop_launch_ops_scheduler
-    import atexit as _atexit_launch
-    launch_ops_scheduler = start_launch_ops_scheduler(app)
-    if launch_ops_scheduler:
-        _atexit_launch.register(stop_launch_ops_scheduler)
-except Exception as e:
-    logger.warning('[LAUNCH_OPS] %s', e)
-    launch_ops_scheduler = None
-
-try:
-    from sincor2.launch_review_notify import start_review_reminder_scheduler, stop_review_reminder_scheduler
-    import atexit as _atexit_review
-    review_reminder_scheduler = start_review_reminder_scheduler(app)
-    if review_reminder_scheduler:
-        _atexit_review.register(stop_review_reminder_scheduler)
-except Exception as e:
-    logger.warning('[REVIEW_REMINDER] %s', e)
-
-try:
-    from sincor2.partner_outreach_notify import start_partner_reminder_scheduler, stop_partner_reminder_scheduler
-    import atexit as _atexit_partner
-    partner_reminder_scheduler = start_partner_reminder_scheduler(app)
-    if partner_reminder_scheduler:
-        _atexit_partner.register(stop_partner_reminder_scheduler)
-except Exception as e:
-    logger.warning('[PARTNER_REMINDER] %s', e)
-
-try:
-    from sincor2.daily_ops_scheduler import start_daily_ops_scheduler, stop_daily_ops_scheduler
-    import atexit as _atexit_daily
-    daily_ops_scheduler = start_daily_ops_scheduler(app)
-    if daily_ops_scheduler:
-        _atexit_daily.register(stop_daily_ops_scheduler)
-except Exception as e:
-    logger.warning('[DAILY_OPS] %s', e)
-    daily_ops_scheduler = None
-
-try:
-    from sincor2.compliance_monitor import start_compliance_scheduler
-    import atexit as _atexit_compliance
-    compliance_scheduler = start_compliance_scheduler()
-    if compliance_scheduler:
-        def _stop_compliance():
-            if compliance_scheduler.running:
-                compliance_scheduler.shutdown(wait=False)
-        _atexit_compliance.register(_stop_compliance)
-except Exception as e:
-    logger.warning('[COMPLIANCE] %s', e)
-    compliance_scheduler = None
-
-try:
-    from sincor2.subscription_scheduler import start_subscription_scheduler, stop_subscription_scheduler
-    import atexit as _atexit_sub
-    subscription_scheduler = start_subscription_scheduler(app)
-    if subscription_scheduler:
-        _atexit_sub.register(stop_subscription_scheduler)
-except Exception as e:
-    logger.warning('[SUBSCRIPTION] %s', e)
+    logger.warning('[SCHEDULER] %s', e)
+    central_scheduler = None
 
 try:
     from sincor2.x402_payments import init_x402_db
@@ -555,15 +813,18 @@ except Exception as e:
     X402_AVAILABLE = False
 
 try:
-    from sincor2.polyclaw_scheduler import start_polyclaw_scheduler, stop_polyclaw_scheduler
-    import atexit as _atexit_poly
-    polyclaw_scheduler = start_polyclaw_scheduler(app)
-    if polyclaw_scheduler:
-        _atexit_poly.register(stop_polyclaw_scheduler)
-        logger.info('[POLYCLAW] scheduler started')
+    # Real /api/polyclaw/status view — registered here, ahead of the legacy
+    # route defined later, so Flask's first-registered rule lets the real
+    # implementation win. The trading loop itself now runs as the
+    # "polyclaw_scan" job on the central scheduler above; this is route-only.
+    # Live-mode CLOB warm-up stays async so it never blocks gunicorn boot
+    # (dry-run default: no-op). Live/dry-run posture and private-key env
+    # handling are untouched by the one-scheduler consolidation.
+    from sincor2.polyclaw_scheduler import register_polyclaw_status_route, maybe_bootstrap_live_client
+    register_polyclaw_status_route(app)
+    maybe_bootstrap_live_client()
 except Exception as e:
     logger.warning('[POLYCLAW] %s', e)
-    polyclaw_scheduler = None
 
 
 @app.before_request
@@ -576,8 +837,69 @@ def log_request():
         logger.info('%s %s', request.method, request.path)
 
 
+# Content-Security-Policy (Base44 review 2026-11-06: header set was
+# good but carried no CSP at all). The directives below are the
+# strictest set the current templates survive, inventoried from
+# templates/ + static/ on 2026-11-06:
+#   * script-src 'unsafe-inline' — 50 inline <script> blocks and ~101
+#     inline event-handler attributes across the templates; removing it
+#     means rewriting every template, out of scope here.
+#   * script-src 'unsafe-eval' — the Alpine.js standard build (unpkg)
+#     evaluates x-data expressions through the Function constructor,
+#     and the Tailwind Play CDN (cdn.tailwindcss.com) compiles in the
+#     browser. Dropping eval breaks the dashboards that use them.
+#   * script host allowlist — cdn.jsdelivr.net (chart.js),
+#     cdn.tailwindcss.com, unpkg.com (alpine), cdnjs.cloudflare.com
+#     (three.js, socket.io), esm.sh (WalletConnect provider, dynamically
+#     imported by static/js/sinc_wallet.js).
+#   * style-src 'unsafe-inline' — 60 <style> blocks + ~595 style=
+#     attributes, plus the Tailwind Play CDN's runtime-injected styles.
+#     Hosts: fonts.googleapis.com (font CSS), jsdelivr / tailwindcss
+#     (tailwind stylesheet).
+#   * img-src https: — image URLs are partly data-driven (API-returned
+#     media, api.qrserver.com QR codes in refer.html, the team.finance
+#     badge); images cannot execute script, so the scheme-wide allow is
+#     the functional floor. data:/blob: cover inline + generated media.
+#   * font-src — fonts.gstatic.com serves the Google Font files.
+#   * connect-src — 'self' covers same-origin fetch/XHR and the
+#     socket.io client (io() with no URL = same origin, incl. its ws
+#     upgrade); api.dexscreener.com is fetched by templates/axiom.html;
+#     mainnet.base.org is the Base RPC the wallet config names;
+#     *.walletconnect.com / *.walletconnect.org (https + wss) are the
+#     WalletConnect relay/verify endpoints for the esm.sh provider.
+#   * frame-src 'self' — the genesis gate iframes /?inner=1 as its
+#     backdrop; frame-ancestors 'self' matches the X-Frame-Options
+#     SAMEORIGIN posture below (the gate frames its own homepage, so
+#     'none' would break it).
+#   * object-src 'none', base-uri 'self', form-action 'self' — no
+#     plugins, no base-tag hijack, forms post same-origin only.
+_CONTENT_SECURITY_POLICY = "; ".join((
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    " https://cdn.jsdelivr.net https://cdn.tailwindcss.com"
+    " https://unpkg.com https://cdnjs.cloudflare.com https://esm.sh",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
+    " https://cdn.jsdelivr.net https://cdn.tailwindcss.com",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "connect-src 'self' https://api.dexscreener.com https://esm.sh"
+    " https://mainnet.base.org https://*.walletconnect.com"
+    " wss://*.walletconnect.com https://*.walletconnect.org"
+    " wss://*.walletconnect.org",
+    "media-src 'self' data: blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-src 'self'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+))
+
+
 @app.after_request
 def apply_security_headers(response):
+    response.headers['Content-Security-Policy'] = _CONTENT_SECURITY_POLICY
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -668,9 +990,115 @@ def init_db():
         updated_at TEXT,
         metadata TEXT
     )''')
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
     db.commit()
     db.close()
     logger.info('[DB] ready at %s', DB_PATH)
+
+
+# --- B3: Stripe webhook event idempotency --------------------------------------
+# Every received Stripe event ID is persisted with a UNIQUE constraint BEFORE
+# processing (insert-or-ignore claim). Duplicate deliveries are acknowledged
+# without re-fulfillment, so fulfillment is idempotent keyed on event ID.
+# Stripe is legacy/not-supported per founder decision D3 — this makes the
+# webhook path safe IF the integration is ever enabled.
+STRIPE_EVENT_CLAIM_TTL_SEC = 300  # reclaim window for crashed (claimed, never processed) events
+
+
+def _ensure_stripe_event_schema(db) -> None:
+    db.execute('''CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id TEXT PRIMARY KEY,
+        event_type TEXT,
+        received_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'claimed'
+    )''')
+
+
+def claim_stripe_webhook_event(event_id: str, event_type: str = "unknown") -> str:
+    """Atomically claim a Stripe webhook event for processing.
+
+    Insert-or-ignore on the PRIMARY KEY means exactly one concurrent delivery
+    wins the claim. Returns:
+      'claimed'             — first delivery; caller owns processing.
+      'reclaimed'           — stale 'claimed' row from a crashed attempt;
+                              caller owns processing.
+      'duplicate_processed' — already fulfilled; ack without re-processing.
+      'duplicate_inflight'  — claimed moments ago by a concurrent delivery;
+                              ack without re-processing.
+    """
+    event_id = (event_id or "").strip()
+    if not event_id:
+        return "missing"
+    db = get_db()
+    db.execute("PRAGMA busy_timeout=5000")
+    _ensure_stripe_event_schema(db)
+    now = datetime.now(timezone.utc).isoformat()
+    cur = db.execute(
+        "INSERT OR IGNORE INTO stripe_webhook_events "
+        "(event_id, event_type, received_at, status) VALUES (?, ?, ?, 'claimed')",
+        (event_id, event_type, now),
+    )
+    db.commit()
+    if cur.rowcount == 1:
+        return "claimed"
+    row = db.execute(
+        "SELECT status, received_at FROM stripe_webhook_events WHERE event_id=?",
+        (event_id,),
+    ).fetchone()
+    if row is None:
+        return "claimed"  # defensive; cannot happen without a deleter
+    if row["status"] == "processed":
+        return "duplicate_processed"
+    # Claimed but not processed: a concurrent delivery in flight, or a crashed
+    # attempt. Reclaim only after the TTL so concurrent duplicates are dropped.
+    try:
+        claimed_at = datetime.fromisoformat(
+            (row["received_at"] or "").replace("Z", "+00:00")
+        )
+        age_sec = (datetime.now(timezone.utc) - claimed_at).total_seconds()
+    except (ValueError, TypeError):
+        age_sec = 0
+    if age_sec < STRIPE_EVENT_CLAIM_TTL_SEC:
+        return "duplicate_inflight"
+    cur = db.execute(
+        "UPDATE stripe_webhook_events SET status='claimed', received_at=?, "
+        "event_type=? WHERE event_id=? AND status='claimed'",
+        (now, event_type, event_id),
+    )
+    db.commit()
+    return "reclaimed" if cur.rowcount == 1 else "duplicate_inflight"
+
+
+def mark_stripe_webhook_event_processed(event_id: str) -> None:
+    """Mark a claimed Stripe event as processed (fulfilled)."""
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "UPDATE stripe_webhook_events SET status='processed' WHERE event_id=?",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
+
+
+def release_stripe_webhook_event_claim(event_id: str) -> None:
+    """Release a 'claimed' event after a processing failure.
+
+    The failed attempt is over, so no concurrent processing is possible;
+    deleting the claim lets a redelivery claim and retry instead of being
+    acked as a duplicate.
+    """
+    db = get_db()
+    _ensure_stripe_event_schema(db)
+    db.execute(
+        "DELETE FROM stripe_webhook_events WHERE event_id=? AND status='claimed'",
+        ((event_id or "").strip(),),
+    )
+    db.commit()
 
 
 init_db()
@@ -767,21 +1195,37 @@ def _check_admin_token(req):
         return False
     try:
         decoded = decode_token(token)
+        # BOTH the admin identity AND the admin role claim are required
+        # (hunt-32 W-44): sub alone used to suffice, which admitted any
+        # token minted for the admin identity without a role — e.g. a
+        # customer OAuth cookie token or a role='user' token. Every real
+        # admin login mints role='admin' (mvp_blueprints/auth.py,
+        # auth_system.py, _admin_cookie_response). Mirrors
+        # auth_system.admin_required semantics.
+        if decoded.get('role') != 'admin':
+            return False
         return _ct_eq(str(decoded.get('sub') or '').lower(), _admin_username().lower())
     except Exception:
         return False
 
 
 def _check_admin_key(req) -> bool:
-    import hmac
-    expected = _admin_password()
-    if not expected:
-        return False
-    key = req.headers.get('X-Admin-Key', '')
-    if not key:
-        data = req.get_json(silent=True) or {}
-        key = str(data.get('admin_key', ''))
-    return bool(key) and hmac.compare_digest(str(key), str(expected))
+    # Header ONLY (hunt-32 W-44): the admin key is never accepted from
+    # the request body, query string, form, or cookies — the
+    # secret-in-body fallback admitted anyone who could place the key
+    # in a JSON payload (it flipped the Command Center killswitch).
+    # Same posture as sponsored_stake._admin_key_ok and the waitlist
+    # handler's _is_admin_request.
+    #
+    # Wren PR 4: the comparison itself lives in the shared helper
+    # (sincor2.admin_api_key.check_admin_header_key). When a dedicated
+    # ADMIN_API_KEY (>= 32 chars) is configured it is the ONLY accepted
+    # header key and the login password stops doubling as an API key;
+    # while it is unset, the legacy ADMIN_PASSWORD header key keeps
+    # working. Constant-time, and an un-comparable (non-ASCII) header
+    # value fails CLOSED (401), never a 500 (hunt-32 W-44).
+    from sincor2.admin_api_key import check_admin_header_key
+    return check_admin_header_key(req.headers.get('X-Admin-Key', ''))
 
 
 def _is_admin_session() -> bool:
@@ -805,9 +1249,8 @@ def _admin_cookie_response(username: str, redirect_url: str = '/admin'):
     access_token = create_access_token(identity=identity, additional_claims={'role': 'admin'})
     resp = make_response(redirect(_safe_next_url(redirect_url, '/admin')))
     resp.set_cookie(
-        'access_token', access_token, httponly=True,
-        secure=bool(os.environ.get('RAILWAY_ENVIRONMENT')),
-        samesite='Lax', max_age=28800,
+        'access_token', access_token, max_age=28800,
+        **secure_cookie_kwargs(),
     )
     return resp
 
@@ -834,17 +1277,118 @@ from sincor2.blueprints.vitals import vitals_bp as _vitals_bp
 
 app.register_blueprint(_vitals_bp)
 
-# /command-center page on production (GET only). Same login gate as the other
-# operator surfaces on this app (see /dashboard, /operator). The full
-# command-center API blueprint is deliberately NOT mounted here: its
-# killswitch POST is unauthenticated upstream and must not be exposed on
-# production until auth lands. The page renders; its live sections show
-# their own "unavailable" states where the APIs are absent.
+# /command-center page on production (GET only). Admin-session gate —
+# stricter than the other operator surfaces on this app (see /dashboard,
+# /operator): the console is operators-only (Wren PR 4). This page route
+# is registered BEFORE the command-center API blueprint below, so it stays
+# the handler for /command-center (the blueprint's own page route is
+# shadowed and never runs on this app).
 @app.get("/command-center")
 def _console_command_center_page():
-    if not (_is_admin_session() or session.get("user_email")):
+    # Wren PR 4: admin session ONLY. The old `session.get("user_email")`
+    # fallback admitted ANY logged-in customer to the operator console
+    # page; a login is not an admin credential.
+    if not _is_admin_session():
         return redirect("/login?next=/command-center")
     return render_template("command_center.html", nav_active="command")
+
+# Command Center APIs (/api/command-center/*) on production. The blueprint
+# was previously mounted ONLY by the legacy app because its killswitch POST
+# is unauthenticated upstream. It is mounted here behind the same admin gate
+# as every other operator API on this app: _require_admin (admin session /
+# admin token / admin key) runs as a before_request guard over EVERY
+# /api/command-center/* path — reads and writes alike, SSE included.
+# Anonymous and non-admin sessions get 401: no data, and no killswitch or
+# grade state can change. The blueprint declares no auth of its own; do not
+# mount it on any app without an equivalent guard in front of these paths.
+from sincor2.blueprints.command_center import command_center_bp as _command_center_bp
+
+app.register_blueprint(_command_center_bp)
+
+
+@app.before_request
+def _admin_key_rate_limit_gate():
+    # Wren PR 4: failed X-Admin-Key attempts are rate-limited per
+    # client address (10/min -> 429 JSON) across every admin surface —
+    # /api/command-center/, /api/waitlist/stats, /api/airdrop/stats,
+    # /api/admin/, and any other path where a key is presented. This
+    # guard is registered BEFORE the admin auth guards below so a
+    # brute-force burst is refused before credential checks run;
+    # requests that authenticate never consume budget (see
+    # sincor2.admin_api_key).
+    from sincor2.admin_api_key import admin_key_rate_limit_response
+    return admin_key_rate_limit_response()
+
+
+@app.before_request
+def _command_center_api_admin_gate():
+    if request.path.startswith("/api/command-center/"):
+        return _require_admin(request)
+    return None
+
+# Waitlist on production: the waitlist blueprint was previously mounted
+# ONLY by the legacy app, so production served no /api/waitlist/* routes
+# at all and the website signup count was trapped in the Railway host's
+# SQLite file (data/waitlist.db) with no read path. Mount it here with
+# the production WaitlistManager singleton (the same data/waitlist.db
+# the signups land in). POST join stays public — it IS the signup
+# endpoint and its behavior is unchanged. The aggregate stats route
+# (GET /api/waitlist/stats) is admin-gated twice: _require_admin runs
+# as a before_request guard over that path (same treatment as the
+# command-center APIs above), and the handler re-checks admin itself.
+from sincor2.blueprints.waitlist import waitlist_bp as _waitlist_bp
+from sincor2.error_handling import ApiError as _WaitlistApiError
+from sincor2.error_handling import api_error as _waitlist_api_error
+from sincor2.waitlist_system import waitlist_manager as _waitlist_manager
+
+app.extensions["waitlist_manager"] = _waitlist_manager
+app.register_blueprint(_waitlist_bp)
+
+
+# The waitlist handlers raise ApiError (400 invalid payload / 400 join
+# failure / 503 unavailable). The legacy app renders those through
+# register_error_handlers; this app never registered an ApiError
+# handler, so without this the newly mounted routes would surface
+# every refusal as a bare 500. Register ONLY the ApiError handler —
+# this app's own 404/500/413 handlers below stay exactly as they are.
+@app.errorhandler(_WaitlistApiError)
+def _waitlist_api_error_handler(error):
+    return _waitlist_api_error(error.code, error.message, error.status, error.details)
+
+
+@app.before_request
+def _waitlist_stats_admin_gate():
+    if request.path.startswith("/api/waitlist/stats"):
+        return _require_admin(request)
+    if request.path.startswith("/api/airdrop/stats"):
+        return _require_admin(request)
+    return None
+
+# Admin intake visibility (WREN PR 6): GET /api/admin/intakes lists pack
+# intakes stuck at intake_complete for 24h+ so a buyer who finished
+# their intake never sits unnoticed. Same double gate as the waitlist
+# stats route above: _require_admin runs as a before_request guard over
+# the path, and the handler re-checks admin itself (the blueprint's own
+# credential check mirrors the waitlist blueprint's).
+from sincor2.blueprints.admin_intakes import admin_intakes_bp as _admin_intakes_bp
+
+app.register_blueprint(_admin_intakes_bp)
+
+
+@app.before_request
+def _admin_intakes_admin_gate():
+    if request.path.startswith("/api/admin/intakes"):
+        return _require_admin(request)
+    return None
+
+
+# One-click unsubscribe (Wren PR 8): public by design — the HMAC-signed
+# token IS the credential, the same way /download links work. A valid
+# token suppresses the address it names; anything else 404s (fail
+# closed, no validity oracle). No admin gate applies here.
+from sincor2.blueprints.unsubscribe import unsubscribe_bp as _unsubscribe_bp
+
+app.register_blueprint(_unsubscribe_bp)
 
 from sincor2.mvp_blueprints import register_mvp_blueprints
 register_mvp_blueprints(app)

@@ -1,0 +1,145 @@
+{
+  "rpc_url": "https://sepolia.base.org",
+  "steps": [
+    {
+      "step": "rpc_connect",
+      "ok": true,
+      "chain_id": 84532,
+      "block": 48114000
+    },
+    {
+      "step": "chain_guard",
+      "ok": true
+    },
+    {
+      "step": "infra_code",
+      "contract": "PoolManager",
+      "address": "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+      "present": true,
+      "code_bytes": 24009
+    },
+    {
+      "step": "infra_code",
+      "contract": "V4Quoter",
+      "address": "0x4a6513c898fe1B2d0E78d3b0e0A4a151589B1cBa",
+      "present": true,
+      "code_bytes": 5820
+    },
+    {
+      "step": "infra_code",
+      "contract": "UniversalRouter",
+      "address": "0x492E6456D9528771018DeB9E87ef7750EF184104",
+      "present": true,
+      "code_bytes": 19540
+    },
+    {
+      "step": "infra_code",
+      "contract": "Permit2",
+      "address": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "present": true,
+      "code_bytes": 9152
+    },
+    {
+      "step": "infra_code",
+      "contract": "WETH",
+      "address": "0x4200000000000000000000000000000000000006",
+      "present": true,
+      "code_bytes": 2041
+    },
+    {
+      "step": "infra_code",
+      "contract": "USDC",
+      "address": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "present": true,
+      "code_bytes": 1798
+    },
+    {
+      "step": "forwarder_balances",
+      "WETH_wei": 0,
+      "USDC_wei": 0,
+      "note": "synthetic forwarder is unfunded by design"
+    },
+    {
+      "step": "obligation_recorded",
+      "obligation_id": "sepolia-dryrun-1791996289-10000000000000000",
+      "token": "WETH",
+      "amount_wei": 10000000000000000
+    },
+    {
+      "step": "discover_pool",
+      "ok": true,
+      "fee": 3000,
+      "tick_spacing": 60
+    },
+    {
+      "step": "quote",
+      "ok": true,
+      "amount_out_wei": 99697,
+      "amount_out_min_wei": 98700,
+      "slippage_bps": 100
+    },
+    {
+      "step": "plan",
+      "ok": true,
+      "tx_kinds": [
+        "approve_permit2",
+        "permit2_approve",
+        "swap",
+        "forward_to_treasury"
+      ],
+      "unsigned_built": true
+    },
+    {
+      "step": "unsigned_tx",
+      "kind": "approve_permit2",
+      "to": "0x4200000000000000000000000000000000000006",
+      "chainId": 84532,
+      "data_prefix": "0x095ea7b300000000..."
+    },
+    {
+      "step": "unsigned_tx",
+      "kind": "permit2_approve",
+      "to": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+      "chainId": 84532,
+      "data_prefix": "0x87517c4500000000..."
+    },
+    {
+      "step": "unsigned_tx",
+      "kind": "swap",
+      "to": "0x492E6456D9528771018DeB9E87ef7750EF184104",
+      "chainId": 84532,
+      "data_prefix": "0x3593564c00000000..."
+    },
+    {
+      "step": "authorization_signed",
+      "ok": true,
+      "synthetic_approvers": true,
+      "auth_hash": "0xd1afa2944eeaeb0a...",
+      "note": "SYNTHETIC keys; no owner key material exists"
+    },
+    {
+      "step": "authorized_dry_run",
+      "ok": true,
+      "predicted_fail_closed": true,
+      "failed_step": "swap",
+      "note": "approvals simulated clean; swap reverted from unfunded synthetic forwarder as designed.  Full swap execution was proven on a Base-mainnet fork with a funded forwarder (docs/ops/FEE_EXECUTOR_FORKSIM_READINESS.md)."
+    },
+    {
+      "step": "negative_control",
+      "ok": true,
+      "note": "tampered record rejected; signatures do not transfer"
+    },
+    {
+      "step": "verdict",
+      "ok": true,
+      "verdict": "DRY_RUN_OK",
+      "findings": [
+        "live Sepolia quote + full unsigned-tx plan built from real chain state (WETH->USDC 3000/60 pool)",
+        "authorization verified end-to-end with synthetic quorum keys; tampered record rejected (negative control)",
+        "approval simulations passed; swap simulation failed closed on the unfunded synthetic forwarder as designed (no funds moved, none exist)",
+        "swap execution leg proven separately on Base-mainnet fork with funded forwarder (historical evidence)"
+      ],
+      "note": "full loop proven against live Sepolia state; nothing broadcast, no keys used, no funds moved"
+    }
+  ]
+}

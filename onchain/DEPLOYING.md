@@ -82,66 +82,37 @@ post-deploy checklist (CREATE2 hook mining, strategy registration, shadow swaps 
 
 ---
 
-## P24 creator-issuance stack — Base Sepolia ceremony
+## P24 creator-issuance stack — local simulation only
 
-Founder ceremony for the four P24 contracts (`onchain/src/p24/`). Script:
-`script/07_DeployP24.s.sol`. Manifest: `onchain/deployments/base-sepolia-p24.json`
-(template with zero-address placeholders; the script rewrites it at ceremony).
+`script/07_DeployP24.s.sol` is an inspection-only local simulation for the four
+P24 contracts (`onchain/src/p24/`). It has no signer, network-write, receipt,
+or verification path. It emits no P24 deployment manifest.
 
-### 1. Ceremony inputs (founder decides)
+### Inputs
 
 | Var | Meaning |
 |-----|---------|
-| `P24_ADMIN` | Factory + guard admin. Founder decision: EOA in Secure Vault vs multisig (auction precedent). |
-| `P24_SCREENER` | `ContentPolicyGuard` screener key — MUST differ from `P24_ADMIN` (script reverts if equal). |
-| `P24_TREASURY` | Optional override of the expected treasury leg. `FeeSplitDistributor.TREASURY` is a **compiled constant** (`0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`); the script reads it back off the deployed instance and reverts on drift. A different treasury means a `.sol` change + re-review, not a deploy flag. |
-| `DEPLOYER_PRIVATE_KEY` | One-shot deployer key, used once with `--broadcast`, then discarded. |
-
-Note: `CreatorTokenFactory`'s constructor takes only the admin. The guard links
-**offchain**: `issue()` requires `screened=true` (policy screen runs in the
-Python onboarding bridge, ruleset version recorded on the token). No `.sol`
-changes needed. `BondingCurve` is per-token (constructor takes the token
-address) — deployed at `issue()` time, not in this ceremony.
-
-### 2. Dry-run first (no key, no broadcast — verified in CI)
+| `P24_ADMIN` | Factory + guard admin address for the local simulation. |
+| `P24_SCREENER` | `ContentPolicyGuard` screener address; it must differ from `P24_ADMIN`. |
+| `P24_TREASURY` | Optional expected treasury constant. `FeeSplitDistributor.TREASURY` is compiled as `0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac`; a different value requires a Solidity change and review, not an environment override. |
 
 ```bash
 cd onchain
 P24_ADMIN=0x... P24_SCREENER=0x... forge script script/07_DeployP24.s.sol
 ```
 
-Expect: 4 contracts deployed in order (Guard → Factory → Splitter → Accrual),
-manifest written. Script reverts if `P24_ADMIN`/`P24_SCREENER` unset, equal, or
-if the treasury constant drifts.
+The simulation constructs Guard → Factory → Splitter → Accrual in a local EVM.
+The printed addresses are **ephemeral simulation addresses, not on-chain
+deployment evidence**. No P24 address, receipt, verification claim, or
+deployment record is produced by this path. The script rejects unset or equal
+admin/screener values and a treasury-constant mismatch.
 
-### 3. Ceremony
+`CreatorTokenFactory` takes only the admin. The guard remains **offchain**:
+`issue()` requires `screened=true` from the Python onboarding policy check, and
+the ruleset version is recorded on the token. `BondingCurve` is per token and
+is constructed by `issue()`; it is not part of this simulation.
 
-```bash
-export P24_ADMIN=<...> P24_SCREENER=<...> DEPLOYER_PRIVATE_KEY=<one-shot>
-forge script script/07_DeployP24.s.sol \
-  --rpc-url https://sepolia.base.org --broadcast --verify
-```
-
-Record the four addresses in `onchain/deployments/base-sepolia-p24.json`
-(script does this automatically) and commit the manifest.
-
-### 4. Verification
-
-Sourcify + Etherscan/BaseScan for each contract with exact constructor args:
-- `ContentPolicyGuard`: `(P24_ADMIN, P24_SCREENER)`
-- `CreatorTokenFactory`: `(P24_ADMIN)`
-- `FeeSplitDistributor`: `()`
-- `RevenueAccrual`: `()`
-
-Mark `verification.Sourcify` / `verification.Etherscan` in the manifest when done.
-
-### 5. Python bridge dry-run (after deploy, before any issuance)
-
-Point the P24 bridge (touch-point 6: `src/sincor2/defi/p24/bridge.py`, once built)
-at the deployed factory address: exact `issue(...)` calldata + `eth_call`
-dry-run before any signing. Signing stays caller-supplied (mirrors the
-`auction_bridge.py` key rule — the module never imports key material).
-
-Still open (not in this ceremony): factory `admin` key custody, screener key
-custody, `live_block` release valve (`gates.py:290-298`), live-blocked product
-release — all founder decisions per the gap audit.
+Any real P24 deployment, verification, issuance release, key custody decision,
+or bridge operation requires a separate owner decision and review. Other
+deployment scripts and workflows in this repository are outside this P24
+simulation-only change.

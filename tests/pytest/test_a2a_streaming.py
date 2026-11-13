@@ -2,6 +2,40 @@
 from __future__ import annotations
 
 import json
+import time
+import uuid
+
+from eth_account import Account
+from eth_account.messages import encode_defunct
+
+# w06 (P3 item 14) strict EIP-191 create-auth: the integrated tree rejects an
+# unsigned message/stream create with 401. This test signs the create message
+# byte-identically to w06's _auth_create_message so it passes with and without
+# the w06 auth gate (on trees without the gate the extra fields are ignored).
+# No security relaxation — the strict auth stays; the test learns to sign.
+_STREAM_SIGNER = Account.from_key("0x" + "cc" * 32)
+
+
+def _signed_create_params(label: str, skill: str, **extra) -> dict:
+    ts = int(time.time())
+    nonce = uuid.uuid4().hex
+    message = (
+        "SINCOR-A2A task-create\n"
+        f"agent_id:{label}\n"
+        f"skill_id:{skill}\n"
+        f"timestamp:{ts}\n"
+        f"nonce:{nonce}"
+    )
+    sig = _STREAM_SIGNER.sign_message(encode_defunct(text=message))
+    params = {
+        "callerId": label,
+        "authSignature": "0x" + sig.signature.hex(),
+        "authTimestamp": ts,
+        "authNonce": nonce,
+        "ownerWallet": _STREAM_SIGNER.address,
+    }
+    params.update(extra)
+    return params
 
 
 def _sse_payloads(response) -> list:
@@ -35,20 +69,22 @@ def test_stream_is_event_stream(client):
 
 
 def test_stream_emits_status_then_token_chunks(client):
+    params = _signed_create_params(
+        "stream-caller-2",
+        "content-blog",
+        skillId="content-blog",
+        message={
+            "role": "user",
+            "parts": [{"text": "Write a short outline about CRM sync automation for sales ops teams"}],
+        },
+    )
     resp = client.post(
         "/api/a2a",
         json={
             "jsonrpc": "2.0",
             "id": "stream-1",
             "method": "message/stream",
-            "params": {
-                "skillId": "content-blog",
-                "callerId": "stream-caller-2",
-                "message": {
-                    "role": "user",
-                    "parts": [{"text": "Write a short outline about CRM sync automation for sales ops teams"}],
-                },
-            },
+            "params": params,
         },
     )
     events = _sse_payloads(resp)

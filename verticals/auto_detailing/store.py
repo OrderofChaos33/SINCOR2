@@ -427,7 +427,7 @@ class ChromaStore:
                 """
                 UPDATE outbound
                 SET status=?, live=1, updated_at=?
-                WHERE id=? AND status IN ('pending_approval', 'approved_dry_run', 'send_failed')
+                WHERE id=? AND status IN ('pending_approval', 'approved_dry_run', 'send_failed', 'not_sent')
                 """,
                 ("sending", _now(), item_id),
             )

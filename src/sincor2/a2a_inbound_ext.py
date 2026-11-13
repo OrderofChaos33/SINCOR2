@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import threading
@@ -34,6 +35,12 @@ from sincor2.a2a_inbound import (
     health_snapshot,
 )
 
+from sincor2.a2a_identity import (
+    register_message as _register_message,
+    transfer_message as _transfer_message,
+    verify_wallet_proof as _verify_wallet_proof,
+)
+
 logger = logging.getLogger("sincor.a2a.inbound")
 _HEARTBEAT_THREAD = None
 
@@ -58,9 +65,11 @@ def _recover_heartbeat_signer(message: str, signature: str) -> str:
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except Exception as exc:
         raise HeartbeatAuthError("signature verification unavailable") from exc
     try:
+        require_low_s(signature)  # reject (r, n-s) malleation twins
         return str(Account.recover_message(
             encode_defunct(text=message), signature=signature))
     except Exception as exc:
@@ -122,6 +131,59 @@ def _require_heartbeat_auth(agent_id: str, body: Dict[str, Any]) -> None:
         raise HeartbeatAuthError("heartbeat signature is not from the registered wallet")
 
 
+# ---------------------------------------------------------------------------
+# First-registration squatting control (wave 32)
+# ---------------------------------------------------------------------------
+#
+# SOURCE OF THE PROTECTED LIST: protocol-reserved names (the platform agent id,
+# service/system names) plus obvious brand-impersonation names. The list is
+# explicit and reviewable in this module — never a hidden blocklist. It lives
+# in code (not a config file) so a change is a reviewable diff.
+PROTECTED_AGENT_IDS = frozenset({
+    # Protocol / platform reserved
+    "sincor", "sincor-platform", "sincor-agent-swarm", "sincor-team",
+    "sadas", "axiom",
+    # Service / system impersonation
+    "admin", "administrator", "system", "root", "official", "support",
+    "help", "security", "moderator", "treasury", "platform", "genesis",
+    "foundation", "team", "staff",
+    # Engine poster identity (W-81 finding 4): the activity engine posts
+    # tasks as "axm-activity-engine". Without reservation, the first
+    # external claim squats the engine's poster identity — engine-task
+    # ring assessments then resolve the poster to the squatter's newborn
+    # record and HOLDs become QUARANTINEs for honest newcomers.
+    "axm-activity-engine",
+})
+
+# Any agent_id that is exactly "sincor" or starts with the "sincor-" prefix
+# (case-insensitive) is reserved for the protocol, in addition to the list.
+_PROTECTED_PREFIXES = ("sincor",)
+
+
+def _is_protected_agent_id(agent_id: str) -> bool:
+    lowered = str(agent_id).strip().lower()
+    if lowered in PROTECTED_AGENT_IDS:
+        return True
+    return any(lowered == p or lowered.startswith(p + "-") or lowered.startswith(p + "_")
+               or lowered.startswith(p + ".") for p in _PROTECTED_PREFIXES)
+
+
+def _registration_proof_required() -> bool:
+    """Hard-reject mode: set SINCOR_REGISTRATION_PROOF_REQUIRED=1 in
+    production to refuse unverified claims outright. Default (unset) marks
+    unverified claims as untrusted instead, preserving existing clients."""
+    return str(os.environ.get("SINCOR_REGISTRATION_PROOF_REQUIRED") or "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _extract_registration_proof(body: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "signature": body.get("registration_signature") or body.get("signature") or "",
+        "wallet": body.get("registration_wallet") or body.get("wallet") or "",
+        "ts": body.get("registration_ts") or body.get("reg_ts") or body.get("timestamp"),
+    }
+
+
 def _kya_listed(agent: Dict[str, Any]) -> None:
     try:
         from sincor2.kya_registry import hook_listed
@@ -179,10 +241,12 @@ def _recover_registration_signer(message: str, signature: str) -> str:
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except Exception as exc:
         raise RegistrationAuthError(
             "signature verification unavailable") from exc
     try:
+        require_low_s(signature)  # reject (r, n-s) malleation twins
         return str(Account.recover_message(
             encode_defunct(text=message), signature=signature))
     except Exception as exc:
@@ -225,6 +289,46 @@ def _require_reregistration_proof(existing: Dict[str, Any],
             "registration signature is not from the registered wallet")
 
 
+def _enforce_sybil_gates(agent_id: str, wallet: str, parsed: Dict[str, Any]) -> None:
+    """Anti-sybil gates for the inbound registration path (red-team 2026-10-08).
+
+    (1) Tombstoned wallets are dead: any new registration OR re-registration
+    behind one raises ``RegistrationAuthError`` (→ HTTP 403) BEFORE the
+    record is touched — rebirth on a tombstoned wallet fails closed.
+    (2) Wallet cardinality: one wallet backs at most MAX_IDENTITIES_PER_WALLET
+    live identities. Parity with bind()'s check via the shared
+    ``_live_identities_for_wallet`` helper; the caller's own record is
+    excluded by agent_id so re-registration cannot self-trip the cap.
+    """
+    from sincor2.kya_registry import (
+        MAX_IDENTITIES_PER_WALLET,
+        _live_identities_for_wallet,
+        card_hash,
+        check_identity_risk,
+    )
+    # Card hash over the same shape list_from_inbound hashes, so the
+    # whitewash detector sees the identity the KYA layer will list.
+    ch = card_hash({
+        "id": agent_id,
+        "name": parsed.get("name"),
+        "description": parsed.get("description"),
+        "version": parsed.get("version"),
+        "skills": parsed.get("skills") or [],
+    })
+    risk = check_identity_risk(agent_id, wallet, ch)
+    tomb = risk.get("tombstoned_wallet") or {}
+    if tomb:
+        raise RegistrationAuthError(
+            "wallet is tombstoned (prior agent %s, reason: %s); "
+            "registration refused — this identity is dead"
+            % (tomb.get("prior_agent_id"), tomb.get("reason")))
+    live = _live_identities_for_wallet(wallet, exclude_agent_id=agent_id)
+    if live >= MAX_IDENTITIES_PER_WALLET:
+        raise RegistrationAuthError(
+            "wallet identity cap reached (%d live identities on this wallet); "
+            "revoke an existing identity first" % live)
+
+
 def register_agent_record(body: Dict[str, Any],
                           _internal_reputation: Optional[float] = None) -> Dict[str, Any]:
     """Register (or re-register) an agent record.
@@ -234,7 +338,28 @@ def register_agent_record(body: Dict[str, Any],
     in API responses). New agents start at 0.0 (probation); re-registration
     preserves already-earned reputation. The only path that assigns
     reputation at registration time is the internal platform seed, via
-    ``_internal_reputation`` — the HTTP route never passes it.
+    ``_internal_reputation`` — the HTTP route never passes it. Records
+    seeded this way carry ``reputation_seeded=True`` (server-assigned, never
+    read from the request body, and surfaced in API responses), so a seeded
+    1.0 is never mistaken for earned reputation (W-96).
+
+    First-registration squatting control (wave 32):
+
+    * Protected names (``PROTECTED_AGENT_IDS`` + the ``sincor`` prefix rule)
+      are refused for new registrations.
+    * A new claim may present a wallet-identity proof: an EIP-191 signature
+      over ``SINCOR-REGISTER|<agent_id>|<timestamp_ms>`` with a mandatory
+      wallet claim equal to the recovered signer (see ``a2a_identity``).
+      Verified claims bind ``owner_wallet`` and set ``identity="verified"``.
+    * A wallet claim WITHOUT a valid proof is REJECTED outright (fail-closed;
+      PermissionError → HTTP 403). Unverified wallet claims are never
+      accepted, because they let anyone bind an arbitrary wallet to an
+      agent_id. Anonymous claims (no wallet) are accepted as
+      ``identity="unverified"``; set ``SINCOR_REGISTRATION_PROOF_REQUIRED=1``
+      to refuse anonymous claims too.
+    * A claim on an owned id by a *different* wallet is rejected — a valid
+      signature from the non-owner never transfers ownership (transfers go
+      through ``transfer_agent_record``).
 
     Re-registration (any update to an existing record) requires proof of
     control: an EIP-191 signature by the currently registered wallet over
@@ -246,13 +371,22 @@ def register_agent_record(body: Dict[str, Any],
     agent_id = parsed["agent_id"]
     if not _AGENT_ID_RE.match(agent_id):
         raise ValueError("agent_id must be 1-128 chars of A-Za-z0-9._:-")
-    if agent_id == _PLATFORM_AGENT_ID and _internal_reputation is None:
+    if _internal_reputation is None and _is_protected_agent_id(agent_id):
         # The platform agent is seeded internally at startup; it cannot be
         # registered (or have its wallet/callback overwritten) via the API.
         raise ValueError("reserved agent_id")
     wallet = parsed["wallet"]
     if wallet and not _WALLET_RE.match(wallet):
         raise ValueError("wallet must be a 0x-prefixed 20-byte hex address")
+    proof = _extract_registration_proof(body)
+    verified_wallet = _verify_wallet_proof(
+        message=_register_message(agent_id, proof["ts"] or 0),
+        signature=proof["signature"],
+        wallet=proof["wallet"],
+        timestamp_ms=proof["ts"],
+    )
+    if wallet:
+        _enforce_sybil_gates(agent_id, wallet, parsed)
     fabric = get_fabric()
     ts = _now_ms()
     with fabric.lock:
@@ -262,9 +396,62 @@ def register_agent_record(body: Dict[str, Any],
         if existing and _internal_reputation is None:
             _require_reregistration_proof(existing, parsed, body)
         if _internal_reputation is not None:
+            # Internal platform seed: bypasses proof, identity is "internal".
+            owner = ""
+            identity = "internal"
+        elif existing:
+            # Re-registration: proof of control already enforced above via
+            # _require_reregistration_proof (fail-closed). The bound owner
+            # wallet stays with the record; identity is verified.
+            owner = str(existing.get("owner_wallet")
+                        or existing.get("wallet") or "").lower()
+            identity = "verified"
+        else:
+            # New claim (wave 32 squatting control): a verified
+            # wallet-identity proof binds owner_wallet.
+            if verified_wallet:
+                # The proof's claimed wallet must equal the body's declared
+                # wallet: otherwise an attacker could display a victim's
+                # wallet while binding their own key as owner_wallet.
+                if wallet and verified_wallet != wallet.lower():
+                    raise PermissionError(
+                        "registration proof wallet does not match the "
+                        "claimed wallet")
+                owner = verified_wallet
+                identity = "verified"
+            elif wallet:
+                # Fail-closed (C3 remediation, 2026-10-08): a wallet claim
+                # WITHOUT a valid EIP-191 proof is rejected outright. An
+                # unverified claim used to be accepted and marked
+                # identity="unverified", which let anyone bind an arbitrary
+                # wallet to an agent_id (identity spoofing adjacent to the
+                # money path: stake deposits, bids). Anonymous claims (no
+                # wallet at all) are still accepted as "unverified" — there
+                # is no wallet claim to spoof. Set
+                # SINCOR_REGISTRATION_PROOF_REQUIRED=1 to refuse anonymous
+                # claims too.
+                raise PermissionError(
+                    "wallet claim requires a valid EIP-191 registration "
+                    "proof (body fields: registration_signature, "
+                    "registration_wallet, registration_ts)")
+            elif _registration_proof_required():
+                raise PermissionError("registration proof required")
+            else:
+                owner = ""
+                identity = "unverified"
+        if _internal_reputation is not None:
             reputation = float(_internal_reputation)
         else:
             reputation = float(existing.get("reputation") or 0.0)
+        # W-96 (transparency, not behavior change): seeded-reputation
+        # disclosure. Whenever the internal platform seed assigns reputation
+        # via _internal_reputation, the record carries
+        # reputation_seeded=True so API consumers can distinguish a seeded
+        # 1.0 from earned reputation. Server-assigned only — never read from
+        # the request body (the body is ignored here entirely). Preserved
+        # across re-registrations, so a reseed never silently wipes it.
+        reputation_seeded = (_internal_reputation is not None
+                             or bool(existing.get("reputation_seeded")))
         agent = {
             "agent_id": agent_id,
             "name": parsed["name"],
@@ -277,14 +464,26 @@ def register_agent_record(body: Dict[str, Any],
             "chain_id": parsed["chain_id"],
             "sinc_staked": parsed["sinc_stake"],
             "reputation": reputation,
+            # First-registration identity (wave 32): the wallet bound at
+            # claim time, and whether the binding was signature-verified.
+            "owner_wallet": owner,
+            "identity": identity,
             "sponsored": bool(existing.get("sponsored", True)),
             "last_heartbeat": ts,
             "registered_at": int(existing.get("registered_at") or ts),
             # Origin classification for registration-velocity ranking
-            # (operating directive): the platform agent is internal,
-            # every API registration is external.  Preserved across
-            # re-registrations like registered_at.
-            "origin": str(existing.get("origin") or ("internal" if agent_id == _PLATFORM_AGENT_ID else "external")),
+            # (operating directive): internal seeds (the platform agent and
+            # the liveness cohort, both seeded via _internal_reputation) are
+            # internal; every API registration is external.  Server-assigned
+            # only — never read from the request body (the body is ignored
+            # here entirely).  Preserved across re-registrations like
+            # registered_at.
+            "origin": str(existing.get("origin") or ("internal" if (_internal_reputation is not None or agent_id == _PLATFORM_AGENT_ID) else "external")),
+            # W-96 seeded-reputation disclosure marker (see above): True when
+            # the record's reputation was assigned by the internal platform
+            # seed rather than earned. Surfaced in API responses via
+            # list_agents() (full-record copy) and the register endpoint.
+            "reputation_seeded": reputation_seeded,
         }
         # probation / requires_merit / status derive from the merit
         # threshold in one place (never declared, never KYA-derived).
@@ -301,6 +500,59 @@ def register_agent_record(body: Dict[str, Any],
                 live["kya_id"] = snapshot["kya_id"]
                 live["kya_status"] = snapshot.get("kya_status")
         _save_agents(fabric)
+    return snapshot
+
+
+def transfer_agent_record(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Transfer an agent_id to a new owner wallet.
+
+    Transfer policy (wave 32): only the current owner wallet can initiate a
+    transfer, by presenting a fresh EIP-191 signature over the canonical
+    transfer message ``SINCOR-TRANSFER|<agent_id>|<new_wallet>|<timestamp_ms>``
+    (see ``a2a_identity``). The new wallet becomes ``owner_wallet`` and the
+    record's declared ``wallet``; ``identity`` becomes ``"verified"``.
+
+    Records without an owner (grandfathered, pre-ownership) cannot be
+    transferred until ownership is first claimed via a signed
+    re-registration. A transfer signature from any wallet other than the
+    current owner is rejected — there is no admin override path.
+
+    Raises: ValueError (bad input) → 400; PermissionError → 403;
+    KeyError (unknown agent) → 404.
+    """
+    agent_id = str(body.get("agent_id") or "").strip()
+    new_wallet = str(body.get("new_wallet") or body.get("wallet") or "").strip()
+    if not agent_id:
+        raise ValueError("agent_id is required")
+    if not new_wallet or not _WALLET_RE.match(new_wallet):
+        raise ValueError("new_wallet must be a 0x-prefixed 20-byte hex address")
+    signature = body.get("transfer_signature") or body.get("signature") or ""
+    ts = body.get("transfer_ts") or body.get("timestamp")
+    fabric = get_fabric()
+    with fabric.lock:
+        existing = fabric.agents.get(agent_id)
+        if not existing:
+            raise KeyError(agent_id)
+        owner = str(existing.get("owner_wallet") or "").lower()
+        if not owner:
+            raise PermissionError(
+                "agent_id has no owner yet; claim it with a signed re-registration first")
+        recovered = _verify_wallet_proof(
+            message=_transfer_message(agent_id, new_wallet, ts or 0),
+            signature=signature,
+            wallet=owner,
+            timestamp_ms=ts,
+        )
+        if not recovered or recovered != owner:
+            raise PermissionError("transfer requires the current owner wallet signature")
+        existing["owner_wallet"] = new_wallet.lower()
+        existing["identity"] = "verified"
+        existing["wallet"] = new_wallet.lower()
+        snapshot = dict(existing)
+    _save_agents(fabric)
+    fabric.publish("agent.transferred",
+                   list(snapshot.get("capability_tags") or []),
+                   {"agent_id": agent_id, "owner_wallet": snapshot["owner_wallet"]})
     return snapshot
 
 
@@ -342,6 +594,133 @@ def ensure_platform_agent() -> Dict[str, Any]:
     _start_platform_heartbeat()
     logger.info("[A2A] Platform agent live id=%s status=%s", snapshot.get("agent_id"), snapshot.get("status"))
     return snapshot
+
+
+# ---------------------------------------------------------------------------
+# Liveness cohort startup seed
+# ---------------------------------------------------------------------------
+# The six sincor-liveness-* cohort agents are first-party/ops agents that run
+# the 24/7 marketplace liveness loop. Their IDs sit under the protected
+# ``sincor-`` prefix, so the public POST /v1/a2a/register route refuses them
+# by design ("reserved agent_id"). They are seeded here at startup through
+# the internal path instead — the same mechanism as ensure_platform_agent().
+#
+# Wallets are the runner's signing-key addresses: heartbeat EIP-191
+# signatures must recover to the registered wallet, so the seed must bind the
+# key the runner actually signs with (NOT the stale wallet values in the
+# runner's cohort.json, which do not match its keys). Override without a code
+# change via LIVENESS_COHORT_WALLETS (JSON object mapping agent_id to wallet).
+_LIVENESS_COHORT_WALLETS_DEFAULT = {
+    "sincor-liveness-01": "0xC2d20A60B4ea93c0aA68a131205224E159766C62",
+    "sincor-liveness-02": "0x4e36d02e8cCE2Fc98576dDEFdA2282623f586717",
+    "sincor-liveness-03": "0x75B0A7efB0B2B8025a8d52bc0f2AefbAAd3187C0",
+    "sincor-liveness-04": "0xB569346B5dFdB0b1e4044f289f912D56D2CEA809",
+    "sincor-liveness-05": "0x4aeF0adF086549eebCAFA2596E277d1a1c4824B8",
+    "sincor-liveness-06": "0xd3A8660d0E95c3FA767A3e1401940a412C116E1a",
+}
+
+_LIVENESS_COHORT_META = {
+    # agent_id: (name, capability_tags)
+    "sincor-liveness-01": ("Liveness Scout Alpha",
+                            ["defi", "data", "monitoring", "markets"]),
+    "sincor-liveness-02": ("Liveness Analyst Beta",
+                            ["defi", "forecasting", "risk", "reporting"]),
+    "sincor-liveness-03": ("Liveness Auditor Gamma",
+                            ["compliance", "audit", "defi", "reporting"]),
+    "sincor-liveness-04": ("Liveness Keeper Delta",
+                            ["defi", "data", "monitoring", "health"]),
+    "sincor-liveness-05": ("Liveness Strategist Epsilon",
+                            ["defi", "lending", "risk", "forecasting"]),
+    "sincor-liveness-06": ("Liveness Reporter Zeta",
+                            ["data", "reporting", "compliance", "monitoring"]),
+}
+
+_LIVENESS_COHORT_DESCRIPTION = (
+    "SINCOR-operated bootstrapping agent. Disclosed market-making "
+    "participant: bids, performs, and settles through the same public paths "
+    "as all agents."
+)
+
+
+def _liveness_cohort_wallets() -> Dict[str, Optional[str]]:
+    """Cohort wallets: built-in defaults merged with LIVENESS_COHORT_WALLETS.
+
+    A partial override MERGES with (never replaces) the defaults: agents
+    not named in the override keep their built-in wallets.  JSON null values
+    are preserved as None — never stringified to the literal "None"; a None
+    wallet means "skip this agent" in the seeder.  Keys that are not cohort
+    agents are ignored with a warning (likely a typo in the override).
+    """
+    wallets: Dict[str, Optional[str]] = dict(_LIVENESS_COHORT_WALLETS_DEFAULT)
+    raw = (os.environ.get("LIVENESS_COHORT_WALLETS") or "").strip()
+    if not raw:
+        return wallets
+    try:
+        parsed = json.loads(raw)
+    except Exception as err:
+        logger.warning("[A2A] LIVENESS_COHORT_WALLETS unparsable (%s); "
+                       "using built-in cohort wallets", err)
+        return wallets
+    if not isinstance(parsed, dict) or not parsed:
+        logger.warning("[A2A] LIVENESS_COHORT_WALLETS is not a non-empty "
+                       "object; using built-in cohort wallets")
+        return wallets
+    overridden = []
+    for key, value in parsed.items():
+        agent_id = str(key)
+        if agent_id not in _LIVENESS_COHORT_META:
+            logger.warning("[A2A] LIVENESS_COHORT_WALLETS ignores unknown "
+                           "agent_id %r", agent_id)
+            continue
+        wallets[agent_id] = None if value is None else str(value)
+        overridden.append(agent_id)
+    logger.info("[A2A] LIVENESS_COHORT_WALLETS override applied for %s; "
+                "built-in defaults kept for the rest",
+                ",".join(sorted(overridden)) or "(none)")
+    return wallets
+
+
+def ensure_liveness_cohort() -> List[str]:
+    """Seed the six liveness cohort agents via the internal registration path.
+
+    Idempotent: re-seeding an existing record updates it in place (the
+    internal path bypasses the re-registration proof requirement, same as
+    the platform agent seed). Returns the list of agent_ids seeded.
+    """
+    base = (os.environ.get("PUBLIC_BASE_URL") or os.environ.get("SITE_URL") or "https://getsincor.com").rstrip("/")
+    wallets = _liveness_cohort_wallets()
+    seeded: List[str] = []
+    skipped: List[str] = []
+    for agent_id, (name, tags) in _LIVENESS_COHORT_META.items():
+        wallet = (wallets.get(agent_id) or "").strip()
+        if not wallet:
+            logger.warning("[A2A] liveness cohort seed skipped %s: no wallet",
+                           agent_id)
+            skipped.append(agent_id)
+            continue
+        try:
+            register_agent_record({
+                "agent_id": agent_id,
+                "name": name,
+                "description": _LIVENESS_COHORT_DESCRIPTION,
+                "version": "1.0.0",
+                "capability_tags": list(tags),
+                "rpc_callback": f"{base}/api/a2a",
+                "wallet": wallet,
+                "chain_id": BASE_CHAIN_ID,
+            }, _internal_reputation=1.0)
+        except Exception as err:
+            # Per-agent fault isolation: one bad wallet/config must never
+            # abort the other five seeds.
+            logger.error("[A2A] liveness cohort seed FAILED for %s: %s "
+                         "(continuing with remaining agents)",
+                         agent_id, err)
+            skipped.append(agent_id)
+            continue
+        seeded.append(agent_id)
+    logger.info("[A2A] Liveness cohort seeded: %s; skipped: %s",
+                ",".join(seeded) or "(none)", ",".join(skipped) or "(none)")
+    return seeded
 
 
 def _start_platform_heartbeat() -> None:
@@ -404,9 +783,23 @@ def mount(app: Flask) -> bool:
         logger.info("[A2A] a2a_inbound already mounted; skipping re-registration")
         return False
     from flask import Blueprint
+    from sincor2.a2a_errors import register_a2a_error_handlers
     from sincor2.a2a_inbound_market import attach_market_routes, seed_probation_tasks
 
+    # Idempotent: registering the same blueprint twice on one app makes
+    # Flask raise ValueError, and re-running the mount body would stack
+    # duplicate before_request hooks and re-seed auctions. Guard on the
+    # app's own blueprint registry (not a module-global flag) so a fresh
+    # app in tests can still mount independently.
+    if "a2a_inbound" in (getattr(app, "blueprints", {}) or {}):
+        logger.info("[A2A] mount() already applied to this app; skipping re-mount")
+        return
+
     bp = Blueprint("a2a_inbound", __name__)
+    # G2.11: every error on this blueprint is a JSON envelope, never an
+    # HTML 500 page (covers market, pool, sponsored-stake and recovery
+    # routes — they all attach to this same blueprint below).
+    register_a2a_error_handlers(bp)
 
     @bp.post("/api/marketplace/register")
     @bp.post("/v1/a2a/register")
@@ -419,6 +812,8 @@ def mount(app: Flask) -> bool:
             return _http_error(str(err), 403)
         except ValueError as err:
             return _http_error(str(err), 400)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
         except OverflowError as err:
             return _http_error(str(err), 503)
         return jsonify({
@@ -430,6 +825,12 @@ def mount(app: Flask) -> bool:
             "stream_url": "/v1/a2a/stream",
             "kya_id": agent.get("kya_id"),
             "kya_status": agent.get("kya_status"),
+            "identity": agent.get("identity"),
+            "owner_wallet": agent.get("owner_wallet"),
+            # W-96: seeded-reputation disclosure — True when the record's
+            # reputation was assigned by the internal platform seed rather
+            # than earned.
+            "reputation_seeded": bool(agent.get("reputation_seeded")),
             # Re-registration is proof-gated: any later update to this
             # record must carry registration_signature (EIP-191, by the
             # registered wallet) + registration_ts over the message built
@@ -441,6 +842,24 @@ def mount(app: Flask) -> bool:
                 "freshness_ms": REGISTRATION_PROOF_FRESHNESS_MS,
             },
         }), 201
+
+    @bp.post("/v1/a2a/transfer")
+    def v1_transfer():
+        body = request.get_json(silent=True) or {}
+        try:
+            agent = transfer_agent_record(body)
+        except ValueError as err:
+            return _http_error(str(err), 400)
+        except PermissionError as err:
+            return _http_error(str(err), 403)
+        except KeyError:
+            return _http_error("unknown agent", 404)
+        return jsonify({
+            "agent_id": agent["agent_id"],
+            "status": "transferred",
+            "owner_wallet": agent.get("owner_wallet"),
+            "identity": agent.get("identity"),
+        }), 200
 
     @bp.post("/v1/a2a/heartbeat")
     def v1_heartbeat():
@@ -534,6 +953,11 @@ def mount(app: Flask) -> bool:
         ensure_platform_agent()
     except Exception as err:
         logger.warning("[A2A] Platform agent seed skipped: %s", err)
+    try:
+        seeded_cohort = ensure_liveness_cohort()
+        logger.info("[A2A] Liveness cohort seed: %d agents", len(seeded_cohort))
+    except Exception as err:
+        logger.warning("[A2A] Liveness cohort seed skipped: %s", err)
     try:
         seeded = seed_probation_tasks()
         logger.info("[A2A] Seeded %s probation auctions", len(seeded))

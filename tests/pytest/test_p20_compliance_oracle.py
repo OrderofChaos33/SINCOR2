@@ -63,6 +63,23 @@ def clean(oracle: ComplianceOracle, account: str) -> None:
     oracle.geo.attest_jurisdiction(account, "US")
 
 
+# -- ComplianceGuard.sol fail-closed flip (C2, ratified 2026-09-29) -------------
+def test_compliance_guard_sol_is_fail_closed():
+    """The .sol isAllowed() must DENY when no oracle is configured.
+
+    Source-level assertion (forge is not available in this environment;
+    behavioral coverage lives in onchain/test/ComplianceGuard.t.sol).
+    The old fail-open branch (oracle unset -> return true) must be gone.
+    """
+    src = Path(ROOT, "onchain/src/ComplianceGuard.sol").read_text()
+    # The fail-closed branch: unset/disabled oracle -> return false.
+    assert "!oracleEnabled || address(sanctionsOracle) == address(0)" in src
+    assert "FAIL-CLOSED" in src
+    # The old fail-open guard must be gone.
+    assert "oracleEnabled && address(sanctionsOracle) != address(0)" not in src
+    assert "fail-open only when no oracle is set" not in src
+
+
 # -- the defer path is gone -------------------------------------------------
 def test_engine_requires_configured_oracle():
     with pytest.raises(ValueError):

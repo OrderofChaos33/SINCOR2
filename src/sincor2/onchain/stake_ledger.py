@@ -48,10 +48,17 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
 from sincor2.onchain import toa_penalty
+
+try:  # POSIX advisory locks for cross-process deposit mutual exclusion
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.market.stake")
 
@@ -115,6 +122,41 @@ class UnauthorizedSlashing(PermissionError):
     pass
 
 
+class DuplicateTxHashError(ValueError):
+    """A tx hash was already recorded for a *different* deposit.
+
+    Subclasses ValueError so existing error mapping (HTTP 400) applies.
+    Raised when the same tx hash is submitted for a different agent or a
+    different amount — either a key-reuse bug or an attempt to credit one
+    on-chain transfer twice.  An exact retry (same agent, same amount) is
+    NOT an error: it returns the existing record with ``duplicate=True``.
+    """
+
+
+# Strict 0x-prefixed 32-byte hex.  Only a reference in this form binds a
+# deposit to a dedupe key; anything else is an opaque note.
+_TX_HASH_RE = re.compile(r"^0x[0-9a-f]{64}$")
+
+
+def _normalize_tx_hash(reference: Any) -> Optional[str]:
+    """Canonical tx-hash form, or None when the reference is not a tx hash.
+
+    Opaque references (e.g. ``"sponsored-stake:<agent>"``) are returned as
+    None: they are stored on the event but never deduplicated.  A reference
+    that *starts* with 0x but is malformed is rejected loudly instead of
+    silently bypassing the duplicate guard — on the money path a near-hash
+    must not dodge dedupe.
+    """
+    tx = str(reference).strip().lower()
+    if tx.startswith("0x"):
+        if not _TX_HASH_RE.match(tx):
+            raise ValueError(
+                "reference looks like a tx hash but is not a 0x-prefixed "
+                "32-byte hex string")
+        return tx
+    return None
+
+
 def required_stake_wei(bid_value_wei: int) -> int:
     """Minimum stake for a bid value (50 % of bid, ratified)."""
     return int(bid_value_wei) * MIN_STAKE_BPS // BPS_DENOM
@@ -153,7 +195,14 @@ class StakeLedger:
         self.path = path or _default_ledger_path()
         self._data: Dict[str, Any] = {"agents": {}, "credits": {},
                                       "events": []}
+        # Guards the read-modify-write cycle inside this process; the
+        # cross-process guard is the fcntl exclusive lock taken in
+        # deposit().
+        self._lock = threading.RLock()
         self._load()
+        # tx_hash (normalized lowercase) -> {agent_id, amount_wei, at}.
+        # Durable: persisted in the ledger file, survives restarts.
+        self._data.setdefault("tx_hashes", {})
 
     # -- persistence ------------------------------------------------------
     def _load(self) -> None:
@@ -165,6 +214,24 @@ class StakeLedger:
                     self._data.update(raw)
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("stake ledger load failed (%s); starting empty", exc)
+
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call with ``self._lock`` held.
+
+        Lets a deposit see tx hashes recorded by another process since this
+        instance last loaded, so the duplicate guard holds across workers.
+        A corrupt file is ignored here (keeps in-memory state) rather than
+        wiping accounting; _load() already warns on the initial read.
+        """
+        if os.path.exists(self.path):
+            try:
+                with open(self.path, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                if isinstance(raw, dict):
+                    self._data.update(raw)
+                    self._data.setdefault("tx_hashes", {})
+            except (json.JSONDecodeError, OSError):
+                pass
 
     def _save(self) -> None:
         tmp = self.path + ".tmp"
@@ -331,25 +398,152 @@ class StakeLedger:
 
     # -- deposits -----------------------------------------------------------
     def deposit(self, agent_id: str, amount_wei: int,
-                reference: Optional[str] = None) -> Dict[str, Any]:
+                reference: Optional[str] = None,
+                signature_hash: Optional[str] = None) -> Dict[str, Any]:
         """Record an exact stake deposit (on-chain movement is separate).
 
         ``reference`` is an optional opaque external reference (e.g. the
         0x tx hash of an on-chain AXM transfer) stored on the deposit
         event for future reconciliation.  The ledger itself is offchain
         accounting; a reference never moves funds.
+
+        Idempotency (W-36): when ``reference`` is a 0x-prefixed 32-byte
+        tx hash, the hash is the dedupe key.  The first deposit with a
+        given hash credits; an exact retry (same agent, same amount)
+        returns the existing record with ``duplicate=True`` and credits
+        nothing (``credited_wei="0"``) instead of erroring, so honest
+        retries are safe.  The same hash for a different agent or a
+        different amount raises DuplicateTxHashError.  Dedupe state is
+        persisted in the ledger file, so it survives restarts.
+
+        Deposits with no tx-hash reference are NOT deduplicated: they are
+        self-service top-ups with no on-chain evidence to key on.
+
+        The check-and-credit runs under the instance lock plus a POSIX
+        exclusive file lock, so concurrent identical deposits in one
+        process — and across worker processes on the same file — credit
+        exactly once.
+
+        ``signature_hash`` is an optional hex digest identifying the
+        deposit authorization (EIP-191 signature) the HTTP route verified.
+        The route normalizes the signature to canonical bytes before
+        hashing (W-40), and ``_deposit_locked`` rejects an already-consumed
+        hash atomically (W-41) with the same opaque 403 the old route
+        pre-check returned.  The hash is stored on the deposit event.
+        ``signature_hash_used`` remains a public inspection helper, but
+        the route no longer depends on it for correctness.
         """
         if amount_wei <= 0:
             raise ValueError("deposit must be positive")
+        amount_wei = int(amount_wei)
+        agent_id = str(agent_id)
+        tx_hash = _normalize_tx_hash(reference) if reference else None
+        with self._lock:
+            lock_fh = None
+            try:
+                parent = os.path.dirname(self.path)
+                if parent:
+                    os.makedirs(parent, exist_ok=True)
+                # Cross-process mutual exclusion for the read-modify-write
+                # below.  Both writers flock the same path before either
+                # replaces it, so the second writer's reload sees the
+                # first writer's tx hash.
+                lock_fh = open(self.path, "a+b")
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._reload_under_lock()
+                return self._deposit_locked(agent_id, amount_wei,
+                                            reference, tx_hash,
+                                            signature_hash)
+            finally:
+                if lock_fh is not None:
+                    try:
+                        if fcntl is not None:
+                            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                    finally:
+                        lock_fh.close()
+
+    def _deposit_locked(self, agent_id: str, amount_wei: int,
+                        reference: Optional[str],
+                        tx_hash: Optional[str],
+                        signature_hash: Optional[str] = None) -> Dict[str, Any]:
+        """deposit() body: call with self._lock held (and file locked)."""
+        # W-40/W-41: each deposit authorization is single-use.  This check
+        # runs under the instance lock plus the POSIX exclusive file
+        # lock, AFTER _reload_under_lock(), so check-and-record is atomic
+        # both in-process and across worker processes.  It runs before
+        # the tx-hash idempotency path below: a reused authorization is
+        # rejected (403, opaque) exactly as the old route-level pre-check
+        # did, honest tx_hash retries (fresh signature) are unaffected.
+        if signature_hash and self.signature_hash_used(signature_hash):
+            raise PermissionError("deposit signature already used")
+        tx_hashes = self._data.setdefault("tx_hashes", {})
+        if tx_hash is not None:
+            seen = tx_hashes.get(tx_hash)
+            if seen is not None:
+                try:
+                    seen_amount = int(seen.get("amount_wei", "-1"))
+                except (TypeError, ValueError):
+                    seen_amount = -1
+                if (seen.get("agent_id") != agent_id
+                        or seen_amount != amount_wei):
+                    # Key reuse for a different write, or a second agent
+                    # claiming the same on-chain transfer: refuse loudly.
+                    # Details go to the event log, not the exception, so
+                    # the conflicting party learns nothing extra.
+                    self._event("deposit_conflict", agent_id=agent_id,
+                                amount_wei=str(amount_wei), tx_hash=tx_hash,
+                                recorded_agent_id=str(seen.get("agent_id")),
+                                recorded_amount_wei=str(seen.get(
+                                    "amount_wei")))
+                    self._save()
+                    raise DuplicateTxHashError(
+                        "tx_hash already recorded for a different deposit; "
+                        "refusing to credit")
+                # Honest retry: no credit, idempotent success.  The replay
+                # is journaled for audit.
+                self._event("deposit_duplicate", agent_id=agent_id,
+                            amount_wei=str(amount_wei), tx_hash=tx_hash)
+                self._save()
+                summary = self.balance_of(agent_id)
+                summary["duplicate"] = True
+                summary["credited_wei"] = "0"
+                return summary
         rec = self._agent(agent_id)
-        rec["deposited_wei"] = str(int(rec["deposited_wei"]) + int(amount_wei))
+        rec["deposited_wei"] = str(int(rec["deposited_wei"]) + amount_wei)
         detail: Dict[str, Any] = {"agent_id": agent_id,
                                   "amount_wei": str(amount_wei)}
         if reference:
             detail["reference"] = str(reference)
+        if tx_hash is not None:
+            tx_hashes[tx_hash] = {"agent_id": agent_id,
+                                  "amount_wei": str(amount_wei),
+                                  "at": _now()}
+        if signature_hash:
+            detail["signature_hash"] = str(signature_hash)
         self._event("deposit", **detail)
         self._save()
-        return self.balance_of(agent_id)
+        summary = self.balance_of(agent_id)
+        summary["duplicate"] = False
+        summary["credited_wei"] = str(amount_wei)
+        return summary
+
+    def signature_hash_used(self, signature_hash: str) -> bool:
+        """True when a deposit event already consumed this signature hash.
+
+        Public inspection helper (kept for tests and audit tooling).  The
+        live single-use guard is the atomic check in ``_deposit_locked``;
+        this method must NOT be relied on as a pre-check: it scans the
+        in-memory view without reloading, so it can miss writes made by
+        another worker process.  Legacy deposits recorded without a
+        signature hash never collide.
+        """
+        sig = str(signature_hash or "").strip()
+        if not sig:
+            return False
+        return any(e.get("kind") == "deposit"
+                   and e.get("signature_hash") == sig
+                   for e in self._data.get("events", []))
 
     def balance_of(self, agent_id: str) -> Dict[str, Any]:
         rec = self._agent(agent_id)
@@ -421,6 +615,22 @@ class StakeLedger:
             self._save()
         return amount
 
+    def locked_for(self, agent_id: str, task_id: str) -> int:
+        """Wei currently locked for (agent_id, task_id).  Pure read.
+
+        Used by the W-78 escrow-concentration cap to test whether a
+        winning escrow is still unreleased (lock held).  Never creates
+        records and never mutates the ledger.
+        """
+        with self._lock:
+            rec = self._data.get("agents", {}).get(agent_id)
+            if not rec:
+                return 0
+            try:
+                return int(rec["locks"].get(task_id, "0"))
+            except (TypeError, ValueError):
+                return 0
+
     # -- slashing (adjudicator only) -------------------------------------------
     def _check_adjudicator(self, adjudicator: Optional[str]) -> str:
         expected = os.environ.get(ADJUDICATOR_ENV, "").strip()
@@ -488,6 +698,8 @@ class StakeLedger:
         verbatim into the audit event.  Every slash decision lands in the
         audit log with agent_id, task_id, slash_bps, reason, and the
         penalty record."""
+        if not 0 < int(slash_bps) <= BPS_DENOM:
+            raise ValueError("slash_bps must be within (0, 10000]")
         caller = self._check_adjudicator(adjudicator)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
@@ -792,7 +1004,8 @@ class StakeLedger:
 
     def quote_slash_ruling(self, agent_id: str, agent_wallet: str,
                            poster_wallet: str, task_id: str, slash_bps: int,
-                           reason: str, nonce: int, expiry: int) -> Dict[str, Any]:
+                           reason: str, nonce: int, expiry: int,
+                           evidence_hash: str = "") -> Dict[str, Any]:
         """Build the ruling fields for an adjudicator-signed slash.
 
         Read-only: computes the slash amount from the agent's locked stake
@@ -803,11 +1016,31 @@ class StakeLedger:
         ``stake_bridge.SlashRuling``; the adjudicator signs
         ``slash_struct_hash(...)`` with their own tooling (canonicalized
         low-S via ``stake_bridge.canonicalize_signature``).
+
+        ``evidence_hash`` is the 0x-prefixed 32-byte keccak256 of the
+        off-chain evidence bundle (e.g. IPFS CID bytes) that justifies the
+        slash.  It is validated here (well-formed and non-zero) and
+        threaded through unchanged into the ruling dict under the
+        ``"evidence_hash"`` key — the exact shape the J1 staged flow's
+        ``stake_bridge.SlashRuling`` (branch
+        ``xioix/j1-adjudicator-hardening``) commits into the signed
+        ``proposeSlash`` digest.  The staged contract reverts on zero
+        evidence (``MissingEvidence``), so an evidence-free quote fails
+        fast here instead of producing an unproposable ruling.
         """
         if reason not in ("ghost", "quality"):
             raise ValueError("reason must be 'ghost' or 'quality'")
         if not 0 < int(slash_bps) <= BPS_DENOM:
             raise ValueError("slash_bps must be within (0, 10000]")
+        ev = str(evidence_hash or "")
+        try:
+            ev_int = int(ev, 16)
+        except ValueError:
+            ev_int = -1
+        if not (ev.startswith("0x") and len(ev) == 66) or ev_int < 0:
+            raise ValueError("evidence_hash must be 0x-prefixed 32-byte hex")
+        if ev_int == 0:
+            raise ValueError("evidence_hash must be non-zero (evidence required)")
         rec = self._agent(agent_id)
         locked = int(rec["locks"].get(task_id, "0"))
         if locked <= 0:
@@ -821,7 +1054,8 @@ class StakeLedger:
         treasury_cut = min(slashed, outstanding)
         return {"agent": agent_wallet, "poster": poster_wallet,
                 "amount_wei": slashed, "treasury_cut_wei": treasury_cut,
-                "nonce": int(nonce), "expiry": int(expiry), "reason": reason}
+                "nonce": int(nonce), "expiry": int(expiry), "reason": reason,
+                "evidence_hash": ev}
 
     def build_onchain_slash_tx(self, ruling: Dict[str, Any],
                                signature: tuple,
@@ -835,6 +1069,12 @@ class StakeLedger:
         """
         from sincor2.onchain.stake_bridge import SlashRuling
         bridge = self.onchain_bridge()
+        # The legacy on-chain slash() digest has no evidenceHash field — the
+        # evidence is committed by the J1 staged flow's proposeSlash digest
+        # instead — so strip it before constructing the legacy SlashRuling.
+        # It was already validated (well-formed, non-zero) at quote time.
+        ruling = {k: v for k, v in dict(ruling).items()
+                  if k != "evidence_hash"}
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
@@ -903,7 +1143,8 @@ class StakeLedger:
 
     def quote_slash_ruling(self, agent_id: str, agent_wallet: str,
                            poster_wallet: str, task_id: str, slash_bps: int,
-                           reason: str, nonce: int, expiry: int) -> Dict[str, Any]:
+                           reason: str, nonce: int, expiry: int,
+                           evidence_hash: str = "") -> Dict[str, Any]:
         """Build the ruling fields for an adjudicator-signed slash.
 
         Read-only: computes the slash amount from the agent's locked stake
@@ -914,11 +1155,31 @@ class StakeLedger:
         ``stake_bridge.SlashRuling``; the adjudicator signs
         ``slash_struct_hash(...)`` with their own tooling (canonicalized
         low-S via ``stake_bridge.canonicalize_signature``).
+
+        ``evidence_hash`` is the 0x-prefixed 32-byte keccak256 of the
+        off-chain evidence bundle (e.g. IPFS CID bytes) that justifies the
+        slash.  It is validated here (well-formed and non-zero) and
+        threaded through unchanged into the ruling dict under the
+        ``"evidence_hash"`` key — the exact shape the J1 staged flow's
+        ``stake_bridge.SlashRuling`` (branch
+        ``xioix/j1-adjudicator-hardening``) commits into the signed
+        ``proposeSlash`` digest.  The staged contract reverts on zero
+        evidence (``MissingEvidence``), so an evidence-free quote fails
+        fast here instead of producing an unproposable ruling.
         """
         if reason not in ("ghost", "quality"):
             raise ValueError("reason must be 'ghost' or 'quality'")
         if not 0 < int(slash_bps) <= BPS_DENOM:
             raise ValueError("slash_bps must be within (0, 10000]")
+        ev = str(evidence_hash or "")
+        try:
+            ev_int = int(ev, 16)
+        except ValueError:
+            ev_int = -1
+        if not (ev.startswith("0x") and len(ev) == 66) or ev_int < 0:
+            raise ValueError("evidence_hash must be 0x-prefixed 32-byte hex")
+        if ev_int == 0:
+            raise ValueError("evidence_hash must be non-zero (evidence required)")
         rec = self._agent(agent_id)
         locked = int(rec["locks"].get(task_id, "0"))
         if locked <= 0:
@@ -932,7 +1193,8 @@ class StakeLedger:
         treasury_cut = min(slashed, outstanding)
         return {"agent": agent_wallet, "poster": poster_wallet,
                 "amount_wei": slashed, "treasury_cut_wei": treasury_cut,
-                "nonce": int(nonce), "expiry": int(expiry), "reason": reason}
+                "nonce": int(nonce), "expiry": int(expiry), "reason": reason,
+                "evidence_hash": ev}
 
     def build_onchain_slash_tx(self, ruling: Dict[str, Any],
                                signature: tuple,
@@ -946,6 +1208,12 @@ class StakeLedger:
         """
         from sincor2.onchain.stake_bridge import SlashRuling
         bridge = self.onchain_bridge()
+        # The legacy on-chain slash() digest has no evidenceHash field — the
+        # evidence is committed by the J1 staged flow's proposeSlash digest
+        # instead — so strip it before constructing the legacy SlashRuling.
+        # It was already validated (well-formed, non-zero) at quote time.
+        ruling = {k: v for k, v in dict(ruling).items()
+                  if k != "evidence_hash"}
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:

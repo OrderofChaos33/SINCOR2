@@ -1,6 +1,5 @@
 """Tests for the fee conversion executor — all offline, no RPC, no keys."""
 
-import json
 import os
 
 import pytest
@@ -11,7 +10,6 @@ from sincor2.onchain.fee_conversion_executor import (
     ACT_SETTLE_ALL,
     ACT_SWAP_EXACT_IN_SINGLE,
     ACT_TAKE_ALL,
-    CMD_SWEEP,
     CMD_V4_SWAP,
     SEL_APPROVE,
     SEL_TRANSFER,
@@ -22,9 +20,8 @@ from sincor2.onchain.fee_conversion_executor import (
     MissingPoolKey,
     ExecutorError,
     PoolKey,
-    STATUS_EXECUTED,
-    STATUS_FAILED,
     STATUS_PENDING,
+    STATUS_QUOTED,
     ZERO_HOOKS,
     PERMIT2,
     SEL_P2_APPROVE,
@@ -73,6 +70,17 @@ def test_zero_for_one():
     pool = _pool()
     assert zero_for_one(pool, AXM) is True
     assert zero_for_one(pool, USDC) is False
+
+
+def test_quote_direction_uses_resolved_token_address(monkeypatch, tmp_path):
+    config = _config(tmp_path=tmp_path)
+    config.pool_keys[("USDC", "AXM")] = _pool()
+    ex = FeeConversionExecutor(config)
+    raw_quote = (123).to_bytes(32, "big") + (456).to_bytes(32, "big")
+    monkeypatch.setattr(ex, "_eth_call", lambda *_args: raw_quote)
+
+    assert ex.quote("AXM", "USDC", 10**18)["zero_for_one"] is True
+    assert ex.quote("USDC", "AXM", 10**18)["zero_for_one"] is False
 
 
 # --- ERC-20 builders --------------------------------------------------------
@@ -277,7 +285,7 @@ class _StubExecutor(FeeConversionExecutor):
 def test_plan_builds_approve_swap_forward(tmp_path):
     cfg = _config(tmp_path=tmp_path)
     ex = _StubExecutor(cfg, allowance_wei=0)
-    ob = ex.ledger.record("ob-plan", "AXM", 10**18)
+    ex.ledger.record("ob-plan", "AXM", 10**18)
     plan = ex.plan("ob-plan")
     kinds = [t["kind"] for t in plan["txs"]]
     assert kinds == ["approve_permit2", "permit2_approve", "swap",
@@ -340,64 +348,59 @@ def test_execute_plan_dry_run_broadcasts_nothing(tmp_path):
     out = ex.execute_plan(plan, boom, lambda h: {"status": 1}, dry_run=True)
     assert out["mode"] == "dry_run"
     assert ex.ledger.get("ob-dry")["txs"] == []
+    assert ex.ledger.get("ob-dry")["status"] == STATUS_QUOTED
 
 
-def test_execute_plan_live_happy_path(tmp_path):
-    # armed=True here is test-only: _config uses rpc_url="https://example.invalid"
-    # and fake_sign never broadcasts. Exercises the live-path logic with mocks.
-    ex = _harness(tmp_path, armed=True)
-    ex.ledger.record("ob-live", "AXM", 10**18)
-    plan = ex.plan("ob-live")
-    seen = []
-
-    def fake_sign(unsigned, kind):
-        seen.append(kind)
-        return "0x" + kind.encode().hex()[:16].ljust(64, "0")[:64]
-
-    out = ex.execute_plan(plan, fake_sign, lambda h: {"status": 1})
-    assert out["status"] == STATUS_EXECUTED
-    kinds = [t["kind"] for t in ex.ledger.get("ob-live")["txs"]]
-    assert kinds == ["approve_permit2", "permit2_approve", "swap",
-                     "forward_to_treasury"]
-    fwd = [t for t in ex.ledger.get("ob-live")["txs"]
-           if t["kind"] == "forward_to_treasury"][0]
-    assert fwd["amount_wei"] == "881000"  # verified post-swap balance
-    assert seen == ["approve_permit2", "permit2_approve", "swap",
-                    "forward_to_treasury"]
-
-
-def test_execute_plan_refuses_when_disarmed(tmp_path):
-    ex = _harness(tmp_path, armed=False)
-    ex.ledger.record("ob-safe", "AXM", 10**18)
-    plan = ex.plan("ob-safe")
-    with pytest.raises(ExecutorError, match="not armed"):
-        ex.execute_plan(plan, lambda u, k: "0x0", lambda h: {"status": 1})
-
-
-def test_execute_plan_marks_failed_on_revert(tmp_path):
-    # armed=True here is test-only (see test_execute_plan_live_happy_path).
-    ex = _harness(tmp_path, armed=True)
-    ex.ledger.record("ob-revert", "AXM", 10**18)
-    plan = ex.plan("ob-revert")
+def test_execute_forward_live_is_denied_before_callbacks_or_balance_read(tmp_path):
+    ex = _harness(tmp_path)
+    ex.ledger.record("ob-forward-live-denied", "AXM", 10**18)
+    ex.plan("ob-forward-live-denied")
+    calls = []
 
     def fake_sign(unsigned, kind):
+        calls.append(("sign", kind))
         return "0xbeef"
 
-    with pytest.raises(ExecutorError, match="reverted"):
-        ex.execute_plan(plan, fake_sign, lambda h: {"status": 0})
-    ob = ex.ledger.get("ob-revert")
-    assert ob["status"] == STATUS_FAILED
-    assert "reverted" in ob["history"][-1]["error"]
+    def fake_receipt(tx_hash):
+        calls.append(("receipt", tx_hash))
+        return {"status": 1}
+
+    def balance_must_not_run(token, owner):
+        raise AssertionError("live denial must precede the balance RPC path")
+
+    ex.balance_of = balance_must_not_run
+    with pytest.raises(ExecutorError, match="no canonical release/approval"):
+        ex._execute_forward("ob-forward-live-denied", "USDC", fake_sign,
+                            fake_receipt, dry_run=False)
+    assert calls == []
+    assert ex.ledger.get("ob-forward-live-denied")["status"] == STATUS_QUOTED
 
 
-def test_execute_plan_refuses_zero_post_swap_balance(tmp_path):
-    # armed=True here is test-only (see test_execute_plan_live_happy_path).
-    cfg = _config(tmp_path=tmp_path, armed=True)
-    ex = _StubExecutor(cfg, balance_wei=0)
-    ex.ledger.record("ob-zero", "AXM", 10**18)
-    plan = ex.plan("ob-zero")
-    with pytest.raises(ExecutorError, match="balance is 0"):
-        ex.execute_plan(plan, lambda u, k: "0x1", lambda h: {"status": 1})
+@pytest.mark.parametrize("armed", [False, True])
+def test_execute_plan_live_is_blocked_before_callbacks(tmp_path, armed):
+    # ``armed`` is legacy configuration, never live authorization.
+    ex = _harness(tmp_path, armed=armed)
+    ex.ledger.record("ob-live-denied", "AXM", 10**18)
+    plan = ex.plan("ob-live-denied")
+    calls = []
+
+    def fake_sign(unsigned, kind):
+        calls.append(("sign", kind))
+        return "0xbeef"
+
+    def fake_receipt(tx_hash):
+        calls.append(("receipt", tx_hash))
+        return {"status": 1}
+
+    def fake_simulation(kind, unsigned):
+        calls.append(("simulate", kind))
+
+    ex._simulate = fake_simulation
+    with pytest.raises(ExecutorError, match="no canonical release/approval"):
+        ex.execute_plan(plan, fake_sign, fake_receipt)
+    assert calls == []
+    assert ex.ledger.get("ob-live-denied")["txs"] == []
+    assert ex.ledger.get("ob-live-denied")["status"] == "quoted"
 
 
 # --- quote decoding -------------------------------------------------------------

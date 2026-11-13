@@ -113,7 +113,20 @@
             document.getElementById('loading').classList.remove('hidden');
 
             try {
-                const response = await fetch(`/api/orders/${encodeURIComponent(email)}`);
+                const response = await fetch(`/api/orders/${encodeURIComponent(email)}`, {
+                    credentials: 'same-origin'
+                });
+                if (response.status === 401) {
+                    document.getElementById('loading').classList.add('hidden');
+                    alert('Please sign in to view your orders.');
+                    window.location.href = '/login?next=/my-orders';
+                    return;
+                }
+                if (response.status === 403) {
+                    document.getElementById('loading').classList.add('hidden');
+                    alert('You can only view orders for your own account.');
+                    return;
+                }
                 const data = await response.json();
 
                 document.getElementById('loading').classList.add('hidden');

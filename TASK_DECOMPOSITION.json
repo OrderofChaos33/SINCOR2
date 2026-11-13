@@ -562,9 +562,9 @@
    "id": "T0047",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 Sepolia dry-run rehearsal",
-   "scope": "forge script --dry-run against Base Sepolia; issue() rehearsal succeeds.",
-   "acceptance": "dry-run green; gas profiled",
+   "title": "P24 local simulation rehearsal",
+   "scope": "Run forge script locally; constructor validation and ordering succeed.",
+   "acceptance": "simulation green; no deployment evidence",
    "est_size": "M",
    "dependencies": [
     "T0046"
@@ -576,39 +576,39 @@
    "id": "T0048",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 deploy ceremony (Sepolia)",
-   "scope": "Broadcast deployment; record addresses/tx; commit onchain/deployments/base-sepolia-p24.json.",
-   "acceptance": "manifest committed",
+   "title": "P24 live deployment authorization hold",
+   "scope": "P24 remains local-simulation-only under CT-01; no live deploy or broadcast.",
+   "acceptance": "separate explicit owner authorization and review before any live deployment",
    "est_size": "M",
    "dependencies": [
     "T0046"
    ],
    "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "blocked_by": "CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 deployment or broadcast."
   },
   {
    "id": "T0049",
    "parent_item": 8,
    "phase": "P2",
-   "title": "Sourcify/Etherscan verification",
-   "scope": "Verify all 4 P24 contracts on Basescan + Sourcify.",
-   "acceptance": "verified badges present",
+   "title": "P24 live verification authorization hold",
+   "scope": "No live P24 verification under CT-01; retain the local simulation path only.",
+   "acceptance": "separate explicit owner authorization and review before any live verification",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Blocked on P24 Sepolia deployment (founder broadcast authorization)."
+   "blocked_by": "CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 verification."
   },
   {
    "id": "T0050",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 mainnet deploy decision",
-   "scope": "Founder go/no-go for mainnet P24 deployment after Sepolia matrix green.",
-   "acceptance": "recorded decision",
+   "title": "P24 mainnet deployment authorization hold",
+   "scope": "No mainnet P24 deployment action under CT-01.",
+   "acceptance": "separate explicit owner authorization and review before any live deployment",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder decision: mainnet P24 deployment timing; depends on Sepolia 6-phase matrix 100% green."
+   "blocked_by": "CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 deployment."
   },
   {
    "id": "T0051",
@@ -2850,57 +2850,57 @@
    "id": "T0224",
    "parent_item": 32,
    "phase": "P5",
-   "title": "Pin AXM->USDC/WETH V4 pool",
-   "scope": "Identify and verify the real pool the executor will route through.",
-   "acceptance": "pool address pinned + verified",
+   "title": "Conversion-route due diligence (read-only)",
+   "scope": "Document candidate route/pool facts only; no key access, signing, transaction, or funds movement.",
+   "acceptance": "read-only evidence report with explicit unknowns",
    "est_size": "M",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder decision: arm conversion executor (item 32) \u2014 pool pinning is step 1 of the arming ceremony."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0225",
    "parent_item": 32,
    "phase": "P5",
-   "title": "Fork-simulate conversion path",
-   "scope": "Simulate swap on fork before arming; slippage/fees within bounds.",
-   "acceptance": "sim green",
+   "title": "Local-only conversion simulation (future gated)",
+   "scope": "Use synthetic obligations and fake/stubbed RPC only; do not sign, broadcast, custody keys, or execute a live conversion.",
+   "acceptance": "offline/local simulation results only; no live transaction evidence",
    "est_size": "M",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Blocked on item-32 arming decision."
+   "blocked_by": "Requires separate review of the canonical authorization design; live conversion remains disabled."
   },
   {
    "id": "T0226",
    "parent_item": 32,
    "phase": "P5",
-   "title": "Forwarder key into Secure Vault",
-   "scope": "Key stored via approved secure flow; executor reads from vault only.",
-   "acceptance": "vault check green",
+   "title": "Conversion signing/custody decision hold",
+   "scope": "Do not provision, store, rotate, or connect a forwarder key for fee conversion under the current hold.",
+   "acceptance": "no signing key introduced; any future custody design requires explicit owner decision and independent review",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Blocked on item-32 arming decision."
+   "blocked_by": "No canonical authorization interface or owner approval exists; key custody and signing are not authorized."
   },
   {
    "id": "T0227",
    "parent_item": 32,
    "phase": "P5",
-   "title": "Arming ceremony: armed=True",
-   "scope": "Set armed=True only after pool pin + sim + vault key + founder sign-off.",
-   "acceptance": "first real onchain conversion settles; treasury receipt verifiable",
+   "title": "Canonical fee-conversion authorization design hold",
+   "scope": "Specify capability, chain/token/target allowlists, limits, approver quorum, expiry, and receipt ownership; do not enable execution.",
+   "acceptance": "independently reviewed design and explicit owner decisions; legacy armed flags cannot authorize live conversion",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder must authorize arming the fee-conversion executor (money movement)."
+   "blocked_by": "No canonical authorization interface or owner approval exists; legacy armed flags cannot authorize live conversion."
   },
   {
    "id": "T0228",
    "parent_item": 32,
    "phase": "P5",
-   "title": "Reconcile listener obligations before arming",
-   "scope": "Pending conversion obligations from fee listener reconciled against receipts.",
-   "acceptance": "reconciliation report",
+   "title": "Reconcile listener obligations (read-only)",
+   "scope": "Reconcile pending fee-listener obligations against observed receipts without authorizing or executing conversion.",
+   "acceptance": "reconciliation report; no conversion or funds movement",
    "est_size": "M",
    "dependencies": [],
    "status": "pending",
@@ -2964,7 +2964,7 @@
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder decision: x402 billing default \u2014 SINC or AXM."
+   "blocked_by": "Founder decision: x402 billing default — SINC or AXM."
   },
   {
    "id": "T0234",
@@ -3036,7 +3036,7 @@
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder decision: $0.15 vs $1.50 price floor \u2014 single source of truth."
+   "blocked_by": "Founder decision: $0.15 vs $1.50 price floor — single source of truth."
   },
   {
    "id": "T0240",
@@ -4115,12 +4115,12 @@
    "parent_item": 0,
    "phase": "X",
    "title": "Milestone: Base Sepolia deploy ceremony",
-   "scope": "Deploy auction + P24 + stake/slash contracts per runbooks; founder authorizes each broadcast.",
-   "acceptance": "contracts verified onchain",
+   "scope": "Deploy auction + stake/slash contracts per their runbooks; P24 remains local-simulation-only pending separate explicit owner authorization.",
+   "acceptance": "authorized non-P24 contracts verified onchain; P24 has no deployment evidence",
    "est_size": "L",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder must authorize each contract broadcast + fund wallets."
+   "blocked_by": "Founder must separately authorize each non-P24 contract broadcast + fund wallets; P24 live activity requires separate explicit owner authorization."
   },
   {
    "id": "T0318",
@@ -6387,8 +6387,8 @@
    "parent_item": 32,
    "phase": "P5",
    "title": "FEE_EXECUTOR_RUNBOOK review",
-   "scope": "docs/ops/FEE_EXECUTOR_RUNBOOK.md reviewed: pool pin, fork-sim, vault key steps.",
-   "acceptance": "review note",
+   "scope": "docs/ops/FEE_EXECUTOR_RUNBOOK.md reviewed for fail-closed behavior; legacy key-custody and arming steps retired.",
+   "acceptance": "review note confirms no live execution authorization",
    "est_size": "M",
    "dependencies": [],
    "status": "done",
@@ -7370,13 +7370,13 @@
    "id": "T0588",
    "parent_item": 0,
    "phase": "X",
-   "title": "Launch gate 6: Executor arming decision recorded",
-   "scope": "Verify launch-gate item; record evidence.",
-   "acceptance": "signed off",
+   "title": "Launch gate 6: fee-conversion capability remains held",
+   "scope": "Record that live conversion remains disabled until a canonical authorization design and explicit owner decisions are independently reviewed.",
+   "acceptance": "hold recorded; no armed flag/key path authorizes execution",
    "est_size": "M",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder-gated launch decisions."
+   "blocked_by": "No canonical authorization interface or explicit owner approval for live treasury conversion."
   },
   {
    "id": "T0589",
@@ -9003,8 +9003,8 @@
    "parent_item": 32,
    "phase": "P5",
    "title": "Acceptance re-check: backlog item 32",
-   "scope": "Verify item 32's acceptance criteria still hold on the merged tree.",
-   "acceptance": "acceptance holds; evidence cited",
+   "scope": "Verify item 32 remains read-only/fail-closed on the merged tree; legacy armed flags and key custody do not enable live conversion.",
+   "acceptance": "hold upheld; evidence cited; no live conversion authorization",
    "est_size": "S",
    "dependencies": [],
    "status": "pending",
@@ -10874,97 +10874,97 @@
    "id": "T0880",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Fund rehearsal wallet (Sepolia)",
-   "scope": "Execute rehearsal step: Fund rehearsal wallet (Sepolia).",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 funding hold: no live wallet funding",
+   "scope": "P24 local simulation requires no funded rehearsal wallet; do not fund a live wallet under CT-01.",
+   "acceptance": "no P24 wallet funded; separate explicit owner authorization required before live funding",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "blocked_by": "CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 wallet funding."
   },
   {
    "id": "T0881",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Dry-run deploy script",
-   "scope": "Execute rehearsal step: Dry-run deploy script.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation: import-closure safety gate",
+   "scope": "Scan the complete project-local import closure for signer, broadcast, RPC-write, and persistent-manifest primitives; run the regression in required CI.",
+   "acceptance": "offline import-closure gate passes; no live deployment evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0882",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Deploy to Sepolia",
-   "scope": "Execute rehearsal step: Deploy to Sepolia.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation: execute deploy script in test EVM",
+   "scope": "Call the deploy script only from a local in-memory Foundry test; verify ephemeral contracts/roles; no broadcast, RPC, wallet, or manifest.",
+   "acceptance": "required local Foundry regression passes; no deployment evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0883",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Verify contracts",
-   "scope": "Execute rehearsal step: Verify contracts.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 live verification authorization hold",
+   "scope": "Do not submit P24 contracts for live verification under CT-01; retain the local simulation path only.",
+   "acceptance": "separate explicit owner authorization required before any live verification",
    "est_size": "S",
    "dependencies": [],
    "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "blocked_by": "CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 verification."
   },
   {
    "id": "T0884",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Rehearse issue() end-to-end",
-   "scope": "Execute rehearsal step: Rehearse issue() end-to-end.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation: issue() end-to-end",
+   "scope": "Exercise issue() end-to-end against local simulated contracts only; no live transaction.",
+   "acceptance": "local flow succeeds or rejects as expected; no on-chain evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0885",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Rehearse policy rejection",
-   "scope": "Execute rehearsal step: Rehearse policy rejection.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation: policy rejection",
+   "scope": "Exercise policy rejection against local simulated contracts only; no live transaction.",
+   "acceptance": "policy rejection is demonstrated locally; no on-chain evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0886",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Gas profile",
-   "scope": "Execute rehearsal step: Gas profile.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation: gas profile",
+   "scope": "Profile gas for local simulated execution only; do not submit live transactions.",
+   "acceptance": "local simulation gas profile recorded; no live transaction evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0887",
    "parent_item": 8,
    "phase": "P2",
-   "title": "P24 rehearsal: Rehearsal report",
-   "scope": "Execute rehearsal step: Rehearsal report.",
-   "acceptance": "step complete; evidence logged",
+   "title": "P24 local simulation report",
+   "scope": "Report only local simulation results; explicitly distinguish them from deployed addresses and on-chain evidence.",
+   "acceptance": "report states simulation-only; no live deployment or verification evidence",
    "est_size": "S",
    "dependencies": [],
-   "status": "blocked",
-   "blocked_by": "Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia."
+   "status": "pending",
+   "blocked_by": null
   },
   {
    "id": "T0888",

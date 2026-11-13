@@ -31,22 +31,39 @@ solcx.set_solc_version("0.8.24")
 MOCK_EP = """
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
+// Mirrors the ERC-4337 v0.7 PackedUserOperation layout used by SincorPaymaster:
+// (sender, nonce, initCode, callData, accountGasLimits,
+//  preVerificationGas, gasFees, paymasterAndData, signature)
+struct PackedUserOperation {
+    address sender;
+    uint256 nonce;
+    bytes initCode;
+    bytes callData;
+    bytes32 accountGasLimits;
+    uint256 preVerificationGas;
+    bytes32 gasFees;
+    bytes paymasterAndData;
+    bytes signature;
+}
 interface IPaymaster {
-    function validatePaymasterUserOp(bytes calldata uo, bytes32 h, uint256 c)
-        external returns (bytes memory, uint256);
-    function postOp(uint8 mode, bytes calldata ctx, uint256 cost) external;
+    function validatePaymasterUserOp(
+        PackedUserOperation calldata uo,
+        bytes32 h,
+        uint256 c
+    ) external returns (bytes memory, uint256);
+    function postOp(uint8 mode, bytes calldata ctx, uint256 cost, uint256 feePerGas) external;
 }
 contract MockEntryPoint {
-    function validate(address pm, bytes calldata userOp, uint256 maxCost)
+    function validate(address pm, PackedUserOperation calldata userOp, uint256 maxCost)
         external returns (bytes memory ctx, uint256 vd)
     {
         (ctx, vd) = IPaymaster(pm).validatePaymasterUserOp(
             userOp, bytes32(uint256(0xdead)), maxCost);
     }
-    function settle(address pm, uint8 mode, bytes calldata ctx, uint256 cost)
+    function settle(address pm, uint8 mode, bytes calldata ctx, uint256 cost, uint256 feePerGas)
         external
     {
-        IPaymaster(pm).postOp(mode, ctx, cost);
+        IPaymaster(pm).postOp(mode, ctx, cost, feePerGas);
     }
     function decodeCtx(bytes calldata ctx)
         external pure returns (address s, uint256 c)
@@ -87,8 +104,19 @@ def deploy(w3, abi, bytecode, args=(), sender=None):
 
 
 def make_userop(w3, sender):
-    # Unpacked ERC-4337 UserOperation: sender is the first 32-byte word.
-    return w3.to_bytes(hexstr=sender).rjust(32, b"\x00") + b"\x00" * 480
+    # ERC-4337 v0.7 PackedUserOperation tuple: the sender is a struct field
+    # (the old raw-bytes userOp encoding is gone — W-34).
+    return (
+        sender,        # sender
+        0,             # nonce
+        b"",           # initCode
+        b"",           # callData
+        b"\x00" * 32,  # accountGasLimits
+        0,             # preVerificationGas
+        b"\x00" * 32,  # gasFees
+        b"",           # paymasterAndData
+        b"",           # signature
+    )
 
 
 @pytest.fixture()
@@ -147,7 +175,7 @@ def test_allowlisted_under_cap_accepted_and_settled(env):
     assert pm.functions.reservedWei().call() == max_cost
     # Settle via postOp: reservation released, actual cost accrued, op counted.
     actual = 6 * 10**14
-    mock_ep.functions.settle(pm.address, 0, ctx, actual).transact({"from": deployer})
+    mock_ep.functions.settle(pm.address, 0, ctx, actual, 10**9).transact({"from": deployer})
     assert pm.functions.reservedWei().call() == 0
     assert pm.functions.sponsoredWei().call() == actual
     assert pm.functions.sponsoredCount(agent).call() == 1
@@ -162,7 +190,7 @@ def test_per_wallet_op_cap_rejected(env):
     uo = make_userop(w3, agent)
     for _ in range(2):
         ctx = do_validate(mock_ep, pm, uo, 10**15, agent)
-        mock_ep.functions.settle(pm.address, 0, ctx, 10**15).transact({"from": deployer})
+        mock_ep.functions.settle(pm.address, 0, ctx, 10**15, 10**9).transact({"from": deployer})
     assert pm.functions.sponsoredCount(agent).call() == 2
     with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
         mock_ep.functions.validate(pm.address, uo, 10**15).call({"from": agent})
@@ -188,7 +216,7 @@ def test_bundle_in_flight_op_cap_rejected(env):
         mock_ep.functions.validate(pm.address, uo, 10**15).call({"from": agent})
     assert _revert_reason(ei.value) == "op cap reached"
     # postOp clears the in-flight slot; the cap still holds afterwards.
-    mock_ep.functions.settle(pm.address, 0, ctx, 10**15).transact({"from": deployer})
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**15, 10**9).transact({"from": deployer})
     assert pm.functions.inFlight(agent).call() == 0
     assert pm.functions.sponsoredCount(agent).call() == 1
     with pytest.raises((ContractLogicError, TransactionFailed)) as ei:
@@ -205,12 +233,12 @@ def test_postop_unmatched_validate_does_not_underflow(env):
     assert pm.functions.inFlight(agent).call() == 0
     # Canonical context, but no validate ever reserved an in-flight slot.
     ctx = abi_encode(["address", "uint256"], [agent, 10**15])
-    mock_ep.functions.settle(pm.address, 0, ctx, 10**14).transact({"from": deployer})
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**14, 10**9).transact({"from": deployer})
     assert pm.functions.inFlight(agent).call() == 0
     # The slot still works normally afterwards.
     ctx = do_validate(mock_ep, pm, make_userop(w3, agent), 10**15, agent)
     assert pm.functions.inFlight(agent).call() == 1
-    mock_ep.functions.settle(pm.address, 0, ctx, 10**15).transact({"from": deployer})
+    mock_ep.functions.settle(pm.address, 0, ctx, 10**15, 10**9).transact({"from": deployer})
     assert pm.functions.inFlight(agent).call() == 0
 
 
@@ -237,7 +265,7 @@ def test_global_spend_ceiling_enforced(env):
         mock_ep.functions.validate(pm.address, uo, 6 * 10**14).call({"from": agent})
     assert _revert_reason(ei.value) == "spend ceiling"
     # After settling the first op (actual 6e14), a 4e14 op fits exactly.
-    mock_ep.functions.settle(pm.address, 0, ctx, 6 * 10**14).transact({"from": deployer})
+    mock_ep.functions.settle(pm.address, 0, ctx, 6 * 10**14, 10**9).transact({"from": deployer})
     do_validate(mock_ep, pm, uo, 4 * 10**14, agent)
     assert pm.functions.sponsoredWei().call() == 6 * 10**14
     assert pm.functions.reservedWei().call() == 4 * 10**14

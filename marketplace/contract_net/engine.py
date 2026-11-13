@@ -16,11 +16,14 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from .eip712 import (
     EMPTY_EPOCH_ROOT,
+    BidSummaryMismatchError,
     demo_signing_secret,
     sign_digest,
     to_hex,
     typed_data_digest,
     typed_data_payload,
+    validate_bid_before_signing,
+    validate_bid_summary,
     verify_digest,
 )
 from .compliance_filter import ComplianceAttestationFilter
@@ -129,6 +132,40 @@ class ContractNetEngine:
         nonce = self.next_nonce(agent.agent_id)
         deadline = now + self.config.bid_ttl_seconds
         bid_price = int(price if price is not None else agent.true_min_price)
+        # Item 301 gate, wired (round 2, finding B1): build the typed-data
+        # payload FIRST and validate it against this engine's OWN intent —
+        # the exact field values about to be signed for and the exact
+        # domain from self.config — BEFORE sign_digest is called. Any
+        # difference raises BidSummaryMismatchError and NO signature is
+        # produced. Honest inputs validate cleanly, so the digest,
+        # signature and SealedBid contents are unchanged.
+        payload = typed_data_payload(
+            self.config,
+            auction_id=auction_id,
+            task_id=task.task_id,
+            agent=agent.wallet,
+            price=bid_price,
+            estimated_tokens=agent.estimated_tokens,
+            nonce=nonce,
+            deadline=deadline,
+            epoch_id=epoch_id,
+            epoch_root=epoch_merkle_root,
+        )
+        validate_bid_before_signing(
+            payload,
+            config=self.config,
+            expected_message={
+                "auctionId": auction_id,
+                "taskId": task.task_id,
+                "agent": agent.wallet,
+                "price": bid_price,
+                "estimatedTokens": agent.estimated_tokens,
+                "nonce": nonce,
+                "deadline": deadline,
+                "epochId": epoch_id,
+                "epochRoot": epoch_merkle_root,
+            },
+        )
         digest = typed_data_digest(
             self.config,
             auction_id=auction_id,
@@ -157,18 +194,7 @@ class ContractNetEngine:
             digest=to_hex(digest),
             signature=signature,
             sig_type=sig_type,
-            typed_data=typed_data_payload(
-                self.config,
-                auction_id=auction_id,
-                task_id=task.task_id,
-                agent=agent.wallet,
-                price=bid_price,
-                estimated_tokens=agent.estimated_tokens,
-                nonce=nonce,
-                deadline=deadline,
-                epoch_id=epoch_id,
-                epoch_root=epoch_merkle_root,
-            ),
+            typed_data=payload,
             submitted_at=now,
             epoch_id=epoch_id,
             epoch_merkle_root=epoch_merkle_root,
@@ -222,6 +248,33 @@ class ContractNetEngine:
         if digest != expected:
             bid.valid = False
             bid.reject_reason = "digest_mismatch"
+            return
+        # W-116 (verify-side binding): the typed_data payload carried with
+        # the bid must be exactly the payload the bid's scalar fields
+        # describe — same nine message fields, same domain as this
+        # engine's config. The sign side already gates its own payloads
+        # this way (item 301); without the same check here, a signature
+        # minted for different terms (another price, chain, or verifying
+        # contract) would verify against scalars it never committed to.
+        try:
+            validate_bid_summary(
+                bid.typed_data,
+                config=self.config,
+                expected_message={
+                    "auctionId": bid.auction_id,
+                    "taskId": bid.task_id,
+                    "agent": bid.agent_wallet,
+                    "price": bid.price,
+                    "estimatedTokens": bid.estimated_tokens,
+                    "nonce": bid.nonce,
+                    "deadline": bid.deadline,
+                    "epochId": bid.epoch_id,
+                    "epochRoot": bid.epoch_merkle_root or EMPTY_EPOCH_ROOT,
+                },
+            )
+        except BidSummaryMismatchError:
+            bid.valid = False
+            bid.reject_reason = "typed_data_mismatch"
             return
         if not verify_digest(
             digest,

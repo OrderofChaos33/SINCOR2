@@ -32,7 +32,16 @@ env
 
 # Documentation
 *.md
-docs/
+docs/*
+# The two docs the discovery blueprint serves over HTTP must be in the
+# image (/docs/TRUST_STACK.md, /docs/architecture/AUCTION_GROUND_TRUTH.md);
+# a whole-directory "docs/" exclusion cannot be partially negated, so the
+# exclusion is per-entry with explicit re-includes. Everything else under
+# docs/ stays out.
+!docs/TRUST_STACK.md
+!docs/architecture
+docs/architecture/*
+!docs/architecture/AUCTION_GROUND_TRUTH.md
 LICENSE
 
 # Tests

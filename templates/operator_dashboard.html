@@ -317,19 +317,15 @@
     }
 
     async function refreshSettlements() {
-      const data = await fetchJson("/api/marketplace/settlement/records");
-      document.getElementById("settlement-count").textContent = data.settlements.length;
-      document.getElementById("treasury-count").textContent = data.treasury_journal.length;
+      // The settlement-records API is not mounted on this deployment, so
+      // the panel degrades honestly: real zero counts and the empty state
+      // below, instead of a fetch that 404s and leaves a perpetual
+      // "Loading settlement history." spinner.
+      document.getElementById("settlement-count").textContent = "0";
+      document.getElementById("treasury-count").textContent = "0";
       renderTableRows(
         "settlements-body",
-        data.settlements.map((record) => `
-          <tr>
-            <td><code>${record.settlement_id}</code></td>
-            <td><code>${record.task_reference}</code></td>
-            <td>${record.amount} ${record.token_symbol}</td>
-            <td><code>${record.tx_hash}</code></td>
-          </tr>
-        `),
+        [],
         "No settlement events recorded yet."
       );
     }

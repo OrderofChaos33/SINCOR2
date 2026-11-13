@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {SincFluidAdapter} from "../src/fluid/SincFluidAdapter.sol";
 import {ComplianceGuard} from "../src/ComplianceGuard.sol";
+import {MockSanctionsOracle} from "./mocks/MockSanctionsOracle.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockFToken, MockDexT1} from "./mocks/MockFluid.sol";
 
@@ -38,6 +39,14 @@ contract SincFluidAdapterTest is Test {
 
         adapter = new SincFluidAdapter(sinc, usdc, guardian, treasury);
         guard = new ComplianceGuard(guardian);
+
+        // Fail-closed flip (C2, 2026-10-08): ComplianceGuard denies everyone
+        // until an oracle is configured. Install a permissive mock oracle so
+        // the adapter tests exercise the block/unblock path rather than the
+        // no-oracle deny-all path (covered in ComplianceGuard.t.sol).
+        MockSanctionsOracle mockOracle = new MockSanctionsOracle();
+        vm.prank(guardian);
+        guard.setOracle(address(mockOracle), true);
 
         vm.startPrank(guardian);
         adapter.setCompliance(address(guard));

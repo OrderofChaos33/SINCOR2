@@ -33,7 +33,7 @@
   5. docs/SINC_INTEGRATION.md → retitle or mark as historical; create AXM_INTEGRATION.md.
   6. Agent YAMLs and marketplace/agent_cards.json — paymentScheme → AXM.
   7. Tests: update test_sinc_integration.py assertions to expect AXIOM default.
-  8. .env.example and config/railway_add_these.env — AXIOM_CONTRACT_ADDRESS first with new address.
+  8. .env.example and config/railway_env.example — AXIOM_CONTRACT_ADDRESS first with new address.
   9. onchain scripts that still hard-code SINC as primary for new deploys must be annotated legacy.
   10. **AIRDROP PREP** — Snapshot ~2600 SINC holders and prepare distribution plan against new AXM contract.
 

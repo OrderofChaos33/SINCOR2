@@ -13,14 +13,17 @@ interface IComplianceGuard {
 }
 
 /// @title  ComplianceGuard — sanctions screening + manual blocklist (Base)
-/// @notice Production compliance gate: optional on-chain sanctions oracle plus a
+/// @notice Production compliance gate: on-chain sanctions oracle plus a
 ///         guardian-controlled blocklist. Oracle address is deliberately NOT
 ///         hardcoded — legal/compliance picks the provider, guardian sets it once.
 ///         ZK-attestation screening (prove non-membership without revealing address)
 ///         is the documented upgrade path; this contract is the enforcement point
 ///         either way, so the swap to ZK later requires no integrator changes.
-/// @dev    Fail-closed on explicit block, fail-open only when no oracle is set
-///         (screening effectively blocklist-only until oracleEnabled).
+/// @dev    FAIL-CLOSED (ratified 2026-09-29, implemented 2026-10-08): an
+///         explicit block denies, and a missing/disabled oracle ALSO denies.
+///         There is no "blocklist-only until oracleEnabled" mode — without a
+///         configured oracle the contract is a deny-all gate, never a rubber
+///         stamp. Guardian must call setOracle before any account is allowed.
 contract ComplianceGuard is IComplianceGuard {
     address public guardian;
     ISanctionsOracle public sanctionsOracle;
@@ -45,13 +48,15 @@ contract ComplianceGuard is IComplianceGuard {
         guardian = _guardian;
     }
 
-    /// @notice True when the account may interact. Blocklist always applies;
-    ///         oracle applies only when enabled AND set.
+    /// @notice True when the account may interact. Fail-closed: the blocklist
+    ///         always applies, and a missing or disabled oracle DENIES (there
+    ///         is no screening without an oracle, so entry is refused).
     function isAllowed(address account) external view returns (bool) {
         if (blocked[account]) return false;
-        if (oracleEnabled && address(sanctionsOracle) != address(0)) {
-            if (sanctionsOracle.isSanctioned(account)) return false;
+        if (!oracleEnabled || address(sanctionsOracle) == address(0)) {
+            return false;
         }
+        if (sanctionsOracle.isSanctioned(account)) return false;
         return true;
     }
 

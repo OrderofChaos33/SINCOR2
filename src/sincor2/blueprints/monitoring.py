@@ -3,11 +3,20 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from functools import wraps
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from flask import Blueprint, current_app, jsonify
 from flask_jwt_extended import jwt_required
+
+try:  # canonical admin-role decorator (403 for non-admin JWT)
+    from sincor2.auth_system import admin_required
+except ImportError:  # pragma: no cover - alternate layout
+    try:
+        from src.sincor2.auth_system import admin_required  # type: ignore
+    except ImportError:  # pragma: no cover - fail closed: no auth, no route
+        admin_required = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -89,20 +98,31 @@ def dashboard_metrics():
 
 
 @monitoring_bp.get("/api/metrics/treasury")
+@jwt_required()
 def treasury_metrics():
     """
     CEO KPI endpoint: treasury balances + 24h inflow ledger.
+
+    AUTHENTICATED (audit P2-A2 remediation): a valid Bearer JWT is required.
+    The response is built from an explicit field allowlist only
+    (``sincor2.treasury_inflow.public_treasury_dto``) — no raw ledger
+    internals, no treasury address, no RPC diagnostics.
 
     On-chain snapshot is best-effort. Ledger is always local and authoritative
     for recorded events. Never exposes keys or signer material.
     """
     try:
-        from sincor2.treasury_inflow import get_treasury_snapshot, ledger_summary_24h
+        from sincor2.treasury_inflow import (
+            get_treasury_snapshot,
+            ledger_summary_24h,
+            public_treasury_dto,
+        )
     except ImportError:
         try:
             from src.sincor2.treasury_inflow import (
                 get_treasury_snapshot,
                 ledger_summary_24h,
+                public_treasury_dto,
             )
         except ImportError as exc:
             logger.error("treasury_inflow import failed: %s", exc)
@@ -120,17 +140,48 @@ def treasury_metrics():
     try:
         snap = get_treasury_snapshot(include_onchain=include_onchain)
         summary = ledger_summary_24h()
-        return jsonify(
-            {
-                "status": "ok",
-                "kpi": "treasury_inflow",
-                "snapshot": snap.to_dict(),
-                "ledger_24h": summary,
-            }
-        ), 200
-    except Exception as exc:
+        return jsonify(public_treasury_dto(snap, summary)), 200
+    except Exception:
         logger.exception("treasury metrics failed")
-        return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
+        return jsonify({"status": "error", "detail": "treasury_metrics_unavailable"}), 500
+
+
+@monitoring_bp.get("/api/metrics/treasury/public")
+def treasury_metrics_public():
+    """
+    PUBLIC (unauthenticated) ledger-only treasury view for the homepage
+    stats strip — observability build #1 (site audit 2026-10-28 §5.1).
+
+    The authenticated route above keeps its JWT gate: on-chain balances
+    stay behind auth. This variant never builds an on-chain snapshot; it
+    serves only the local inflow-ledger 24h aggregates plus the bounty
+    pool figures that ``GET /v1/a2a/pool`` already publishes anonymously
+    (see ``sincor2.treasury_inflow.public_treasury_public_dto``).
+    """
+    try:
+        from sincor2.treasury_inflow import (
+            ledger_summary_24h,
+            public_treasury_public_dto,
+        )
+        from sincor2.a2a_bounty_pool import bounty_pool
+    except ImportError:
+        try:
+            from src.sincor2.treasury_inflow import (  # type: ignore
+                ledger_summary_24h,
+                public_treasury_public_dto,
+            )
+            from src.sincor2.a2a_bounty_pool import bounty_pool  # type: ignore
+        except ImportError as exc:
+            logger.error("treasury public import failed: %s", exc)
+            return jsonify({"status": "error", "detail": "treasury_inflow unavailable"}), 503
+
+    try:
+        summary = ledger_summary_24h()
+        pool_status = bounty_pool().status()
+        return jsonify(public_treasury_public_dto(summary, pool_status)), 200
+    except Exception:
+        logger.exception("treasury public metrics failed")
+        return jsonify({"status": "error", "detail": "treasury_public_unavailable"}), 500
 
 
 @monitoring_bp.get("/api/polyclaw/bankroll")
@@ -171,12 +222,42 @@ def polyclaw_bankroll():
         return jsonify({"status": "error", "detail": str(exc)[:200]}), 500
 
 
+def _admin_gate():
+    """Return the admin-role decorator for sensitive routes (C1).
+
+    Uses the canonical ``sincor2.auth_system.admin_required`` (JWT + role ==
+    admin, 403 otherwise). If the decorator cannot be imported, returns a
+    stand-in that serves 503 — the route stays registered but never runs
+    unauthenticated.
+    """
+    if admin_required is not None:
+        return admin_required()
+
+    def _disabled(fn):
+        @wraps(fn)
+        def _wrapper(*args, **kwargs):
+            return jsonify({
+                "status": "error",
+                "detail": "admin auth unavailable — route disabled (fail closed)",
+            }), 503
+        return _wrapper
+    return _disabled
+
+
 @monitoring_bp.post("/api/polyclaw/clear-dry-runs")
+@_admin_gate()
 def polyclaw_clear_dry_runs():
     """Close all simulated/dry-run open trades and release stuck exposure.
 
     This is the fix when available=$0 because dry-run cycles piled up
     open exposure that never settled.
+
+    ADMIN-GATED (C1 remediation, 2026-10-08): this handler also clears the
+    bankroll kill switch when tripped. An unauthenticated caller must never
+    be able to re-arm trading after a kill-switch trip, so the route
+    requires an admin JWT (403 otherwise). If the admin decorator cannot be
+    imported, the route serves 503 instead of running unauthenticated
+    (fail closed).
     """
     try:
         from sincor2.bankroll import get_bankroll

@@ -27,9 +27,12 @@ Legacy    : POST /api/a2a/tasks/send   GET /api/a2a/tasks/<id>
             POST /api/a2a/tasks/cancel GET /api/a2a/agents  POST /api/a2a/quote
 
 The AgentCard advertises the SINCOR skill catalogue as individual skills
-(16 base skills plus registry-backed vertical skills — 32 total against the
-current marketplace/agent_cards.json registry; the count grows as vertical
-packs are registered).
+(42 entries in SINCOR_SKILLS at import — 41 cross-cutting skills plus the
+P24 creator-token issuance skill — and further registry-backed vertical
+skills appended at platform bootstrap: 14 against the current
+marketplace/agent_cards.json registry, 56 total advertised; description-less
+fixture records are quarantined and never advertised.  The count grows as
+vertical packs are registered).
 External agents select the skill they need and submit a task with their
 AXIOM payment commitment.  SINCOR validates the on-chain payment (or an
 off-chain signed intent), routes the task through the swarm, and returns
@@ -59,7 +62,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Protocol, Tuple
 
 from sincor2.base_agentkit import build_base_commerce_profile
 from sincor2.onchain.constants import (
@@ -75,6 +78,14 @@ from sincor2 import treasury_inflow as _treasury_inflow
 from sincor2.treasury_settlement import record_platform_fee_inflow
 from sincor2.a2a_idempotency import idempotent
 from sincor2.defi.p24 import skill as _p24_issuance_skill
+from sincor2.free_ration import (
+    DAILY_RATION_LIMIT,
+    HOOK_COPY,
+    abuse_client_ip,
+    daily_ration_tracker,
+    hook_payload,
+    truncate_sample,
+)
 
 logger = logging.getLogger("sincor.a2a")
 
@@ -224,6 +235,16 @@ class AgentSkill:
             "estimatedLatencySeconds":  self.estimated_latency_seconds,
             "reputationFloor":          self.reputation_floor,
             "freeQuota":                self.free_quota,
+            # Wave 1 hook: universal daily free ration (3/agent/skill/UTC
+            # day) on EVERY skill, plus a no-wallet free peek route.
+            "freeDailyRation":          DAILY_RATION_LIMIT,
+            "peekUrl":                  f"{PLATFORM_URL}/api/a2a/peek/{self.id}",
+            "peek": {
+                "sample": False,
+                "kind":   "metadata",
+                "note":   "Free peek (no wallet): GET the peekUrl for this "
+                          "skill's live sample or labelled metadata.",
+            },
         }
 
 
@@ -294,6 +315,10 @@ class AgentCard:
             "defaultInputModes":   self.default_input_modes,
             "defaultOutputModes":  self.default_output_modes,
             "skills":              [s.to_dict() for s in self.skills],
+            # Wave 1 hook offer (free daily ration, free peek, pool-backed
+            # task bidding, conditional sponsored stake, free genesis SBT
+            # + airdrop for registered agents; token = platform access).
+            "hook":                hook_payload(),
         }
         if self.security_schemes:
             d["securitySchemes"] = self.security_schemes
@@ -330,12 +355,19 @@ class AgentCard:
             "url":            url,
             "version":        self.version,
             "skills":         [s.to_dict() for s in self.skills],
+            "hook":           hook_payload(),
             "provider":       self.provider,
             "authentication": {
                 "schemes":     list(self.security_schemes.keys()),
                 "description": (
-                    "Pass your API key in the X-API-Key header. "
-                    "Obtain a key at https://getsincor.com/api-keys."
+                    "No API key required. Quote and task submission are "
+                    "open to all A2A callers; payment is enforced on-chain "
+                    "via AXM transfer confirmation on Base. To register an "
+                    "agent identity, POST /v1/a2a/register — a wallet claim "
+                    "must carry an EIP-191 registration proof "
+                    "(registration_signature over "
+                    "SINCOR-REGISTER|<agent_id>|<registration_ts>, with "
+                    "registration_wallet set to the signing wallet)."
                 ),
             },
             "capabilities":   self.capabilities,
@@ -723,7 +755,7 @@ SINCOR_SKILLS: List[AgentSkill] = [
         tags=["analytics", "forecasting", "data-science", "monte-carlo"],
         examples=[
             "Model ARR growth under three expansion scenarios for Q3 2026.",
-            "Forecast SINC token price trajectory given the $0.15 floor and volume.",
+            "Forecast quarterly revenue and trading volume under three growth scenarios.",
         ],
         axm_price_wei=int(4.0 * 10**18),
         sinc_price=4,
@@ -1083,6 +1115,987 @@ SINCOR_SKILLS: List[AgentSkill] = [
         reputation_floor=0,
         free_quota=0,
     ),
+    # ── Adopt-24 T2: ComposioHQ Tier-2 content/document skills ──────────
+    # Adapted from ComposioHQ/awesome-claude-skills (each skill folder
+    # carries its own Apache-2.0 LICENSE.txt; see
+    # THIRD_PARTY_NOTICES_COMPOSIO.md). Re-expressed in AgentSkill format;
+    # file-producing skills return their artifact as text/JSON output.
+    AgentSkill(
+        id="webapp-testing",
+        name="Web Application Testing",
+        description=(
+            "Test local web applications with Playwright: verify frontend "
+            "functionality, debug UI behaviour, capture screenshots, and "
+            "review browser logs. The caller receives a structured test "
+            "report with per-check results and findings. Powered by "
+            "Auditor + Builder agents."
+        ),
+        tags=["testing", "playwright", "qa", "web", "browser"],
+        examples=[
+            "Test my local web app at localhost:5173 and verify the checkout flow works end to end.",
+            "Debug why the signup form UI breaks on submit and capture screenshots of the failure.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["target"],
+            "properties": {
+                "target": {"type": "string", "description": "Local app URL or HTML file to test"},
+                "checks": {"type": "array", "items": {"type": "string"},
+                           "description": "Flows or behaviours to verify"},
+                "capture": {"type": "array", "items": {"type": "string"},
+                            "description": "Evidence to capture: screenshots, console logs"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "checks": {"type": "array", "items": {"type": "object"}},
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "screenshots": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="mcp-builder",
+        name="MCP Server Builder",
+        description=(
+            "Design and build high-quality MCP (Model Context Protocol) "
+            "servers that connect LLMs to external APIs and services, in "
+            "Python (FastMCP) or Node/TypeScript (MCP SDK). The caller "
+            "receives a tool design, implementation plan, and evaluation "
+            "set for the server. Powered by Builder agents."
+        ),
+        tags=["mcp", "developer-tools", "api", "integration", "servers"],
+        examples=[
+            "Build an MCP server that exposes our inventory API as agent tools in Python.",
+            "Design the tool set and schemas for a TypeScript MCP server over the GitHub API.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["service"],
+            "properties": {
+                "service": {"type": "string", "description": "External API or service to integrate"},
+                "language": {"type": "string", "enum": ["python", "typescript"],
+                             "description": "Implementation language"},
+                "tools": {"type": "array", "items": {"type": "string"},
+                          "description": "Workflows the server should expose as tools"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "tool_designs": {"type": "array", "items": {"type": "object"}},
+                "implementation_plan": {"type": "array", "items": {"type": "string"}},
+                "evaluation_questions": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="skill-creator",
+        name="Skill Creator",
+        description=(
+            "Create effective agent skills that extend capabilities with "
+            "specialised knowledge, workflows, and tool integrations. The "
+            "caller receives a complete skill package design: trigger "
+            "description, SKILL.md draft, and the scripts, references, and "
+            "assets to bundle. Powered by Builder agents."
+        ),
+        tags=["skills", "agent-development", "workflows", "authoring"],
+        examples=[
+            "Create a skill that teaches an agent our PDF rotation workflow.",
+            "Design a skill for onboarding agents onto our BigQuery schema.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["skill_goal"],
+            "properties": {
+                "skill_goal": {"type": "string", "description": "What the new skill should enable"},
+                "use_cases": {"type": "array", "items": {"type": "string"},
+                              "description": "Concrete example requests the skill should handle"},
+                "resources": {"type": "array", "items": {"type": "string"},
+                              "description": "Scripts, references, or assets to bundle"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "skill_name": {"type": "string"},
+                "skill_markdown": {"type": "string"},
+                "structure": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="internal-comms",
+        name="Internal Communications Writer",
+        description=(
+            "Write internal communications in proven company formats: 3P "
+            "updates (Progress, Plans, Problems), company newsletters, "
+            "FAQ responses, status reports, leadership updates, project "
+            "updates, and incident reports. The caller receives a "
+            "ready-to-send draft matched to the format. Powered by "
+            "Builder + Synthesizer agents."
+        ),
+        tags=["communications", "writing", "internal", "newsletter", "status-report"],
+        examples=[
+            "Write a 3P update for the platform team covering this week's progress, plans, and problems.",
+            "Draft a company newsletter announcing the new release and answering the top FAQs.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["comm_type"],
+            "properties": {
+                "comm_type": {"type": "string",
+                              "description": "Format: 3p-update, newsletter, faq, status-report, leadership-update, project-update, incident-report"},
+                "audience": {"type": "string", "description": "Who will read it"},
+                "key_points": {"type": "array", "items": {"type": "string"},
+                               "description": "Points the communication must cover"},
+                "context": {"type": "string", "description": "Background details to weave in"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="brand-guidelines",
+        name="Brand Guidelines Styler",
+        description=(
+            "Apply a brand's colours, typography, and visual identity to "
+            "artifacts such as slides, documents, and pages. The caller "
+            "supplies the brand palette and fonts and receives the styled "
+            "artifact specification with the exact colours and type "
+            "choices applied. Powered by Builder agents."
+        ),
+        tags=["branding", "design", "typography", "visual-identity", "styling"],
+        examples=[
+            "Style this slide deck with our brand colours and heading fonts.",
+            "Apply our corporate identity to this report: palette, typography, and accent shapes.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["artifact"],
+            "properties": {
+                "artifact": {"type": "string", "description": "The artifact to style"},
+                "brand_colors": {"type": "array", "items": {"type": "string"},
+                                 "description": "Brand colour hex codes"},
+                "heading_font": {"type": "string"},
+                "body_font": {"type": "string"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "summary": {"type": "string"},
+                "palette": {"type": "array", "items": {"type": "string"}},
+                "fonts": {"type": "object"},
+                "styled_artifact": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="canvas-design",
+        name="Canvas Design Studio",
+        description=(
+            "Create original visual art and posters as PNG or PDF "
+            "artifacts, guided by a written design philosophy covering "
+            "form, space, colour, and composition. The caller receives "
+            "the design philosophy document plus the finished canvas "
+            "artifact description. Powered by Builder agents."
+        ),
+        tags=["design", "art", "poster", "visual", "canvas"],
+        examples=[
+            "Create a poster for a jazz night with a bold geometric design philosophy.",
+            "Design a single-page visual artwork that expresses quiet minimalism.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["brief"],
+            "properties": {
+                "brief": {"type": "string", "description": "Subject and mood for the artwork"},
+                "format": {"type": "string", "enum": ["png", "pdf"],
+                           "description": "Artifact format"},
+                "style_notes": {"type": "string", "description": "Aesthetic direction"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "design_philosophy": {"type": "string"},
+                "artifact": {"type": "string",
+                             "description": "The produced canvas artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="theme-factory",
+        name="Theme Factory",
+        description=(
+            "Style slides, documents, reports, and HTML landing pages "
+            "with a curated professional theme — colour palette plus "
+            "font pairings — or generate a custom theme from a short "
+            "description. The caller receives the themed artifact "
+            "specification and the full theme definition. Powered by "
+            "Builder agents."
+        ),
+        tags=["themes", "design", "slides", "styling", "templates"],
+        examples=[
+            "Apply the Ocean Depths theme to my pitch deck.",
+            "Create a custom warm autumn theme for this landing page and apply it.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["artifact"],
+            "properties": {
+                "artifact": {"type": "string", "description": "Artifact to theme: slides, doc, report, or landing page"},
+                "theme_name": {"type": "string",
+                               "description": "Preset theme name, or a description for a custom theme"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "theme_name": {"type": "string"},
+                "palette": {"type": "array", "items": {"type": "string"}},
+                "fonts": {"type": "object"},
+                "artifact": {"type": "string",
+                             "description": "The themed artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=40,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="artifacts-builder",
+        name="Artifacts Builder",
+        description=(
+            "Build elaborate multi-component HTML artifacts with modern "
+            "frontend technology — React, Tailwind CSS, and shadcn/ui — "
+            "including state management and routing, bundled into a "
+            "single self-contained HTML file. The caller receives the "
+            "bundled artifact and a component summary. Powered by "
+            "Builder agents."
+        ),
+        tags=["artifacts", "frontend", "react", "html", "web"],
+        examples=[
+            "Build an interactive dashboard artifact with charts and stateful filters.",
+            "Create a multi-view planning tool artifact bundled as a single HTML file.",
+        ],
+        axm_price_wei=int(3.0 * 10**18),
+        sinc_price=3,
+        input_schema={
+            "type": "object",
+            "required": ["artifact_request"],
+            "properties": {
+                "artifact_request": {"type": "string", "description": "What the artifact should do"},
+                "features": {"type": "array", "items": {"type": "string"},
+                             "description": "Components or capabilities to include"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "components": {"type": "array", "items": {"type": "string"}},
+                "artifact": {"type": "string",
+                             "description": "The bundled single-file HTML artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=45,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="slack-gif-creator",
+        name="Slack GIF Creator",
+        description=(
+            "Create animated GIFs optimised for Slack — message GIFs and "
+            "emoji GIFs — from a plain description, using composable "
+            "animation primitives and validators for Slack's size and "
+            "dimension limits. The caller receives the GIF artifact "
+            "specification with its validated dimensions and size. "
+            "Powered by Builder agents."
+        ),
+        tags=["gif", "slack", "animation", "media", "emoji"],
+        examples=[
+            "Make me a Slack GIF of a rocket launching with the word LIFTOFF.",
+            "Create a 128x128 emoji GIF of a party parrot bouncing, under the 64KB emoji limit.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["description"],
+            "properties": {
+                "description": {"type": "string", "description": "What the GIF should show"},
+                "gif_type": {"type": "string", "enum": ["message", "emoji"],
+                             "description": "message = up to ~2MB at 480x480; emoji = 64KB at 128x128"},
+                "animation": {"type": "string",
+                              "description": "Motion style: shake, bounce, spin, pulse, fade, zoom, slide, flip"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "format": {"type": "string"},
+                "summary": {"type": "string"},
+                "dimensions": {"type": "string"},
+                "size_kb": {"type": "number"},
+                "artifact": {"type": "string",
+                             "description": "The produced GIF artifact (format + content summary)"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    # ── Micro-reads: deterministic single-read skills ─────────────────────
+    # The A2A face of the x402 wallet-sanctions-screen resource: one EVM
+    # wallet address in, one OFAC SDN verdict out, screened by
+    # sincor2.sanctions_screen against the same vendored/refreshed OFAC
+    # snapshot the paid x402 route uses. Priced as a micro-read: 0.1 AXM,
+    # 10x below the cheapest agent-task skill (1 AXM) — the card prices
+    # skills in AXM, so no separate USDC price is advertised here (the
+    # x402 resource keeps its own USDC pricing). free_quota=0 like the
+    # other deterministic skills; the Wave 1 universal daily ration
+    # (freeDailyRation, added by AgentSkill.to_dict) applies as usual.
+    AgentSkill(
+        id="wallet-sanctions-screen",
+        name="Wallet Sanctions Screen",
+        description=(
+            "Screen one EVM wallet address against the OFAC SDN sanctions "
+            "snapshot and return a flagged or clean verdict with the matched "
+            "entry metadata and full snapshot provenance (publication date, "
+            "entry count). Fail-closed honesty: a snapshot older than 48h "
+            "returns an unknown verdict, never clean. Use it as a "
+            "pre-transaction sanctions check on an unknown wallet."
+        ),
+        tags=["compliance", "ofac", "sanctions", "wallet", "screening", "kya"],
+        examples=[
+            "Screen wallet 0x000000000000000000000000000000000000dEaD for OFAC sanctions before paying it.",
+            "Is this wallet address on the OFAC SDN list?",
+        ],
+        axm_price_wei=int(1 * 10**17),  # 0.1 AXM micro-read price
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["address"],
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "EVM wallet address to screen (0x + 40 hex chars)",
+                },
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string"},
+                "status": {"type": "string"},
+                "screened": {"type": "boolean"},
+                "stale": {"type": "boolean"},
+                "address": {"type": "string"},
+                "snapshot_publication_date": {"type": "string"},
+                "snapshot_entry_count": {"type": "integer"},
+            },
+        },
+        estimated_latency_seconds=5,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    # ── Adopt-24 T1: methodology skills (obra/superpowers, MIT) ─────────
+    # Re-expressed in SINCOR AgentSkill format from the upstream
+    # superpowers skill procedures; see THIRD_PARTY_NOTICES.md for the
+    # full attribution, the MIT licence, and the two brand renames
+    # (using-superpowers -> agent-methodology-guide,
+    # diagnosing-superpowers -> agent-methodology-self-check).
+    # free_quota=0 for all: the Wave 1 universal daily ration
+    # (freeDailyRation, added by AgentSkill.to_dict) applies as usual.
+    AgentSkill(
+        id="verification-before-completion",
+        name="Verification Before Completion",
+        description=(
+            "Run fresh verification commands for a completion claim and return an "
+            "evidence-backed verdict: the commands run, their outputs, and whether "
+            "the claim holds. Callers receive proof they can cite before committing, "
+            "merging, or reporting success. Powered by Auditor agents."
+        ),
+        tags=["methodology", "verification", "quality", "evidence"],
+        examples=[
+            "Verify the claim that the new quote route passes its tests.",
+            "Verify that the settlement tests pass before this branch is reported done.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["claim"],
+            "properties": {
+                "claim": {"type": "string", "description": "The completion claim to verify"},
+                "context": {"type": "string", "description": "Where the work lives (branch, repo, files)"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "verdict": {"type": "string"},
+                "commands": {"type": "array", "items": {"type": "string"}},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="test-driven-development",
+        name="Test-Driven Development",
+        description=(
+            "Guide a feature or bugfix through the red-green-refactor cycle: a failing "
+            "test first, the smallest code change that passes it, then cleanup with the "
+            "suite green. Callers receive the test cases, the cycle record, and the "
+            "passing evidence. Powered by Builder agents."
+        ),
+        tags=["methodology", "tdd", "testing", "development"],
+        examples=[
+            "Add a retry helper that retries a failed operation three times.",
+            "Fix the empty-email bug with a failing test that proves the fix.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["feature"],
+            "properties": {
+                "feature": {"type": "string", "description": "Feature or bugfix to build test-first"},
+                "context": {"type": "string", "description": "Codebase or module context"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tests": {"type": "array", "items": {"type": "string"}},
+                "cycle": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="systematic-debugging",
+        name="Systematic Debugging",
+        description=(
+            "Investigate a bug, test failure, or unexpected behaviour through root-cause "
+            "analysis: reproduce the issue, trace the data flow, test one hypothesis at "
+            "a time, and fix the cause. Callers receive the root cause, the evidence "
+            "trail, and the verified fix. Powered by Auditor agents."
+        ),
+        tags=["methodology", "debugging", "root-cause", "quality"],
+        examples=[
+            "The settlement test fails only when run after the quota tests — find the root cause.",
+            "Trace why this payment webhook intermittently returns a 500 error.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["issue"],
+            "properties": {
+                "issue": {"type": "string", "description": "Bug, failure, or unexpected behaviour to investigate"},
+                "context": {"type": "string", "description": "Error output, repro steps, or recent changes"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "root_cause": {"type": "string"},
+                "evidence": {"type": "array", "items": {"type": "string"}},
+                "fix": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="requesting-code-review",
+        name="Requesting Code Review",
+        description=(
+            "Prepare and dispatch a focused code review request for a completed change, "
+            "with the base and head commits, the requirements, and a summary of what was "
+            "built. Callers receive structured review findings grouped by severity with "
+            "a readiness assessment. Powered by Auditor agents."
+        ),
+        tags=["methodology", "code-review", "quality", "review"],
+        examples=[
+            "Review the branch that adds the new catalogue skills before it merges.",
+            "Request a review of the payment reconciliation change against its requirements.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["change"],
+            "properties": {
+                "change": {"type": "string", "description": "The completed change to review"},
+                "requirements": {"type": "string", "description": "Plan or requirements the change should meet"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "assessment": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="receiving-code-review",
+        name="Receiving Code Review",
+        description=(
+            "Evaluate incoming code review feedback item by item against the codebase, "
+            "verify each point technically, and produce an implementation order with "
+            "reasoned responses. Callers receive a verified action list that separates "
+            "fixes, clarifications, and pushback. Powered by Auditor agents."
+        ),
+        tags=["methodology", "code-review", "quality", "review"],
+        examples=[
+            "A reviewer asked for the price constants to be named values — evaluate the feedback.",
+            "Work through these six review comments and give me the verified action order.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["feedback"],
+            "properties": {
+                "feedback": {"type": "string", "description": "The review feedback to evaluate"},
+                "context": {"type": "string", "description": "Codebase context for verification"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "actions": {"type": "array", "items": {"type": "string"}},
+                "clarifications": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="agent-methodology-self-check",
+        name="Agent Methodology Self-Check",
+        description=(
+            "Examine a finished agent session that went wrong — repeated work, missed "
+            "plans, slow or costly runs — and assemble an evidence-cited report from "
+            "the session record. Callers receive findings where every claim points at "
+            "a concrete source line. Powered by Auditor agents."
+        ),
+        tags=["methodology", "diagnosis", "session-review", "quality"],
+        examples=[
+            "The last session re-ran a finished task twice and cost too much — examine it.",
+            "Build an evidence report on why the previous run ignored the plan.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["session"],
+            "properties": {
+                "session": {"type": "string", "description": "Session id, path, or description of what went wrong"},
+                "concern": {"type": "string", "description": "The observable that matters: time, cost, repeated work"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "findings": {"type": "array", "items": {"type": "string"}},
+                "report": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="brainstorming",
+        name="Brainstorming & Design Exploration",
+        description=(
+            "Explore what to build before building it: clarify intent and success "
+            "criteria, compare concrete approaches with their trade-offs, and shape an "
+            "approved design. Callers receive a design summary with the chosen approach "
+            "and the reasoning behind it. Powered by Synthesizer agents."
+        ),
+        tags=["methodology", "brainstorming", "design", "planning"],
+        examples=[
+            "Design a booking reminder flow for a local detailing shop.",
+            "Explore approaches for adding a new settlement rail and recommend one.",
+        ],
+        axm_price_wei=int(2.0 * 10**18),
+        sinc_price=2,
+        input_schema={
+            "type": "object",
+            "required": ["topic"],
+            "properties": {
+                "topic": {"type": "string", "description": "What to design or decide"},
+                "context": {"type": "string", "description": "Known constraints, audience, or goals"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "approaches": {"type": "array", "items": {"type": "string"}},
+                "recommendation": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="subagent-driven-development",
+        name="Subagent-Driven Development",
+        description=(
+            "Execute an implementation plan with a fresh subagent per task, a spec and "
+            "quality review after each task, and a whole-branch review at the end. "
+            "Callers receive per-task completion records, review outcomes, and a final "
+            "branch assessment. Powered by Director agents."
+        ),
+        tags=["methodology", "subagents", "orchestration", "management"],
+        examples=[
+            "Execute the catalogue adoption plan task by task with reviews.",
+            "Run this implementation plan with a fresh implementer and reviewer per task.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["plan"],
+            "properties": {
+                "plan": {"type": "string", "description": "Plan file path or plan summary to execute"},
+                "context": {"type": "string", "description": "Spec or global constraints for the plan"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "reviews": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=20,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="dispatching-parallel-agents",
+        name="Dispatching Parallel Agents",
+        description=(
+            "Split two or more independent problems into focused agent assignments that "
+            "run concurrently, each with a clear scope, constraints, and expected output. "
+            "Callers receive the assignment set and an integration summary once the "
+            "agents return. Powered by Director agents."
+        ),
+        tags=["methodology", "parallel", "orchestration", "management"],
+        examples=[
+            "Three unrelated test files are failing in different subsystems — dispatch them in parallel.",
+            "Split this audit into independent domains and assign one agent per domain.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["workload"],
+            "properties": {
+                "workload": {"type": "string", "description": "The independent problems to dispatch in parallel"},
+                "constraints": {"type": "string", "description": "Shared constraints for every assignment"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "assignments": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="writing-plans",
+        name="Writing Plans",
+        description=(
+            "Turn a spec or requirements set into a bite-sized implementation plan with "
+            "exact files, interfaces, test steps, and commit points for each task. "
+            "Callers receive a complete plan an implementer can execute task by task "
+            "with verification at every step. Powered by Director agents."
+        ),
+        tags=["methodology", "planning", "spec", "management"],
+        examples=[
+            "Plan the multi-step rollout of the new skill catalogue.",
+            "Write the implementation plan for the sanctions screening upgrade from its spec.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["spec"],
+            "properties": {
+                "spec": {"type": "string", "description": "Spec, requirements, or feature description to plan"},
+                "context": {"type": "string", "description": "Codebase structure or constraints"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "plan": {"type": "string"},
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="executing-plans",
+        name="Executing Plans",
+        description=(
+            "Execute a written implementation plan task by task in the current session, "
+            "proving each step with tests and recording progress in a durable ledger. "
+            "Callers receive per-task completion evidence and a final whole-branch "
+            "review outcome. Powered by Director agents."
+        ),
+        tags=["methodology", "execution", "planning", "management"],
+        examples=[
+            "Execute the written catalogue adoption plan in this session.",
+            "Work through this implementation plan task by task and ledger the results.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["plan"],
+            "properties": {
+                "plan": {"type": "string", "description": "Plan file path or plan summary to execute"},
+                "context": {"type": "string", "description": "Spec the plan argues from"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "tasks": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=30,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="using-git-worktrees",
+        name="Using Git Worktrees",
+        description=(
+            "Set up an isolated git worktree workspace for feature work, with the right "
+            "branch, project setup, and a clean baseline test run. Callers receive the "
+            "workspace path, branch details, and the verified baseline result. "
+            "Powered by Builder agents."
+        ),
+        tags=["methodology", "git", "worktrees", "management"],
+        examples=[
+            "Start the catalogue feature in an isolated workspace.",
+            "Create a worktree for the payment fix and verify its baseline tests.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["feature"],
+            "properties": {
+                "feature": {"type": "string", "description": "Feature or branch the workspace is for"},
+                "context": {"type": "string", "description": "Repository or base branch details"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "workspace": {"type": "string"},
+                "branch": {"type": "string"},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="writing-skills",
+        name="Writing Skills",
+        description=(
+            "Create or refine an agent skill with test-driven documentation: pressure "
+            "scenarios first, then the skill text, then verification that agents follow "
+            "it. Callers receive the finished skill draft with its test scenarios and "
+            "compliance evidence. Powered by Builder agents."
+        ),
+        tags=["methodology", "skills", "documentation", "management"],
+        examples=[
+            "Create a skill that teaches the sanctions screening workflow.",
+            "Refine the debugging skill with pressure scenarios that close its loopholes.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["skill_topic"],
+            "properties": {
+                "skill_topic": {"type": "string", "description": "Technique, pattern, or tool the skill teaches"},
+                "context": {"type": "string", "description": "Audience or runtime for the skill"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "skill": {"type": "string"},
+                "scenarios": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=25,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="finishing-a-development-branch",
+        name="Finishing a Development Branch",
+        description=(
+            "Bring a completed development branch to integration: verify the full test "
+            "suite, identify the base branch and workspace state, and present the merge, "
+            "pull-request, or keep options. Callers receive the verified state and the "
+            "integration choices. Powered by Director agents."
+        ),
+        tags=["methodology", "git", "integration", "management"],
+        examples=[
+            "The catalogue branch is green and ready to integrate — finish it.",
+            "Verify this feature branch and give me the integration options.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["branch"],
+            "properties": {
+                "branch": {"type": "string", "description": "Branch ready to integrate"},
+                "context": {"type": "string", "description": "Base branch or workspace details"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "options": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=15,
+        reputation_floor=0,
+        free_quota=0,
+    ),
+    AgentSkill(
+        id="agent-methodology-guide",
+        name="Agent Methodology Guide",
+        description=(
+            "Match any incoming task to the methodology skills that apply to it and "
+            "return the ordered skill sequence to follow, starting with process skills. "
+            "Callers receive a concrete starting skill and the full sequence for their "
+            "task. Powered by Director agents."
+        ),
+        tags=["methodology", "guide", "skills", "management"],
+        examples=[
+            "Starting a new task: which methodology skill applies first?",
+            "I am about to fix a bug — give me the methodology sequence for it.",
+        ],
+        axm_price_wei=int(1.0 * 10**18),
+        sinc_price=1,
+        input_schema={
+            "type": "object",
+            "required": ["task"],
+            "properties": {
+                "task": {"type": "string", "description": "The task about to start"},
+                "context": {"type": "string", "description": "Session or plan state, if any"},
+            },
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "starting_skill": {"type": "string"},
+                "skills": {"type": "array", "items": {"type": "string"}},
+                "summary": {"type": "string"},
+            },
+        },
+        estimated_latency_seconds=10,
+        reputation_floor=0,
+        free_quota=0,
+    ),
 ]
 
 
@@ -1094,6 +2107,53 @@ def refresh_skill_schemas() -> None:
     """Recompile after vertical skills are appended to SINCOR_SKILLS."""
     global _SCHEMA_CACHE
     _SCHEMA_CACHE = compile_skill_schemas(SINCOR_SKILLS)
+
+
+def skill_implementation_ref(skill_id: str) -> Optional[str]:
+    """Return a resolvable implementation reference for an advertised skill.
+
+    Format ``"module:qualname"`` — the module must import cleanly and the
+    qualname (when non-empty) must resolve to a real attribute/callable.
+    Returns None when the skill id has no known implementation — callers
+    treat that as a registry defect, never as a silent pass.
+
+    Resolution order:
+      1. P24 creator-token issuance -> sincor2.defi.p24.skill (the skill's
+         advertised contract lives next to its caller).
+      2. Wallet sanctions screen -> sincor2.sanctions_screen (the
+         deterministic OFAC handler that also serves the x402 resource
+         of the same id).
+      3. AgencyKernel task-type map (sincor2.vertical_dispatch
+         _KERNEL_SKILL_MAP) -> the kernel task type.
+      4. Vertical-dispatch task-type map (sincor2.vertical_dispatch
+         _SKILL_TASK_TYPE_MAP) -> the dispatch task type.
+    """
+    sid = str(skill_id or "").strip()
+    if not sid:
+        return None
+    try:
+        from sincor2 import sanctions_screen as _sanctions
+        if sid == _sanctions.RESOURCE_ID:
+            return "sincor2.sanctions_screen:screen_wallet"
+    except Exception:
+        pass
+    try:
+        from sincor2.defi.p24 import skill as _p24_skill
+        if sid == _p24_skill.SKILL_ID:
+            return "sincor2.defi.p24.skill:SKILL_ID"
+    except Exception:
+        pass
+    try:
+        from sincor2 import vertical_dispatch as _vd
+        kernel = getattr(_vd, "_KERNEL_SKILL_MAP", {})
+        task_map = getattr(_vd, "_SKILL_TASK_TYPE_MAP", {})
+        if sid in kernel:
+            return f"sincor2.vertical_dispatch:_KERNEL_SKILL_MAP[{sid}]"
+        if sid in task_map:
+            return f"sincor2.vertical_dispatch:_SKILL_TASK_TYPE_MAP[{sid}]"
+    except Exception:
+        pass
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1119,6 +2179,7 @@ def build_agent_card() -> AgentCard:
             "professional-grade intelligence, content, and automation in return. "
             "Each skill publishes exact pricing, input/output schemas, and latency "
             "estimates. The top 5 skills offer a free quota for new external callers. "
+            f"{HOOK_COPY} "
             "Platform fee policy: realized AXM/SINC fees are converted to "
             "USDC/WETH before treasury deposit."
         ),
@@ -1222,6 +2283,56 @@ def build_marketplace_manifest() -> Dict[str, Any]:
             "read": "120/min + 5000/hour per IP",
         },
         "invariants": "docs/architecture/AUCTION_GROUND_TRUTH.md",
+    }
+
+
+# ---------------------------------------------------------------------------
+# AP2 discovery factory (/.well-known/ap2.json)
+# ---------------------------------------------------------------------------
+
+def build_ap2_discovery_document() -> Dict[str, Any]:
+    """Return the SINCOR AP2 discovery document for /.well-known/ap2.json.
+
+    Content is the staged document from the ap2-seal-adapter package
+    (``src/ap2_seal_adapter/well-known/ap2.json``), served verbatim with
+    exactly one founder-approved change: per that package's
+    INTEGRATION.md, ``status`` is flipped from DRAFT/staged as part of
+    the deploy itself (founder greenlight, 2026-11-11). Every honesty
+    field is preserved exactly — in particular
+    ``settlement.hub_deployed_on_mainnet`` stays False: no
+    SincorSettlementHub contract is deployed on Base mainnet, and
+    settlement is proven locally (eth-tester) only.
+    """
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "ap2_concepts_version": "v0.1 mandate names (IntentMandate / CartMandate / PaymentMandate) as public AP2 concepts; v0.2 renamed these to open/closed Checkout and Payment Mandates",
+        "discovery_url_intended": "https://getsincor.com/.well-known/ap2.json",
+        "input_format": " mandate-shaped JSON objects (dicts / VC-like wrappers with contents or credentialSubject); SD-JWT verification not yet supported",
+        "issuer": "SINCOR Business Solutions",
+        "mandates_accepted": ["IntentMandate", "CartMandate", "PaymentMandate"],
+        "market_claims": "none — third-party market figures circulating in planning documents are UNVERIFIED and are not SINCOR claims",
+        "protocol": "ap2",
+        "settlement": {
+            "asset": "USDC",
+            "asset_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "chain_id": 8453,
+            "eip712_domain": {"name": "SINCOR_SEAL", "version": "1"},
+            "fee_bps": 500,
+            "fee_bps_is_canon": True,
+            "fee_note": "500 bps (5%) is the locked SINCOR fee canon. A 0.5-1% AP2-rail take (50-100 bps) exists only as an unapproved pricing proposal — FOUNDER PRICING DECISION required before any change.",
+            "hub_deployed_on_mainnet": False,
+            "hub_note": "No SincorSettlementHub contract is deployed on Base mainnet. Settlement is proven locally (eth-tester) only.",
+            "network": "base",
+            "rail": "SINCOR SEAL via SincorSettlementHub interface (EIP-712 SealAuthorization)",
+            "scheme": "sincor-seal-v1",
+        },
+        "sigil": {
+            "commitment": "keccak256(taskId || canonical-JSON output)",
+            "expected_schema_hash": "keccak256(canonical-JSON cart contents)",
+        },
+        "status": "LIVE — AP2 discovery document served at https://getsincor.com/.well-known/ap2.json (founder-approved deploy, 2026-11-11); the settlement hub's deployment state is stated in settlement.hub_deployed_on_mainnet.",
+        "verification_enforced_offchain": True,
+        "verification_note": "The Hub records any sigilCommitment it is handed and never checks expectedSchemaHash on-chain; verification is enforced by the settling engine before submission, as in sincor-x402.",
     }
 
 
@@ -1425,14 +2536,22 @@ class ReputationLedger:
             return int(row["cnt"]) if row else 0
 
     def leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Return top callers ranked by total settlements and AXM volume."""
+        """Return top callers ranked by total settlements and AXM volume.
+
+        The AXM sum is REAL-typed (``SUM(CAST(... AS REAL))``): a plain
+        integer SUM overflows sqlite's INT64 accumulator (raising
+        ``sqlite3.OperationalError: integer overflow``) once cumulative
+        settlements exceed ~9.2 AXM in wei, which would 500 the
+        leaderboard route. REAL loses integer precision past 2**53, which
+        is immaterial for a display sum rendered to 4 decimals of AXM.
+        """
         with self._lock:
             conn = self._connect()
             rows = conn.execute(
                 """
                 SELECT caller_id,
                        COUNT(*) AS total_settlements,
-                       SUM(axm_paid_wei) AS total_axm_wei
+                       SUM(CAST(axm_paid_wei AS REAL)) AS total_axm_wei
                 FROM settlements
                 GROUP BY caller_id
                 ORDER BY total_settlements DESC, total_axm_wei DESC
@@ -1452,47 +2571,619 @@ class ReputationLedger:
             ]
 
 
+    def reset(self, caller_key: str) -> int:
+        """Delete every settlement row for a caller key (ghost penalty).
+
+        Returns the number of rows removed. Used when ghosting zeroes a
+        caller's reputation: the settlement count behind the priority flag
+        must go to zero for the ghost's *verified* wallet, not just the
+        agent registry's earned-reputation field.
+        """
+        with self._lock:
+            conn = self._connect()
+            cur = conn.execute(
+                "DELETE FROM settlements WHERE caller_id = ?",
+                (caller_key,),
+            )
+            removed = cur.rowcount if cur.rowcount is not None else 0
+            conn.commit()
+            conn.close()
+            return int(removed)
+
+
 # Module-level singleton
 _reputation_ledger = ReputationLedger()
 
 
 # ---------------------------------------------------------------------------
-# Free-quota tracker  (in-memory; caller_id + skill_id → used count)
+# Verified caller identity for reputation  (wave 24; mirrors wave 18)
 # ---------------------------------------------------------------------------
+#
+# Reputation used to be keyed on the self-declared ``caller_id`` — rotating
+# IDs evaded a bad reputation and anyone could claim a victim's ID for the
+# priority flag. Reputation is now keyed on the wallet address recovered from
+# an EIP-191 personal signature over a canonical identity message. This reuses
+# the codebase's existing EIP-191 recovery primitive (dispute route, KYA
+# registry) — no new identity scheme.
+#
+# The canonical messages are byte-identical to wave 18's quota messages, so
+# ONE signature serves both subsystems: a caller who signed for free quota
+# automatically accrues reputation under the same wallet.
+#   send:  "SINCOR-QUOTA|<skill_id>|<input_hash_hex>|<timestamp_ms>"
+#   quote: "SINCOR-QUOTA-QUOTE|<skill_id>|<timestamp_ms>"
+# ``input_hash_hex`` binds the signature to the exact task input so a
+# captured signature cannot be replayed for a different task. ``timestamp_ms``
+# must be within IDENTITY_SIGNATURE_MAX_SKEW_MS of server time.
+#
+# A task's reputation identity is fixed at send time and stored in
+# task.metadata["verified_wallet"]; settle/finalize paths use it verbatim.
+# Call sites without a verified wallet keep the old caller_id behavior but
+# are explicitly marked UNTRUSTED-INPUT KEYED (see residuals below).
 
-class _FreeQuotaTracker:
+IDENTITY_MESSAGE_PREFIX = "SINCOR-QUOTA"
+IDENTITY_QUOTE_MESSAGE_PREFIX = "SINCOR-QUOTA-QUOTE"
+# Freshness window for identity signatures (matches the re-registration window).
+IDENTITY_SIGNATURE_MAX_SKEW_MS = 5 * 60 * 1000
+
+_IDENTITY_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+def _keccak256(data: bytes) -> bytes:
+    """keccak256 with the codebase's standard fallback (mirrors a2a_inbound_market)."""
+    try:
+        from eth_hash.auto import keccak
+        return keccak(data)
+    except Exception:
+        from sha3 import keccak_256  # type: ignore
+        return keccak_256(data).digest()
+
+
+def _recover_identity_signer(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 identity message.
+
+    Same primitive as the dispute route and the KYA registry (lazy
+    eth_account import keeps this module importable without the dependency).
     """
-    Tracks how many free calls each caller has used for each free-quota skill.
-    Thread-safe; resets on restart (intentional — prevents abuse across deployments).
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        require_low_s(signature)
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def identity_message_for_send(skill_id: str, input_text: str,
+                              timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to prove wallet identity on send.
+
+    Byte-identical to wave 18's quota send message: one signature covers both.
+    """
+    input_hash = _keccak256((input_text or "").encode("utf-8")).hex()
+    return "|".join([IDENTITY_MESSAGE_PREFIX, str(skill_id), input_hash,
+                     str(int(timestamp_ms))])
+
+
+def identity_message_for_quote(skill_id: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to prove wallet identity.
+
+    Byte-identical to wave 18's quota quote message: usable as a pure
+    identity proof without binding task input.
+    """
+    return "|".join([IDENTITY_QUOTE_MESSAGE_PREFIX, str(skill_id),
+                     str(int(timestamp_ms))])
+
+
+def _reputation_key(verified_wallet: Optional[str], caller_id: str) -> str:
+    """Ledger key for a caller's reputation.
+
+    Verified wallets and self-declared caller IDs live in separate trust
+    domains: an unsigned caller declaring someone else's wallet address as
+    ``caller_id`` must NOT reach that wallet's settlement rows (that would
+    steal the victim's priority flag). Legacy rows keyed on bare caller_id
+    strings (pre-migration) match neither namespace — they were
+    untrusted-input keyed and are intentionally not carried forward.
+    """
+    if verified_wallet:
+        return "wallet:" + str(verified_wallet).lower()
+    return "id:" + str(caller_id)
+
+
+def _resolve_verified_wallet(
+    *,
+    skill_id: str,
+    params: Any = None,
+    msg_obj: Any = None,
+    input_text: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve the verified wallet identity for a request.
+
+    Returns the lowercased wallet address recovered from a fresh EIP-191
+    identity signature, or None when the caller presented none / an invalid
+    one. Field layout mirrors wave 18's quota identity (same fields, same
+    canonical messages) so one signature serves both.
+
+    Accepted fields (first non-empty wins):
+      signature: params.message.metadata.signature | params.signature |
+                 params.callerSignature | params.caller_signature
+      quota_ts:  params.message.metadata.quota_ts | params.quota_ts |
+                 params.quotaTs | params.quota_timestamp
+      wallet:    params.message.metadata.wallet | params.wallet (REQUIRED;
+                 must equal the recovered signer — ECDSA recovery returns *some*
+                 address for any message/signature pair, so without this check a
+                 single signature would validate against arbitrary messages and
+                 mint fresh reputation buckets)
+
+    ``input_text=None`` selects the quote-shape message (no input to bind).
+    """
+    meta: Dict[str, Any] = {}
+    if isinstance(msg_obj, dict):
+        maybe_meta = msg_obj.get("metadata")
+        if isinstance(maybe_meta, dict):
+            meta = maybe_meta
+    getter = getattr(params, "get", None)
+
+    def _param(*names: str) -> Any:
+        for name in names:
+            value = meta.get(name)
+            if value:
+                return value
+        if callable(getter):
+            for name in names:
+                try:
+                    value = getter(name)
+                except Exception:
+                    value = None
+                if value:
+                    return value
+        return None
+
+    signature = _param("signature", "quota_signature", "callerSignature",
+                       "caller_signature")
+    if not signature:
+        return None
+    ts_raw = _param("quota_ts", "quotaTs", "quota_timestamp")
+    claimed_wallet = _param("wallet")
+    if not claimed_wallet or not _IDENTITY_ADDRESS_RE.match(str(claimed_wallet).strip()):
+        # The wallet claim is mandatory: ECDSA recovery yields *some* address
+        # for any message/signature pair, so the recovered address is only
+        # meaningful when checked against the caller's claimed wallet.
+        logger.warning("A2A identity rejected: missing/invalid wallet claim")
+        return None
+    try:
+        timestamp_ms = int(str(ts_raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("A2A identity rejected: bad quota_ts %r", ts_raw)
+        return None
+    now_ms = int(time.time() * 1000)
+    if abs(now_ms - timestamp_ms) > IDENTITY_SIGNATURE_MAX_SKEW_MS:
+        logger.warning(
+            "A2A identity rejected: quota_ts outside freshness window (skew=%dms)",
+            now_ms - timestamp_ms,
+        )
+        return None
+    if input_text is None:
+        message = identity_message_for_quote(skill_id, timestamp_ms)
+    else:
+        message = identity_message_for_send(skill_id, input_text, timestamp_ms)
+    try:
+        recovered = _recover_identity_signer(message, str(signature)).lower()
+    except ValueError as exc:
+        logger.warning("A2A identity rejected: %s", exc)
+        return None
+    if str(claimed_wallet).lower() != recovered:
+        logger.warning("A2A identity rejected: claimed wallet != recovered signer")
+        return None
+    return recovered
+
+
+# ---------------------------------------------------------------------------
+# Free-quota identity + tracker  (G2.6 / wave 18)
+# ---------------------------------------------------------------------------
+# The verified-identity primitives above are wave 24 (reputation); the quota
+# messages below are byte-identical to wave 24's, so ONE signature serves both
+# subsystems.  The free quota used to be keyed on the self-declared
+# ``caller_id`` request field, so rotating caller IDs granted unlimited free
+# calls on the top-5 subsidised skills. The quota is now keyed on a
+# *verified* identity: the wallet address recovered from an EIP-191 personal
+# signature over a canonical quota message. This reuses the codebase's
+# existing EIP-191 recovery primitive (dispute route, KYA registry) — no new
+# identity scheme.
+#
+# Canonical messages (signed off-chain with the caller's wallet):
+#   send:  "SINCOR-QUOTA|<skill_id>|<input_hash_hex>|<timestamp_ms>"
+#   quote: "SINCOR-QUOTA-QUOTE|<skill_id>|<timestamp_ms>"
+# ``input_hash_hex`` binds the signature to the exact task input so a
+# captured signature cannot be replayed for a different task. ``timestamp_ms``
+# must be within QUOTA_SIGNATURE_MAX_SKEW_MS of server time.
+#
+# Counters live behind the QuotaStore protocol so the durable-state wave can
+# swap the in-memory backend for a shared (Redis) one without touching call
+# sites.
+
+QUOTA_MESSAGE_PREFIX = "SINCOR-QUOTA"
+QUOTA_QUOTE_MESSAGE_PREFIX = "SINCOR-QUOTA-QUOTE"
+# Freshness window for quota signatures (matches the re-registration window).
+QUOTA_SIGNATURE_MAX_SKEW_MS = 5 * 60 * 1000
+
+_QUOTA_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+
+class QuotaStore(Protocol):
+    """Counter backend for free-quota usage.
+
+    Keyed on the verified quota identity (lowercased wallet address) plus
+    skill id. Implementations must be safe for concurrent use; ``try_consume``
+    must be atomic (check-and-increment under one lock / one Lua script) so
+    concurrent requests cannot overshoot the quota.
+    """
+
+    def get(self, identity_key: str, skill_id: str) -> int:
+        """Return consumed free-call count for this identity + skill (0 if unknown)."""
+        ...
+
+    def try_consume(self, identity_key: str, skill_id: str, limit: int) -> bool:
+        """Atomically consume one free call iff used < limit. Return True if consumed."""
+        ...
+
+
+class _MemoryQuotaStore:
+    """Process-local QuotaStore (matches existing in-memory conventions).
+
+    Thread-safe; resets on restart. The durable-state wave replaces this
+    with a shared backend — call sites only see the QuotaStore protocol.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._usage: Dict[Tuple[str, str], int] = {}
 
-    def is_free(self, caller_id: str, skill: AgentSkill) -> bool:
-        """Return True if this caller still has free quota for the given skill."""
+    def get(self, identity_key: str, skill_id: str) -> int:
+        with self._lock:
+            return self._usage.get((identity_key, skill_id), 0)
+
+    def try_consume(self, identity_key: str, skill_id: str, limit: int) -> bool:
+        if limit <= 0:
+            return False
+        key = (identity_key, skill_id)
+        with self._lock:
+            used = self._usage.get(key, 0)
+            if used >= limit:
+                return False
+            self._usage[key] = used + 1
+            return True
+
+    def clear(self) -> None:
+        """Drop all counters (tests / ops only)."""
+        with self._lock:
+            self._usage.clear()
+
+
+class _FreeQuotaTracker:
+    """Free-call quota keyed on verified identity (recovered wallet address).
+
+    ``identity_key`` must be the lowercased wallet recovered from a fresh
+    EIP-191 quota signature (see _resolve_quota_identity). Never pass the
+    self-declared ``caller_id`` — that was the G2.6 bypass.
+    """
+
+    def __init__(self, store: Optional[QuotaStore] = None) -> None:
+        self._store: QuotaStore = store if store is not None else _MemoryQuotaStore()
+
+    def is_free(self, identity_key: str, skill: AgentSkill) -> bool:
+        """Best-effort read: does this identity still have free quota? (Display only.)"""
+        if not identity_key:
+            return False
         if skill.free_quota <= 0 or skill.id not in FREE_QUOTA_SKILLS:
             return False
-        key = (caller_id, skill.id)
-        with self._lock:
-            used = self._usage.get(key, 0)
-        return used < skill.free_quota
+        return self._store.get(identity_key, skill.id) < skill.free_quota
 
-    def consume(self, caller_id: str, skill_id: str) -> None:
-        """Increment free-quota usage for this caller + skill pair."""
-        key = (caller_id, skill_id)
-        with self._lock:
-            self._usage[key] = self._usage.get(key, 0) + 1
+    def consume_if_available(self, identity_key: str, skill: AgentSkill) -> bool:
+        """Atomically consume one free call iff quota remains. The send path's decision."""
+        if not identity_key:
+            return False
+        if skill.free_quota <= 0 or skill.id not in FREE_QUOTA_SKILLS:
+            return False
+        return self._store.try_consume(identity_key, skill.id, skill.free_quota)
 
-    def remaining(self, caller_id: str, skill: AgentSkill) -> int:
-        key = (caller_id, skill.id)
-        with self._lock:
-            used = self._usage.get(key, 0)
-        return max(0, skill.free_quota - used)
+    def remaining(self, identity_key: str, skill: AgentSkill) -> int:
+        """Free calls left for this identity (display only)."""
+        if not identity_key:
+            return 0
+        return max(0, skill.free_quota - self._store.get(identity_key, skill.id))
+
+    # -- Wave 1: universal DAILY ration (new layer, all 42 skills) --------
+    # The lifetime top-5 quota above is untouched. The daily ration lives
+    # in sincor2.free_ration (shared with the x402 surface), keyed on
+    # identity + skill + UTC date, resetting at UTC midnight, with a
+    # per-IP daily cap on free serves enforced by the shared tracker.
+    def daily_remaining(self, identity_key: str, skill: AgentSkill) -> int:
+        """Daily-ration calls left for this identity on this skill."""
+        if not identity_key:
+            return 0
+        return daily_ration_tracker.remaining(identity_key, skill.id)
+
+    def consume_daily_if_available(
+        self, identity_key: str, skill: AgentSkill, *, ip: Optional[str] = None,
+    ) -> bool:
+        """Atomically consume one daily-ration call iff ration remains."""
+        if not identity_key:
+            return False
+        return daily_ration_tracker.try_consume(identity_key, skill.id, ip=ip)
 
 
 _free_quota_tracker = _FreeQuotaTracker()
+
+
+def _is_registered_agent_wallet(wallet: Optional[str]) -> bool:
+    """True when ``wallet`` owns a record in the inbound agent registry.
+
+    The Wave 1 daily ration is per *agent*: on the A2A surface it is
+    granted to verified wallets that are registered agents (the funnel
+    is peek -> register -> free ration -> paid). Unregistered signed
+    wallets keep exactly the pre-Wave-1 behaviour (lifetime top-5 quota
+    only). Fail-soft: an unreadable registry means no daily ration.
+    """
+    if not wallet:
+        return False
+    try:
+        from sincor2.a2a_inbound import get_fabric
+
+        wanted = str(wallet).strip().lower()
+        if not wanted:
+            return False
+        for agent in get_fabric().agents.values():
+            for field_name in ("owner_wallet", "wallet"):
+                if str(agent.get(field_name) or "").strip().lower() == wanted:
+                    return True
+    except Exception:  # noqa: BLE001 - registry unavailable = no ration
+        return False
+    return False
+
+
+def _daily_ration_remaining(identity_key: str, skill: AgentSkill) -> int:
+    """Daily-ration remaining for display: registered-agent wallets only."""
+    if not identity_key or not _is_registered_agent_wallet(identity_key):
+        return 0
+    return _free_quota_tracker.daily_remaining(identity_key, skill)
+
+
+# ---------------------------------------------------------------------------
+# Wave 1 free peek — no-auth, no-wallet sample per A2A skill
+# ---------------------------------------------------------------------------
+
+#: Canonical sample decision for the one A2A skill whose handler runs
+#: cheaply and synchronously in-process (toa-decision reuses the TOA
+#: micro-decision machinery). Every other A2A skill executes as an
+#: asynchronous swarm task, so it has no honest cheap sample.
+_PEEK_TOA_PAYLOAD: Dict[str, Any] = {
+    "decision_id": "wave1-peek-sample",
+    "options": [
+        {"id": "a", "label": "Option A", "signals": [1.0, 2.0, 3.0, 4.0]},
+        {"id": "b", "label": "Option B", "signals": [4.0, 3.0, 2.0, 1.0]},
+    ],
+}
+
+
+def build_skill_peek(skill: AgentSkill) -> Dict[str, Any]:
+    """Free peek for one A2A skill: a real bounded sample, or labelled
+    live metadata — never a fabricated sample output.
+
+    * ``toa-decision``: run the real TOA handler on the canonical sample
+      payload and return its (truncated) output with ``sample: True``.
+    * All other skills: their handlers execute as asynchronous agent
+      tasks (enqueue -> swarm execution), so there is no cheap
+      synchronous sample and no cached real output in this process;
+      return the skill's live metadata labelled ``peek_kind: metadata``
+      with ``sample: False``.
+    """
+    base: Dict[str, Any] = {
+        "ok": True,
+        "skill_id": skill.id,
+        "free": True,
+        "hook": hook_payload(),
+    }
+    if skill.id == "toa-decision":
+        try:
+            from sincor2.toa_micro_decision import serve_toa_micro_decision
+
+            status, body = serve_toa_micro_decision(dict(_PEEK_TOA_PAYLOAD))
+        except Exception:  # noqa: BLE001 - fall back to honest metadata
+            status, body = 0, {}
+        if status == 200:
+            sample, truncated = truncate_sample(body)
+            return {
+                **base,
+                "sample": True,
+                "peek_kind": "sample",
+                "label": "Real sample output from this skill's handler on "
+                         "a canonical sample input (bounded).",
+                "truncated": truncated,
+                "result": sample,
+            }
+    return {
+        **base,
+        "sample": False,
+        "peek_kind": "metadata",
+        "label": "Metadata only — this skill runs as an agent task, so "
+                 "there is no cheap synchronous sample; this is its live "
+                 "metadata, not a sample output.",
+        "metadata": {
+            "id": skill.id,
+            "name": skill.name,
+            "description": skill.description,
+            "axmPriceWei": str(skill.axm_price_wei),
+            "sincPrice": skill.sinc_price,
+            "freeQuota": skill.free_quota,
+            "freeDailyRation": DAILY_RATION_LIMIT,
+            "inputSchema": skill.input_schema,
+            "outputSchema": skill.output_schema,
+            "exampleInputs": skill.examples,
+            "estimatedLatencySeconds": skill.estimated_latency_seconds,
+        },
+    }
+
+
+# NOTE: _keccak256 is defined once in the wave-24 identity section above;
+# the quota message builders below reuse it (messages are byte-identical).
+def _recover_quota_signer(message: str, signature: str) -> str:
+    """Recover the signer address of an EIP-191 quota message.
+
+    Same primitive as the dispute route and the KYA registry (lazy
+    eth_account import keeps this module importable without the dependency).
+    """
+    try:
+        from eth_account import Account
+        from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
+    except Exception as exc:
+        raise ValueError("signature verification unavailable") from exc
+    try:
+        require_low_s(signature)
+        return str(Account.recover_message(
+            encode_defunct(text=message), signature=signature))
+    except Exception as exc:
+        raise ValueError("bad signature") from exc
+
+
+def quota_message_for_send(skill_id: str, input_text: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to claim free quota on send.
+
+    Binds skill + exact task input + timestamp: a captured signature cannot
+    be replayed for a different task or skill.
+    """
+    input_hash = _keccak256((input_text or "").encode("utf-8")).hex()
+    return "|".join([QUOTA_MESSAGE_PREFIX, str(skill_id), input_hash, str(int(timestamp_ms))])
+
+
+def quota_message_for_quote(skill_id: str, timestamp_ms: int) -> str:
+    """Canonical EIP-191 message a caller signs to query free quota."""
+    return "|".join([QUOTA_QUOTE_MESSAGE_PREFIX, str(skill_id), str(int(timestamp_ms))])
+
+
+def _resolve_quota_identity(
+    *,
+    skill_id: str,
+    params: Any = None,
+    msg_obj: Any = None,
+    input_text: Optional[str] = None,
+) -> Optional[str]:
+    """Resolve the verified quota identity for a request.
+
+    Returns the lowercased wallet address recovered from a fresh EIP-191
+    quota signature, or None when the caller presented none / an invalid one.
+    Callers without a valid signature are NOT eligible for free quota (G2.6):
+    the free quota subsidises *verified* external callers.
+
+    Accepted fields (first non-empty wins):
+      signature: params.message.metadata.signature | params.signature |
+                 params.callerSignature | params.caller_signature
+      quota_ts:  params.message.metadata.quota_ts | params.quota_ts |
+                 params.quotaTs | params.quota_timestamp
+      wallet:    params.message.metadata.wallet | params.wallet (REQUIRED;
+                 must equal the recovered signer — ECDSA recovery returns *some*
+                 address for any message/signature pair, so without this check a
+                 single signature would validate against arbitrary messages and
+                 mint fresh quota buckets)
+
+    ``input_text=None`` selects the quote-shape message (no input to bind).
+    """
+    meta: Dict[str, Any] = {}
+    if isinstance(msg_obj, dict):
+        maybe_meta = msg_obj.get("metadata")
+        if isinstance(maybe_meta, dict):
+            meta = maybe_meta
+    getter = getattr(params, "get", None)
+
+    def _param(*names: str) -> Any:
+        for name in names:
+            value = meta.get(name)
+            if value:
+                return value
+        if callable(getter):
+            for name in names:
+                try:
+                    value = getter(name)
+                except Exception:
+                    value = None
+                if value:
+                    return value
+        return None
+
+    signature = _param("signature", "quota_signature", "callerSignature", "caller_signature")
+    if not signature:
+        return None
+    ts_raw = _param("quota_ts", "quotaTs", "quota_timestamp")
+    claimed_wallet = _param("wallet")
+    if not claimed_wallet or not _QUOTA_ADDRESS_RE.match(str(claimed_wallet).strip()):
+        # The wallet claim is mandatory: ECDSA recovery yields *some* address
+        # for any message/signature pair, so the recovered address is only
+        # meaningful when checked against the caller's claimed wallet.
+        logger.warning("A2A quota identity rejected: missing/invalid wallet claim")
+        return None
+    try:
+        timestamp_ms = int(str(ts_raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("A2A quota identity rejected: bad quota_ts %r", ts_raw)
+        return None
+    now_ms = int(time.time() * 1000)
+    if abs(now_ms - timestamp_ms) > QUOTA_SIGNATURE_MAX_SKEW_MS:
+        logger.warning(
+            "A2A quota identity rejected: quota_ts outside freshness window (skew=%dms)",
+            now_ms - timestamp_ms,
+        )
+        return None
+    if input_text is None:
+        message = quota_message_for_quote(skill_id, timestamp_ms)
+    else:
+        message = quota_message_for_send(skill_id, input_text, timestamp_ms)
+    try:
+        recovered = _recover_quota_signer(message, str(signature)).lower()
+    except ValueError as exc:
+        logger.warning("A2A quota identity rejected: %s", exc)
+        return None
+    if str(claimed_wallet).lower() != recovered:
+        logger.warning("A2A quota identity rejected: claimed wallet != recovered signer")
+        return None
+    return recovered
+
+
+def _quota_quote_note(
+    *,
+    skill: AgentSkill,
+    is_free_call: bool,
+    free_remaining: int,
+    current_axm_price: int,
+) -> str:
+    """Human-readable quota/payment note for the quote endpoint."""
+    if is_free_call:
+        return (
+            f"FREE — {free_remaining} free call(s) left for this signed wallet "
+            "(no txHash needed)."
+        )
+    if skill.id in FREE_QUOTA_SKILLS:
+        return (
+            f"Free quota ({skill.free_quota} calls per wallet) requires a wallet "
+            "signature: EIP-191 personal_sign over "
+            f"\"{QUOTA_QUOTE_MESSAGE_PREFIX}|{skill.id}|<timestamp_ms>\" for quotes, "
+            f"\"{QUOTA_MESSAGE_PREFIX}|{skill.id}|<keccak256(input)>|<timestamp_ms>\" "
+            "for tasks/send (freshness 5 min). Include signature + quota_ts + wallet "
+            "in the request. Unsigned callers pay AXM. "
+            f"Every skill also carries a free daily ration of {DAILY_RATION_LIMIT} "
+            "calls per registered agent per day."
+        )
+    return (
+        f"Free daily ration: {DAILY_RATION_LIMIT} calls per registered agent "
+        "per day on every skill. "
+        f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
+        f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
+        f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
+    )
 
 
 def _now() -> str:
@@ -1571,7 +3262,8 @@ def _reject_non_axm(token) -> Optional[str]:
 def _new_task(skill_id: str, input_text: str, caller_id: str,
               session_id: str, axm_paid: int = 0,
               tx_hash: Optional[str] = None,
-              owner_wallet: str = "") -> A2ATask:
+              owner_wallet: str = "",
+              verified_wallet: Optional[str] = None) -> A2ATask:
     task_id = str(uuid.uuid4())
     context_id = session_id or task_id
     # Record the initial user message in history
@@ -1599,6 +3291,10 @@ def _new_task(skill_id: str, input_text: str, caller_id: str,
             "skill_id": skill_id,
             "caller_id": caller_id,
             "owner_wallet": (owner_wallet or "").strip().lower(),
+            # Verified EIP-191 signer wallet when the caller signed at send
+            # time; settle/finalize paths key reputation on this. None means
+            # the task's reputation falls back to caller_id (UNTRUSTED-INPUT).
+            "verified_wallet": verified_wallet,
             "simulation_mode": bool(
                 axm_paid and tx_hash and str(tx_hash).startswith("0xSIMULATED")
             ),
@@ -1644,7 +3340,11 @@ class PaymentVerifier:
     _TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
     _verified: Dict[str, bool] = {}
+    _amounts: Dict[str, int] = {}
     _lock: threading.Lock = threading.Lock()
+
+    class PaymentRpcError(RuntimeError):
+        """Raised when the payment amount cannot be read (transient RPC failure)."""
 
     @classmethod
     def is_verified(cls, tx_hash: str, expected_amount_wei: int,
@@ -1682,11 +3382,34 @@ class PaymentVerifier:
         whose `to` address matches *expected_to* and whose value is at least
         *expected_amount_wei*.
         """
+        ok = cls._sum_transfer_value(logs, expected_to) >= expected_amount_wei
+        if not ok:
+            logger.warning(
+                "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
+                "expected ≥%d wei to %s from contract %s",
+                expected_amount_wei, expected_to, AXIOM_CONTRACT,
+            )
+        return ok
+
+    @classmethod
+    def _sum_transfer_value(
+        cls,
+        logs: List[Dict[str, Any]],
+        expected_to: str,
+    ) -> int:
+        """
+        Sum of AXM Transfer values to *expected_to* across all receipt logs.
+
+        Only Transfer(address,address,uint256) events emitted by the AXM
+        contract with `to` == *expected_to* count. This is the actual amount
+        the treasury received — never a caller claim.
+        """
         axm_addr = AXIOM_CONTRACT.lower()
         expected_to_norm = expected_to.lower()
         # Transfer(address indexed from, address indexed to, uint256 value)
         # topics[0] = event sig, topics[1] = from, topics[2] = to
         # data = value (32-byte big-endian hex)
+        total = 0
         for log in logs:
             if log.get("address", "").lower() != axm_addr:
                 continue
@@ -1702,14 +3425,59 @@ class PaymentVerifier:
                 value = int(raw_value, 16)
             except ValueError:
                 continue
-            if value >= expected_amount_wei:
-                return True
-        logger.warning(
-            "PaymentVerifier: no qualifying AXM Transfer log found in tx; "
-            "expected ≥%d wei to %s from contract %s",
-            expected_amount_wei, expected_to, AXIOM_CONTRACT,
-        )
-        return False
+            total += value
+        return total
+
+    @classmethod
+    def verified_amount_wei(cls, tx_hash: str,
+                            expected_to: str = TREASURY_WALLET) -> Optional[int]:
+        """
+        Return the actual AXM wei transferred to *expected_to* in *tx_hash*,
+        read from the confirmed receipt's Transfer logs.
+
+        Returns None when the amount cannot be determined without chain
+        access (non-production env, simulated tx, malformed hash, or a failed
+        receipt). Raises PaymentRpcError on transient RPC failure — callers
+        must fail closed, not fall back to a caller-supplied claim.
+        """
+        env = os.getenv("FLASK_ENV", "production").lower()
+        if env in _DEV_ENVS:
+            return None
+
+        if (not tx_hash or not str(tx_hash).startswith("0x")
+                or str(tx_hash).startswith("0xSIMULATED")):
+            return None
+
+        with cls._lock:
+            if tx_hash in cls._amounts:
+                return cls._amounts[tx_hash]
+
+        rpc_url = os.getenv("BASE_RPC_URL")
+        if not rpc_url:
+            raise cls.PaymentRpcError("BASE_RPC_URL not set")
+
+        try:
+            payload = json.dumps({
+                "jsonrpc": "2.0", "id": 1,
+                "method":  "eth_getTransactionReceipt",
+                "params":  [tx_hash],
+            }).encode()
+            with _urllib_request.urlopen(_urllib_request.Request(
+                rpc_url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            ), timeout=BASE_RPC_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+            receipt = data.get("result")
+        except Exception as exc:
+            raise cls.PaymentRpcError(f"RPC error: {exc}") from exc
+
+        if not receipt or receipt.get("status") != "0x1":
+            return None
+        amount = cls._sum_transfer_value(receipt.get("logs", []), expected_to)
+        with cls._lock:
+            cls._amounts[tx_hash] = amount
+        return amount
 
     @classmethod
     def verified_tx_data(cls, tx_hash: str, expected_amount_wei: int,
@@ -1786,7 +3554,11 @@ class A2ARouter:
 
     def __init__(self) -> None:
         from flask import Blueprint
+        from sincor2.a2a_errors import register_a2a_error_handlers
         self.blueprint = Blueprint("a2a", __name__)
+        # G2.11: JSON error envelopes on this blueprint — errors are never
+        # HTML pages (this blueprint is also mounted standalone in tests).
+        register_a2a_error_handlers(self.blueprint)
         self._register_routes()
 
     def _register_routes(self) -> None:
@@ -1804,6 +3576,26 @@ class A2ARouter:
             from flask import jsonify
             return jsonify(build_agent_card().to_legacy_dict())
 
+        # ── Wave 1 free peek — no auth, no wallet, per-IP rate-limited ──────
+        @bp.route("/api/a2a/peek/<skill_id>", methods=["GET"])
+        @bp.route("/api/a2a/peek", methods=["GET"])
+        def skill_peek(skill_id=None):
+            from flask import jsonify, request
+            sid = skill_id or _resolve_skill_id(request.args)
+            skill = next((s for s in SINCOR_SKILLS if s.id == sid), None)
+            if not skill:
+                return jsonify(_err(f"Unknown skill: {sid}", code=-32602)), 400
+            ip = abuse_client_ip(request.remote_addr, environ=request.environ)
+            if not daily_ration_tracker.try_consume_peek(ip):
+                return jsonify({
+                    "ok": False, "error": "peek_rate_limited",
+                    "skill_id": sid,
+                    "note": "Free peek is rate-limited per IP per day; "
+                            "the skill's paid and free-ration paths are "
+                            "unaffected.",
+                }), 429
+            return jsonify(build_skill_peek(skill))
+
         # ── Discovery — marketplace manifest ────────────────────────────────
         @bp.route("/.well-known/sincor-marketplace.json", methods=["GET"])
         def marketplace_manifest():
@@ -1811,6 +3603,64 @@ class A2ARouter:
             plus the MCP server entry point. jsonify → application/json."""
             from flask import jsonify
             return jsonify(build_marketplace_manifest())
+
+        # ── Discovery — AP2 document (canonical .json + aliases) ────────────
+        @bp.route("/.well-known/ap2.json", methods=["GET"])
+        @bp.route("/.well-known/ap2", methods=["GET"])
+        @bp.route("/ap2", methods=["GET"])
+        def ap2_discovery():
+            """AP2 discovery document: mandates accepted + SEAL settlement
+            terms for AP2 routers. Same pattern as the agent card above —
+            jsonify(factory) → application/json. The bare /.well-known/ap2
+            path is the founder-greenlit alias and /ap2 is the bare root
+            alias; the .json path is the canonical one named in the
+            document itself (discovery_url_intended). All three paths are
+            served by this one view so the document can never drift."""
+            from flask import jsonify
+            return jsonify(build_ap2_discovery_document())
+
+        # ── Lane 3 — zero-friction external agent registration ──────────
+        @bp.route("/ap2/register", methods=["POST"])
+        def ap2_register():
+            """POST /ap2/register: name + endpoint URL + contact, stored
+            through the existing registration path; the first 20 external
+            registrations are flagged for the introductory AXM
+            micro-bounty. Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.register_external_agent(body)
+            return jsonify(payload), status
+
+        # ── Lane 3 — x402 paid endpoints (in-repo sincor-x402 package) ──
+        @bp.route("/x402-live/quick-scan", methods=["POST"])
+        def x402_quick_scan():
+            """$0.01 quick scan: unauthenticated calls get the package's
+            402 challenge for 0.01 USDC on Base; settlement is
+            facilitator-gated until a facilitator is configured.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.quick_scan(dict(request.headers), body)
+            return jsonify(payload), status
+
+        @bp.route("/audit-express/order", methods=["POST"])
+        def audit_express_order():
+            """Audit Express entry-tier (500 USDC) order intake — the
+            same x402 challenge pattern as the quick scan.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.audit_order(dict(request.headers), body)
+            return jsonify(payload), status
 
         @bp.route("/docs/a2a", methods=["GET"])
         def a2a_docs():
@@ -1886,11 +3736,11 @@ class A2ARouter:
                 )), 404
 
             payload = handler(body)
-            # Surface caller-auth failures as real HTTP statuses (P3 item 14).
-            try:
-                err_code = (payload.get("error") or {}).get("code")
-            except AttributeError:
-                err_code = None
+            # Surface caller-auth failures as real HTTP statuses (P3 item 14)
+            # and queue-unavailable as 503 + Retry-After (C2, P2 audit).
+            err_code = _payload_error_code(payload)
+            if err_code == _ERR_QUEUE_UNAVAILABLE:
+                return _queue_unavailable_response(payload)
             http_status = _AUTH_HTTP_STATUS.get(err_code)
             if http_status is not None:
                 return jsonify(payload), http_status
@@ -1903,6 +3753,8 @@ class A2ARouter:
             body = request.get_json(force=True, silent=True) or {}
             payload = _handle_send(body)
             if payload.get("error"):
+                if _payload_error_code(payload) == _ERR_QUEUE_UNAVAILABLE:
+                    return _queue_unavailable_response(payload)
                 return jsonify(payload), _auth_http_status(payload)
             task = payload.get("result") or {}
             task_id = task.get("id")
@@ -1961,9 +3813,11 @@ class A2ARouter:
                         "estimated_latency_seconds": s.estimated_latency_seconds,
                         "reputation_floor":          s.reputation_floor,
                         "free_quota":                s.free_quota,
+                        "free_daily_ration":         DAILY_RATION_LIMIT,
                     }
                     for s in SINCOR_SKILLS
                 ],
+                "hook":            hook_payload(),
                 "primary_token":   A2A_PRIMARY_TOKEN,
                 "sinc_contract":   SINC_CONTRACT,
                 "axiom_contract":  AXIOM_CONTRACT,
@@ -1977,11 +3831,14 @@ class A2ARouter:
             from flask import jsonify, request
             if request.method == "GET":
                 skill_id = _resolve_skill_id(request.args)
-                caller_id = request.args.get("caller_id") or request.args.get("callerId") or "anonymous"
+                src = request.args
+                msg_obj = {}
             else:
                 body = request.get_json(force=True, silent=True) or {}
                 skill_id = _resolve_skill_id(body)
-                caller_id = body.get("caller_id") or body.get("callerId") or "anonymous"
+                src = body
+                msg_obj = body.get("message") or {}
+            caller_id = src.get("caller_id") or src.get("callerId") or "anonymous"
 
             skill = next((s for s in SINCOR_SKILLS if s.id == skill_id), None)
             if not skill:
@@ -1989,12 +3846,43 @@ class A2ARouter:
 
             current_axm_price = _price_engine.get_price(skill_id)
             _price_engine.record_quote(skill_id)
-            free_remaining = _free_quota_tracker.remaining(caller_id, skill)
-            is_free_call = free_remaining > 0
+            # G2.6: quota is keyed on the verified wallet, never on caller_id.
+            quota_identity = _resolve_quota_identity(
+                skill_id=skill_id, params=src, msg_obj=msg_obj, input_text=None,
+            )
+            if quota_identity is not None:
+                free_remaining = _free_quota_tracker.remaining(quota_identity, skill)
+                # Wave 1: the daily ration also makes a quote free for
+                # registered-agent wallets (display only here — consumption
+                # happens atomically on send).
+                daily_remaining = _daily_ration_remaining(quota_identity, skill)
+            else:
+                # B44 (Base44 review 2026-11-06): no verified identity was
+                # presented, so there is NO attributable usage to report —
+                # the trackers' empty-identity 0 read as "entitlement
+                # exhausted" and flatly contradicted the documented
+                # new-caller promise (llms.txt / ai.txt: quote
+                # unauthenticated, "5 free executions per caller", daily
+                # ration 3/agent/skill/day). Report the documented
+                # NEW-CALLER entitlement instead: the lifetime quota a
+                # fresh verified wallet receives on the top-5 skills, and
+                # the daily ration a fresh registered agent receives on
+                # every skill. The note below names the claiming steps
+                # (wallet signature / agent registration). This grants
+                # NOTHING: is_free stays False, the paid price stays
+                # visible, and send-path consumption still requires the
+                # verified / registered identities exactly as before.
+                free_remaining = (
+                    skill.free_quota if skill.id in FREE_QUOTA_SKILLS else 0
+                )
+                daily_remaining = DAILY_RATION_LIMIT
+            is_free_call = quota_identity is not None and (
+                free_remaining > 0 or daily_remaining > 0)
 
             logger.info(
-                "A2A quote  skill=%s  caller=%s  axm=%.4f AXM  free_remaining=%d",
-                skill_id, caller_id, current_axm_price / 10**18, free_remaining,
+                "A2A quote  skill=%s  caller=%s  quota_id=%s  axm=%.4f AXM  free_remaining=%d",
+                skill_id, caller_id, quota_identity or "-",
+                current_axm_price / 10**18, free_remaining,
             )
             platform_fee_wei = _compute_platform_fee_wei(current_axm_price) if not is_free_call else 0
 
@@ -2027,15 +3915,17 @@ class A2ARouter:
                 "estimated_latency_seconds": skill.estimated_latency_seconds,
                 "reputation_floor":         skill.reputation_floor,
                 "free_quota_remaining":     free_remaining,
+                "free_daily_ration_limit":  DAILY_RATION_LIMIT,
+                "free_daily_ration_remaining": daily_remaining,
+                "hook":                     hook_payload(),
                 "is_free":                  is_free_call,
                 "input_schema":             skill.input_schema,
                 "output_schema":            skill.output_schema,
-                "note": (
-                    "FREE — include caller_id in your tasks/send request (no txHash needed)."
-                    if is_free_call else
-                    f"AXM-only. Pay {current_axm_price / 10**18:.4f} AXM "
-                    f"to pay_to on Base (chain 8453), then include txHash in your tasks/send request. "
-                    f"Platform fee {A2A_PLATFORM_FEE_BPS} bps routes to treasury {TREASURY_WALLET}."
+                "note": _quota_quote_note(
+                    skill=skill,
+                    is_free_call=is_free_call,
+                    free_remaining=free_remaining,
+                    current_axm_price=current_axm_price,
                 ),
             })
 
@@ -2221,9 +4111,15 @@ class A2ARouter:
                 return jsonify(_err(
                     "proof construction failed", code=-32003)), 500
 
-            # Record in reputation ledger
+            # Record in reputation ledger — keyed on the task's verified
+            # wallet when the caller signed at send time (wallet: namespace),
+            # else on the self-declared caller_id (id: namespace, separate
+            # trust domain — see _reputation_key).
             _reputation_ledger.record(
-                caller_id=task.caller_id or caller_id,
+                caller_id=_reputation_key(
+                    (task.metadata or {}).get("verified_wallet"),
+                    task.caller_id or caller_id,
+                ),
                 skill_id=task.skill_id,
                 task_id=task.id,
                 axm_paid_wei=task.axm_paid,
@@ -2246,7 +4142,14 @@ class A2ARouter:
         def leaderboard():
             """Return top external A2A callers by volume and settlement count."""
             from flask import jsonify, request
-            limit = min(int(request.args.get("limit", 10)), 100)
+            from sincor2.a2a_errors import error_envelope, parse_int_param
+            try:
+                # G2.11: garbage ?limit=abc is a 400, never a 500.
+                limit = parse_int_param(
+                    request.args.get("limit"), "limit",
+                    default=10, minimum=1, maximum=100)
+            except ValueError as err:
+                return error_envelope(str(err), 400)
             return jsonify({
                 "leaderboard": _reputation_ledger.leaderboard(limit=limit),
                 "description": (
@@ -2346,17 +4249,37 @@ def _sse_event(data: Dict[str, Any]) -> str:
 _ERR_AUTH_REQUIRED = -32010  # HTTP 401 — missing / invalid / stale / replayed signature
 _ERR_FORBIDDEN = -32011      # HTTP 403 — valid signature, but not the task owner
 
+# C2 (P2 audit): queue availability is a distinct failure domain from
+# auth/payment — it gets its own code, not an auth-code reuse.
+# -32012 means "the task was created but the job was NOT accepted; no work
+# started". Callers must treat data.retryable=true + the HTTP Retry-After
+# header as the signal to retry (with the same idempotency key), never as a
+# silent success.
+_ERR_QUEUE_UNAVAILABLE = -32012  # HTTP 503 — enqueue failed; safe to retry
+
 # Map auth error codes to HTTP status for the REST routes and dispatcher.
 _AUTH_HTTP_STATUS = {_ERR_AUTH_REQUIRED: 401, _ERR_FORBIDDEN: 403}
 
 _AUTH_CREATE_DOMAIN = "SINCOR-A2A task-create"
 _AUTH_MARKET_CREATE_DOMAIN = "SINCOR-A2A-MARKET task-create"
 _AUTH_TASK_DOMAIN_FMT = "SINCOR-A2A task-{purpose}"  # get | cancel | list | push
+_AUTH_BID_DOMAIN_FMT = "SINCOR-A2A-MARKET bid-{purpose}"  # commit | reveal
 _AUTH_MAX_SKEW_S = 600      # signature freshness window, seconds
 _AUTH_REPLAY_MAX = 8192     # bounded replay cache (per-process)
 
-_auth_seen: Dict[str, float] = {}  # sha256(message + signature).hex -> expiry epoch
+# Sentinel replay-digest for the (unreachable) _auth_digest ValueError path.
+# It is not valid hex, so no genuine sha256 digest can ever collide with it.
+_AUTH_DIGEST_MALFORMED = "auth-digest:malformed-signature"
+
+_auth_seen: Dict[str, float] = {}  # sha256(message + canonical sig bytes).hex -> expiry epoch
 _auth_lock = threading.Lock()
+
+# Poison the sentinel: a require_low_s failure inside _auth_digest maps here,
+# so _auth_replay_seen() reports it as already consumed and the caller gets
+# the existing "Signature already used (replay rejected)." payload —
+# fail closed, no 500, no new error oracle. float("inf") expiry keeps the
+# periodic eviction from ever clearing it.
+_auth_seen[_AUTH_DIGEST_MALFORMED] = float("inf")
 
 
 def _auth_create_message(agent_label: str, skill_id: str, timestamp: int,
@@ -2415,8 +4338,28 @@ def _canonical_signature_hex(signature: str) -> str:
 
 
 def _auth_digest(message: str, signature: str) -> str:
-    """Replay-cache key: canonical message + canonical signature bytes."""
-    return hashlib.sha256((message + _canonical_signature_hex(signature)).encode()).hexdigest()
+    """Replay-cache key: canonical message + canonical signature bytes.
+
+    Digests the 65 canonical bytes returned by ``require_low_s`` (low-s
+    enforced, v normalized 0->27 / 1->28), so every re-encoding of the same
+    signing operation — v 27<->0 / 28<->1 flips, hex case, 0x prefix,
+    surrounding whitespace — hashes to one canonical key. ``message`` stays
+    in the digest to bind the signature to the specific signed message.
+
+    ``require_low_s`` raising ValueError here is unreachable: every call
+    site runs ``_recover_eip191_signer`` (which applies the same guard) on
+    the same signature first and bails on failure. Fail closed anyway: the
+    malformed input maps to the pre-poisoned ``_AUTH_DIGEST_MALFORMED``
+    sentinel, which the replay guard rejects with the existing
+    "Signature already used (replay rejected)." payload — no 500, no new
+    error oracle.
+    """
+    from sincor2.sig_canonical import require_low_s
+    try:
+        raw = require_low_s(signature)
+    except ValueError:
+        return _AUTH_DIGEST_MALFORMED
+    return hashlib.sha256(message.encode() + raw).hexdigest()
 
 
 def _recover_eip191_signer(message: str, signature: str) -> Optional[str]:
@@ -2426,16 +4369,15 @@ def _recover_eip191_signer(message: str, signature: str) -> Optional[str]:
     try:
         from eth_account import Account
         from eth_account.messages import encode_defunct
+        from sincor2.sig_canonical import require_low_s
     except ImportError:  # eth_account is a hard dependency; fail closed if absent
         return None
     try:
-        raw = bytes.fromhex(_canonical_signature_hex(signature))
-        if len(raw) != 65:
-            return None
-        if int.from_bytes(raw[32:64], "big") > _SECP256K1_HALF_N:
-            return None  # non-canonical high-s: possible (r, n-s) malleation
+        raw = require_low_s(bytes.fromhex(_canonical_signature_hex(signature)))
         return str(Account.recover_message(encode_defunct(text=message), signature=raw))
     except Exception:
+        # Malformed, wrong length, or non-canonical high-s (possible
+        # (r, n-s) malleation): refuse. Callers fail closed.
         return None
 
 
@@ -2478,7 +4420,11 @@ def _auth_replay_seen(digest: str) -> bool:
             for key in [k for k, exp in _auth_seen.items() if exp <= now]:
                 _auth_seen.pop(key, None)
             while len(_auth_seen) > _AUTH_REPLAY_MAX:
-                _auth_seen.pop(next(iter(_auth_seen)), None)
+                # Never evict the malformed-signature sentinel: it must stay
+                # consumed so the fail-closed path in _auth_digest keeps
+                # rejecting with the existing replay payload.
+                victim = next(k for k in _auth_seen if k != _AUTH_DIGEST_MALFORMED)
+                _auth_seen.pop(victim, None)
         if digest in _auth_seen:
             return True
         _auth_seen[digest] = now + _AUTH_MAX_SKEW_S
@@ -2492,6 +4438,29 @@ def _auth_http_status(payload: Dict[str, Any]) -> int:
     except AttributeError:
         return 400
     return _AUTH_HTTP_STATUS.get(code, 400)
+
+
+def _queue_unavailable_response(payload: Dict[str, Any]):
+    """HTTP 503 + Retry-After for _ERR_QUEUE_UNAVAILABLE (C2, P2 audit).
+
+    The job was NOT accepted and nothing ran — the caller decides whether
+    to retry. The Retry-After hint carries the queue's advised backoff.
+    """
+    from flask import jsonify
+
+    try:
+        data = (payload.get("error") or {}).get("data") or {}
+        retry_after = int(data.get("retry_after_seconds") or 30)
+    except (AttributeError, TypeError, ValueError):
+        retry_after = 30
+    return jsonify(payload), 503, {"Retry-After": str(retry_after)}
+
+
+def _payload_error_code(payload: Any) -> Any:
+    try:
+        return (payload.get("error") or {}).get("code")
+    except AttributeError:
+        return None
 
 
 def _verify_create_auth(params: Dict[str, Any], skill_id: str,
@@ -2589,6 +4558,53 @@ def _verify_list_auth(params: Optional[Dict[str, Any]],
         return None, _err("Signature already used (replay rejected).",
                            code=_ERR_AUTH_REQUIRED, rpc_id=rpc_id)
     return signer.lower(), None
+
+
+def _auth_bid_message(purpose: str, task_id: str, agent_id: str,
+                      payload: str, timestamp: int, nonce: str) -> str:
+    """Canonical bid message for the marketplace commit/reveal routes.
+
+    Binds the signature to the exact bid action: purpose (commit|reveal),
+    task, bidding agent, and the action payload (the commitment hex for
+    commit; ``bid_axm:nonce`` for reveal).  A captured commit signature
+    cannot be replayed as a reveal or retargeted to another task/agent.
+    """
+    return (
+        f"{_AUTH_BID_DOMAIN_FMT.format(purpose=purpose)}\n"
+        f"task_id:{task_id}\n"
+        f"agent_id:{agent_id}\n"
+        f"payload:{payload}\n"
+        f"timestamp:{int(timestamp)}\n"
+        f"nonce:{nonce}"
+    )
+
+
+def _server_bound_bidder_wallet(body: Optional[Dict[str, Any]], *,
+                                purpose: str, task_id: str, agent_id: str,
+                                payload: str) -> Optional[str]:
+    """Recover the bidder wallet from an EIP-191 bid signature (W-77).
+
+    Returns the recovered wallet (lowercased), or None when the request is
+    unsigned, the signature is invalid/stale/replayed, or required fields
+    are missing.  Callers bind the recovered wallet to the agent's
+    registered wallet — a client-supplied ``agent_id`` is NEVER trusted
+    for attribution on its own.
+    """
+    src = body or {}
+    auth = _extract_auth_fields(src)
+    ts = _parse_auth_timestamp(auth["timestamp"])
+    if (not auth["signature"] or ts is None or not auth["nonce"]
+            or not task_id or not agent_id):
+        return None
+    message = _auth_bid_message(purpose, task_id, agent_id, payload,
+                                ts, auth["nonce"])
+    signer = _recover_eip191_signer(message, auth["signature"])
+    if not signer:
+        return None
+    digest = _auth_digest(message, auth["signature"])
+    if _auth_replay_seen(digest):
+        return None
+    return signer.lower()
 
 
 def _server_bound_poster_id(body: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -2713,6 +4729,42 @@ def _extract_send_params(body: Dict[str, Any]):
             tx_hash, axm_paid, history_length)
 
 
+def _reconcile_axm_paid(tx_hash: Optional[str], claimed_wei: int,
+                       rpc_id: Any) -> tuple:
+    """Reconcile a caller-supplied axmPaidWei against the chain.
+
+    The on-chain Transfer total (via PaymentVerifier.verified_amount_wei)
+    always wins over the claim; a mismatch is corrected and logged. When the
+    chain cannot be read (dev/test bypass, simulated tx) the claim is kept.
+    A transient RPC outage fails closed with a -32001 error — never with the
+    untrusted claim.
+
+    Returns (amount_wei, error_dict_or_None).
+    """
+    if not tx_hash:
+        return claimed_wei, None
+    try:
+        chain_amount = PaymentVerifier.verified_amount_wei(tx_hash)
+    except PaymentVerifier.PaymentRpcError as exc:
+        logger.error(
+            "A2A payment amount unreadable for tx %s: %s", tx_hash, exc,
+        )
+        return None, _err(
+            f"Payment tx {tx_hash} amount could not be verified on Base. "
+            "Retry once the network is reachable.",
+            code=-32001, rpc_id=rpc_id,
+        )
+    if chain_amount is None:
+        return claimed_wei, None
+    if chain_amount != claimed_wei:
+        logger.warning(
+            "A2A payment amount corrected: caller claimed %d wei, "
+            "chain shows %d wei (tx %s)",
+            claimed_wei, chain_amount, tx_hash,
+        )
+    return chain_amount, None
+
+
 def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     """Handle message/send (and legacy tasks/send) JSON-RPC call."""
     (rpc_id, skill_id, context_id, caller_id, input_text,
@@ -2774,12 +4826,67 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         else:
             return _err("No input text found in message.parts", code=-32602, rpc_id=rpc_id)
 
+    # --- Verified caller identity -----------------------------------------
+    # Recovered EIP-191 signer wallet (None when the caller presented no
+    # valid signature). Reputation is keyed on this wallet; the self-declared
+    # caller_id below is UNTRUSTED-INPUT KEYED (rotating IDs used to evade
+    # reputation, and anyone can claim a victim's ID for the priority flag).
+    verified_wallet = _resolve_verified_wallet(
+        skill_id=skill_id,
+        params=params if isinstance(params, dict) else None,
+        msg_obj=msg_obj if isinstance(msg_obj, dict) else None,
+        input_text=input_text,
+    )
+
     # --- Reputation score → priority flag --------------------------------
-    caller_reputation = _reputation_ledger.score(caller_id)
+    # Score under the verified wallet when present; unsigned callers fall
+    # back to caller_id in a SEPARATE trust domain (id:<caller_id>) so they
+    # can never reach another wallet's rows by declaring its address.
+    # UNTRUSTED-INPUT KEYED for the unsigned path — see _reputation_key.
+    caller_reputation = _reputation_ledger.score(
+        _reputation_key(verified_wallet, caller_id)
+    )
     is_high_rep = caller_reputation >= REPUTATION_HIGH_THRESHOLD
 
-    # --- Free-quota check ------------------------------------------------
-    free_call = _free_quota_tracker.is_free(caller_id, skill)
+    # --- Free-quota check (G2.6: verified identity, not caller_id) ---------
+    # The self-declared caller_id no longer grants free calls — rotating it
+    # was an unlimited-free-call bypass. Only a fresh EIP-191 quota signature
+    # from the caller's wallet establishes quota identity, and the quota is
+    # consumed atomically so concurrent requests cannot overshoot it.
+    quota_identity = _resolve_quota_identity(
+        skill_id=skill_id, params=params, msg_obj=msg_obj, input_text=input_text,
+    )
+    free_call = _free_quota_tracker.consume_if_available(quota_identity or "", skill)
+
+    # --- Wave 1 daily ration (universal layer, registered agents) --------
+    # Every skill carries 3 free calls per registered agent per UTC day.
+    # Identity is a verified wallet (quota signer, verified wallet, or
+    # task owner — never the self-declared caller_id) that owns a record
+    # in the inbound agent registry. Lifetime top-5 quota is consumed
+    # first, so the daily ration only fires once it is exhausted or for
+    # skills outside the top 5. A daily-ration call is a free call: no
+    # payment gate, no fee record (see maybe_record_a2a_platform_fee's
+    # free_call skip, driven by task.metadata["free_call"] below).
+    daily_ration_call = False
+    if not free_call:
+        daily_identity = quota_identity or verified_wallet or owner_wallet
+        if daily_identity and _is_registered_agent_wallet(daily_identity):
+            _ip: Optional[str] = None
+            try:
+                from flask import has_request_context, request as _flask_request
+
+                if has_request_context():
+                    _ip = abuse_client_ip(
+                        _flask_request.remote_addr,
+                        environ=_flask_request.environ,
+                    )
+            except Exception:  # noqa: BLE001 - IP cap is best-effort here
+                _ip = None
+            daily_ration_call = _free_quota_tracker.consume_daily_if_available(
+                daily_identity, skill, ip=_ip,
+            )
+            if daily_ration_call:
+                free_call = True
 
     # --- Payment gate (skip for free calls, axiom-payment skill, and dev) --
     env = os.getenv("FLASK_ENV", "production").lower()
@@ -2788,6 +4895,15 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     if not skip_payment and skill_id != "axiom-payment":
         skill_price = _price_engine.get_price(skill_id)
         if not tx_hash:
+            if quota_identity is not None and skill.id in FREE_QUOTA_SKILLS:
+                return _err(
+                    f"Free quota exhausted for this wallet on skill '{skill_id}' "
+                    f"({skill.free_quota} free calls per wallet). Pay "
+                    f"{skill_price / 10**18:.4f} AXM to continue: call "
+                    "/api/a2a/quote for the amount and treasury address, send "
+                    "the transfer on Base, then include txHash.",
+                    code=-32000, rpc_id=rpc_id,
+                )
             return _err(
                 "Payment required. Call /api/a2a/quote to get the AXM amount and "
                 "treasury address, send the transfer on Base, then include txHash. "
@@ -2800,10 +4916,23 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
                 "Ensure the transfer is confirmed (≥1 block).",
                 code=-32001, rpc_id=rpc_id,
             )
+        # G2.5: never trust the caller's axmPaidWei — record the chain amount.
+        axm_paid, pay_err = _reconcile_axm_paid(tx_hash, axm_paid, rpc_id)
+        if pay_err:
+            return pay_err
 
-    # Consume free quota before dispatch
+    # G2.5: a free call carries no verified payment — recording the
+    # caller's axmPaidWei claim would be fiction (and an oversized claim
+    # overflows downstream INTEGER columns). Record zero.
+    # (Free quota was already atomically consumed by consume_if_available
+    # in the G2.6 check above; no second consume here.)
     if free_call:
-        _free_quota_tracker.consume(caller_id, skill_id)
+        if axm_paid:
+            logger.info(
+                "A2A free call: ignoring caller-supplied axmPaidWei=%d",
+                axm_paid,
+            )
+        axm_paid = 0
 
     # --- Create task & enqueue (never block the gunicorn worker) ----------
     task = _new_task(
@@ -2814,29 +4943,58 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
         owner_wallet=owner_wallet,
+        verified_wallet=verified_wallet,
     )
-    # Annotate high-rep and free-call status in metadata
+    # Annotate high-rep, free-call, and verified quota identity in metadata
     task.metadata["high_rep_caller"] = is_high_rep
     task.metadata["free_call"] = free_call
+    task.metadata["free_daily_ration"] = daily_ration_call
+    task.metadata["verified_wallet"] = verified_wallet
+    if quota_identity:
+        task.metadata["quota_identity"] = quota_identity
     logger.info(
-        "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s",
+        "A2A task %s created  skill=%s caller=%s rep=%d high_rep=%s free=%s quota_id=%s",
         task.id, skill_id, caller_id, caller_reputation, is_high_rep, free_call,
+        quota_identity or "-",
     )
 
     try:
-        from sincor2.task_queue import enqueue
+        from sincor2.task_queue import QueueEnqueueError, enqueue
 
         job = enqueue("a2a.execute", {"task_id": task.id})
         task.metadata["queue_job_id"] = job.id
         _update_task(task)
         # Eager (tests) already finalized the A2A task; reload.
         task = _get_task(task.id) or task
+    except QueueEnqueueError as exc:
+        # C2 (P2 audit): the job was NOT accepted — nothing ran. Never
+        # silently execute inline here; that changes failure semantics behind
+        # the caller's back. Return a retriable error: the caller decides
+        # whether to retry (HTTP 503 + Retry-After at the route layer).
+        logger.warning("Queue unavailable for A2A task %s: %s", task.id, exc)
+        return _err(
+            f"queue_unavailable: {exc}",
+            code=_ERR_QUEUE_UNAVAILABLE,
+            rpc_id=rpc_id,
+            data={
+                "retryable": True,
+                "retry_after_seconds": exc.retry_after,
+                "task_id": task.id,
+            },
+        )
     except Exception as exc:
-        logger.exception("Queue enqueue failed for A2A task %s: %s", task.id, exc)
-        _update_task(task, state=TaskState.WORKING)
-        output, error = _dispatch_to_swarm(task)
-        _finalize_a2a_task(task, output, error)
-        task = _get_task(task.id) or task
+        # Unexpected (non-queue) failure on the enqueue path. The task record
+        # exists but dispatch never started — surface it as a failure, still
+        # without executing inline behind the caller's back.
+        logger.exception("Enqueue path failed for A2A task %s: %s", task.id, exc)
+        _update_task(task, state=TaskState.FAILED,
+                     error=f"enqueue_failed: {exc}")
+        return _err(
+            f"enqueue_failed: {exc}",
+            code=_ERR_QUEUE_UNAVAILABLE,
+            rpc_id=rpc_id,
+            data={"retryable": True, "task_id": task.id},
+        )
 
     task_dict = _task_to_rpc(task, history_length=history_length)
     # Surface proof of settlement at top-level for convenience
@@ -2847,12 +5005,63 @@ def _handle_send(body: Dict[str, Any]) -> Dict[str, Any]:
     return _rpc_ok(task_dict, rpc_id=rpc_id)
 
 
+def _record_kya_telemetry(task: "A2ATask", output: Optional[str],
+                          error: Optional[str]) -> None:
+    """Record one A2A execution outcome into the KYA telemetry store.
+
+    The agent key is the caller's reputation identity — the same
+    ``_reputation_key`` the reputation ledger uses in
+    ``_finalize_a2a_task`` — so telemetry, reputation, and the trust
+    score all describe the same verified party. Outcome mapping: an
+    error mentioning a timeout is a ``timeout``; any other error is
+    an ``error``; a completed execution is a ``success``. Latency is
+    the wall clock from task creation to finalization when the
+    creation stamp parses, else None. This function NEVER raises:
+    telemetry must not fail or alter the execution it describes.
+    """
+    try:
+        from sincor2 import kya_telemetry
+
+        if error:
+            lowered = str(error).lower()
+            outcome = (
+                kya_telemetry.OUTCOME_TIMEOUT
+                if ("timeout" in lowered or "timed out" in lowered)
+                else kya_telemetry.OUTCOME_ERROR
+            )
+        else:
+            outcome = kya_telemetry.OUTCOME_SUCCESS
+        latency_ms: Optional[float] = None
+        try:
+            started = datetime.fromisoformat(str(task.created_at))
+            if started.tzinfo is not None:
+                latency_ms = max(
+                    0.0,
+                    (datetime.now(timezone.utc) - started)
+                    .total_seconds() * 1000.0,
+                )
+        except Exception:
+            latency_ms = None
+        agent_key = _reputation_key(
+            (task.metadata or {}).get("verified_wallet"), task.caller_id)
+        kya_telemetry.record_execution_outcome(
+            agent_key, outcome, skill_id=task.skill_id,
+            latency_ms=latency_ms)
+    except Exception as err:  # telemetry must never brick finalization
+        logger.warning(
+            "kya telemetry hook failed for task %s: %s", task.id, err)
+
+
 def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[str]) -> Dict[str, Any]:
     """Persist swarm output, proof of settlement, and terminal task state.
 
     Called from the async worker (and the eager test path). Safe to invoke
     outside a Flask request context.
     """
+    # KYA telemetry (recommendation #2 wiring): record this execution's
+    # outcome before the terminal-state bookkeeping, in both the
+    # success and error branches. Fail-open by construction.
+    _record_kya_telemetry(task, output, error)
     if error:
         _update_task(task, state=TaskState.FAILED, error=error)
         _fire_toa_feedback(task, success=False)
@@ -2914,8 +5123,13 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
 
     if (axm_paid > 0 and tx_hash) or free_call:
         _record_a2a_settlement(task, axm_paid, tx_hash or "")
+        # Reputation identity was fixed at send time in task.metadata
+        # (wallet: namespace); the caller_id fallback is UNTRUSTED-INPUT
+        # KEYED in a separate trust domain (see _reputation_key).
         _reputation_ledger.record(
-            caller_id=caller_id,
+            caller_id=_reputation_key(
+                (task.metadata or {}).get("verified_wallet"), caller_id
+            ),
             skill_id=skill_id,
             task_id=task.id,
             axm_paid_wei=axm_paid,
@@ -3135,6 +5349,19 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
                 f"Payment tx {tx_hash} unverified on Base.", -32001, rpc_id
             ))
             return
+        # G2.5: never trust the caller's axmPaidWei — record the chain amount.
+        axm_paid, pay_err = _reconcile_axm_paid(tx_hash, axm_paid, rpc_id)
+        if pay_err:
+            yield _sse_event(pay_err)
+            return
+
+    # Verified caller identity (same EIP-191 scheme as message/send).
+    stream_verified_wallet = _resolve_verified_wallet(
+        skill_id=skill_id,
+        params=params if isinstance(params, dict) else None,
+        msg_obj=msg_obj if isinstance(msg_obj, dict) else None,
+        input_text=input_text,
+    )
 
     task = _new_task(
         skill_id=skill_id,
@@ -3144,6 +5371,7 @@ def _handle_stream(body: Dict[str, Any]) -> Generator[str, None, None]:
         axm_paid=axm_paid,
         tx_hash=tx_hash,
         owner_wallet=owner_wallet,
+        verified_wallet=stream_verified_wallet,
     )
     logger.info("A2A stream task %s  skill=%s caller=%s", task.id, skill_id, caller_id)
 
@@ -3264,18 +5492,25 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
     params = body.get("params") or body
     context_id  = params.get("contextId")
     state_filter = params.get("state")
-
     owner_wallet, auth_err = _verify_list_auth(params, rpc_id)
     if auth_err:
         return auth_err
 
-    page_size   = int(params.get("pageSize") or 50)
+    # G2.11: garbage pageSize/pageToken is a JSON-RPC invalid-params
+    # error (-32602), never a 500.
+    from sincor2.a2a_errors import parse_int_param
+    try:
+        page_size = parse_int_param(
+            params.get("pageSize"), "pageSize", default=50, minimum=1)
+        offset = parse_int_param(
+            params.get("pageToken"), "pageToken", default=0, minimum=0)
+    except ValueError as err:
+        return _err(str(err), code=-32602, rpc_id=rpc_id)
     if page_size > TASK_LIST_MAX_PAGE:
         return _err(
             f"pageSize exceeds maximum ({TASK_LIST_MAX_PAGE})",
             code=-32602, rpc_id=rpc_id,
         )
-    page_token  = params.get("pageToken")  # simple offset-based for now
 
     with _store_lock:
         tasks = list(_tasks.values())
@@ -3287,7 +5522,7 @@ def _handle_list(body: Dict[str, Any]) -> Dict[str, Any]:
         tasks = [t for t in tasks if t.state.value == state_filter]
 
     # Pagination
-    offset = int(page_token or 0)
+    # offset validated above; slice is safe
     page   = tasks[offset: offset + page_size]
     next_token = str(offset + page_size) if offset + page_size < len(tasks) else None
 
