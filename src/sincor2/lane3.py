@@ -286,6 +286,8 @@ QUICK_SCAN_AMOUNT_ATOMIC = "10000"        # 0.01 USDC (6 decimals)
 AUDIT_ORDER_AMOUNT_ATOMIC = "500000000"   # 500 USDC — Audit Express entry tier
 BASE_CHAIN_ID = 8453
 _FACILITATOR_ENV = "SINCOR_X402_FACILITATOR_URL"
+_CDP_HOSTS_ENV = "SINCOR_X402_CDP_HOSTS"
+_DEFAULT_CDP_HOSTS = ("api.cdp.coinbase.com",)
 
 
 def _load_sincor_x402():
@@ -300,6 +302,56 @@ def _load_sincor_x402():
     import sincor_x402
 
     return sincor_x402
+
+
+def _cdp_allowlist() -> frozenset:
+    """Hosts that may receive CDP credentials. Default: Coinbase's
+    CDP API host only. ``SINCOR_X402_CDP_HOSTS`` (comma-separated
+    hostnames) REPLACES the default when set — an operator who
+    points the facilitator anywhere else must name that host
+    explicitly before any credential is sent to it."""
+    raw = (os.environ.get(_CDP_HOSTS_ENV) or "").strip()
+    hosts = set()
+    if raw:
+        for entry in raw.split(","):
+            entry = entry.strip().lower()
+            if not entry:
+                continue
+            if "://" in entry:
+                entry = urlparse(entry).hostname or ""
+            else:
+                entry = entry.split(":", 1)[0]
+            if entry:
+                hosts.add(entry)
+    return frozenset(hosts) if hosts else frozenset(_DEFAULT_CDP_HOSTS)
+
+
+def _credentials_allowed(url: str) -> bool:
+    """CDP credentials are attached ONLY to an HTTPS URL whose host
+    is on the allowlist. Any other facilitator URL — plain HTTP, or
+    a host the operator has not explicitly allowlisted — is called
+    with NO Authorization header, ever: a credential sent to an
+    arbitrary configured host is a credential handed to whoever
+    controls, or can redirect, that host (CWE-522)."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    return bool(host) and host in _cdp_allowlist()
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Fail closed on redirects for credentialed requests.
+
+    urllib's default redirect handler re-sends the request —
+    including the Authorization header — to the redirect target,
+    which may be a different origin. A facilitator never
+    legitimately redirects these API POSTs, so any 3xx on a
+    credentialed call is an error, never a forwarding opportunity:
+    returning None here makes urllib raise HTTPError instead."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class _HttpFacilitator:
@@ -335,6 +387,16 @@ class _HttpFacilitator:
     CDP_API_KEY is sent as a Bearer token fallback. No credentials
     -> no auth header (the testnet facilitator needs none). Env
     values are never logged or returned.
+
+    Credential safety (Strix finding, PR #691): credentials are
+    attached ONLY when the request URL is HTTPS and its host is on
+    the CDP allowlist (default ``api.cdp.coinbase.com``, overridable
+    via ``SINCOR_X402_CDP_HOSTS``) — any other host is called with
+    no Authorization header at all. Credentialed requests also
+    refuse redirects outright: urllib's default handler would
+    re-send the Authorization header to the redirect target, so a
+    compromised or redirecting facilitator could otherwise harvest
+    the operator's long-lived CDP key (CWE-522).
     """
 
     def __init__(self, base_url: str) -> None:
@@ -343,6 +405,8 @@ class _HttpFacilitator:
         self._settle_url = self._base_url + "/settle"
 
     def _auth_headers(self, url: str) -> Dict[str, str]:
+        if not _credentials_allowed(url):
+            return {}
         key_id = (os.environ.get("CDP_API_KEY_ID") or "").strip()
         secret = (os.environ.get("CDP_API_KEY_SECRET") or "").strip()
         raw = (os.environ.get("CDP_API_KEY") or "").strip()
@@ -371,7 +435,14 @@ class _HttpFacilitator:
         req = urllib.request.Request(
             url, data=json.dumps(body).encode("utf-8"),
             headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        if "Authorization" in headers:
+            # Credentialed request: use an opener that refuses
+            # redirects, so the credential can never be forwarded
+            # to a redirect target on another origin.
+            opener = urllib.request.build_opener(_NoRedirectHandler())
+        else:
+            opener = urllib.request.build_opener()
+        with opener.open(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def verify_and_hold(self, *, payment_payload, requirement):

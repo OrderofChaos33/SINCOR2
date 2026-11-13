@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import ssl
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -113,11 +114,14 @@ def _validate(body: dict, settled_nonces: set) -> tuple[bool, str, dict]:
 
 
 class _MockFacilitator:
-    def __init__(self) -> None:
+    def __init__(self, https_cert=None, redirect_to=None) -> None:
         self.calls: list[dict] = []
         self.settled_nonces: set = set()
         self.force_invalid = False
         self.force_settle_fail = False
+        # When set, /verify answers 302 -> redirect_to instead of a
+        # verification result (a redirecting facilitator).
+        self.redirect_to = redirect_to
 
         mock = self
 
@@ -137,6 +141,12 @@ class _MockFacilitator:
                     "headers": dict(self.headers),
                     "body": body,
                 })
+                if mock.redirect_to is not None and self.path == "/verify":
+                    self.send_response(302)
+                    self.send_header("Location", mock.redirect_to)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 if self.path == "/verify":
                     data = mock.verify(body)
                 elif self.path == "/settle":
@@ -152,8 +162,14 @@ class _MockFacilitator:
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self._server.daemon_threads = True
+        if https_cert is not None:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(https_cert[0], https_cert[1])
+            self._server.socket = ctx.wrap_socket(
+                self._server.socket, server_side=True)
         self.port = self._server.server_address[1]
-        self.url = f"http://127.0.0.1:{self.port}"
+        scheme = "https" if https_cert is not None else "http"
+        self.url = f"{scheme}://127.0.0.1:{self.port}"
         self._thread = threading.Thread(
             target=self._server.serve_forever, daemon=True)
         self._thread.start()
@@ -191,6 +207,115 @@ class _MockFacilitator:
     def close(self) -> None:
         self._server.shutdown()
         self._server.server_close()
+
+
+class _RecordingServer:
+    """Attacker endpoint: records anything that reaches it and
+    answers a benign 200, so a credential-forwarding client would
+    happily deliver the goods here."""
+
+    def __init__(self) -> None:
+        self.hits: list[dict] = []
+        recorder = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):  # keep test output clean
+                pass
+
+            def _record(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                if length:
+                    self.rfile.read(length)
+                recorder.hits.append({
+                    "method": self.command,
+                    "path": self.path,
+                    "headers": dict(self.headers),
+                })
+                out = b"{}"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+            do_GET = _record
+            do_POST = _record
+
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self._server.daemon_threads = True
+        self.port = self._server.server_address[1]
+        self.url = f"http://127.0.0.1:{self.port}"
+        self._thread = threading.Thread(
+            target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def close(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+
+def _self_signed_cert(tmp_path):
+    """Self-signed cert for 127.0.0.1 (IP SAN), generated in-test.
+    Returns (cert_path, key_path). Tests point SSL_CERT_FILE at the
+    cert so the stdlib HTTPS stack trusts exactly this mock."""
+    import datetime
+    import ipaddress
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=1))
+        .add_extension(
+            x509.SubjectAlternativeName(
+                [x509.IPAddress(ipaddress.IPv4Address("127.0.0.1"))]),
+            critical=False)
+        .sign(key, hashes.SHA256()))
+    cert_path = tmp_path / "mock-cert.pem"
+    key_path = tmp_path / "mock-key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()))
+    return str(cert_path), str(key_path)
+
+
+def _https_mock(tmp_path, monkeypatch, redirect_to=None):
+    """Start the mock facilitator over HTTPS on loopback, trusting
+    its cert for this test only (via SSL_CERT_FILE). The caller
+    closes the returned mock."""
+    cert = _self_signed_cert(tmp_path)
+    monkeypatch.setenv("SSL_CERT_FILE", cert[0])
+    return _MockFacilitator(https_cert=cert, redirect_to=redirect_to)
+
+
+def _configure_https(monkeypatch, mock, *, allowlist="127.0.0.1"):
+    """Deployment state pointing at the HTTPS mock. ``allowlist``
+    is the SINCOR_X402_CDP_HOSTS value; None leaves the env unset
+    (production default allowlist)."""
+    monkeypatch.setenv("SINCOR_X402_FACILITATOR_URL", mock.url)
+    if allowlist is None:
+        monkeypatch.delenv("SINCOR_X402_CDP_HOSTS", raising=False)
+    else:
+        monkeypatch.setenv("SINCOR_X402_CDP_HOSTS", allowlist)
+    monkeypatch.delenv("CDP_API_KEY_ID", raising=False)
+    monkeypatch.delenv("CDP_API_KEY_SECRET", raising=False)
+    monkeypatch.delenv("CDP_API_KEY", raising=False)
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    lane3._ENDPOINT_CACHE.clear()
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -430,13 +555,125 @@ def test_unreachable_facilitator_fails_closed(monkeypatch, mvp_client):
 
 # ── CDP auth headers ────────────────────────────────────────────────────────
 
-def test_cdp_jwt_auth_headers(monkeypatch, configured, mvp_client,
+def test_cdp_jwt_auth_headers(monkeypatch, tmp_path, mvp_client,
                               stubbed_rpc):
     """With CDP_API_KEY_ID + CDP_API_KEY_SECRET (a throwaway EC key
-    generated in-test), every facilitator call carries a per-request
-    ES256 Bearer JWT scoped to that call's exact method+host+path —
-    the auth the real CDP facilitator requires."""
+    generated in-test) and the facilitator's HTTPS host on the CDP
+    allowlist, every facilitator call carries a per-request ES256
+    Bearer JWT scoped to that call's exact method+host+path — the
+    auth the real CDP facilitator requires."""
     import jwt as pyjwt
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    mock = _https_mock(tmp_path, monkeypatch)
+    try:
+        _configure_https(monkeypatch, mock)
+        key = ec.generate_private_key(ec.SECP256R1())
+        pem = key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()).decode("utf-8")
+        public_pem = key.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+        monkeypatch.setenv("CDP_API_KEY_ID", "test-key-id-not-a-real-key")
+        monkeypatch.setenv("CDP_API_KEY_SECRET", pem)
+
+        header = _signed_header(_challenge("quick-scan"), 10000)
+        resp = mvp_client.post(
+            "/x402-live/quick-scan",
+            json={"address": USDC},
+            headers={"X-PAYMENT": header},
+        )
+        assert resp.status_code == 200
+        assert mock.paths() == ["/verify", "/settle"]
+        for call, path in zip(mock.calls, ["/verify", "/settle"]):
+            authz = call["headers"].get("Authorization", "")
+            assert authz.startswith("Bearer ")
+            token = authz[len("Bearer "):]
+            headers = pyjwt.get_unverified_header(token)
+            assert headers["alg"] == "ES256"
+            assert headers["kid"] == "test-key-id-not-a-real-key"
+            claims = pyjwt.decode(token, public_pem, algorithms=["ES256"])
+            assert claims["sub"] == "test-key-id-not-a-real-key"
+            assert claims["uris"] == [
+                f"POST 127.0.0.1:{mock.port}{path}"]
+    finally:
+        mock.close()
+        lane3._ENDPOINT_CACHE.clear()
+
+
+# ── CDP credential containment (Strix medium, PR #691) ─────────────────────
+# The pre-patch client attached the CDP credential to whatever host
+# SINCOR_X402_FACILITATOR_URL named, and urllib's default redirect
+# handler re-sent the Authorization header to redirect targets on
+# other origins — a compromised or redirecting facilitator would
+# receive the operator's long-lived CDP key (CWE-522). The tests
+# below pin the containment: allowlist + HTTPS gating, and
+# fail-closed redirect refusal on credentialed requests.
+
+def test_credentials_allowed_matrix(monkeypatch):
+    """The gate itself: default allowlist is the CDP host over HTTPS
+    only; SINCOR_X402_CDP_HOSTS replaces it when set."""
+    monkeypatch.delenv("SINCOR_X402_CDP_HOSTS", raising=False)
+    assert lane3._credentials_allowed(
+        "https://api.cdp.coinbase.com/platform/v2/x402")
+    assert not lane3._credentials_allowed(
+        "http://api.cdp.coinbase.com/platform/v2/x402")
+    assert not lane3._credentials_allowed("https://x402.org/facilitator")
+    assert not lane3._credentials_allowed("https://evil.example.com/x")
+    monkeypatch.setenv("SINCOR_X402_CDP_HOSTS",
+                       "x402.org, other.example:8443")
+    assert lane3._credentials_allowed("https://x402.org/facilitator")
+    assert lane3._credentials_allowed("https://other.example:8443/f")
+    assert not lane3._credentials_allowed(
+        "https://api.cdp.coinbase.com/platform/v2/x402")
+    assert not lane3._credentials_allowed("http://x402.org/facilitator")
+
+
+def test_cdp_redirect_never_forwards_credentials(monkeypatch, tmp_path,
+                                                 mvp_client, stubbed_rpc):
+    """The allowlisted facilitator answers /verify with a 302 to an
+    attacker host. The credential attached to the first hop must NOT
+    be forwarded: the credentialed opener refuses the redirect, the
+    payment fails closed, and the attacker sees nothing."""
+    attacker = _RecordingServer()
+    mock = _https_mock(tmp_path, monkeypatch,
+                       redirect_to=attacker.url + "/steal")
+    try:
+        _configure_https(monkeypatch, mock)
+        monkeypatch.setenv("CDP_API_KEY",
+                           "test-raw-cdp-key-not-a-real-key")
+        header = _signed_header(_challenge("quick-scan"), 10000)
+        resp = mvp_client.post(
+            "/x402-live/quick-scan",
+            json={"address": USDC},
+            headers={"X-PAYMENT": header},
+        )
+        assert resp.status_code == 402
+        assert resp.get_json()["error"] == "payment_verification_failed"
+        assert "result" not in resp.get_json()
+        # The credential WAS attached to the allowlisted first hop…
+        assert mock.paths() == ["/verify"]
+        assert mock.calls[0]["headers"].get("Authorization") == \
+            "Bearer test-raw-cdp-key-not-a-real-key"
+        # …and never reached the attacker: no request arrived there.
+        assert attacker.hits == []
+        assert stubbed_rpc == []  # work never ran
+    finally:
+        mock.close()
+        attacker.close()
+        lane3._ENDPOINT_CACHE.clear()
+
+
+def test_no_credentials_to_non_allowlist_host(monkeypatch, configured,
+                                              mvp_client, stubbed_rpc):
+    """CDP credentials are configured, but the facilitator URL is a
+    plain-HTTP loopback host that is NOT on the allowlist: neither
+    the raw key nor the JWT pair may be sent. The facilitator is
+    still called — keyless, exactly like the testnet facilitator —
+    and the payment settles."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -445,11 +682,9 @@ def test_cdp_jwt_auth_headers(monkeypatch, configured, mvp_client,
         serialization.Encoding.PEM,
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption()).decode("utf-8")
-    public_pem = key.public_key().public_bytes(
-        serialization.Encoding.PEM,
-        serialization.PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
     monkeypatch.setenv("CDP_API_KEY_ID", "test-key-id-not-a-real-key")
     monkeypatch.setenv("CDP_API_KEY_SECRET", pem)
+    monkeypatch.setenv("CDP_API_KEY", "test-raw-cdp-key-not-a-real-key")
 
     header = _signed_header(_challenge("quick-scan"), 10000)
     resp = mvp_client.post(
@@ -459,14 +694,61 @@ def test_cdp_jwt_auth_headers(monkeypatch, configured, mvp_client,
     )
     assert resp.status_code == 200
     assert configured.paths() == ["/verify", "/settle"]
-    for call, path in zip(configured.calls, ["/verify", "/settle"]):
-        authz = call["headers"].get("Authorization", "")
-        assert authz.startswith("Bearer ")
-        token = authz[len("Bearer "):]
-        headers = pyjwt.get_unverified_header(token)
-        assert headers["alg"] == "ES256"
-        assert headers["kid"] == "test-key-id-not-a-real-key"
-        claims = pyjwt.decode(token, public_pem, algorithms=["ES256"])
-        assert claims["sub"] == "test-key-id-not-a-real-key"
-        assert claims["uris"] == [
-            f"POST 127.0.0.1:{configured.port}{path}"]
+    for call in configured.calls:
+        assert "Authorization" not in call["headers"]
+
+
+def test_no_credentials_to_unlisted_https_host(monkeypatch, tmp_path,
+                                               mvp_client, stubbed_rpc):
+    """HTTPS alone is not enough: an HTTPS facilitator host that is
+    not on the allowlist (env unset -> production default) receives
+    no credential either."""
+    mock = _https_mock(tmp_path, monkeypatch)
+    try:
+        _configure_https(monkeypatch, mock, allowlist=None)
+        monkeypatch.setenv("CDP_API_KEY",
+                           "test-raw-cdp-key-not-a-real-key")
+        header = _signed_header(_challenge("quick-scan"), 10000)
+        resp = mvp_client.post(
+            "/x402-live/quick-scan",
+            json={"address": USDC},
+            headers={"X-PAYMENT": header},
+        )
+        assert resp.status_code == 200
+        assert mock.paths() == ["/verify", "/settle"]
+        for call in mock.calls:
+            assert "Authorization" not in call["headers"]
+    finally:
+        mock.close()
+        lane3._ENDPOINT_CACHE.clear()
+
+
+def test_cdp_allowlisted_host_settles_end_to_end(monkeypatch, tmp_path,
+                                                 mvp_client, stubbed_rpc):
+    """Happy path on the allowlist: the HTTPS facilitator host named
+    in SINCOR_X402_CDP_HOSTS receives the CDP credential on both
+    calls, and the payment verifies + settles end to end."""
+    mock = _https_mock(tmp_path, monkeypatch)
+    try:
+        _configure_https(monkeypatch, mock)
+        monkeypatch.setenv("CDP_API_KEY",
+                           "test-raw-cdp-key-not-a-real-key")
+        header = _signed_header(_challenge("quick-scan"), 10000)
+        resp = mvp_client.post(
+            "/x402-live/quick-scan",
+            json={"address": USDC},
+            headers={"X-PAYMENT": header},
+        )
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["ok"] is True
+        assert body["verification"]["passed"] is True
+        assert body["settlement"]
+        assert mock.paths() == ["/verify", "/settle"]
+        for call in mock.calls:
+            assert call["headers"].get("Authorization") == \
+                "Bearer test-raw-cdp-key-not-a-real-key"
+        assert stubbed_rpc.count("eth_getCode") == 1
+    finally:
+        mock.close()
+        lane3._ENDPOINT_CACHE.clear()
