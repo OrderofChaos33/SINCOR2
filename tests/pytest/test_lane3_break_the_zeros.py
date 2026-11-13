@@ -4,8 +4,10 @@ Covers:
 * GET /x402-live, GET /register, GET /audit-express → 200 on the
   production (mvp) app, with the proof wall's sourcing rules honored.
 * POST /ap2/register → validation 400s, storage through the existing
-  registration path, and the first-20 introductory-bounty flag + pool
-  ledger note (21st external registration is NOT flagged).
+  registration path, and the introductory-bounty gate (W-151):
+  anonymous registrations are provisional and allocate nothing; the
+  first-20 VERIFIED external registrations are flagged + reserved in
+  the pool ledger (21st verified registration is NOT flagged).
 * POST /x402-live/quick-scan → the sincor-x402 package's 402 challenge
   shape; paid-but-unconfigured → 402 facilitator_gated, work never runs;
   paid with the package's local reference facilitator (test-only) →
@@ -177,6 +179,27 @@ def _register_payload(**overrides):
     return payload
 
 
+def _proof_fields(agent_id, signer):
+    """Valid first-claim wallet proof fields for /ap2/register (W-151):
+    an EIP-191 signature over the canonical register message."""
+    import time
+
+    from eth_account.messages import encode_defunct
+
+    from sincor2 import a2a_identity as ident
+
+    ts = int(time.time() * 1000)
+    sig = signer.sign_message(
+        encode_defunct(text=ident.register_message(agent_id, ts))
+    ).signature.hex()
+    return {
+        "wallet": signer.address,
+        "registration_wallet": signer.address,
+        "registration_signature": sig if sig.startswith("0x") else "0x" + sig,
+        "registration_ts": ts,
+    }
+
+
 def test_register_validation_errors(client, fabric_isolated):
     for payload in (
         {"endpoint": "https://a.example.com", "contact": "c@x.io"},
@@ -191,8 +214,11 @@ def test_register_validation_errors(client, fabric_isolated):
         assert resp.get_json()["ok"] is False
 
 
-def test_register_success_storage_and_first20_flag(
+def test_register_success_storage_bounty_pending_until_verified(
         client, fabric_isolated, tmp_pool):
+    """W-151: an anonymous /ap2/register registration is stored through
+    the existing path but is PROVISIONAL — it allocates no intro bounty
+    and consumes no slot until its identity is verified by proof."""
     _clear_externals(fabric_isolated)
     resp = client.post("/ap2/register", json=_register_payload())
     assert resp.status_code == 201
@@ -200,6 +226,7 @@ def test_register_success_storage_and_first20_flag(
     assert data["ok"] is True
     agent_id = data["agent"]["agent_id"]
     assert data["agent"]["origin"] == "external"
+    assert data["agent"]["identity"] == "unverified"
 
     # Stored through the existing fabric/registration path.
     record = fabric_isolated.agents[agent_id]
@@ -207,15 +234,13 @@ def test_register_success_storage_and_first20_flag(
     assert record["origin"] == "external"
     assert "ops@example.com" in record["description"]
 
-    # First external registration → flagged + ledger note via allocate().
+    # No flag, no allocation, no slot consumed while unverified.
     flag = data["intro_bounty"]
-    assert flag["eligible"] is True
-    assert flag["ordinal"] == 1
-    assert flag["status"] == "reserved"
-    assert flag["allocation_id"]
-    assert record["intro_bounty"]["eligible"] is True
-    allocations = tmp_pool.allocations_for_task(f"intro-bounty:{agent_id}")
-    assert len(allocations) == 1
+    assert flag["eligible"] is False
+    assert flag["status"] == "pending_verification"
+    assert flag["allocation_id"] is None
+    assert record["intro_bounty"]["eligible"] is False
+    assert tmp_pool.allocations_for_task(f"intro-bounty:{agent_id}") == []
     verdict = tmp_pool.verify_ledger()
     assert verdict["inconclusive"] is None
     assert verdict["ok"], verdict
@@ -223,6 +248,11 @@ def test_register_success_storage_and_first20_flag(
 
 def test_register_21st_external_not_flagged(
         client, fabric_isolated, tmp_pool):
+    """The 20 slots are counted among VERIFIED external registrations:
+    the 21st verified registration is not flagged and allocates
+    nothing (anonymous registrations never consume slots at all)."""
+    from eth_account import Account
+
     _clear_externals(fabric_isolated)
     fabric = fabric_isolated
     from sincor2.a2a_inbound import _save_agents
@@ -232,15 +262,19 @@ def test_register_21st_external_not_flagged(
             fabric.agents[f"seed-ext-{i:02d}"] = {
                 "agent_id": f"seed-ext-{i:02d}",
                 "origin": "external",
+                "identity": "verified",
                 "registered_at": 1_000 + i,
                 "name": f"seed {i}",
             }
     _save_agents(fabric)
 
-    resp = client.post(
-        "/ap2/register", json=_register_payload(name="lane3-late-agent"))
+    signer = Account.create()
+    payload = _register_payload(name="lane3-late-agent")
+    payload.update(_proof_fields("lane3-late-agent", signer))
+    resp = client.post("/ap2/register", json=payload)
     assert resp.status_code == 201
     data = resp.get_json()
+    assert data["agent"]["identity"] == "verified"
     assert data["intro_bounty"]["eligible"] is False
     assert data["intro_bounty"]["ordinal"] == 21
     agent_id = data["agent"]["agent_id"]
@@ -249,8 +283,11 @@ def test_register_21st_external_not_flagged(
 
 def test_register_flag_survives_unfunded_pool(
         client, fabric_isolated, monkeypatch):
-    """Pool that cannot reserve → flag still lands, marked
-    flagged_unfunded; no allocation is faked."""
+    """Pool that cannot reserve → a VERIFIED registration's flag still
+    lands, marked flagged_unfunded; no allocation is faked. (W-151:
+    the flag only exists once identity is verified by proof.)"""
+    from eth_account import Account
+
     from sincor2.a2a_bounty_pool import InsufficientPoolFunds
 
     class _BrokePool:
@@ -260,8 +297,10 @@ def test_register_flag_survives_unfunded_pool(
     monkeypatch.setattr(
         "sincor2.a2a_bounty_pool.bounty_pool", lambda: _BrokePool())
     _clear_externals(fabric_isolated)
-    resp = client.post(
-        "/ap2/register", json=_register_payload(name="lane3-broke-agent"))
+    signer = Account.create()
+    payload = _register_payload(name="lane3-broke-agent")
+    payload.update(_proof_fields("lane3-broke-agent", signer))
+    resp = client.post("/ap2/register", json=payload)
     assert resp.status_code == 201
     flag = resp.get_json()["intro_bounty"]
     assert flag["eligible"] is True

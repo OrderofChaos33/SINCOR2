@@ -132,12 +132,18 @@ def _intro_bounty_amount() -> float:
     return amount if amount > 0 else INTRO_BOUNTY_DEFAULT_AXM
 
 
-def _external_ordinal(agents: Dict[str, Any], agent_id: str) -> Optional[int]:
+def _external_ordinal(agents: Dict[str, Any], agent_id: str,
+                      *, verified_only: bool = False) -> Optional[int]:
     """1-based position of ``agent_id`` among origin=="external" records,
-    ordered by (registered_at, agent_id). None if not present/external."""
+    ordered by (registered_at, agent_id). None if not present/external.
+
+    With ``verified_only=True`` the ranking runs over verified external
+    records only — the ranking the intro bounty uses (W-151), so
+    anonymous registrations never consume bounty ordering."""
     externals = [
         r for r in agents.values()
         if isinstance(r, dict) and r.get("origin") == "external"
+        and (not verified_only or r.get("identity") == "verified")
     ]
     externals.sort(key=lambda r: (int(r.get("registered_at") or 0),
                                   str(r.get("agent_id") or "")))
@@ -149,9 +155,22 @@ def _external_ordinal(agents: Dict[str, Any], agent_id: str) -> Optional[int]:
 
 def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
     """Flag ``agent_id`` for the introductory micro-bounty if it is among
-    the first ``INTRO_BOUNTY_SLOTS`` external registrations, and note the
-    flag in the bounty pool ledger via the pool's existing allocate()
-    path. Idempotent: an already-flagged record returns its flag.
+    the first ``INTRO_BOUNTY_SLOTS`` VERIFIED external registrations, and
+    note the flag in the bounty pool ledger via the pool's existing
+    allocate() path. Idempotent: an already-flagged record returns its
+    flag, and a live ledger reservation for the agent is reused, never
+    duplicated.
+
+    W-151: only a record whose identity is ``"verified"`` (a wallet
+    bound by a valid EIP-191 registration proof) can be flagged or
+    allocated. An anonymous (``identity="unverified"``) record receives
+    a non-allocating ``pending_verification`` marker instead — no slot
+    is consumed and no pool reservation is made — and slots/ordinals
+    are counted among verified external records only, so zero-cost
+    anonymous registration spam cannot exhaust the budget. The flag is
+    applied by this module's registration route, and by
+    ``a2a_inbound_ext.register_agent_record`` when a provisional record
+    is claimed with a valid wallet proof.
 
     The allocation is a ledger reservation only — payout happens through
     the existing a2a settle flow on the agent's first verified handshake.
@@ -169,42 +188,79 @@ def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
         existing = record.get("intro_bounty")
         if isinstance(existing, dict) and existing.get("eligible"):
             return dict(existing)
-        ordinal = _external_ordinal(fabric.agents, agent_id)
-        if ordinal is None:
+        if record.get("origin") != "external":
             return {"eligible": False, "reason": "not_external"}
-        if ordinal > INTRO_BOUNTY_SLOTS:
-            return {"eligible": False, "ordinal": ordinal,
-                    "slots": INTRO_BOUNTY_SLOTS}
-        flag: Dict[str, Any] = {
-            "eligible": True,
-            "ordinal": ordinal,
-            "slots": INTRO_BOUNTY_SLOTS,
-            "amount_axm": amount,
-            "status": "flagged",
-            "payable_on": "first_verified_handshake",
-            "allocation_id": None,
-        }
-        record["intro_bounty"] = flag
+        if record.get("identity") != "verified":
+            # W-151: gate the money — an unverified identity must not
+            # allocate the bounty or consume a slot. The marker keeps
+            # the pending state visible without reserving anything.
+            pending: Dict[str, Any] = {
+                "eligible": False,
+                "reason": "identity_unverified",
+                "status": "pending_verification",
+                "slots": INTRO_BOUNTY_SLOTS,
+                "amount_axm": amount,
+                "payable_on": "first_verified_handshake",
+                "allocation_id": None,
+            }
+            record["intro_bounty"] = pending
+            flag = dict(pending)
+            ordinal = None
+        else:
+            ordinal = _external_ordinal(
+                fabric.agents, agent_id, verified_only=True)
+            if ordinal is None:
+                return {"eligible": False, "reason": "not_external"}
+            if ordinal > INTRO_BOUNTY_SLOTS:
+                return {"eligible": False, "ordinal": ordinal,
+                        "slots": INTRO_BOUNTY_SLOTS}
+            flag = {
+                "eligible": True,
+                "ordinal": ordinal,
+                "slots": INTRO_BOUNTY_SLOTS,
+                "amount_axm": amount,
+                "status": "flagged",
+                "payable_on": "first_verified_handshake",
+                "allocation_id": None,
+            }
+            record["intro_bounty"] = flag
     _save_agents(fabric)
+    if not flag.get("eligible"):
+        return dict(flag)
 
     # Ledger note through the pool's existing code path. A custom journal
     # action would make verify_ledger() inconclusive, so this is a plain
-    # allocate() against a per-agent task id.
+    # allocate() against a per-agent task id. Exactly-once is enforced at
+    # the ledger level too: a live reservation for this agent (e.g. left
+    # behind by a record rebuild on re-registration) is reused, never
+    # reserved twice.
     try:
         from sincor2.a2a_bounty_pool import bounty_pool
 
-        alloc = bounty_pool().allocate(
-            task_id=f"intro-bounty:{agent_id}",
-            amount_axm=amount,
-            reason=(
-                "Lane-3 introductory micro-bounty for external agent "
-                f"{agent_id} (registration #{ordinal} of "
-                f"{INTRO_BOUNTY_SLOTS}); payable on its first verified "
-                "handshake via the existing a2a settle flow."
-            ),
-        )
-        flag["allocation_id"] = alloc.get("allocation_id") or alloc.get("id")
-        flag["status"] = "reserved"
+        pool = bounty_pool()
+        task_id = f"intro-bounty:{agent_id}"
+        live_allocations: Any = []
+        allocations_for_task = getattr(pool, "allocations_for_task", None)
+        if callable(allocations_for_task):
+            live_allocations = allocations_for_task(task_id) or []
+        if live_allocations:
+            flag["allocation_id"] = (
+                live_allocations[0].get("allocation_id")
+                or live_allocations[0].get("id"))
+            flag["status"] = "reserved"
+        else:
+            alloc = pool.allocate(
+                task_id=task_id,
+                amount_axm=amount,
+                reason=(
+                    "Lane-3 introductory micro-bounty for external agent "
+                    f"{agent_id} (registration #{ordinal} of "
+                    f"{INTRO_BOUNTY_SLOTS}); payable on its first verified "
+                    "handshake via the existing a2a settle flow."
+                ),
+            )
+            flag["allocation_id"] = alloc.get("allocation_id") or alloc.get("id")
+            flag["status"] = "reserved"
     except Exception as exc:  # pool unfunded/degraded — flag stands alone
         flag["status"] = "flagged_unfunded"
         flag["note"] = f"{type(exc).__name__}: {exc}"
@@ -222,6 +278,16 @@ def register_external_agent(body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
 
     Returns (http_status, payload). Validation failures are 400s; the
     storage itself is the platform's existing registration path.
+
+    W-151: registration stays zero-friction, but the record it creates
+    is PROVISIONAL until a wallet-identity proof is completed — an
+    anonymous registration allocates no intro bounty and does not make
+    the slug permanent. Callers may complete the proof in the same call
+    by including the standard registration proof fields (``wallet`` /
+    ``registration_wallet``, ``registration_signature``,
+    ``registration_ts``); a provisional record can also be claimed
+    later by presenting that proof (see
+    ``a2a_inbound_ext.register_agent_record``).
     """
     from sincor2.a2a_inbound import RegistrationAuthError
     from sincor2.a2a_inbound_ext import register_agent_record
@@ -254,6 +320,16 @@ def register_external_agent(body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
             f"Contact: {contact}"
         ),
     }
+    # Optional wallet-identity proof pass-through (W-151): when present,
+    # the registration path verifies it exactly as it does for
+    # POST /v1/a2a/register — a valid proof binds the wallet, verifies
+    # the identity, and makes the slug permanent; an invalid one fails
+    # closed there. Absent fields keep the anonymous provisional path.
+    for field in ("wallet", "registration_wallet", "registration_signature",
+                  "signature", "registration_ts", "reg_ts", "timestamp"):
+        value = body.get(field)
+        if value not in (None, ""):
+            record_body[field] = value
     try:
         record = register_agent_record(record_body)
     except (PermissionError, RegistrationAuthError) as exc:

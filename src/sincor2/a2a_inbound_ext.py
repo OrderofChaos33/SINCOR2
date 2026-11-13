@@ -360,6 +360,15 @@ def register_agent_record(body: Dict[str, Any],
     * A claim on an owned id by a *different* wallet is rejected — a valid
       signature from the non-owner never transfers ownership (transfers go
       through ``transfer_agent_record``).
+    * W-151: an anonymous claim is PROVISIONAL — it binds no wallet, so
+      it owns nothing and must not freeze the slug forever. A provisional
+      record (identity ``"unverified"``, no wallet bound) can be claimed
+      by the first caller presenting a valid wallet proof (the
+      first-claim form, or the re-registration form over the new record
+      contents);
+      the proof binds ``owner_wallet``, sets ``identity="verified"``,
+      and only then is the slug permanent. Without a valid proof, a
+      provisional record stays frozen to mutation (fail closed).
 
     Re-registration (any update to an existing record) requires proof of
     control: an EIP-191 signature by the currently registered wallet over
@@ -385,20 +394,76 @@ def register_agent_record(body: Dict[str, Any],
         wallet=proof["wallet"],
         timestamp_ms=proof["ts"],
     )
+    # W-151: second claim-proof form for PROVISIONAL records only. A
+    # wallet-less record has no registered wallet for
+    # _require_reregistration_proof to check against, so a caller may
+    # instead prove control of the wallet being bound with the
+    # re-registration signature form (over the exact new record contents
+    # + a fresh timestamp). The recovered signer must equal the declared
+    # wallet. This proves key control exactly as the first-claim proof
+    # does; it is only consulted when the record turns out to be
+    # provisional (see below) — owned records never see this path.
+    rereg_claim_wallet = ""
+    if not verified_wallet and proof["signature"]:
+        declared = str(proof["wallet"] or wallet or "").strip().lower()
+        ts_raw = body.get("registration_ts")
+        if declared and ts_raw is not None:
+            try:
+                claim_ts_ms = int(ts_raw)
+            except (TypeError, ValueError):
+                claim_ts_ms = 0
+            if claim_ts_ms and abs(
+                    _now_ms() - claim_ts_ms) <= REGISTRATION_PROOF_FRESHNESS_MS:
+                try:
+                    signer = _recover_registration_signer(
+                        _reregistration_message_from_parsed(
+                            parsed, claim_ts_ms),
+                        str(proof["signature"])).lower()
+                except RegistrationAuthError:
+                    signer = ""
+                if signer and signer == declared:
+                    rereg_claim_wallet = declared
     if wallet:
         _enforce_sybil_gates(agent_id, wallet, parsed)
     fabric = get_fabric()
     ts = _now_ms()
+    claimed_provisional = False
     with fabric.lock:
         if agent_id not in fabric.agents and len(fabric.agents) >= MAX_AGENTS:
             raise OverflowError("directory full")
         existing = fabric.agents.get(agent_id) or {}
-        if existing and _internal_reputation is None:
+        # W-151: a PROVISIONAL record — an anonymous claim, identity
+        # "unverified", with no wallet bound — owns nothing yet, so it
+        # must not freeze the slug forever. The first caller presenting
+        # a valid wallet proof CLAIMS it (first-claim form,
+        # or the re-registration form recovered above): the proof binds
+        # owner_wallet and the record becomes verified, which is also
+        # what makes the slug permanent. Without a valid proof the
+        # record stays frozen to mutation exactly as before (fail
+        # closed in _require_reregistration_proof). A proof whose wallet
+        # does not match the body's declared wallet is not a claim.
+        claim_wallet = verified_wallet or rereg_claim_wallet
+        provisional_claim = bool(
+            existing
+            and _internal_reputation is None
+            and str(existing.get("identity") or "") == "unverified"
+            and not str(existing.get("owner_wallet") or "").strip()
+            and not str(existing.get("wallet") or "").strip()
+            and claim_wallet
+            and (not wallet or claim_wallet == wallet.lower())
+        )
+        claimed_provisional = provisional_claim
+        if existing and _internal_reputation is None and not provisional_claim:
             _require_reregistration_proof(existing, parsed, body)
         if _internal_reputation is not None:
             # Internal platform seed: bypasses proof, identity is "internal".
             owner = ""
             identity = "internal"
+        elif provisional_claim:
+            # W-151 claim of a provisional record: the valid wallet
+            # proof binds the owner wallet; identity becomes verified.
+            owner = claim_wallet
+            identity = "verified"
         elif existing:
             # Re-registration: proof of control already enforced above via
             # _require_reregistration_proof (fail-closed). The bound owner
@@ -500,6 +565,22 @@ def register_agent_record(body: Dict[str, Any],
                 live["kya_id"] = snapshot["kya_id"]
                 live["kya_status"] = snapshot.get("kya_status")
         _save_agents(fabric)
+    # W-151: when a PROVISIONAL record is claimed with a valid wallet
+    # proof, that proof-completing registration is what allocates the
+    # Lane 3 introductory bounty — exactly once (the flag function is
+    # idempotent and ledger-guarded). The trigger is scoped to claims
+    # on purpose: a fresh verified registration allocates only through
+    # the Lane 3 funnel (lane3.register_external_agent also applies the
+    # flag), and anonymous registrations allocate nothing. Fail-soft:
+    # a bounty-side failure must never break registration.
+    if claimed_provisional:
+        try:
+            from sincor2.lane3 import apply_intro_bounty_flag
+
+            apply_intro_bounty_flag(agent_id)
+        except Exception as err:  # bounty path must never break registration
+            logger.warning("[AP2] intro bounty flag skipped for %s: %s",
+                           agent_id, err)
     return snapshot
 
 

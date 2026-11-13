@@ -172,12 +172,23 @@ class RegistrationIdentityTests(unittest.TestCase):
                 _body("reg-grandfather-01", description="updated", wallet=""))
 
     def test_grandfathered_record_claims_ownership_with_proof(self):
-        # A proof-less (anonymous) record has no bound wallet, so control
-        # cannot be proven by re-registration — fail closed.
+        # W-151: a proof-less (anonymous) record is PROVISIONAL — it has
+        # no owner, so the first caller presenting a valid wallet proof
+        # (here the re-registration form, signed by the wallet being
+        # bound) CLAIMS it. Before W-151 this failed closed forever
+        # ("no wallet bound, so control cannot be proven"), which let a
+        # zero-cost anonymous squat permanently burn the slug.
         ext.register_agent_record(_body("reg-claim-01", wallet=""))
+        snap = ext.register_agent_record(
+            _rereg_body("reg-claim-01", signer=_OWNER,
+                        wallet=_OWNER_WALLET))
+        self.assertEqual(snap["identity"], "verified")
+        self.assertEqual(snap["owner_wallet"], _OWNER_WALLET.lower())
+        # Once claimed, the record is owned: a different key's
+        # re-registration proof is refused (fail closed again).
         with self.assertRaises(RegistrationAuthError):
             ext.register_agent_record(
-                _rereg_body("reg-claim-01", signer=_OWNER,
+                _rereg_body("reg-claim-01", signer=_ATTACKER,
                             wallet=_OWNER_WALLET))
         # Ownership is established by a first registration with a signed
         # wallet claim; the attacker is then locked out.
