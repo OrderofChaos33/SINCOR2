@@ -451,6 +451,23 @@ def pricing_page():
     return render_template("pricing.html")
 
 
+@bp.route("/x402-live")
+def x402_live_page():
+    from sincor2 import lane3
+
+    return render_template("x402_live.html", **lane3.proof_wall_data())
+
+
+@bp.route("/register")
+def register_page():
+    return render_template("register.html")
+
+
+@bp.route("/audit-express")
+def audit_express_page():
+    return render_template("audit_express.html")
+
+
 @bp.route("/earn")
 def earn_page():
     return render_template("earn.html")
@@ -498,6 +515,7 @@ _SITEMAP_XML_PATHS = (
     "/products/enterprise", "/dashboard", "/agents", "/tasks", "/pool",
     "/catalog", "/agent-card", "/register-agent", "/toa", "/webbuilder",
     "/sinc", "/axiom", "/sin-airdrop",
+    "/x402-live", "/register", "/audit-express",
     "/terms", "/privacy", "/security", "/sitemap",
 )
 

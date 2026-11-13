@@ -3619,6 +3619,49 @@ class A2ARouter:
             from flask import jsonify
             return jsonify(build_ap2_discovery_document())
 
+        # ── Lane 3 — zero-friction external agent registration ──────────
+        @bp.route("/ap2/register", methods=["POST"])
+        def ap2_register():
+            """POST /ap2/register: name + endpoint URL + contact, stored
+            through the existing registration path; the first 20 external
+            registrations are flagged for the introductory AXM
+            micro-bounty. Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.register_external_agent(body)
+            return jsonify(payload), status
+
+        # ── Lane 3 — x402 paid endpoints (in-repo sincor-x402 package) ──
+        @bp.route("/x402-live/quick-scan", methods=["POST"])
+        def x402_quick_scan():
+            """$0.01 quick scan: unauthenticated calls get the package's
+            402 challenge for 0.01 USDC on Base; settlement is
+            facilitator-gated until a facilitator is configured.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.quick_scan(dict(request.headers), body)
+            return jsonify(payload), status
+
+        @bp.route("/audit-express/order", methods=["POST"])
+        def audit_express_order():
+            """Audit Express entry-tier (500 USDC) order intake — the
+            same x402 challenge pattern as the quick scan.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.audit_order(dict(request.headers), body)
+            return jsonify(payload), status
+
         @bp.route("/docs/a2a", methods=["GET"])
         def a2a_docs():
             """Machine-readable A2A surface so Agent Card documentationUrl is not 404."""
