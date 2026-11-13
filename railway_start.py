@@ -1,12 +1,10 @@
 """Railway / Gunicorn entry.
 
 Gunicorn imports this module, then binds PORT. /health is served from this
-file with the stdlib only so Railway's probe can pass while mvp_app loads.
-
-The previous shim imported mvp_app on the first real request inside a sync
-worker, cached any failure forever, and kept advertising healthy. That left
-getsincor.com serving JSON stubs for /, /buy, and every other path while
-Railway kept billing the replica.
+file with the stdlib only and is the deploy probe: it stays 200 only while
+mvp_app is loaded or still inside its boot budget, and goes 503 when the
+load has failed or exceeded the budget, so Railway fails a broken deploy
+instead of promoting it.
 
 Load happens in a background thread (post_worker_init + first request).
 Failures retry. /ready tells the truth. /boot shows the exception.
@@ -15,10 +13,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 
 logger = logging.getLogger("sincor2.railway_start")
 if not logging.getLogger().handlers:
@@ -30,6 +30,13 @@ if not logging.getLogger().handlers:
 
 _LIVENESS = frozenset({"/health", "/api/health", "/healthz"})
 _HEALTH = b'{"status":"healthy","service":"SINCOR2 MVP","entry":"railway_start"}'
+
+# Boot budget for the deploy probe (/health). Comfortably under Railway's
+# 120s healthcheckTimeout: a load that failed or is still stuck after this
+# long is a broken deploy and must fail the probe so the previous good
+# deployment keeps serving. A transient failure that recovers on retry flips
+# back to 200 once loaded, so brief blips don't kill good deploys.
+_HEALTH_BOOT_BUDGET_S = 90.0
 
 _lock = threading.Lock()
 _ready = threading.Event()
@@ -46,6 +53,29 @@ _REQUEST_WAIT_SECONDS = 45.0
 
 def _json_bytes(payload: dict) -> bytes:
     return json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+
+def _health_probe(start_response):
+    """Truthful deploy probe for Railway's healthcheck.
+
+    - mvp_app loaded -> 200 with the healthy JSON (unchanged).
+    - Not loaded, load failed (_full_error set) or boot budget exceeded
+      -> 503 with boot_status() JSON (error field included so the deploy
+      log shows why).
+    - Not loaded, no error, still inside the boot budget -> 200 (the app
+      normally imports in ~10s; don't fail good deploys mid-boot).
+    """
+    start_background_load()
+    with _lock:
+        full = _full
+        error = _full_error
+    if full is not None:
+        return _respond(start_response, "200 OK", _HEALTH)
+    if error is not None or (time.time() - _started_at) >= _HEALTH_BOOT_BUDGET_S:
+        return _respond(
+            start_response, "503 Service Unavailable", _json_bytes(boot_status())
+        )
+    return _respond(start_response, "200 OK", _HEALTH)
 
 
 def _safe_error(exc: BaseException) -> str:
@@ -94,6 +124,20 @@ def _load_loop() -> None:
         delay = min(delay * 1.5, 60.0)
 
 
+def _start_ofac_auto_refresh() -> None:
+    """Start the OFAC snapshot auto-refresh (boot + daily).
+
+    Fully isolated: any import/start failure is logged and swallowed
+    so it can never break app boot.
+    """
+    try:
+        from sincor2.ofac_auto_refresh import start_auto_refresh
+
+        start_auto_refresh()
+    except Exception as exc:
+        logger.warning("[boot] OFAC auto-refresh not started: %s", _safe_error(exc))
+
+
 def start_background_load() -> None:
     """Idempotent. Called from gunicorn post_worker_init and on first request."""
     global _thread_started
@@ -103,6 +147,36 @@ def start_background_load() -> None:
         _thread_started = True
         thread = threading.Thread(target=_load_loop, name="sincor2-boot", daemon=True)
         thread.start()
+    _start_ofac_auto_refresh()
+
+
+def _build_stamp() -> dict:
+    """Deployed-build identifier (observability build #5), stdlib-only —
+    this module must stay importable before sincor2.mvp_app loads. Mirrors
+    sincor2.build_info: RAILWAY_GIT_COMMIT_SHA, then SINCOR_BUILD_SHA,
+    then "unknown"; build time is SINCOR_BUILD_TIME or this process's
+    start. Never raises."""
+    try:
+        sha = ""
+        for var in ("RAILWAY_GIT_COMMIT_SHA", "SINCOR_BUILD_SHA"):
+            sha = (os.environ.get(var) or "").strip()
+            if sha:
+                break
+        stamp_time = (os.environ.get("SINCOR_BUILD_TIME") or "").strip()
+        if not stamp_time:
+            stamp_time = (
+                datetime.fromtimestamp(_started_at, timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+        return {
+            "sha": sha or "unknown",
+            "short": sha[:12] if sha else "unknown",
+            "time": stamp_time,
+        }
+    except Exception:
+        return {"sha": "unknown", "short": "unknown", "time": "unknown"}
 
 
 def boot_status() -> dict:
@@ -115,6 +189,7 @@ def boot_status() -> dict:
         "status": "ready" if loaded else ("loading" if attempts == 0 or error is None else "error"),
         "service": "SINCOR2 MVP",
         "entry": "railway_start",
+        "build": _build_stamp(),
         "loaded": loaded,
         "attempts": attempts,
         "error": error,
@@ -123,6 +198,24 @@ def boot_status() -> dict:
             None if not last_attempt_at else int(time.time() - last_attempt_at)
         ),
     }
+
+
+def _public_boot_status() -> dict:
+    """Public /boot view (Wren PR 4): short build SHA + build time ONLY.
+
+    boot_status() keeps the full 40-char SHA for internal/diagnostic
+    use, but /boot is unauthenticated — the full SHA must not be
+    disclosed there (it stays available behind the app's admin gates
+    via sincor2.build_info). Never raises beyond boot_status()'s own
+    guarantees: the build mapping degrades to "unknown" fields.
+    """
+    payload = boot_status()
+    build = payload.get("build") or {}
+    payload["build"] = {
+        "short": build.get("short") or "unknown",
+        "time": build.get("time") or "unknown",
+    }
+    return payload
 
 
 def _respond(start_response, status: str, body: bytes, content_type: str = "application/json"):
@@ -152,11 +245,19 @@ def wsgi(environ, start_response):
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
 
+    if path == "/health":
+        # Deploy probe: truthful. A broken deploy must fail Railway's
+        # healthcheck instead of going live.
+        return _health_probe(start_response)
+
     if path in _LIVENESS:
+        # /api/health and /healthz are NOT the deploy probe; keep the
+        # instant-200 behavior.
         return _respond(start_response, "200 OK", _HEALTH)
 
     if path == "/boot":
-        return _respond(start_response, "200 OK", _json_bytes(boot_status()))
+        # Public view: 12-char SHA + build time only (Wren PR 4).
+        return _respond(start_response, "200 OK", _json_bytes(_public_boot_status()))
 
     start_background_load()
 

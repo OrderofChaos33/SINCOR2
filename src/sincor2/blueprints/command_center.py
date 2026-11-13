@@ -45,6 +45,17 @@ command_center_bp = Blueprint(
     url_prefix="",
 )
 
+
+@command_center_bp.before_request
+def _command_center_key_rate_limit_gate():
+    # Wren PR 4: failed X-Admin-Key attempts are rate-limited per
+    # client address (10/min -> 429). This covers standalone mounts of
+    # the blueprint; on the production app mvp_app's gate runs first
+    # and the shared helper records at most one attempt per request.
+    from sincor2.admin_api_key import admin_key_rate_limit_response
+
+    return admin_key_rate_limit_response()
+
 # ---------------------------------------------------------------------------
 # SSE event bus — a single in-process pub/sub so every subscriber gets every
 # market event without polling the filesystem.
@@ -230,7 +241,9 @@ def _build_agent_roster() -> List[Dict[str, Any]]:
             # Merit & career
             "merit_points": merit_points,
             "tasks_completed": tasks_completed,
-            "success_rate": round(float(rep.get("success_rate", 1.0)) * 100, 1),
+            # No reputation data means no measured success: default 0.0,
+            # never 1.0 — a fabricated 100% next to 0 completed tasks.
+            "success_rate": round(float(rep.get("success_rate", 0.0)) * 100, 1),
             "average_quality": round(float(rep.get("average_quality", 0.0)) * 100, 1),
             "career": _career_trajectory(merit_points, tasks_completed),
             # Budget

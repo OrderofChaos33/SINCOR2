@@ -5,7 +5,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "spec",
   "title": "Spec P23 fractional-NFT pools: vault, whitelist, oracle, caps, live-blocked posture",
-  "description": "Deliverable: docs/spec/P23_ARCHITECTURE.md for fractionalized NFT yield pools: collection whitelist registry (48 h timelock), utilization-cap enforcer (0.75), fractional vault (ERC-20 shares), NFT pricing oracle adapter (7-day TWAP, 2+ sources), and the live-blocked posture (live_blocked=True, no live intents ever). Acceptance: (1) fractionalization model defined with share-mint formula and 1e3 minimum-shares burn; (2) whitelist governance and cap math (0.75 utilization, 0.08 per-collection, 60% max LTV, 75% liquidation threshold) written as implementable numbers; (3) live-blocked stated as a hard invariant with LiveBlocked semantics. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: docs/spec/P23_ARCHITECTURE.md for fractionalized NFT yield pools: collection whitelist registry (48 h timelock), utilization-cap enforcer (0.75), fractional vault (ERC-20 shares), NFT pricing oracle adapter (7-day TWAP, 2+ sources), and the live-blocked posture (live_blocked=True, no live intents ever). Acceptance: (1) fractionalization model defined with share-mint formula and 1e3 minimum-shares burn; (2) whitelist governance and cap math (0.75 utilization, 0.08 per-collection, 60% max LTV, 75% liquidation threshold) written as implementable numbers; (3) live-blocked stated as a hard invariant with LiveBlocked semantics. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-architecture-spec",
   "tags": [
    "defi",
@@ -23,7 +23,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "spec",
   "title": "Define P23 Solidity + Python interfaces (vault, registry, oracle)",
-  "description": "Deliverable: Solidity interfaces in onchain/src/p23/interfaces/ (IFractionalVault, ICollectionRegistry, INftPricingOracle) and Python protocols in src/sincor2/defi/p23/interfaces.py. Acceptance: (1) Solidity interfaces compile under solc 0.8.24; (2) Python protocols type-check and cover deposits, redemptions, whitelist ops, and price queries; (3) interface docs state the live-blocked constraint on every state-changing path. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: Solidity interfaces in onchain/src/p23/interfaces/ (IFractionalVault, ICollectionRegistry, INftPricingOracle) and Python protocols in src/sincor2/defi/p23/interfaces.py. Acceptance: (1) Solidity interfaces compile under solc 0.8.24; (2) Python protocols type-check and cover deposits, redemptions, whitelist ops, and price queries; (3) interface docs state the live-blocked constraint on every state-changing path. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-interface-definitions",
   "tags": [
    "defi",
@@ -42,7 +42,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "spec",
   "title": "Write P23 economics: 15% APR, 20 bps fee, caps, worked per-pool example",
-  "description": "Deliverable: docs/spec/P23_ECONOMICS.md with target_apr=0.15, fee_bps=20 on realized per-pool yield, risk_score bound 0.65, max_alloc_pct=0.08 per collection, utilization cap 0.75, min_capital_usd=400.0. Acceptance: (1) worked example: $1M pool at 15% -> $150,000/yr -> $300.00/yr fee (net 14.97%), matching fee math to the cent; (2) utilization-cap formula and per-collection cap stated as equations the enforcer implements verbatim; (3) borrower terms quantified (60% max LTV, 75% liquidation threshold, 24 h grace). Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: docs/spec/P23_ECONOMICS.md with target_apr=0.15, fee_bps=20 on realized per-pool yield, risk_score bound 0.65, max_alloc_pct=0.08 per collection, utilization cap 0.75, min_capital_usd=400.0. Acceptance: (1) worked example: $1M pool at 15% -> $150,000/yr -> $300.00/yr fee (net 14.97%), matching fee math to the cent; (2) utilization-cap formula and per-collection cap stated as equations the enforcer implements verbatim; (3) borrower terms quantified (60% max LTV, 75% liquidation threshold, 24 h grace). Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-economic-model",
   "tags": [
    "defi",
@@ -62,7 +62,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "scaffold",
   "title": "Create P23 repo layout: onchain/src/p23/ + src/sincor2/defi/p23/",
-  "description": "Deliverable: onchain/src/p23/ (vault, registry, oracle adapter, interfaces), src/sincor2/defi/p23/ (manager, interfaces), tests/pytest/test_p23_*.py stubs, configs/agents/p23-nftfi-pools.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Python package imports cleanly; (2) layout mirrors the interface definitions from the spec phase; (3) agent YAML validates. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: onchain/src/p23/ (vault, registry, oracle adapter, interfaces), src/sincor2/defi/p23/ (manager, interfaces), tests/pytest/test_p23_*.py stubs, configs/agents/p23-nftfi-pools.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Python package imports cleanly; (2) layout mirrors the interface definitions from the spec phase; (3) agent YAML validates. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-repo-layout",
   "tags": [
    "defi",
@@ -82,7 +82,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "scaffold",
   "title": "Write P23 starter boilerplate: vault stub, registry stub, mock oracle",
-  "description": "Deliverable: FractionalVault stub with ReentrancyGuard, whitelist registry stub, mock pricing oracle returning fixed floors, Python monitor stub with TOA hooks. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock deposit/redeem round-trip works in Python against the mock oracle; (3) every stub's state-changing path is marked live-blocked in code comments. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: FractionalVault stub with ReentrancyGuard, whitelist registry stub, mock pricing oracle returning fixed floors, Python monitor stub with TOA hooks. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock deposit/redeem round-trip works in Python against the mock oracle; (3) every stub's state-changing path is marked live-blocked in code comments. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-starter-code",
   "tags": [
    "defi",
@@ -102,7 +102,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Build the collection whitelist registry: 48 h timelock, freeze-on-removal",
-  "description": "Deliverable: CollectionRegistry (Solidity + Python mirror): only allowlisted ERC-721 collections can back pools; add/remove via 48-hour timelocked admin; events on every change. Acceptance: (1) deposits for non-whitelisted collections revert in 100% of fuzzed cases; (2) timelock removal freezes new deposits within one block while existing redemptions keep working; (3) every whitelist change emits an event mirrored by the Python monitor. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: CollectionRegistry (Solidity + Python mirror): only allowlisted ERC-721 collections can back pools; add/remove via 48-hour timelocked admin; events on every change. Acceptance: (1) deposits for non-whitelisted collections revert in 100% of fuzzed cases; (2) timelock removal freezes new deposits within one block while existing redemptions keep working; (3) every whitelist change emits an event mirrored by the Python monitor. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-collection-whitelist-registry",
   "tags": [
    "defi",
@@ -123,7 +123,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Build the utilization-cap enforcer: 0.75 cap, withdrawals never blocked",
-  "description": "Deliverable: utilization-cap enforcer with utilization = deployed_lending_value / total_pool_value <= 0.75; deposits breaching the cap revert; withdrawals never blocked; cap readable onchain. Acceptance: (1) cap-breach deposits revert, verified at utilizations 0.74/0.75/0.76; (2) withdrawals succeed at 0.99 utilization; (3) currentUtilization() and utilizationCap() return exact onchain values. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: utilization-cap enforcer with utilization = deployed_lending_value / total_pool_value <= 0.75; deposits breaching the cap revert; withdrawals never blocked; cap readable onchain. Acceptance: (1) cap-breach deposits revert, verified at utilizations 0.74/0.75/0.76; (2) withdrawals succeed at 0.99 utilization; (3) currentUtilization() and utilizationCap() return exact onchain values. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-utilization-cap-enforcer",
   "tags": [
    "defi",
@@ -145,7 +145,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Build the fractional NFT vault: ERC-20 shares, NAV accrual, redemptions",
-  "description": "Deliverable: FractionalVault.sol: ERC-721 custody, ERC-20 fractional share mint/burn against whitelisted deposits, borrower-interest NAV accrual, redemptions; ReentrancyGuard, SafeERC20, try/catch on oracle calls degrading to last-good-price (never bricking). Acceptance: (1) full deposit-accrue-redeem cycle on a local chain with share math matching the spec to the wei; (2) 1e3 minimum shares burned on first deposit (inflation-attack guard); (3) oracle failure freezes deposits but never bricks withdrawals. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: FractionalVault.sol: ERC-721 custody, ERC-20 fractional share mint/burn against whitelisted deposits, borrower-interest NAV accrual, redemptions; ReentrancyGuard, SafeERC20, try/catch on oracle calls degrading to last-good-price (never bricking). Acceptance: (1) full deposit-accrue-redeem cycle on a local chain with share math matching the spec to the wei; (2) 1e3 minimum shares burned on first deposit (inflation-attack guard); (3) oracle failure freezes deposits but never bricks withdrawals. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-fractional-vault",
   "tags": [
    "defi",
@@ -167,7 +167,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Build the NFT pricing oracle: 7-day TWAP, 24 h breaker, 25% clamp",
-  "description": "Deliverable: NftPricingOracle adapter with per-collection floor as 7-day TWAP from >=2 independent sources, 24-hour staleness circuit-breaker, and max 25% price move per update. Acceptance: (1) manipulated feeds (>25% single-update jump) are clamped and alert; (2) stale feeds (>24 h) freeze deposits and fall back to last-good-price without bricking the vault; (3) source divergence >15% alerts, >30% auto-freezes deposits (fork-tested). Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: NftPricingOracle adapter with per-collection floor as 7-day TWAP from >=2 independent sources, 24-hour staleness circuit-breaker, and max 25% price move per update. Acceptance: (1) manipulated feeds (>25% single-update jump) are clamped and alert; (2) stale feeds (>24 h) freeze deposits and fall back to last-good-price without bricking the vault; (3) source divergence >15% alerts, >30% auto-freezes deposits (fork-tested). Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-nft-pricing-oracle",
   "tags": [
    "defi",
@@ -189,7 +189,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Implement 20 bps fee on realized per-pool yield to 0x09E289...9612Ac",
-  "description": "Deliverable: fee module computing fee = floor(realized_epoch_yield_wei * 20 / 10000) per collection pool per 7-day epoch, routed to the canonical treasury with per-pool accounting. Acceptance: (1) fee math matches the P23_ECONOMICS.md $1M-pool worked example to the wei; (2) per-pool ledger attributes every wei to its collection; (3) settlement targets only 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: fee module computing fee = floor(realized_epoch_yield_wei * 20 / 10000) per collection pool per 7-day epoch, routed to the canonical treasury with per-pool accounting. Acceptance: (1) fee math matches the P23_ECONOMICS.md $1M-pool worked example to the wei; (2) per-pool ledger attributes every wei to its collection; (3) settlement targets only 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-fee-routing",
   "tags": [
    "defi",
@@ -210,7 +210,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Build the pool liquidity manager agent (dry-run advisory only)",
-  "description": "Deliverable: src/sincor2/defi/p23/manager.py monitoring pool utilization, rebalancing advisory allocations across whitelisted collections within the 0.08 per-collection cap, emitting TOA feedback; dry-run only, never signs. Acceptance: (1) manager rebalances a mocked pool set without ever breaching a utilization cap; (2) per-collection exposure stays <=0.08 in all plans; (3) any live-intent path raises LiveBlocked. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: src/sincor2/defi/p23/manager.py monitoring pool utilization, rebalancing advisory allocations across whitelisted collections within the 0.08 per-collection cap, emitting TOA feedback; dry-run only, never signs. Acceptance: (1) manager rebalances a mocked pool set without ever breaching a utilization cap; (2) per-collection exposure stays <=0.08 in all plans; (3) any live-intent path raises LiveBlocked. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-liquidity-manager",
   "tags": [
    "defi",
@@ -232,7 +232,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "core",
   "title": "Implement the live-block gate: LiveBlocked on every live-intent path",
-  "description": "Deliverable: live-block enforcement matching catalog live_blocked=True: the module never emits live intents; any live-intent code path raises LiveBlocked. Acceptance: (1) tests attempting live emission through every entrypoint (vault, registry, oracle, manager) all raise LiveBlocked; (2) dry-run paths unaffected (full deposit/redeem cycle works in dry-run); (3) a LiveBlocked raise emits a P0 security event. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: live-block enforcement matching catalog live_blocked=True: the module never emits live intents; any live-intent code path raises LiveBlocked. Acceptance: (1) tests attempting live emission through every entrypoint (vault, registry, oracle, manager) all raise LiveBlocked; (2) dry-run paths unaffected (full deposit/redeem cycle works in dry-run); (3) a LiveBlocked raise emits a P0 security event. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-live-block-gate",
   "tags": [
    "defi",
@@ -253,7 +253,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "testing",
   "title": "Write P23 unit tests: registry, caps, share math, fees, live-block",
-  "description": "Deliverable: tests/pytest/test_p23_nftfi_pools_unit.py covering whitelist registry, utilization caps, vault share math, 20 bps fee math, and the live-block gate. Acceptance: (1) all tests pass; (2) Solidity coverage via forge and Python coverage >=85%; (3) share-math tests pin deposit-accrue-redeem to the wei. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: tests/pytest/test_p23_nftfi_pools_unit.py covering whitelist registry, utilization caps, vault share math, 20 bps fee math, and the live-block gate. Acceptance: (1) all tests pass; (2) Solidity coverage via forge and Python coverage >=85%; (3) share-math tests pin deposit-accrue-redeem to the wei. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-unit-tests",
   "tags": [
    "defi",
@@ -274,7 +274,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "testing",
   "title": "Write P23 integration tests: whitelist->deposit->accrue->redeem cycle",
-  "description": "Deliverable: end-to-end tests: whitelist to deposit to accrue to redeem with oracle price moves, cap enforcement under pressure, manager rebalancing. Acceptance: (1) green cycle with exact NAV accounting; (2) cap-breach deposits revert mid-cycle while withdrawals proceed; (3) stale-oracle injection freezes deposits without bricking the cycle. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: end-to-end tests: whitelist to deposit to accrue to redeem with oracle price moves, cap enforcement under pressure, manager rebalancing. Acceptance: (1) green cycle with exact NAV accounting; (2) cap-breach deposits revert mid-cycle while withdrawals proceed; (3) stale-oracle injection freezes deposits without bricking the cycle. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-integration-tests",
   "tags": [
    "defi",
@@ -295,7 +295,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "testing",
   "title": "Write P23 invariant/fuzz tests: 1000+ deposit/redeem/price sequences",
-  "description": "Deliverable: property tests asserting (a) share supply backs to deposited NFT value within oracle tolerance, (b) utilization never exceeds 0.75, (c) every deposit references a whitelisted collection. Acceptance: (1) invariants hold over >=1000 randomized deposit/redeem/price sequences; (2) violations fail loudly with the offending sequence logged; (3) fixed fuzz seeds for reproducibility. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: property tests asserting (a) share supply backs to deposited NFT value within oracle tolerance, (b) utilization never exceeds 0.75, (c) every deposit references a whitelisted collection. Acceptance: (1) invariants hold over >=1000 randomized deposit/redeem/price sequences; (2) violations fail loudly with the offending sequence logged; (3) fixed fuzz seeds for reproducibility. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-invariant-fuzz-tests",
   "tags": [
    "defi",
@@ -316,7 +316,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "testing",
   "title": "Run P23 mainnet-fork simulation with real NFT collection data",
-  "description": "Deliverable: fork run of vault + oracle adapter against mainnet state with real NFT collection data, verifying pricing, caps, and the live-block gate. Acceptance: (1) completed run with valid pool state and exact accounting; (2) zero live intents emitted (asserted, not assumed); (3) oracle behaves within the 25% clamp / 24 h breaker spec under real data. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: fork run of vault + oracle adapter against mainnet state with real NFT collection data, verifying pricing, caps, and the live-block gate. Acceptance: (1) completed run with valid pool state and exact accounting; (2) zero live intents emitted (asserted, not assumed); (3) oracle behaves within the 25% clamp / 24 h breaker spec under real data. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-fork-simulation",
   "tags": [
    "defi",
@@ -336,7 +336,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "audit",
   "title": "Assemble P23 audit-prep package: snapshot, threat model, limitations log",
-  "description": "Deliverable: single reviewable directory with frozen snapshot (commit hash recorded), threat model covering oracle manipulation, whitelist governance capture, and share-math rounding, plus known-limitations log. Acceptance: (1) snapshot builds and all P23 tests pass from the frozen tree; (2) each threat maps to a mitigating control and its test; (3) limitations log states the reserve-sleeve scope (idiosyncratic defaults only, not systemic collection collapse). Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: single reviewable directory with frozen snapshot (commit hash recorded), threat model covering oracle manipulation, whitelist governance capture, and share-math rounding, plus known-limitations log. Acceptance: (1) snapshot builds and all P23 tests pass from the frozen tree; (2) each threat maps to a mitigating control and its test; (3) limitations log states the reserve-sleeve scope (idiosyncratic defaults only, not systemic collection collapse). Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-audit-prep",
   "tags": [
    "defi",
@@ -356,7 +356,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "audit",
   "title": "Remediate P23 audit findings: zero open medium+ with suite green",
-  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P23 suite plus live-block gate tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: fixes for all audit findings rated medium or higher, each with a regression test. Acceptance: (1) zero open medium-or-higher findings; (2) full P23 suite plus live-block gate tests re-run green after each fix; (3) each fix references the finding ID in its commit message. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-findings-remediation",
   "tags": [
    "defi",
@@ -376,7 +376,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "audit",
   "title": "Gas-optimize P23 vault and registry: 20% reduction target with report",
-  "description": "Deliverable: gas measurements per deposit/redeem/price-update path and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P23 tests still pass; (3) no change to cap math, share math, or live-block semantics (verified by the invariant suite). Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: gas measurements per deposit/redeem/price-update path and optimizations targeting >=20% reduction on hot paths without behavior change. Acceptance: (1) committed before/after gas report with per-path numbers; (2) all P23 tests still pass; (3) no change to cap math, share math, or live-block semantics (verified by the invariant suite). Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-gas-optimization",
   "tags": [
    "defi",
@@ -396,7 +396,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "docs",
   "title": "Write P23 technical docs: contracts, agents, whitelist/cap semantics",
-  "description": "Deliverable: technical docs with component reference for Solidity contracts and Python agents, whitelist and utilization-cap semantics, and the live-blocked posture. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the live-blocked invariant stated on every state-changing path's page. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: technical docs with component reference for Solidity contracts and Python agents, whitelist and utilization-cap semantics, and the live-blocked posture. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the live-blocked invariant stated on every state-changing path's page. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-technical-docs",
   "tags": [
    "defi",
@@ -416,7 +416,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "docs",
   "title": "Ship P23 agent YAML config and ops runbook",
-  "description": "Deliverable: configs/agents/p23-nftfi-pools.yaml (budgets, memory, TOA hooks, check-in cadence) and docs/ops/P23_RUNBOOK.md (whitelist changes via 48 h timelock, cap monitoring, oracle breaker resets). Acceptance: (1) YAML validates; (2) runbook steps executable in order (dry-run first); (3) timelock delay honored with no emergency bypass, stated explicitly. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: configs/agents/p23-nftfi-pools.yaml (budgets, memory, TOA hooks, check-in cadence) and docs/ops/P23_RUNBOOK.md (whitelist changes via 48 h timelock, cap monitoring, oracle breaker resets). Acceptance: (1) YAML validates; (2) runbook steps executable in order (dry-run first); (3) timelock delay honored with no emergency bypass, stated explicitly. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-agent-yaml-runbook",
   "tags": [
    "defi",
@@ -437,7 +437,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "docs",
   "title": "Add P23 dashboard monitoring hooks: utilization, oracle, whitelist events",
-  "description": "Deliverable: monitoring hooks on the feed schema: utilization-vs-cap alert (fires at 0.70), oracle staleness P0 alarm (24 h), whitelist-change events. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated cap pressure fires the utilization alert; (3) simulated 24 h oracle staleness fires the P0 alarm. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: monitoring hooks on the feed schema: utilization-vs-cap alert (fires at 0.70), oracle staleness P0 alarm (24 h), whitelist-change events. Acceptance: (1) hooks emit valid feed-schema events; (2) simulated cap pressure fires the utilization alert; (3) simulated 24 h oracle staleness fires the P0 alarm. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-dashboard-monitoring-hooks",
   "tags": [
    "defi",
@@ -457,7 +457,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "deploy",
   "title": "Write P23 testnet deploy scripts: live emission disabled by default",
-  "description": "Deliverable: deploy scripts for vault, registry, oracle adapter (testnet) plus offchain agent deployment, with live emission disabled by default. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) any live-intent attempt on testnet raises LiveBlocked (asserted in the deploy smoke test). Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: deploy scripts for vault, registry, oracle adapter (testnet) plus offchain agent deployment, with live emission disabled by default. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) any live-intent attempt on testnet raises LiveBlocked (asserted in the deploy smoke test). Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-testnet-deploy-scripts",
   "tags": [
    "defi",
@@ -477,7 +477,7 @@
   "project_name": "NFT-Fi Liquidity Pools",
   "phase": "deploy",
   "title": "Produce P23 mainnet readiness checklist: signed NO-GO by design",
-  "description": "Deliverable: mainnet readiness checklist (audit signoff, whitelist freeze policy, oracle feed verification, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with NO-GO recorded and the re-audit precondition stated; (3) no mainnet deploy script ships enabled. Judged per specs/p23-nftfi-pools.md §Acceptance criteria.",
+  "description": "Deliverable: mainnet readiness checklist (audit signoff, whitelist freeze policy, oracle feed verification, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with NO-GO recorded and the re-audit precondition stated; (3) no mainnet deploy script ships enabled. Judged per specs/p23-nftfi-pools.md \u00a7Acceptance criteria.",
   "skill": "p23-nftfi-pools-mainnet-readiness-checklist",
   "tags": [
    "defi",
@@ -489,6 +489,300 @@
   "effort": "S",
   "depends_on": [
    "p23-nftfi-pools-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-nft-pricing-oracle-testharden-0",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "testing",
+  "title": "Test-hardening: Build the NFT pricing oracle: 7-day TWAP, 24 h breaker, 25% clamp",
+  "description": "Follow-on to p23-nftfi-pools-nft-pricing-oracle (Build the NFT pricing oracle: 7-day TWAP, 24 h breaker, 25% clamp).\n\nBuilds on the deliverable: NftPricingOracle adapter with per-collection floor as 7-day TWAP from >=2 independent sources, 24-hour staleness circuit-breaker, and max 25% price move per update. Acceptance: (1) manipulated feeds (>25% single-update jump) are clamped and alert; (2) stale feeds (>24 h) freeze deposits and fall back to last-good-price...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p23-nftfi-pools-nft-pricing-oracle-testharden-0",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "oracle",
+   "pricing",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-nft-pricing-oracle"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-fee-routing-testharden-1",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "testing",
+  "title": "Test-hardening: Implement 20 bps fee on realized per-pool yield to 0x09E289...9612Ac",
+  "description": "Follow-on to p23-nftfi-pools-fee-routing (Implement 20 bps fee on realized per-pool yield to 0x09E289...9612Ac).\n\nBuilds on the deliverable: fee module computing fee = floor(realized_epoch_yield_wei * 20 / 10000) per collection pool per 7-day epoch, routed to the canonical treasury with per-pool accounting. Acceptance: (1) fee math matches the P23_ECONOMICS.md $1M-pool worked example to the wei; (2) per-pool ledger attributes every wei to its collection; (3...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p23-nftfi-pools-fee-routing-testharden-1",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "fees",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-fee-routing"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-liquidity-manager-testharden-2",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "testing",
+  "title": "Test-hardening: Build the pool liquidity manager agent (dry-run advisory only)",
+  "description": "Follow-on to p23-nftfi-pools-liquidity-manager (Build the pool liquidity manager agent (dry-run advisory only)).\n\nBuilds on the deliverable: src/sincor2/defi/p23/manager.py monitoring pool utilization, rebalancing advisory allocations across whitelisted collections within the 0.08 per-collection cap, emitting TOA feedback; dry-run only, never signs. Acceptance: (1) manager rebalances a mocked pool set without ever breaching a utilization cap; (2) per-collec...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p23-nftfi-pools-liquidity-manager-testharden-2",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "agent",
+   "toa",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-liquidity-manager"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-live-block-gate-testharden-3",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "testing",
+  "title": "Test-hardening: Implement the live-block gate: LiveBlocked on every live-intent path",
+  "description": "Follow-on to p23-nftfi-pools-live-block-gate (Implement the live-block gate: LiveBlocked on every live-intent path).\n\nBuilds on the deliverable: live-block enforcement matching catalog live_blocked=True: the module never emits live intents; any live-intent code path raises LiveBlocked. Acceptance: (1) tests attempting live emission through every entrypoint (vault, registry, oracle, manager) all raise LiveBlocked; (2) dry-run paths unaffected (full deposit/redee...\n\nAcceptance criteria: (1) fork-sim replay covering the parent deliverable's state transitions runs green with zero assertion failures; (2) invariant/fuzz coverage across the numeric bands named in the parent task (minimum 256 runs); (3) gas benchmark recorded against the parent's acceptance thresholds, no regression over 5% unexplained; (4) every new assertion maps to a numbered acceptance criterion of the parent task -- no invented criteria. Proof: test file paths plus the full run log.",
+  "skill": "p23-nftfi-pools-live-block-gate-testharden-3",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "gates",
+   "security",
+   "testing"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-live-block-gate"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-collection-whitelist-registry-secreview-0",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "audit",
+  "title": "Security review: Build the collection whitelist registry: 48 h timelock, freeze-on-removal",
+  "description": "Follow-on to p23-nftfi-pools-collection-whitelist-registry (Build the collection whitelist registry: 48 h timelock, freeze-on-removal).\n\nBuilds on the deliverable: CollectionRegistry (Solidity + Python mirror): only allowlisted ERC-721 collections can back pools; add/remove via 48-hour timelocked admin; events on every change. Acceptance: (1) deposits for non-whitelisted collections revert in 100% of fuzzed cases; (2) timelock removal freezes new deposits within one block while e...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p23-nftfi-pools-collection-whitelist-registry-secreview-0",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "whitelist",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-collection-whitelist-registry"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-utilization-cap-enforcer-secreview-1",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "audit",
+  "title": "Security review: Build the utilization-cap enforcer: 0.75 cap, withdrawals never blocked",
+  "description": "Follow-on to p23-nftfi-pools-utilization-cap-enforcer (Build the utilization-cap enforcer: 0.75 cap, withdrawals never blocked).\n\nBuilds on the deliverable: utilization-cap enforcer with utilization = deployed_lending_value / total_pool_value <= 0.75; deposits breaching the cap revert; withdrawals never blocked; cap readable onchain. Acceptance: (1) cap-breach deposits revert, verified at utilizations 0.74/0.75/0.76; (2) withdrawals succeed at 0.99 utilization; (3) current...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p23-nftfi-pools-utilization-cap-enforcer-secreview-1",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "risk",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-utilization-cap-enforcer"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-fractional-vault-secreview-2",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "audit",
+  "title": "Security review: Build the fractional NFT vault: ERC-20 shares, NAV accrual, redemptions",
+  "description": "Follow-on to p23-nftfi-pools-fractional-vault (Build the fractional NFT vault: ERC-20 shares, NAV accrual, redemptions).\n\nBuilds on the deliverable: FractionalVault.sol: ERC-721 custody, ERC-20 fractional share mint/burn against whitelisted deposits, borrower-interest NAV accrual, redemptions; ReentrancyGuard, SafeERC20, try/catch on oracle calls degrading to last-good-price (never bricking). Acceptance: (1) full deposit-accrue-redeem cycle on a local chain with sh...\n\nAcceptance criteria: (1) static-analysis pass over the parent deliverable's contract/module files with every finding triaged (fix or explicit waiver with rationale); (2) access-control matrix: each privileged function mapped to its authorized caller, no open setters; (3) economic-attack checklist dispositioned against the parent's numeric bands (reentrancy, oracle manipulation, rounding direction, fee-on-transfer); (4) unresolved findings filed as follow-up tasks referencing this task's key. Proof: review report plus the triage table.",
+  "skill": "p23-nftfi-pools-fractional-vault-secreview-2",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "vault",
+   "solidity",
+   "audit"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-fractional-vault"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-testnet-deploy-scripts-prodready-0",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "deploy",
+  "title": "Production readiness: Write P23 testnet deploy scripts: live emission disabled by default",
+  "description": "Follow-on to p23-nftfi-pools-testnet-deploy-scripts (Write P23 testnet deploy scripts: live emission disabled by default).\n\nBuilds on the deliverable: deploy scripts for vault, registry, oracle adapter (testnet) plus offchain agent deployment, with live emission disabled by default. Acceptance: (1) scripts run end-to-end on Base Sepolia; (2) agent check-ins visible in logs; (3) any live-intent attempt on testnet raises LiveBlocked (asserted in the deploy smoke test)....\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p23-nftfi-pools-testnet-deploy-scripts-prodready-0",
+  "tags": [
+   "defi",
+   "nftfi",
+   "deploy",
+   "testnet"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-testnet-deploy-scripts"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-mainnet-readiness-checklist-prodready-1",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "deploy",
+  "title": "Production readiness: Produce P23 mainnet readiness checklist: signed NO-GO by design",
+  "description": "Follow-on to p23-nftfi-pools-mainnet-readiness-checklist (Produce P23 mainnet readiness checklist: signed NO-GO by design).\n\nBuilds on the deliverable: mainnet readiness checklist (audit signoff, whitelist freeze policy, oracle feed verification, treasury 0x09E289...9612Ac verification, rollback plan, printed compliance checkpoint) recorded as NO-GO by design until re-audit. Acceptance: (1) every item has owner + evidence link; (2) checklist reviewed and signed with N...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p23-nftfi-pools-mainnet-readiness-checklist-prodready-1",
+  "tags": [
+   "defi",
+   "nftfi",
+   "deploy",
+   "mainnet"
+  ],
+  "bounty_axm": 1.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-mainnet-readiness-checklist"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-technical-docs-prodready-2",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "deploy",
+  "title": "Production readiness: Write P23 technical docs: contracts, agents, whitelist/cap semantics",
+  "description": "Follow-on to p23-nftfi-pools-technical-docs (Write P23 technical docs: contracts, agents, whitelist/cap semantics).\n\nBuilds on the deliverable: technical docs with component reference for Solidity contracts and Python agents, whitelist and utilization-cap semantics, and the live-blocked posture. Acceptance: (1) docs build with zero warnings; (2) every public function documented with params and numeric constraints; (3) the live-blocked invariant stated on every...\n\nAcceptance criteria: (1) deploy runbook with exact commands, environment checklist, and parameter values taken from the parent deliverable; (2) monitoring and alerting wired: health endpoint plus anomaly thresholds on the parent's numeric bands; (3) rollback drill documented with a recovery-time target and the exact revert commands; (4) testnet/mainnet config diff reviewed -- no secrets or private keys anywhere in the repo. Proof: runbook file plus the drill log.",
+  "skill": "p23-nftfi-pools-technical-docs-prodready-2",
+  "tags": [
+   "defi",
+   "nftfi",
+   "docs",
+   "deploy"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-technical-docs"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-repo-layout-devex-0",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "scaffold",
+  "title": "DevEx: Create P23 repo layout: onchain/src/p23/ + src/sincor2/defi/p23/",
+  "description": "Follow-on to p23-nftfi-pools-repo-layout (Create P23 repo layout: onchain/src/p23/ + src/sincor2/defi/p23/).\n\nBuilds on the deliverable: onchain/src/p23/ (vault, registry, oracle adapter, interfaces), src/sincor2/defi/p23/ (manager, interfaces), tests/pytest/test_p23_*.py stubs, configs/agents/p23-nftfi-pools.yaml, docs runbook stub. Acceptance: (1) solc 0.8.24 compiles the Solidity tree and the Python package imports cleanly; (2) layout mirrors the int...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p23-nftfi-pools-repo-layout-devex-0",
+  "tags": [
+   "defi",
+   "nftfi",
+   "scaffold"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-repo-layout"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-starter-code-devex-1",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "scaffold",
+  "title": "DevEx: Write P23 starter boilerplate: vault stub, registry stub, mock oracle",
+  "description": "Follow-on to p23-nftfi-pools-starter-code (Write P23 starter boilerplate: vault stub, registry stub, mock oracle).\n\nBuilds on the deliverable: FractionalVault stub with ReentrancyGuard, whitelist registry stub, mock pricing oracle returning fixed floors, Python monitor stub with TOA hooks. Acceptance: (1) solc compiles all stubs with zero warnings; (2) mock deposit/redeem round-trip works in Python against the mock oracle; (3) every stub's state-changing path...\n\nAcceptance criteria: (1) one-command reproducible dev setup for the parent deliverable's module (fresh checkout to green tests); (2) CI job covering the module runs green on the scaffold; (3) lint, format, and type gates enforced pre-commit for the module's paths. Proof: CI run link or log plus the setup script.",
+  "skill": "p23-nftfi-pools-starter-code-devex-1",
+  "tags": [
+   "defi",
+   "nftfi",
+   "scaffold",
+   "solidity"
+  ],
+  "bounty_axm": 0.75,
+  "effort": "S",
+  "depends_on": [
+   "p23-nftfi-pools-starter-code"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-collection-whitelist-registry-completion-0",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "core",
+  "title": "Core completion: Build the collection whitelist registry: 48 h timelock, freeze-on-removal",
+  "description": "Follow-on to p23-nftfi-pools-collection-whitelist-registry (Build the collection whitelist registry: 48 h timelock, freeze-on-removal).\n\nBuilds on the deliverable: CollectionRegistry (Solidity + Python mirror): only allowlisted ERC-721 collections can back pools; add/remove via 48-hour timelocked admin; events on every change. Acceptance: (1) deposits for non-whitelisted collections revert in 100% of fuzzed cases; (2) timelock removal freezes new deposits within one block while e...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p23-nftfi-pools-collection-whitelist-registry-completion-0",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "whitelist",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-collection-whitelist-registry"
+  ]
+ },
+ {
+  "task_key": "p23-nftfi-pools-utilization-cap-enforcer-completion-1",
+  "project_id": "P23",
+  "project_name": "NFT-Fi Liquidity Pools",
+  "phase": "core",
+  "title": "Core completion: Build the utilization-cap enforcer: 0.75 cap, withdrawals never blocked",
+  "description": "Follow-on to p23-nftfi-pools-utilization-cap-enforcer (Build the utilization-cap enforcer: 0.75 cap, withdrawals never blocked).\n\nBuilds on the deliverable: utilization-cap enforcer with utilization = deployed_lending_value / total_pool_value <= 0.75; deposits breaching the cap revert; withdrawals never blocked; cap readable onchain. Acceptance: (1) cap-breach deposits revert, verified at utilizations 0.74/0.75/0.76; (2) withdrawals succeed at 0.99 utilization; (3) current...\n\nAcceptance criteria: (1) implements the next build step directly implied by the parent deliverable, integrating with the sibling interfaces it names; (2) behavior matches the parent's numeric bands with no silent widening; (3) unit tests for the new logic green, referencing the parent's acceptance criteria by number; (4) no new external dependencies without a recorded justification. Proof: code paths plus test log.",
+  "skill": "p23-nftfi-pools-utilization-cap-enforcer-completion-1",
+  "tags": [
+   "defi",
+   "nftfi",
+   "core",
+   "risk",
+   "solidity"
+  ],
+  "bounty_axm": 2.0,
+  "effort": "M",
+  "depends_on": [
+   "p23-nftfi-pools-utilization-cap-enforcer"
   ]
  }
 ]

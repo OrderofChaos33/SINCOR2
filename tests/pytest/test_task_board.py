@@ -8,7 +8,9 @@ policy coverage for the new routes.
 """
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
+
+from bid_testkit import register_wallet_agent, signed_commit_body, key_for
 
 import json
 import os
@@ -35,7 +37,7 @@ def board_client(tmp_path, monkeypatch):
     reset_fabric()
     monkeypatch.setenv("SINCOR_A2A_TASKS_PATH", str(tmp_path / "tasks.json"))
     monkeypatch.setenv("SINCOR_BOUNTY_POOL_PATH", str(tmp_path / "pool.json"))
-    monkeypatch.setenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", "test-admin-key")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-key")
     from sincor2.a2a_bounty_pool import reset_bounty_pool
 
     reset_bounty_pool(path=str(tmp_path / "pool.json"))
@@ -239,21 +241,21 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
     from sincor2.onchain.stake_ledger import reset_stake_ledger, stake_ledger
 
     reset_stake_ledger(path="/tmp/sincor-test-board-stake.json")
-    r = board_client.post("/v1/a2a/register", json={
-        "agent_id": "board-bidder",
-        "capability_tags": ["deal-scoring"],
-        "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "ab" * 20,
-    })
-    assert r.status_code in (200, 201), r.get_json()
+    # W-77: bids bind to the agent's registered wallet.
+    register_wallet_agent(
+        board_client, "board-bidder",
+        capability_tags=["deal-scoring"])
     assert board_client.post(
         "/v1/a2a/heartbeat", json={"agent_id": "board-bidder"},
         headers=hb_headers()).status_code == 200
     stake_ledger().deposit("board-bidder", 10 * 10**18)
 
     r = board_client.post("/v1/a2a/tasks", json={
+        # Signed: the anti-gaming guards reject bids on anonymous
+        # (unsigned) bounty tasks, so the post must bind a poster.
         "skill": "deal-scoring", "tags": ["deal-scoring"],
         "bounty_axm": 1.0, "sealed": True,
+        **signed_task_auth("deal-scoring"),
     })
     task_id = r.get_json()["task_id"]
     fabric = get_fabric()
@@ -261,11 +263,8 @@ def test_commit_after_stale_window_refreshes_not_kills(board_client):
         fabric.tasks[task_id]["reveal_deadline"] = 1
         fabric.tasks[task_id]["commit_deadline"] = 1
 
-    r = board_client.post("/v1/a2a/bids/commit", json={
-        "task_id": task_id,
-        "agent_id": "board-bidder",
-        "commitment": "0x" + "cd" * 32,
-    })
+    r = board_client.post("/v1/a2a/bids/commit", json=signed_commit_body(
+        key_for("board-bidder"), task_id, "board-bidder", "0x" + "cd" * 32))
     assert r.status_code == 201, r.get_json()
     assert get_fabric().tasks[task_id]["state"] in ("open", "auction")
 
@@ -340,7 +339,7 @@ def test_pool_default_zero(board_client):
 
 
 def test_pool_admin_gate(board_client, monkeypatch):
-    monkeypatch.delenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD", raising=False)
     # deny-by-default: admin surface disabled without a key
     assert board_client.post("/v1/a2a/pool/fund", json={}).status_code == 503
     assert board_client.post(
@@ -352,7 +351,7 @@ def test_pool_admin_gate(board_client, monkeypatch):
     # public status stays readable
     assert board_client.get("/v1/a2a/pool").status_code == 200
 
-    monkeypatch.setenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", "right-key")
+    monkeypatch.setenv("ADMIN_PASSWORD", "right-key")
     assert board_client.post(
         "/v1/a2a/pool/fund", json={}).status_code == 401  # no key sent
     assert board_client.post(

@@ -1,13 +1,17 @@
-# Fork-Simulation Notes — DeFi Product Arm P01–P03 (audit-prep)
+# Fork-Simulation Notes — DeFi Product Arm (audit-prep)
 
-**Status:** scaffolding sketch only. No fork harness is implemented in this
-branch; no forked state is read or written by any test here. This document
-records WHAT a Base fork-sim would need per module, and — critically —
-what is still **unpinned** and therefore blocks it.
+**Status (2026-09-30):** the harness now exists at `fork_sim/run_fork_sims.py`
+(branch `xioix/buildout-25-fork-sim-harness`). It replays read-only against
+Base mainnet state at a pinned block via public JSON-RPC — no Anvil, no
+signing, no broadcasting. 17/26 products have passing `fork_sim` evidence in
+the proof ledger; the other 9 remain findings (blockers below), never passes.
 
-**Standing rule:** never invent mainnet addresses. Every address below is
-copied verbatim from the codebase. Anything not in the codebase is listed
-under "Unpinned blockers", not guessed.
+The original scaffolding sketch for P01–P03 is preserved below as the plan
+record; the harness supersedes it for the products it covers.
+
+**Standing rule:** never invent mainnet addresses. Every address used is
+copied verbatim from the codebase. Anything not in the codebase stays a
+finding, never a pass.
 
 ## Pinned in code (usable on a fork)
 
@@ -85,4 +89,6 @@ empty at the end of every sim (any write = harness bug).
 
 - No live transactions, no signing, no broadcasting — from any module.
 - No invented addresses, ever. A gap stays a gap until the auditor pins it.
-- No "passing" fork-sim is claimed here; this file is the plan, not the run.
+- Passing fork-sims are claimed only via `fork_sim/run_fork_sims.py` runs
+  whose entries land in the proof ledger with `passed: 1, failed: 0`; the
+  original plan sketches below are not evidence by themselves.

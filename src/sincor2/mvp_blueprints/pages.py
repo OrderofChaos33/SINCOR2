@@ -87,24 +87,108 @@ def index():
 
 
 @bp.route("/api/genesis/claim", methods=["POST"])
-@limiter.limit("10 per minute")
+# Base44 review (2026-11-06): the claim write path needs a burst limit
+# tight enough to stop scripted genesis-cohort farming — 5/minute per
+# client address (single digits; a human retrying the form never comes
+# close), stacked under a 30/hour ceiling so a slow drip from one
+# address also stops. Keying is the limiter default (get_remote_address,
+# i.e. the ProxyFix-derived address — see the trusted-edge note where
+# the limiter is constructed in mvp_app). Limiter refusals surface as
+# 429 {"error": "rate_limited"} via the app errorhandler, with
+# X-RateLimit-* / Retry-After headers (headers_enabled on the limiter).
+@limiter.limit("5 per minute; 30 per hour")
 def genesis_claim_api():
     """Genesis pass claim — the signup target of the launch gate's form.
 
     Public and intentionally ungated by launch date (it must work before
-    launch). A successful claim sets the genesis cookie, which lifts the
-    homepage gate for that browser.
+    launch). W-136: a claim request only creates a PENDING claim and
+    emails a confirmation link to the address — it binds no wallet,
+    reveals no allocation, and sets NO genesis cookie. The cookie (and
+    the wallet binding) happen only in genesis_confirm_api, once the
+    emailed token proves ownership of the email address. The response
+    is the same neutral receipt for new, pending, and existing emails.
     """
     try:
         from sincor2.genesis_cohort import claim as genesis_claim
     except Exception:
         return jsonify({"ok": False, "error": "Claim service unavailable."}), 503
     payload = request.get_json(silent=True) or {}
+    # No password: customer password login is disabled, so the claim form
+    # no longer collects one and nothing here reads or forwards one.
     result = genesis_claim(
         payload.get("email", ""),
-        payload.get("password", ""),
-        payload.get("wallet", ""),
+        wallet=payload.get("wallet", ""),
     )
+    if result.get("ok"):
+        status = 200
+    elif result.get("email_unavailable"):
+        status = 503
+    else:
+        status = 400
+    return jsonify(result), status
+
+
+@bp.route("/api/genesis/confirm", methods=["GET", "POST"])
+@limiter.limit("30 per minute; 200 per hour")
+def genesis_confirm_api():
+    """Confirm a pending genesis claim via its emailed token (W-136).
+
+    W-138: confirmation binds on POST ONLY. A GET — the emailed link
+    itself — renders a neutral confirmation page whose button POSTs
+    the token. Mail-security scanners and link-preview bots prefetch
+    links with GET; if the GET bound the wallet, a prefetch would
+    complete the confirmation (in a squat, binding the attacker's
+    pending wallet to the victim's email) before the owner ever
+    clicked. The GET therefore changes no state: it does not call
+    confirm_claim, does not consume or rotate the token, does not
+    reveal whether the token is valid, and sets no cookie — so a
+    prefetch leaves the owner's later POST fully functional.
+
+    POST accepts the token as a JSON body {"token": ...}, a form
+    field (the confirmation page's button), or a ?token= query
+    parameter. On success the wallet binds (or is replaced, for a
+    reclaim), the member's allocation is returned to the now-verified
+    owner, and the genesis cookie is set — POST is the only path
+    that sets it.
+    """
+    if request.method == "GET":
+        from html import escape as _html_escape
+
+        from flask import Response
+
+        token = request.args.get("token") or ""
+        page = (
+            "<!DOCTYPE html>\n"
+            '<html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            "<title>Confirm your genesis claim — SINCOR</title>"
+            "<style>body{background:#0a0c10;color:#e8e6df;font-family:Inter,"
+            "system-ui,sans-serif;display:flex;min-height:100vh;margin:0;"
+            "align-items:center;justify-content:center}"
+            "main{max-width:26rem;padding:2rem;text-align:center}"
+            "h1{color:#f0c664;font-size:1.4rem}"
+            "button{background:#d4a94e;color:#0a0c10;border:0;border-radius:"
+            "0.5rem;padding:0.8rem 1.6rem;font-size:1rem;font-weight:600;"
+            "cursor:pointer}</style></head><body><main>"
+            "<h1>Confirm your genesis claim</h1>"
+            "<p>Press the button below to confirm this claim and bind "
+            "your wallet. Opening this page on its own confirms "
+            "nothing.</p>"
+            '<form method="post" action="/api/genesis/confirm">'
+            f'<input type="hidden" name="token" value="{_html_escape(token, quote=True)}">'
+            '<button type="submit">Confirm my claim</button>'
+            "</form></main></body></html>"
+        )
+        return Response(page, status=200, mimetype="text/html")
+    try:
+        from sincor2.genesis_cohort import confirm_claim
+    except Exception:
+        return jsonify({"ok": False, "error": "Claim service unavailable."}), 503
+    token = request.args.get("token") or ""
+    if not token:
+        payload = request.get_json(silent=True) or {}
+        token = payload.get("token") or request.form.get("token") or ""
+    result = confirm_claim(token)
     status = 200 if result.get("ok") else 400
     resp = jsonify(result)
     if result.get("ok"):
@@ -122,6 +206,7 @@ def genesis_alias():
 
 
 @bp.route("/login", methods=["GET", "POST"])
+@credential_rate_limits(limiter, methods=["POST"])  # P2-A3: throttle credential checks (POST only)
 def login_page():
     next_url = request.values.get("next") or request.args.get("next") or ""
     identifier = (request.form.get("identifier") or request.form.get("email") or request.form.get("username") or "").strip()
@@ -142,16 +227,25 @@ def login_page():
     if not identifier:
         return render_template("login.html", error="Email or username required.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 400
     if _admin_credentials_match(identifier, password):
+        note_login_success(identifier)
         return _admin_cookie_response(identifier, _safe_next_url(next_url, "/admin"))
-    customer = None
-    try:
-        customer = _resolve_customer(identifier)
-    except Exception as exc:
-        logger.warning("[AUTH] customer resolve failed: %s", exc)
-    if customer and customer.get("email"):
-        session["username"] = customer.get("username") or customer["email"].split("@")[0]
-        return _auth_cookie_response(customer["email"], _safe_next_url(next_url, "/dashboard"))
-    return render_template("login.html", error="Invalid credentials.", next_url=next_url, identifier=identifier, oauth_google=oauth_google, oauth_github=oauth_github), 401
+    # AUDIT P1 finding 1: the customer path below granted a session on
+    # identifier alone (no password store exists for customers — admin auth
+    # is env credentials; genesis_cohort is a separate marketing claim DB).
+    # Customer password login is DISABLED until a proper credential store
+    # ships; customers authenticate via OAuth (verified email) meanwhile.
+    # P2-A3: failed attempt still counts toward progressive backoff.
+    note_login_failure(identifier)
+    logger.warning(
+        "[AUTH] Disabled customer password-login attempt for identifier=%r from %s",
+        identifier, request.remote_addr,
+    )
+    return render_template(
+        "login.html",
+        error="Customer password sign-in is currently disabled. Please use Google/GitHub sign-in or contact support.",
+        next_url=next_url, identifier=identifier,
+        oauth_google=oauth_google, oauth_github=oauth_github,
+    ), 403
 
 
 @bp.route("/logout")
@@ -357,6 +451,23 @@ def pricing_page():
     return render_template("pricing.html")
 
 
+@bp.route("/x402-live")
+def x402_live_page():
+    from sincor2 import lane3
+
+    return render_template("x402_live.html", **lane3.proof_wall_data())
+
+
+@bp.route("/register")
+def register_page():
+    return render_template("register.html")
+
+
+@bp.route("/audit-express")
+def audit_express_page():
+    return render_template("audit_express.html")
+
+
 @bp.route("/earn")
 def earn_page():
     return render_template("earn.html")
@@ -392,6 +503,37 @@ def operator_page():
 @bp.route("/sitemap")
 def sitemap_page():
     return render_template("sitemap.html")
+
+
+# Public pages listed in the machine-readable sitemap. Every path here is
+# asserted against this app's route table by
+# tests/pytest/test_sitemap_truth.py — do not add a path that does not
+# resolve on the production app.
+_SITEMAP_XML_PATHS = (
+    "/", "/pricing", "/signup", "/contact", "/docs", "/whitepaper",
+    "/products", "/products/starter", "/products/professional",
+    "/products/enterprise", "/dashboard", "/agents", "/tasks", "/pool",
+    "/catalog", "/agent-card", "/register-agent", "/toa", "/webbuilder",
+    "/sinc", "/axiom", "/sin-airdrop",
+    "/x402-live", "/register", "/audit-express",
+    "/terms", "/privacy", "/security", "/sitemap",
+)
+
+
+@bp.route("/sitemap.xml")
+def sitemap_xml():
+    from flask import Response
+
+    root = request.url_root.rstrip("/")
+    urls = "".join(
+        f"<url><loc>{root}{path}</loc></url>" for path in _SITEMAP_XML_PATHS
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return Response(body, mimetype="application/xml")
 
 
 @bp.route("/products/starter")
@@ -434,6 +576,17 @@ _PRODUCT_SLUGS = frozenset((
     "p22-stablecoin-yield", "p23-nftfi-pools", "p24-socialfi-revenue",
     "p25-agent-portfolio", "p26-defi-os",
 ))
+
+# Observability / audit SKUs: live pages at templates/products/sku-*.html.
+# Copy on each page is honest build-stage framing (private beta / service
+# engagement) — none claims a live production deployment.
+_SKU_SLUGS = frozenset((
+    "sku-obs-01-agent-vitals", "sku-obs-02-agent-audit-trail",
+    "sku-obs-03-drift-quality-watch", "sku-aud-01-agent-forensic-audit",
+    "sku-aud-02-compliance-pack", "sku-obs-ent-enterprise-mesh",
+))
+
+_PRODUCT_SLUGS = _PRODUCT_SLUGS | _SKU_SLUGS
 
 
 @bp.route("/products")

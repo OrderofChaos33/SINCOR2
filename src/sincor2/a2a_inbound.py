@@ -10,20 +10,25 @@ import os
 import re
 import threading
 import time
-import uuid
 from collections import deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
-from flask import Blueprint, Flask, Response, jsonify, request, stream_with_context
+from flask import Flask, jsonify
 
+from sincor2.card_sanitize import (
+    AGENT_ID_MAX_LEN,
+    DESCRIPTION_MAX_LEN,
+    NAME_MAX_LEN,
+    SKILL_FIELD_MAX_LEN,
+    TAG_MAX_LEN,
+    VERSION_MAX_LEN,
+    sanitize_card_text,
+    sanitize_skills,
+    safe_url,
+)
 from sincor2.contract_net import (
     BASE_CHAIN_ID,
-    ESCROW_ADDRESS,
-    calculate_bid_score,
-    probe_base_chain,
-    stage_payout,
 )
 
 logger = logging.getLogger("sincor.a2a.inbound")
@@ -108,14 +113,35 @@ def _slug(value: str) -> str:
     return (re.sub(r"[^a-z0-9]+", "-", (value or "agent").lower()).strip("-") or "agent")[:80]
 
 
-def sign_payload(payload: Dict[str, Any], secret: str) -> str:
-    """HMAC-SHA256 sign a canonicalised payload.
+_A2A_SECRET_ENV = "SINCOR_A2A_SECRET"
 
-    ``secret`` is mandatory: there is deliberately no module-level default.
-    A hardcoded fallback secret shipped here until 2026-09-30 and was
-    removed (no route ever used it). Callers must supply their own secret
-    from configuration; never commit one to the repo.
+
+def _a2a_signing_secret() -> str:
+    """Resolve the A2A payload-signing secret from the environment.
+
+    FAIL-CLOSED: there is deliberately no hardcoded or demo fallback.
+    If the variable is unset or empty, signing raises instead of signing
+    with a guessable secret.
     """
+    secret = os.environ.get(_A2A_SECRET_ENV, "").strip()
+    if not secret:
+        raise RuntimeError(
+            f"{_A2A_SECRET_ENV} is not set; refusing to sign payloads "
+            "with a fallback secret"
+        )
+    return secret
+
+
+def sign_payload(payload: Dict[str, Any], secret: Optional[str] = None) -> str:
+    """HMAC-SHA256 sign ``payload`` with ``secret``.
+
+    ``secret`` is required: when omitted it is resolved from the
+    ``SINCOR_A2A_SECRET`` environment variable, and resolution fails
+    closed (``RuntimeError``) if the variable is unset. There is no
+    hardcoded demo secret.
+    """
+    if not secret:
+        secret = _a2a_signing_secret()
     body = json.dumps({k: payload[k] for k in sorted(payload) if k != "signature"}, separators=(",", ":"), sort_keys=True)
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
@@ -148,8 +174,43 @@ def get_fabric() -> Fabric:
         with _FABRIC_LOCK:
             if _FABRIC is None:
                 _FABRIC = Fabric()
-                _load_agents(_FABRIC)
+                agents_path = _persist_path()
+                agents_file_existed = bool(agents_path is not None and agents_path.is_file())
+                restored, expected = _load_agents(_FABRIC)
                 _load_tasks(_FABRIC)
+                _FABRIC.registry_boot = _registry_persistence_check(restored)
+                restore_check = _registry_restore_integrity_check(restored, expected, agents_file_existed)
+                _FABRIC.registry_boot["restore_integrity"] = restore_check
+                if not _is_test_env():
+                    if bool(os.environ.get("RAILWAY_ENVIRONMENT")) and not _FABRIC.registry_boot["persistent"]:
+                        logger.error(
+                            "[A2A] REGISTRY NOT PERSISTENT: %s — agent registry will NOT survive restarts; mount the /data volume",
+                            _FABRIC.registry_boot["reason"],
+                        )
+                    alarm = restore_check["alarm"]
+                    if alarm == "empty":
+                        logger.error(
+                            "[A2A] REGISTRY RESTORE EMPTY: %s existed but 0 agents were restored — the registry may have been wiped",
+                            agents_path,
+                        )
+                    elif alarm == "short":
+                        logger.error(
+                            "[A2A] REGISTRY RESTORE SHORT: %s held %d agents at last save but only %d restored (%d missing) — "
+                            "the registry may have been partially wiped; investigate before trusting it",
+                            agents_path,
+                            restore_check["expected"],
+                            restored,
+                            restore_check["missing"],
+                        )
+                    elif alarm == "collapse":
+                        logger.critical(
+                            "[A2A] REGISTRY RESTORE COLLAPSE: %s held %d agents at last save but only %d restored (%d missing) — "
+                            "over half the registry is gone; treat the registry as compromised until reviewed",
+                            agents_path,
+                            restore_check["expected"],
+                            restored,
+                            restore_check["missing"],
+                        )
     return _FABRIC
 
 
@@ -168,19 +229,120 @@ def _persist_path():
         return None
 
 
-def _load_agents(fabric: Fabric) -> None:
+def _is_test_env() -> bool:
+    """True when running under a test harness (never log boot alarms there)."""
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENVIRONMENT") or "production").strip().lower()
+    return env in {"test", "testing"}
+
+
+def _registry_restore_integrity_check(restored: int, expected: "int | None", file_existed: bool) -> Dict[str, Any]:
+    """Boot-time integrity check against a partial registry wipe (W-95).
+
+    The old check only alarmed when the restore was totally empty
+    (``restored == 0``); a wipe down to a single attacker-controlled record
+    restored silently. This compares the restored count against the
+    ``expected_agent_count`` persisted by :func:`_save_agents`.
+
+    Returns ``{"expected": int|None, "restored": int, "missing": int,
+    "alarm": None|"empty"|"short"|"collapse"}``. ``alarm`` is ``None`` on a
+    clean restore, on first boot (no file), and on files that carry no
+    expected count (can't compare — don't alarm on evidence we don't have).
+
+    Tolerance: a drop of up to ``max(1, expected // 10)`` agents is quiet
+    (covers legitimate churn between the last save and boot). Beyond that
+    the alarm is ``"short"``; losing more than half the registry is a
+    ``"collapse"`` (logged at CRITICAL and surfaced via health_snapshot).
+    Never raises.
+    """
+    try:
+        if not file_existed:
+            return {"expected": expected, "restored": restored, "missing": 0, "alarm": None}
+        if restored == 0:
+            # Preserves the pre-W-95 total-wipe behavior: any existing file
+            # that yields zero agents is loud, even with no expected count.
+            return {"expected": expected, "restored": 0, "missing": expected or 0, "alarm": "empty"}
+        if expected is None or restored >= expected:
+            return {"expected": expected, "restored": restored, "missing": 0, "alarm": None}
+        missing = expected - restored
+        tolerance = max(1, expected // 10)
+        if missing <= tolerance:
+            return {"expected": expected, "restored": restored, "missing": missing, "alarm": None}
+        alarm = "collapse" if restored * 2 < expected else "short"
+        return {"expected": expected, "restored": restored, "missing": missing, "alarm": alarm}
+    except Exception as err:  # never fatal at boot
+        return {"expected": expected, "restored": restored, "missing": 0, "alarm": None, "error": str(err)}
+
+
+def _registry_persistence_check(restored_count: int) -> Dict[str, Any]:
+    """Boot-time check: is the agent registry on persistent storage?
+
+    Returns ``{"persistent": bool, "data_dir": str, "restored_agents": int,
+    "reason": str}``. Off Railway, local/ephemeral storage is expected and
+    counts as persistent. On Railway, the data dir must be a mounted volume
+    (``/data``), otherwise the registry is wiped on every redeploy/restart.
+    Never raises: a failed check reports ``persistent=False`` with the reason.
+    """
+    try:
+        on_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+        from sincor2.data_paths import data_dir
+        ddir = str(data_dir())
+        if not on_railway:
+            return {
+                "persistent": True,
+                "data_dir": ddir,
+                "restored_agents": restored_count,
+                "reason": "not on Railway; local storage is expected",
+            }
+        if os.path.ismount(ddir):
+            return {
+                "persistent": True,
+                "data_dir": ddir,
+                "restored_agents": restored_count,
+                "reason": "data dir is a mounted volume",
+            }
+        return {
+            "persistent": False,
+            "data_dir": ddir,
+            "restored_agents": restored_count,
+            "reason": "on Railway but data dir is not a mounted volume",
+        }
+    except Exception as err:  # never fatal at boot
+        return {
+            "persistent": False,
+            "data_dir": "",
+            "restored_agents": restored_count,
+            "reason": "persistence check failed: %s" % (err,),
+        }
+
+
+def _load_agents(fabric: Fabric) -> "tuple":
+    """Restore agent records; returns ``(restored, expected)``.
+
+    ``expected`` is the agent count the registry file claims it holds
+    (``expected_agent_count``, written by :func:`_save_agents`); ``None``
+    when the file carries no count (first-boot / pre-W-95-format files) —
+    no integrity comparison is possible in that case.
+    """
     path = _persist_path()
     if path is None or not path.is_file():
-        return
+        return 0, None
+    restored = 0
+    expected = None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            count = raw.get("expected_agent_count")
+            if isinstance(count, int) and count >= 0:
+                expected = count
         agents = raw.get("agents") if isinstance(raw, dict) else raw
         if isinstance(agents, list):
             for agent in agents:
                 if isinstance(agent, dict) and agent.get("agent_id"):
                     fabric.agents[agent["agent_id"]] = agent
+                    restored += 1
     except Exception as err:
         logger.warning("[A2A] restore failed: %s", err)
+    return restored, expected
 
 
 def _save_agents(fabric: Fabric) -> None:
@@ -189,7 +351,20 @@ def _save_agents(fabric: Fabric) -> None:
         return
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"agents": list(fabric.agents.values()), "saved_at": _now_ms()}), encoding="utf-8")
+        # W-95: persist the expected agent count alongside the registry so a
+        # partial wipe (file still parses, records silently dropped) trips the
+        # boot-time integrity check in get_fabric().
+        written = [a for a in fabric.agents.values() if isinstance(a, dict) and a.get("agent_id")]
+        path.write_text(
+            json.dumps(
+                {
+                    "agents": list(fabric.agents.values()),
+                    "saved_at": _now_ms(),
+                    "expected_agent_count": len(written),
+                }
+            ),
+            encoding="utf-8",
+        )
     except Exception as err:
         logger.warning("[A2A] persist failed: %s", err)
 
@@ -221,41 +396,183 @@ def _tasks_persist_enabled() -> bool:
     return env not in {"test", "testing"}
 
 
+def _board_checkpoint_db_path():
+    """Workflow checkpoint DB for the board: SINCOR_MARKETPLACE_
+    CHECKPOINT_PATH, else beside the tasks JSON file."""
+    from sincor2.workflow_state import marketplace_checkpoint_path
+    return Path(marketplace_checkpoint_path(_tasks_persist_path()))
+
+
+def _mirror_board_to_checkpoint(state: Dict[str, Any]) -> Optional[int]:
+    """Mirror a board snapshot into the workflow checkpoint store
+    (hash-bound). Returns the new checkpoint's monotonic version, or
+    None when the mirror failed. Best-effort, mirroring _save_tasks'
+    contract: the JSON file stays a valid boot source, so a mirror
+    failure is logged, never fatal — but the caller records the
+    version in the JSON it writes, so boot can tell a paired
+    JSON+checkpoint from an unpaired one without trusting clocks."""
+    try:
+        from sincor2.workflow_state import (
+            BOARD_CHECKPOINT_NAME,
+            BOARD_RUN_ID,
+            WorkflowStateStore,
+            save_state_snapshot,
+        )
+        store = WorkflowStateStore.open(str(_board_checkpoint_db_path()))
+        try:
+            checkpoint = save_state_snapshot(store, BOARD_RUN_ID,
+                                             BOARD_CHECKPOINT_NAME, state)
+            return checkpoint.version
+        finally:
+            store.close()
+    except Exception as err:
+        logger.warning("[A2A] board checkpoint mirror failed: %s", err)
+        return None
+
+
+def _load_board_checkpoint() -> Optional[Any]:
+    """Latest verified board checkpoint from the checkpoint store, or
+    None when no snapshot exists. Raises RuntimeError when a checkpoint
+    DB exists but is corrupt or fails verification — boot must fail
+    closed rather than start with an empty board over checkpointed
+    state."""
+    db_path = _board_checkpoint_db_path()
+    if not db_path.is_file():
+        return None
+    try:
+        from sincor2.workflow_state import (
+            BOARD_CHECKPOINT_NAME,
+            BOARD_RUN_ID,
+            WorkflowStateStore,
+            load_state_snapshot_checkpoint,
+        )
+        store = WorkflowStateStore.open(str(db_path))
+        try:
+            return load_state_snapshot_checkpoint(store, BOARD_RUN_ID,
+                                                  BOARD_CHECKPOINT_NAME)
+        finally:
+            store.close()
+    except Exception as err:
+        raise RuntimeError(
+            f"[A2A] board checkpoint store {db_path} is corrupt or "
+            f"failed verification: {err}") from err
+
+
+def _restore_board_state(fabric: Fabric, state: Dict[str, Any]) -> None:
+    """Apply a board snapshot (tasks + bids + commits + proofs)."""
+    tasks = state.get("tasks") or []
+    items = tasks.values() if isinstance(tasks, dict) else tasks
+    for task in items or []:
+        if isinstance(task, dict) and task.get("task_id"):
+            fabric.tasks[task["task_id"]] = task
+    for bid in state.get("bids") or []:
+        if isinstance(bid, dict) and bid.get("bid_id"):
+            fabric.bids[bid["bid_id"]] = bid
+    commits = state.get("commits") or {}
+    if isinstance(commits, dict):
+        for key, record in commits.items():
+            if isinstance(record, dict):
+                fabric.commits[key] = record
+    for proof in state.get("proofs") or []:
+        if isinstance(proof, dict) and proof.get("proof_id"):
+            fabric.proofs[proof["proof_id"]] = proof
+
+
 def _load_tasks(fabric: Fabric) -> None:
-    """Restore task listings into a fresh fabric (boot path only)."""
+    """Restore task listings into a fresh fabric (boot path only).
+
+    Boot sources: the workflow checkpoint snapshot (which also carries
+    bids/commits/proofs — collections the JSON file never persisted)
+    and the legacy tasks JSON file. Freshness is decided ONLY by the
+    checkpoint store's monotonic version, never by payload wall-clock
+    ``saved_at`` (a skewed or forged clock must not resurrect settled
+    tasks or drop live ones):
+
+    * JSON missing → the verified checkpoint is the only source.
+    * JSON present and paired with the latest checkpoint (the JSON's
+      ``checkpoint_version`` equals the checkpoint's version — the two
+      were written by the same _save_tasks) → checkpoint wins (it
+      carries the bids/commits/proofs the JSON lacks).
+    * Every other case (legacy JSON with no version, checkpoint
+      behind or ahead by any amount, JSON written by a save whose
+      mirror failed) → the present JSON wins. A checkpoint ahead of
+      the JSON is never trusted over it: a crash between the mirror
+      and the JSON write loses at most that one save (the same loss
+      class as any crash-before-save), while trusting an unpaired
+      newer checkpoint would let a stale-but-validly-signed snapshot
+      resurrect settled tasks.
+
+    A corrupt persistence file on either path RAISES: boot recovery is
+    fail-closed, never a silent empty board over existing state.
+    """
     if not _tasks_persist_enabled():
         return
+    checkpoint = _load_board_checkpoint()
     path = _tasks_persist_path()
-    if path is None or not path.is_file():
-        return
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+    raw = None
+    if path is not None and path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as err:
+            raise RuntimeError(
+                f"[A2A] task persistence file {path} is corrupt: "
+                f"{err}") from err
+    if checkpoint is not None:
+        if raw is None:
+            _restore_board_state(fabric, checkpoint.state)
+            return
+        json_version = (raw.get("checkpoint_version")
+                        if isinstance(raw, dict) else None)
+        if (isinstance(json_version, int)
+                and not isinstance(json_version, bool)
+                and checkpoint.version == json_version):
+            _restore_board_state(fabric, checkpoint.state)
+            return
+    if raw is not None:
         tasks = raw.get("tasks") if isinstance(raw, dict) else raw
         items = tasks.values() if isinstance(tasks, dict) else tasks
         if items:
             for task in items:
                 if isinstance(task, dict) and task.get("task_id"):
                     fabric.tasks[task["task_id"]] = task
-    except Exception as err:
-        logger.warning("[A2A] task restore failed: %s", err)
 
 
 def _save_tasks(fabric: Fabric) -> None:
-    """Write-through task persistence (atomic tmp + os.replace).
+    """Write-through task persistence: a hash-bound checkpoint snapshot
+    in the workflow state store, plus the legacy tasks JSON file
+    (atomic tmp + os.replace).
 
     Call outside ``fabric.lock`` after a task mutation, mirroring
     ``_save_agents``. Never raises: a failed write is logged, never fatal.
+    The checkpoint is mirrored FIRST and the JSON records the resulting
+    monotonic ``checkpoint_version``, so boot can pair the two sources
+    without trusting wall clocks (see _load_tasks). When the mirror
+    fails the JSON is still written — with no version, which makes
+    boot prefer the JSON over the now-stale checkpoint. The checkpoint
+    snapshot additionally carries bids, commits, and proofs — an
+    auction in flight at restart time keeps its bids, which the JSON
+    file alone never persisted.
     """
     if not _tasks_persist_enabled():
         return
     path = _tasks_persist_path()
     if path is None:
         return
+    saved_at = _now_ms()
+    state = {
+        "tasks": list(fabric.tasks.values()),
+        "bids": list(fabric.bids.values()),
+        "commits": dict(fabric.commits),
+        "proofs": list(fabric.proofs.values()),
+        "saved_at": saved_at,
+    }
+    checkpoint_version = _mirror_board_to_checkpoint(state)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp")
         tmp.write_text(
-            json.dumps({"tasks": list(fabric.tasks.values()), "saved_at": _now_ms()}),
+            json.dumps({"tasks": state["tasks"], "saved_at": saved_at,
+                        "checkpoint_version": checkpoint_version}),
             encoding="utf-8",
         )
         os.replace(tmp, path)
@@ -267,12 +584,19 @@ def health_snapshot() -> Dict[str, Any]:
     fabric = get_fabric()
     ts = _now_ms()
     ttl_ms = HEARTBEAT_TTL_S * 1000
+    # Boot-integrity hedge (Oct-11 registry wipe): registry_boot is set by
+    # get_fabric() on the boot path. Fabrics built via reset_fabric() (tests)
+    # never ran the check — default to safe values.
+    registry_boot = getattr(fabric, "registry_boot", None) or {}
+    restore = registry_boot.get("restore_integrity") or {}
     with fabric.lock:
         live = sum(1 for a in fabric.agents.values() if ts - int(a.get("last_heartbeat") or 0) <= ttl_ms)
         open_auctions = sum(1 for t in fabric.tasks.values() if t.get("state") in ("open", "auction"))
         return {
             "ready": True,
-            "critical": False,
+            # Flipped by the W-95 boot integrity check: a registry collapse
+            # (over half the agents missing vs. last save) is critical for ops.
+            "critical": restore.get("alarm") == "collapse",
             "detail": "inbound_register",
             "live_agents": live,
             "registered_agents": len(fabric.agents),
@@ -281,6 +605,11 @@ def health_snapshot() -> Dict[str, Any]:
             "heartbeat_ttl_s": HEARTBEAT_TTL_S,
             "merit_threshold_axm": MERIT_THRESHOLD_AXM,
             "base_chain_id": BASE_CHAIN_ID,
+            "registry_persistent": registry_boot.get("persistent"),
+            "registry_restored_agents": registry_boot.get("restored_agents", 0),
+            "registry_expected_agents": restore.get("expected"),
+            "registry_restore_missing": restore.get("missing", 0),
+            "registry_restore_alarm": restore.get("alarm"),
         }
 
 
@@ -332,9 +661,14 @@ def build_reregistration_message(body: Dict[str, Any], ts_ms: int) -> str:
 
 
 def _safe_url(value: Any) -> str:
-    url = str(value or "").strip()
-    parsed = urlparse(url)
-    return url if url and parsed.scheme in ("http", "https") and parsed.netloc else ""
+    # W-82: hardened SSRF policy lives in card_sanitize (shared with
+    # kya_registry). This wrapper preserves the historical call sites.
+    return safe_url(value)
+
+
+def _sanitize_card_text(value: Any, max_len: int) -> str:
+    # W-82: single choke point for agent-card display fields.
+    return sanitize_card_text(value, max_len)
 
 
 def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -350,23 +684,30 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         for skill in skills:
             if not isinstance(skill, dict) or not skill.get("id") or not skill.get("name"):
                 raise ValueError("each skill needs id and name")
-            tags.append(str(skill.get("id")))
-            tags.extend(str(t) for t in (skill.get("tags") or []))
+            tags.append(_sanitize_card_text(skill.get("id"), SKILL_FIELD_MAX_LEN))
+            tags.extend(_sanitize_card_text(t, TAG_MAX_LEN) for t in (skill.get("tags") or []))
         interfaces = card.get("supportedInterfaces") or []
         interface_url = str(interfaces[0].get("url") or "") if interfaces and isinstance(interfaces[0], dict) else ""
         return {
-            "agent_id": str(card.get("id") or _slug(str(card.get("name")))),
-            "name": str(card["name"]),
-            "description": str(card.get("description") or ""),
-            "version": str(card.get("version") or "0.0.0"),
+            # W-82: agent_id is sanitized at the choke point (defense in depth;
+            # register_agent_record also allowlists it via _AGENT_ID_RE).
+            "agent_id": sanitize_card_text(str(card.get("id") or ""), AGENT_ID_MAX_LEN) or _slug(str(card.get("name"))),
+            "name": _sanitize_card_text(card["name"], NAME_MAX_LEN),
+            "description": _sanitize_card_text(card.get("description") or "", DESCRIPTION_MAX_LEN),
+            "version": _sanitize_card_text(card.get("version") or "0.0.0", VERSION_MAX_LEN),
             "capability_tags": sorted({t.lower() for t in tags if t}),
             "rpc_callback": _safe_url(body.get("agent_url") or interface_url),
             "wallet": str(card.get("wallet") or body.get("wallet") or ""),
             "chain_id": int(body.get("chain_id") or card.get("chain_id") or BASE_CHAIN_ID),
             "sinc_stake": int(body.get("sinc_stake") or 0),
-            "skills": skills,
+            "skills": sanitize_skills(skills),
         }
-    agent_id = str(body.get("agent_id") or _slug(str(body.get("name") or ""))).strip()
+    # W-82: agent_id is sanitized at the choke point (defense in depth;
+    # register_agent_record also allowlists it via _AGENT_ID_RE).
+    agent_id = (
+        sanitize_card_text(str(body.get("agent_id") or ""), AGENT_ID_MAX_LEN).strip()
+        or _slug(str(body.get("name") or ""))
+    ).strip()
     if not agent_id:
         raise ValueError("agent_id is required")
     tags = body.get("capability_tags") or body.get("tags") or []
@@ -374,17 +715,22 @@ def _normalize_registration(body: Dict[str, Any]) -> Dict[str, Any]:
         tags = [t.strip() for t in tags.split(",") if t.strip()]
     if not tags:
         raise ValueError("capability_tags required")
+    clean_tags = sorted({
+        t
+        for t in (sanitize_card_text(t, TAG_MAX_LEN).lower() for t in tags)
+        if t
+    })
     return {
         "agent_id": agent_id,
-        "name": str(body.get("name") or agent_id),
-        "description": str(body.get("description") or ""),
-        "version": str(body.get("version") or "0.1.0"),
-        "capability_tags": sorted({str(t).lower() for t in tags if t}),
+        "name": _sanitize_card_text(body.get("name") or agent_id, NAME_MAX_LEN),
+        "description": _sanitize_card_text(body.get("description") or "", DESCRIPTION_MAX_LEN),
+        "version": _sanitize_card_text(body.get("version") or "0.1.0", VERSION_MAX_LEN),
+        "capability_tags": clean_tags,
         "rpc_callback": _safe_url(body.get("rpc_callback") or body.get("agent_url")),
         "wallet": str(body.get("wallet") or ""),
         "chain_id": int(body.get("chain_id") or BASE_CHAIN_ID),
         "sinc_stake": int(body.get("sinc_stake") or 0),
-        "skills": [{"id": t, "name": t} for t in tags],
+        "skills": [{"id": t, "name": t} for t in clean_tags],
     }
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 import json
 
@@ -15,11 +15,22 @@ from sincor2.contract_net import (
     calculate_bid_score,
 )
 from sincor2.a2a_inbound import (
-    MERIT_THRESHOLD_AXM,
     register as register_inbound,
     reset_fabric,
 )
 from sincor2.a2a_inbound_market import close_auction
+
+
+def _signed_task_body(skill, tags, bounty_axm, key="0x" + "cc" * 32):
+    """Task-create body with a fresh EIP-191 caller signature so the
+    marketplace binds poster_id server-side. Required since the
+    anti-gaming guards reject bids on anonymous (unsigned) bounty tasks."""
+    return {
+        "skill": skill,
+        "tags": tags,
+        "bounty_axm": bounty_axm,
+        **signed_task_auth(skill, key=key),
+    }
 
 
 @pytest.fixture
@@ -165,7 +176,6 @@ def test_v1_register_manifest(client):
             "agent_id": "scout-1",
             "name": "Scout",
             "capability_tags": ["lead-enrichment"],
-            "wallet": "0x" + "11" * 20,
             "rpc_callback": "https://scout.example.com/rpc",
         },
     )
@@ -183,7 +193,6 @@ def test_heartbeat_and_directory(client):
         "agent_id": "hb-1",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://hb.example/rpc",
-        "wallet": "0x" + "22" * 20,
     })
     beat = client.post("/v1/a2a/heartbeat", json={"agent_id": "hb-1"}, headers=hb_headers())
     assert beat.status_code == 200
@@ -201,11 +210,12 @@ def test_probation_agent_bids_micro_task(client):
         "agent_id": "prob-1",
         "capability_tags": ["lead-enrichment"],
         "rpc_callback": "https://p.example/rpc",
-        "wallet": "0x" + "33" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "lead-enrichment", "tags": ["lead-enrichment"], "bounty_axm": 1.5},
+        # Signed: the anti-gaming guards reject bids on anonymous
+        # (unsigned) bounty tasks, so the post must bind a poster.
+        json=_signed_task_body("lead-enrichment", ["lead-enrichment"], 1.5),
     )
     assert task.status_code == 201
     assert task.get_json()["requires_merit"] is False
@@ -227,7 +237,6 @@ def test_merit_gate_blocks_probation_on_large_bounty(client):
         "agent_id": "prob-2",
         "capability_tags": ["compliance-sbom"],
         "rpc_callback": "https://p2.example/rpc",
-        "wallet": "0x" + "44" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",
@@ -277,17 +286,17 @@ def test_close_auction_assigns_lowest_composite(client):
         "agent_id": "fast",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://a.example/rpc",
-        "wallet": "0x" + "55" * 20,
     })
     client.post("/v1/a2a/register", json={
         "agent_id": "slow",
         "capability_tags": ["deal-scoring"],
         "rpc_callback": "https://b.example/rpc",
-        "wallet": "0x" + "66" * 20,
     })
     task = client.post(
         "/v1/a2a/tasks",
-        json={"skill": "deal-scoring", "tags": ["deal-scoring"], "bounty_axm": 2.0},
+        # Signed: the anti-gaming guards reject bids on anonymous
+        # (unsigned) bounty tasks, so the post must bind a poster.
+        json=_signed_task_body("deal-scoring", ["deal-scoring"], 2.0),
     ).get_json()
     client.post("/v1/a2a/bids", json={
         "task_id": task["task_id"], "agent_id": "slow", "bid_axm": 9.0, "estimated_seconds": 400,
@@ -315,7 +324,9 @@ def test_close_auction_assigns_lowest_composite(client):
     )
     assert proof.status_code == 202
     body = proof.get_json()
-    assert body["status"] == "paid"
+    # Claim-honesty: no broadcast happens in stage_payout, so settlement is
+    # staged — never presented as "paid".
+    assert body["status"] == "payout_staged"
     assert body["payout"]["mode"] == "staged"
 
 

@@ -18,6 +18,15 @@ decisions, never yield**, and **never auto-allowlists**:
   plugin returns FAIL, STALE, or is unreachable/erroring. REFER blocks
   until a reviewer resolves it. PASS decisions cache for 24h; any list
   or geo update invalidates the cache immediately.
+- :class:`ComplianceOracle` — the configured oracle. Pluggable
+  KYC/AML/geo plugins behind one :class:`OraclePlugin` interface, plus
+  the registry-management API (sanctions updates, issuer allowlist,
+  timelocked geo changes). Every registry mutation notifies the
+  engine, which invalidates its 24h PASS cache immediately.
+  :func:`build_reference_oracle` builds a deterministic oracle from the
+  labeled reference fixture in ``defi/data/p20_reference_lists.json``.
+- :class:`EvaluationContext` — the per-decision plugin input
+  (account, attestation, timestamp).
 - :class:`AuditTrail` — append-only decision log with hash chaining;
   no update/delete path exists. Off-chain, Ed25519-signed,
   hash-chained receipts verify end-to-end without repo access.
@@ -27,13 +36,25 @@ decisions, never yield**, and **never auto-allowlists**:
   auto-expiry, on-chain reason. An override of list X never clears a
   FAIL from list Y.
 
+ORACLE STATUS (2026-09-29): the compliance oracle is built.
+:class:`DecisionEngine` requires a configured :class:`ComplianceOracle`
+— there is no unset-oracle (fail-open) mode in this module, and the
+"no oracle configured" defer path from
+``onchain/src/ComplianceGuard.sol`` ``isAllowed()`` has no counterpart
+here: constructing an engine without an oracle raises. Reference
+deployments use :func:`build_reference_oracle`; production deployments
+wire production adapters into :class:`ComplianceOracle`. The on-chain
+``ComplianceGuard.sol`` fail-open default is untouched (its flip is
+still unratified), as is the time-boxed ``LEGACY_ALLOWLIST`` migration.
+This module implements neither.
+
 PENDING FOUNDER DECISION (not implemented here): the deep spec
 proposes flipping ``onchain/src/ComplianceGuard.sol`` from fail-open
 (when no oracle is set) to fail-closed, plus a time-boxed
 ``LEGACY_ALLOWLIST`` migration for pre-existing integrations. Both are
-**unratified** as of 2026-09-27. This module implements neither: it is
-a conservative Python reference that is fail-closed by construction
-and contains no allowlist-migration path whatsoever.
+**unratified** as of 2026-09-27. This module is a conservative Python
+reference that is fail-closed by construction and contains no
+allowlist-migration path whatsoever.
 
 Safety rules (hard):
 - Default mode is DRY_RUN. Verdicts are emitted, never enforced
@@ -49,6 +70,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import time
@@ -219,16 +241,21 @@ class AMLAdapter:
         now = now if now is not None else time.time()
         if not self.reachable:
             raise ComplianceError("AML provider unreachable")
-        if now - self.list_updated_at > LIST_FRESHNESS_FAIL_SECONDS:
+        list_age = now - self.list_updated_at
+        if list_age > LIST_FRESHNESS_FAIL_SECONDS:
             return PluginResult("aml", Verdict.STALE,
                                 _commit(account), self.VERSION,
                                 "sanctions lists stale >48h")
+        freshness_note = ""
+        if list_age > LIST_FRESHNESS_ALERT_SECONDS:
+            freshness_note = (f"; freshness alert: lists "
+                              f"{list_age / 3600:.1f}h old")
         # Hop 0: the account itself is screened first — a sanctioned
         # account with no recorded fund flows still fails.
         if account in self.sanctions:
             return PluginResult("aml", Verdict.FAIL,
                                 _commit(account), self.VERSION,
-                                "account on sanctions list")
+                                "account on sanctions list" + freshness_note)
         hops_used = 0
         visited = {account}
         frontier = [account]
@@ -241,7 +268,8 @@ class AMLAdapter:
                         return PluginResult(
                             "aml", Verdict.FAIL, _commit(account),
                             self.VERSION,
-                            f"taint at hop {hops_used}: {counterparty}")
+                            f"taint at hop {hops_used}: {counterparty}"
+                            + freshness_note)
                     if counterparty not in visited:
                         visited.add(counterparty)
                         nxt.append(counterparty)
@@ -249,7 +277,8 @@ class AMLAdapter:
         assert hops_used <= TAINT_MAX_HOPS  # the lookback is bounded
         return PluginResult("aml", Verdict.PASS, _commit(account),
                             self.VERSION,
-                            f"clean within {TAINT_MAX_HOPS} hops")
+                            f"clean within {TAINT_MAX_HOPS} hops"
+                            + freshness_note)
 
     @property
     def max_hops(self) -> int:
@@ -308,6 +337,257 @@ class GeoRegistry:
                                 f"blocked jurisdiction {jurisdiction}")
         return PluginResult("geo", Verdict.PASS, _commit(account),
                             self.VERSION, f"allowed {jurisdiction}")
+
+
+# -- compliance oracle ----------------------------------------------------------------------
+# The oracle eliminates the "no oracle configured" defer path: it bundles
+# the KYC/AML/geo adapters behind one pluggable interface and owns every
+# registry mutation, so the decision engine can never run in an
+# unset-oracle (fail-open) mode. Constructing a DecisionEngine without an
+# oracle raises; there is no defer branch anywhere in this module.
+
+
+@dataclass
+class EvaluationContext:
+    """Per-decision plugin input: the account under review, the KYC
+    attestation it presented (None when it presented none), and the
+    decision timestamp."""
+    account: str
+    attestation: Optional[KYCAttestation]
+    now: float
+
+
+class OraclePlugin:
+    """Interface for oracle plugins. Subclass and override
+    :meth:`evaluate` / :meth:`health`; register via
+    :class:`ComplianceOracle` ``extra_plugins``."""
+
+    @property
+    def name(self) -> str:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    @property
+    def version(self) -> str:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    def evaluate(self, ctx: EvaluationContext) -> PluginResult:  # pragma: no cover - interface
+        raise NotImplementedError
+
+    def health(self) -> Dict[str, Any]:  # pragma: no cover - interface
+        raise NotImplementedError
+
+
+def _outage_result(plugin: str, version: str, account: str,
+                   err: Exception) -> PluginResult:
+    # Provider outage fails closed — never degrades to PASS.
+    return PluginResult(plugin, Verdict.FAIL,
+                        _commit(account + "|" + plugin + "-outage"),
+                        version, f"{plugin} provider error: {err}")
+
+
+class _KYCPlugin(OraclePlugin):
+    def __init__(self, adapter: KYCAdapter):
+        self._adapter = adapter
+
+    @property
+    def name(self) -> str:
+        return "kyc"
+
+    @property
+    def version(self) -> str:
+        return self._adapter.VERSION
+
+    def evaluate(self, ctx: EvaluationContext) -> PluginResult:
+        if ctx.attestation is None:
+            return PluginResult("kyc", Verdict.FAIL,
+                                _commit(ctx.account + "|nokyc"),
+                                self.version, "no attestation presented")
+        try:
+            return self._adapter.verify(ctx.attestation, now=ctx.now)
+        except ComplianceError as e:
+            return _outage_result("kyc", self.version, ctx.account, e)
+
+    def health(self) -> Dict[str, Any]:
+        return {"reachable": self._adapter.reachable,
+                "issuers": len(self._adapter.issuer_keys)}
+
+
+class _AMLPlugin(OraclePlugin):
+    def __init__(self, adapter: AMLAdapter):
+        self._adapter = adapter
+
+    @property
+    def name(self) -> str:
+        return "aml"
+
+    @property
+    def version(self) -> str:
+        return self._adapter.VERSION
+
+    def evaluate(self, ctx: EvaluationContext) -> PluginResult:
+        try:
+            return self._adapter.screen(ctx.account, now=ctx.now)
+        except ComplianceError as e:
+            return _outage_result("aml", self.version, ctx.account, e)
+
+    def health(self) -> Dict[str, Any]:
+        age = time.time() - self._adapter.list_updated_at
+        return {"reachable": self._adapter.reachable,
+                "list_age_hours": round(age / 3600, 2),
+                "freshness": ("stale" if age > LIST_FRESHNESS_FAIL_SECONDS
+                              else "alert" if age > LIST_FRESHNESS_ALERT_SECONDS
+                              else "fresh"),
+                "sanctions_entries": len(self._adapter.sanctions)}
+
+
+class _GeoPlugin(OraclePlugin):
+    def __init__(self, registry: GeoRegistry):
+        self._registry = registry
+
+    @property
+    def name(self) -> str:
+        return "geo"
+
+    @property
+    def version(self) -> str:
+        return self._registry.VERSION
+
+    def evaluate(self, ctx: EvaluationContext) -> PluginResult:
+        try:
+            return self._registry.check(ctx.account)
+        except ComplianceError as e:
+            return _outage_result("geo", self.version, ctx.account, e)
+
+    def health(self) -> Dict[str, Any]:
+        return {"reachable": self._registry.reachable,
+                "blocked_jurisdictions": sorted(
+                    c for c, b in self._registry.blocked.items() if b),
+                "timelock_pending": self._registry._pending is not None}
+
+
+_REFERENCE_FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "data", "p20_reference_lists.json")
+
+
+def _reference_issuer_key(name: str) -> bytes:
+    # Synthetic, deterministic test keys — obviously not real issuer
+    # material. Derived from a fixed label so the reference oracle is
+    # reproducible without storing secrets.
+    return hashlib.sha256(b"p20-reference-issuer:" + name.encode()).digest()
+
+
+def load_reference_data() -> Dict[str, Any]:
+    """Load the labeled reference fixture. Every entry is synthetic
+    test data — never real sanctions/issuer material."""
+    with open(_REFERENCE_FIXTURE, encoding="utf-8") as f:
+        data = json.load(f)
+    if not data.get("reference_only"):
+        raise ComplianceError("reference fixture missing reference_only flag")
+    return data
+
+
+class ComplianceOracle:
+    """The configured compliance oracle.
+
+    Bundles the KYC/AML/geo adapters behind the :class:`OraclePlugin`
+    interface and owns every registry mutation. Any list, issuer, or
+    geo change notifies registered listeners (the decision engine
+    registers its cache invalidation), so a PASS can never survive a
+    registry update.
+    """
+
+    ORACLE_VERSION = "p20-oracle-v1"
+
+    def __init__(self, kyc: KYCAdapter, aml: AMLAdapter, geo: GeoRegistry,
+                 extra_plugins: Optional[List[OraclePlugin]] = None,
+                 reference_only: bool = False):
+        self.kyc = kyc
+        self.aml = aml
+        self.geo = geo
+        self.reference_only = reference_only
+        self.plugins: List[OraclePlugin] = [
+            _KYCPlugin(kyc), _AMLPlugin(aml), _GeoPlugin(geo),
+        ]
+        for plugin in extra_plugins or []:
+            if not isinstance(plugin, OraclePlugin):
+                raise TypeError("extra_plugins must be OraclePlugin "
+                                "instances")
+            self.plugins.append(plugin)
+        self._listeners: List[Any] = []
+
+    # -- listener fan-out --------------------------------------------------
+    def on_registry_update(self, listener: Any) -> None:
+        self._listeners.append(listener)
+
+    def _notify(self) -> None:
+        for listener in self._listeners:
+            listener()
+
+    # -- plugin evaluation -------------------------------------------------
+    def evaluate(self, account: str,
+                 attestation: Optional[KYCAttestation],
+                 now: float) -> List[PluginResult]:
+        ctx = EvaluationContext(account, attestation, now)
+        return [plugin.evaluate(ctx) for plugin in self.plugins]
+
+    # -- registry management: every mutation invalidates downstream ------
+    def update_sanctions(self, sanctions: Set[str],
+                         now: Optional[float] = None) -> None:
+        self.aml.sanctions = set(sanctions)
+        self.aml.list_updated_at = now if now is not None else time.time()
+        self._notify()
+
+    def update_fund_flows(self,
+                          fund_flows: Dict[str, List[Tuple[str, Set[str]]]],
+                          now: Optional[float] = None) -> None:
+        self.aml.fund_flows = {k: list(v) for k, v in fund_flows.items()}
+        self.aml.list_updated_at = now if now is not None else time.time()
+        self._notify()
+
+    def register_issuer(self, issuer: str, key: bytes) -> None:
+        self.kyc.issuer_keys[issuer] = key
+        self._notify()
+
+    def revoke_issuer(self, issuer: str) -> None:
+        self.kyc.issuer_keys.pop(issuer, None)
+        self._notify()
+
+    def geo_propose_update(self, code: str, blocked: bool, caller: str,
+                           now: Optional[float] = None) -> None:
+        # Proposing does not change decisions; only execution does.
+        self.geo.propose_update(code, blocked, caller, now=now)
+
+    def geo_execute_update(self, caller: str,
+                           now: Optional[float] = None) -> None:
+        self.geo.execute_update(caller, now=now)
+        self._notify()
+
+    # -- observability -----------------------------------------------------
+    def health(self) -> Dict[str, Any]:
+        return {"oracle_version": self.ORACLE_VERSION,
+                "reference_only": self.reference_only,
+                "plugins": {p.name: p.health() for p in self.plugins}}
+
+
+def build_reference_oracle(now: Optional[float] = None) -> ComplianceOracle:
+    """Build the deterministic reference oracle from the labeled
+    fixture. Same fixture + same ``now`` => same decisions. All data
+    is synthetic and labeled reference-only; this oracle is for tests
+    and design validation, never production screening."""
+    data = load_reference_data()
+    ts = now if now is not None else time.time()
+    kyc = KYCAdapter({name: _reference_issuer_key(name)
+                      for name in data["issuers"]})
+    flows = {acct: [(cp, set(tags)) for cp, tags in edges]
+             for acct, edges in data["fund_flows"].items()}
+    aml = AMLAdapter(sanctions=set(data["sanctions"]), fund_flows=flows,
+                     list_updated_at=ts)
+    geo = GeoRegistry(admin=data["geo_admin"])
+    # Genesis blocklist: the fixture's blocked jurisdictions are the
+    # starting state; later changes go through the 48h timelock.
+    for code in data["geo_blocked"]:
+        geo.blocked[code] = True
+    return ComplianceOracle(kyc, aml, geo, reference_only=True)
 
 
 # -- audit trail --------------------------------------------------------------------------
@@ -432,19 +712,48 @@ class Override:
     expires_at: float
 
 
-class DecisionEngine:
-    """Fail-closed combination of KYC/AML/geo signals."""
+REVIEWER_VERSION = "reviewer-v1"
 
-    def __init__(self, kyc: KYCAdapter, aml: AMLAdapter, geo: GeoRegistry,
-                 guardian: str):
-        self.kyc = kyc
-        self.aml = aml
-        self.geo = geo
+
+class DecisionEngine:
+    """Fail-closed combination of the oracle's KYC/AML/geo signals.
+
+    The engine requires a configured :class:`ComplianceOracle` — there
+    is deliberately no unset-oracle mode, so the "no oracle
+    configured" defer path cannot exist here. Registry mutations on
+    the oracle invalidate the 24h PASS cache immediately via a
+    listener registered at construction.
+    """
+
+    def __init__(self, oracle: ComplianceOracle, guardian: str):
+        if oracle is None:
+            raise ValueError(
+                "DecisionEngine requires a configured ComplianceOracle: "
+                "there is no unset-oracle (fail-open) mode")
+        if not isinstance(oracle, ComplianceOracle):
+            raise TypeError("oracle must be a ComplianceOracle instance")
+        self.oracle = oracle
         self.guardian = guardian
         self.trail = AuditTrail()
         self.receipts = ReceiptChain()
         self._cache: Dict[str, Tuple[Verdict, float]] = {}
         self._overrides: List[Override] = []
+        self._resolutions: Dict[str, Tuple[bool, str, str, float]] = {}
+        oracle.on_registry_update(self.invalidate_cache)
+
+    # Adapter access for callers/tests that work with the plugins
+    # directly (attesting jurisdictions, signing test attestations).
+    @property
+    def kyc(self) -> KYCAdapter:
+        return self.oracle.kyc
+
+    @property
+    def aml(self) -> AMLAdapter:
+        return self.oracle.aml
+
+    @property
+    def geo(self) -> GeoRegistry:
+        return self.oracle.geo
 
     # -- emergency override ------------------------------------------------
     def grant_override(self, account: str, list_name: str, reason: str,
@@ -470,12 +779,44 @@ class DecisionEngine:
     def invalidate_cache(self) -> None:
         self._cache.clear()
 
+    # -- reviewer resolution -------------------------------------------------
+    def resolve_referral(self, account: str, reviewer: str, approve: bool,
+                         reason: str,
+                         now: Optional[float] = None) -> None:
+        """Record a reviewer's resolution of a REFER-blocked account.
+
+        The resolution is one-shot: the next :meth:`decide` applies it
+        exactly once, then the underlying plugins are re-evaluated from
+        scratch. An approval is never cached — if the blocking
+        condition persists, the account returns to REFER and needs a
+        fresh review. Both the resolution and its application are
+        appended to the audit trail.
+        """
+        if not reviewer:
+            raise ValueError("reviewer identity required")
+        if not reason:
+            raise ValueError("resolution requires a reason")
+        ts = now if now is not None else time.time()
+        self._resolutions[account] = (bool(approve), reviewer, reason, ts)
+        intended = Verdict.PASS if approve else Verdict.FAIL
+        self.trail.append(
+            account, intended,
+            [PluginResult("reviewer", intended,
+                          _commit(account + "|review|" + repr(ts)),
+                          REVIEWER_VERSION,
+                          f"{reviewer} recorded "
+                          f"{'approval' if approve else 'rejection'}: "
+                          f"{reason}")],
+            now=ts)
+        self.invalidate_cache()
+
     # -- the decision ------------------------------------------------------
     def decide(self, account: str,
                attestation: Optional[KYCAttestation] = None,
                now: Optional[float] = None) -> Tuple[Verdict, List[PluginResult]]:
         """One call, one verdict. FAIL if any plugin FAILs, is STALE, or
-        is unreachable; REFER blocks until resolved; else PASS."""
+        is unreachable; REFER blocks until a reviewer resolves it; else
+        PASS. The oracle is always configured — there is no defer."""
         now = now if now is not None else time.time()
         cached = self._cache.get(account)
         if cached and now - cached[1] < SCREENING_CACHE_SECONDS:
@@ -483,31 +824,7 @@ class DecisionEngine:
             self.trail.append(account, verdict, [], now=now)
             return verdict, []
 
-        results: List[PluginResult] = []
-        try:
-            if attestation is None:
-                results.append(PluginResult(
-                    "kyc", Verdict.FAIL, _commit(account + "|nokyc"),
-                    KYCAdapter.VERSION, "no attestation presented"))
-            else:
-                results.append(self.kyc.verify(attestation, now=now))
-        except ComplianceError as e:
-            # Provider outage fails closed — never degrades to PASS.
-            results.append(PluginResult("kyc", Verdict.FAIL,
-                                        _commit(account + "|kyc-outage"),
-                                        KYCAdapter.VERSION, str(e)))
-        try:
-            results.append(self.aml.screen(account, now=now))
-        except ComplianceError as e:
-            results.append(PluginResult("aml", Verdict.FAIL,
-                                        _commit(account + "|aml-outage"),
-                                        AMLAdapter.VERSION, str(e)))
-        try:
-            results.append(self.geo.check(account))
-        except ComplianceError as e:
-            results.append(PluginResult("geo", Verdict.FAIL,
-                                        _commit(account + "|geo-outage"),
-                                        GeoRegistry.VERSION, str(e)))
+        results = self.oracle.evaluate(account, attestation, now)
 
         # Per-list emergency overrides: an override of list X never
         # clears a FAIL from list Y.
@@ -523,14 +840,30 @@ class DecisionEngine:
                 final.append(r)
 
         verdicts = {r.verdict for r in final}
+        reviewer_applied = False
         if Verdict.FAIL in verdicts or Verdict.STALE in verdicts:
             verdict = Verdict.FAIL
         elif Verdict.REFER in verdicts:
-            verdict = Verdict.REFER
+            resolution = self._resolutions.pop(account, None)
+            if resolution is None:
+                verdict = Verdict.REFER
+            else:
+                approve, reviewer, reason, _ = resolution
+                final.append(PluginResult(
+                    "reviewer", Verdict.PASS if approve else Verdict.FAIL,
+                    _commit(account + "|review-applied"),
+                    REVIEWER_VERSION,
+                    f"reviewer {reviewer} "
+                    f"{'approved' if approve else 'rejected'}: {reason}"))
+                verdict = Verdict.PASS if approve else Verdict.FAIL
+                reviewer_applied = approve
         else:
             verdict = Verdict.PASS
 
-        if verdict == Verdict.PASS:
+        # A reviewer approval is one-shot and never cached: the next
+        # decision re-runs the plugins, so a persisting block returns
+        # to REFER instead of riding a stale approval.
+        if verdict == Verdict.PASS and not reviewer_applied:
             self._cache[account] = (verdict, now)
         self.trail.append(account, verdict, final, now=now)
         self.receipts.issue(account, verdict,
@@ -593,4 +926,10 @@ def status_payload(engine: DecisionEngine) -> Dict[str, Any]:
         "chain_valid": engine.trail.verify_chain(),
         "cache_entries": len(engine._cache),
         "fee_bps": 0,
+        "oracle": {
+            "version": ComplianceOracle.ORACLE_VERSION,
+            "reference_only": engine.oracle.reference_only,
+            "plugins": {p.name: p.version for p in engine.oracle.plugins},
+            "health": engine.oracle.health(),
+        },
     }

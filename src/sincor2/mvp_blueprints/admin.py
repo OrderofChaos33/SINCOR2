@@ -20,6 +20,18 @@ def _bind_mvp():
         g[key] = value
 
 
+def _central_job_running(job_id):
+    """One-scheduler consolidation: query the central scheduler by canonical job id."""
+    import sincor2.mvp_app as mvp
+    sched = getattr(mvp, 'central_scheduler', None)
+    if not sched or not sched.running:
+        return False
+    try:
+        return sched.get_job(job_id) is not None
+    except Exception:
+        return False
+
+
 _bind_mvp()
 
 
@@ -52,7 +64,7 @@ def content_status():
         analytics = ContentAnalytics()
         top = analytics.get_top_performers(3)
 
-        scheduler_status = "running" if (content_scheduler and content_scheduler.running) else "stopped"
+        scheduler_status = "running" if _central_job_running('content_cycle') else "stopped"
 
         return jsonify({
             "scheduler": scheduler_status,

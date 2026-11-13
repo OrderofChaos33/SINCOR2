@@ -20,9 +20,15 @@ logger = logging.getLogger("chroma.send_gate")
 PENDING = "pending_approval"
 APPROVED_DRY_RUN = "approved_dry_run"
 SENT = "sent"
+NOT_SENT = "not_sent"
+SEND_FAILED = "send_failed"
 SENDING = "sending"
 KILLED = "killed"
 BLOCKED = "blocked_live_flag_off"
+
+#: Provider marker for the log-only delivery stub. A result carrying this
+#: provider was NEVER delivered — it was only recorded in the log.
+LOG_ONLY_PROVIDER = "log_only"
 
 
 def toa_score_outbound(
@@ -92,8 +98,33 @@ def enqueue(
     return saved
 
 
+def _actually_delivered(result: Dict[str, Any]) -> bool:
+    """Truth check for a delivery receipt: nothing counts as sent unless
+    ALL three hold — ``ok`` is truthy, the provider is a real provider
+    (never ``LOG_ONLY_PROVIDER``), and ``delivered`` is explicitly True.
+
+    This is the fix for the log-only truth gap: the old code treated
+    ``ok=True`` alone as "sent", so the log_only stub (which never touches
+    the network) was recorded as ``status="sent", live=True``.
+    """
+    if not isinstance(result, dict):
+        return False
+    if not result.get("ok"):
+        return False
+    if result.get("provider") == LOG_ONLY_PROVIDER:
+        return False
+    return result.get("delivered") is True
+
+
 def approve(item_id: str, store: Optional[ChromaStore] = None) -> Dict[str, Any]:
-    """Owner said yes. Still blocked unless CHROMA_LIVE_SEND=true."""
+    """Owner said yes. Still blocked unless CHROMA_LIVE_SEND=true.
+
+    TRUTH CONTRACT: even with the live flag on, an item is recorded
+    ``status="sent", live=True`` ONLY when a real provider actually
+    delivered it (see :func:`_actually_delivered`). A log_only receipt —
+    no provider wired — is recorded ``status="not_sent", live=False`` and
+    can never be confused with a send.
+    """
     store = store or get_store()
     item = store.get_outbound(item_id)
     if not item:
@@ -129,13 +160,20 @@ def approve(item_id: str, store: Optional[ChromaStore] = None) -> Dict[str, Any]
         raise ValueError("Outbound item is no longer sendable")
 
     delivered = _deliver(claimed)
+    sent = _actually_delivered(delivered)
+    if sent:
+        new_status, event_kind = SENT, "sent"
+    elif delivered.get("provider") == LOG_ONLY_PROVIDER:
+        new_status, event_kind = NOT_SENT, "not_sent"
+    else:
+        new_status, event_kind = SEND_FAILED, "send_failed"
     updated = store.update_outbound(
         item_id,
-        status=SENT if delivered.get("ok") else "send_failed",
-        live=True,
+        status=new_status,
+        live=sent,
         delivery=delivered,
     )
-    store.add_event(claimed.get("lead_id"), "sent" if delivered.get("ok") else "send_failed", item_id)
+    store.add_event(claimed.get("lead_id"), event_kind, item_id)
     return updated or item
 
 
@@ -179,22 +217,28 @@ def edit(
 
 
 def _deliver(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Live delivery stub. Twilio/SMTP stay mocked unless providers exist.
+    """Live delivery stub. Twilio/SMTP stay unwired unless providers exist.
 
-    Tests patch this. Default live path still refuses network and records
-    a provider-missing result so CI never talks to the internet.
+    TRUTH CONTRACT: this default path never touches the network. It returns
+    a log-only receipt with ``delivered=False`` and ``status="not_sent"`` —
+    callers MUST NOT record this as sent (see :func:`_actually_delivered`).
+
+    Tests patch this with a provider-shaped result, e.g.
+    ``{"ok": True, "provider": "twilio", "delivered": True, "status": "sent"}``.
     """
     channel = item.get("channel")
     logger.info(
-        "CHROMA LIVE_SEND would deliver channel=%s to=%s id=%s — no provider wired",
+        "CHROMA LIVE_SEND would deliver channel=%s to=%s id=%s — no provider wired; logged, NOT sent",
         channel,
         item.get("to") or item.get("to_addr"),
         item.get("id"),
     )
     return {
         "ok": True,
-        "provider": "log_only",
-        "note": "CHROMA_LIVE_SEND=true but no Twilio/SMTP provider — logged as sent.",
+        "provider": LOG_ONLY_PROVIDER,
+        "delivered": False,
+        "status": NOT_SENT,
+        "note": "CHROMA_LIVE_SEND=true but no Twilio/SMTP provider wired — logged only, NOT sent.",
         "at": datetime.now(timezone.utc).isoformat(),
     }
 

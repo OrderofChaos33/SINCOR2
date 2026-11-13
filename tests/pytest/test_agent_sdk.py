@@ -24,16 +24,28 @@ from sincor2.a2a_sdk import (
 
 AGENT = "sdk-agent-1"
 TAGS = ["lead-enrichment"]
-WALLET = "0x" + "22" * 20
+
+
+def _agent_key():
+    # Real key per agent: first-time wallet claims require a valid EIP-191
+    # proof (C3 fail-closed), so the SDK signs with the claimed wallet's key.
+    from eth_account import Account
+    return Account.create()
 
 
 @pytest.fixture
 def sdk(tmp_path):
     from sincor2.a2a_inbound import reset_fabric
+    from sincor2.a2a_rate_limits import reset_a2a_limits
     from sincor2.onchain.stake_ledger import reset_stake_ledger
     from sincor2.sponsored_stake import reset_sponsored_ledger
 
     reset_fabric()
+    # The module-global register rate limiter (5/hr) is not cleared by
+    # reset_fabric(); without this, collection order (e.g. alongside other
+    # test modules) leaks hits across tests and yields spurious 429s.
+    # Same class of fix as the sealed-bid shim's fixture.
+    reset_a2a_limits()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
     reset_sponsored_ledger(path=str(tmp_path / "sponsored.json"))
     app = Flask(__name__)
@@ -42,20 +54,37 @@ def sdk(tmp_path):
     return SincorAgentSDK(FlaskTestTransport(app.test_client()))
 
 
-def _onboard(sdk, agent_id=AGENT, stake_axm=2.0):
+def _onboard(sdk, agent_id=AGENT, stake_axm=2.0, key=None):
+    key = key or _agent_key()
     reg = sdk.register(
-        agent_id, "SDK Agent", TAGS, wallet=WALLET,
+        agent_id, "SDK Agent", TAGS, wallet=key.address, signer=key,
         rpc_callback="https://sdk-agent.example/rpc")
     assert reg["status"] == "registered"
     hb = sdk.heartbeat(agent_id, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     assert hb["ok"] is True
-    dep = sdk.deposit_stake(agent_id, stake_axm)
+    dep = sdk.deposit_stake(agent_id, stake_axm, signer=key)
     assert dep["agent_id"] == agent_id
     return reg
 
 
 def _sealed_task(sdk, bounty_axm=1.5):
-    task = sdk.post_task("lead-enrichment", TAGS, bounty_axm, sealed=True)
+    # Signed poster: the anti-gaming guards reject bids on anonymous
+    # (unsigned) bounty tasks, so the post must bind a poster wallet
+    # (distinct from the bidding agent).
+    import time
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_sdk import SincorAgentSDK
+
+    poster_key = Account.create()
+    auth = SincorAgentSDK.make_poster_auth(
+        "sdk-poster", "lead-enrichment", int(time.time()),
+        lambda m: "0x" + poster_key.sign_message(
+            encode_defunct(text=m)).signature.hex())
+    task = sdk.post_task("lead-enrichment", TAGS, bounty_axm, sealed=True,
+                         **auth)
     assert task["sealed"] is True
     assert task["commit_deadline"] and task["reveal_deadline"]
     return task["task_id"]
@@ -153,7 +182,8 @@ def test_sdk_commitment_mismatch_rejected(sdk):
 
 
 def test_sdk_commit_without_stake_rejected(sdk):
-    sdk.register(AGENT, "Broke Agent", TAGS, wallet=WALLET)
+    key = _agent_key()
+    sdk.register(AGENT, "Broke Agent", TAGS, wallet=key.address, signer=key)
     sdk.heartbeat(AGENT, heartbeat_token=os.environ["AGENT_HEARTBEAT_TOKEN"])
     task_id = _sealed_task(sdk)
     with pytest.raises(SDKError) as exc:
@@ -168,7 +198,7 @@ def test_sdk_registration_is_earned_only(sdk, tmp_path):
     client = sdk.t._client
     r = client.post("/v1/a2a/register", json={
         "agent_id": "sdk-earned-1", "capability_tags": TAGS,
-        "wallet": WALLET, "reputation": 9.9,
+        "reputation": 9.9,
     })
     assert r.status_code == 201
     agent = get_fabric().agents["sdk-earned-1"]
@@ -187,3 +217,42 @@ def test_sdk_task_view_is_sealed_safe(sdk):
     # No commitment or bid material leaks through the public view.
     blob = str(view)
     assert "commitment" not in blob and "price_wei" not in blob
+
+
+def test_sdk_unsigned_commit_rejected_403(sdk):
+    """W-77 gate intact: a commit with no bidder auth is rejected (403).
+
+    A fresh SDK handle that never saw the agent's key sends the commit
+    unsigned; the server must refuse it even though the agent is
+    registered, heartbeated, and staked.
+    """
+    _onboard(sdk)
+    task_id = _sealed_task(sdk)
+    bare = SincorAgentSDK(sdk.t)  # no remembered signer -> unsigned
+    with pytest.raises(SDKError) as exc:
+        bare.sealed_commit(task_id, AGENT, 0.9)
+    assert exc.value.status == 403
+    assert "EIP-191" in str(exc.value.body)
+
+
+def test_sdk_wrong_wallet_bid_signature_rejected(sdk):
+    """W-77 gate intact: a bid signature from a wallet other than the
+    agent's registered wallet is rejected (403) — the spoofed-commit hole
+    stays closed even with a well-formed signature."""
+    import time as _time
+
+    _onboard(sdk)
+    task_id = _sealed_task(sdk)
+    wrong_key = _agent_key()
+    assert wrong_key.address.lower() != get_fabric().agents[AGENT]["wallet"].lower()
+    from sincor2.onchain.bidder_client import random_salt
+    salt = random_salt()
+    commit_hex = SincorAgentSDK.make_commitment(0.9, salt, AGENT)
+    auth = SincorAgentSDK.make_bid_auth(
+        "commit", task_id, AGENT, commit_hex, int(_time.time()), wrong_key)
+    body = {"task_id": task_id, "agent_id": AGENT, "commitment": commit_hex}
+    body.update(auth)
+    with pytest.raises(SDKError) as exc:
+        sdk.t.post("/v1/a2a/bids/commit", body)
+    assert exc.value.status == 403
+    assert "registered wallet" in str(exc.value.body)

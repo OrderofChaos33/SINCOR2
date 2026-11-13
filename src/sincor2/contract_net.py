@@ -38,6 +38,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import threading
 import time
 from typing import Any, Dict, Optional
@@ -162,6 +163,10 @@ def stage_payout(
         "rpc_ok": bool(chain.get("ok")),
         "rpc_chain_id": chain.get("chain_id"),
         "ts": int(time.time()),
+        # Broadcast contract: a real broadcast path sets receipt["tx_hash"]
+        # to the on-chain transaction hash. Until then this stays None, and
+        # every payout surface must present "payout_staged" — never "paid".
+        "tx_hash": None,
     }
     digest = hashlib.sha256(
         f"{task_id}:{wallet}:{amount_axm}:{receipt_hash}".encode()
@@ -172,6 +177,37 @@ def stage_payout(
     if live_signer:
         staged["note"] = "signer present — broadcast still requires Railway ESCROW_SIGNER_KEY wiring"
     return staged
+
+
+def payout_broadcast_status(receipt: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Honest payout surface derived from a stage_payout receipt.
+
+    A staged digest is NOT an on-chain transaction hash and must never be
+    presented as one (it is 0x + 64 hex — shape-identical to a real tx
+    hash). Only an actual broadcast — a real ``tx_hash`` on the receipt —
+    earns ``"paid"`` / ``payout_tx``. Every other outcome is staged.
+
+    Fail-closed on the hash shape: ``tx_hash`` must be exactly ``0x`` +
+    64 hex characters. Garbage, truncated, whitespace-padded, or
+    non-string values never earn ``"paid"``.
+    """
+    receipt = receipt or {}
+    raw_hash = receipt.get("tx_hash")
+    tx_hash = raw_hash if isinstance(raw_hash, str) else ""
+    broadcasted = bool(re.fullmatch(r"0x[0-9a-fA-F]{64}", tx_hash))
+    if receipt.get("ok") and broadcasted:
+        proof_status = "paid"
+    elif receipt.get("ok"):
+        proof_status = "payout_staged"
+    else:
+        proof_status = "rejected"
+    return {
+        "broadcasted": broadcasted,
+        # Never echo an invalid hash back out as if it were one.
+        "tx_hash": tx_hash if broadcasted else None,
+        "staged_digest": receipt.get("staged_tx_digest"),
+        "proof_status": proof_status,
+    }
 
 
 class MemoryHashStore:
@@ -319,14 +355,19 @@ class ContractNetEvaluator:
             task_id=task_id,
             receipt_hash=receipt_hash,
         )
-        self.store.hset(
-            meta_key,
-            mapping={
-                "status": "settled",
-                "settled_at": str(int(time.time())),
-                "payout_tx": receipt.get("staged_tx_digest") or "",
-            },
-        )
+        payout = payout_broadcast_status(receipt)
+        payout_fields = {
+            "status": "settled",
+            "settled_at": str(int(time.time())),
+        }
+        if payout["broadcasted"]:
+            payout_fields["payout_tx"] = payout["tx_hash"]
+        else:
+            # Claim-honesty: never store a staged digest under the
+            # tx-shaped "payout_tx" field name.
+            if payout["staged_digest"]:
+                payout_fields["payout_staged_digest"] = payout["staged_digest"]
+        self.store.hset(meta_key, mapping=payout_fields)
         self.store.publish(
             TASK_BROADCAST_CHANNEL,
             json.dumps(

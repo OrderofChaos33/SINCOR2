@@ -74,18 +74,19 @@ SINCOR_BRAND = {
     "tagline": "Autonomous AI agent swarm. Verified SINC on Base. Self-serve — no human sales.",
     "description": (
         "SINCOR is an autonomous agent swarm on Base with verifiable on-chain inventory. "
-        "SINC is 1B supply at a $0.15 floor ($150M FDV). Pay at /buy. "
+        "SINC is the platform access token with 1B fixed supply, available at /buy. "
+        "SINCOR does not publish a token price or valuation. "
         "Agents draft proof-of-work content; contracts handle distribution."
     ),
     "features": [
         "Specialized AI agents — content, ops, on-chain stats, review queue",
-        "Self-serve checkout at /buy — SINC $0.15 floor ($150M / 1B)",
+        "Self-serve checkout at /buy — platform access in SINC, 1B fixed supply",
         "Verifiable Base contracts: SINC token, v4 hook, Sourcify-matched source",
         "Human-in-the-loop launch review (~5 min/day) — agents draft, you approve",
         "CRM sync, deduplication, lead enrichment (platform layer)",
         "A2A agent card at /.well-known/agent.json for discovery",
     ],
-    "pricing_note": "Platform from $297/mo; SINC official price $0.15 ($150M FDV / 1B tokens).",
+    "pricing_note": "Platform from $297/mo; SINC is platform access — 1B fixed supply, no published price.",
     "sinc_token": SINC_TOKEN,
 }
 
@@ -707,13 +708,23 @@ class WordPressPublisher:
                 paragraphs.append(p)
             return "\n".join(paragraphs)
 
-    def publish(self, post: dict, scheduled_for: Optional[str] = None) -> dict:
+    def publish(self, post: dict, scheduled_for: Optional[str] = None, manual: bool = False) -> dict:
         """
         Publish or schedule a post to WordPress.
         Returns WP API response with post_id and URL.
+
+        P1 audit #9 backstop: requires explicit CONTENT_AGENT_ENABLED opt-in
+        (waived only for an explicit per-action ``manual=True`` publish) and
+        refuses whenever the SINCOR_COMMS_KILL_SWITCH is engaged.
         """
         import urllib.request
         import urllib.error
+
+        from sincor2.comms_gating import content_publish_allowed
+        ok, reason = content_publish_allowed(manual=manual)
+        if not ok:
+            logger.warning("[WP] Publish refused (%s) — kill switch / opt-in gate", reason)
+            return {"error": "publish_blocked", "reason": reason}
 
         if not self.enabled:
             logger.warning("[WP] Skipping publish — WordPress not configured")
@@ -986,6 +997,12 @@ def run_autonomous_cycle(model: str = "claude-haiku-4-5"):
     logger.info("[CYCLE] Starting autonomous content cycle")
     init_db()
 
+    # P1 audit #9: kill switch forces dry-run — generate drafts, never publish.
+    from sincor2.comms_gating import kill_switch_engaged
+    dry_run = kill_switch_engaged()
+    if dry_run:
+        logger.warning("[CYCLE] Kill switch engaged — dry-run mode, publishing disabled")
+
     # 1. Load or generate calendar
     if not CALENDAR_PATH.exists():
         logger.info("[CYCLE] No calendar found — generating 12-week calendar")
@@ -1027,11 +1044,13 @@ def run_autonomous_cycle(model: str = "claude-haiku-4-5"):
         post = generate_blog_post(keyword, ctype, model=model)
         path = save_post(post)
 
-        # Publish
+        # Publish (skipped in dry-run; the publish backstop refuses regardless)
         publish_date = item["publish_date"]
-        if wp.enabled:
+        if wp.enabled and not dry_run:
             result = wp.schedule_post(post, publish_date)
             logger.info(f"[CYCLE] Scheduled to WP: {result}")
+        elif wp.enabled and dry_run:
+            logger.warning(f"[CYCLE] Dry-run: publish skipped for '{keyword}'")
         else:
             logger.info(f"[CYCLE] Saved draft: {path}")
 

@@ -422,16 +422,16 @@ class AtomicSwapController:
             with self._lock:
                 if self._staged_epoch is None:
                     raise RuntimeError("no staged epoch")
-                if self._active_epoch is not None:
-                    merged = dict(self._active_epoch.records)
-                    for tid in tombstones:
-                        merged.pop(tid, None)
-                    merged.update(delta_records)
-                else:
-                    merged = dict(self._staged_epoch.records)
-                    for tid in tombstones:
-                        merged.pop(tid, None)
-                    merged.update(delta_records)
+                # The staged epoch is the new truth: it was built from the
+                # compacted warm segment, so TTL expiry and decay pruning
+                # are already applied. Starting from the OLD active epoch
+                # instead would resurrect pruned records (expired bid states
+                # would live forever). Final delta writes/tombstones that
+                # landed during staging are applied on top.
+                merged = dict(self._staged_epoch.records)
+                for tid in tombstones:
+                    merged.pop(tid, None)
+                merged.update(delta_records)
 
                 builder = EpochBuilder()
                 next_epoch = builder.build(

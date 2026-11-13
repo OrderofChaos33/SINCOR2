@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""Generate TASK_DECOMPOSITION.json: ~1000 bounded swarm tasks from the 37-item gap audit."""
+"""Legacy partial task-seed generator; not the canonical task ledger.
+
+The checked-in TASK_DECOMPOSITION.json contains later, curated tasks that this
+older seed list does not reproduce. This script only writes an explicitly
+named preview and refuses to overwrite the canonical ledger.
+"""
+import argparse
+from collections import Counter
 import json
+from pathlib import Path
 
 tasks = []
 _n = 0
@@ -118,12 +126,14 @@ T(7,"P1","Migrate divergent inbound auction callers","a2a_inbound*.py call canon
 T(7,"P1","Pricing-engine scope disambiguation","dynamic_pricing_engine vs defi/pricing scopes documented.","no same-name confusion", "S", status="done")
 
 # ============ P2 — P24 issuance wiring ============
-# Item 8: deploy P24 (blocked: broadcast)
+# Item 8: P24 local simulation (live deployment outside CT-01)
+T(8,"P2","P24 funding hold: no live wallet funding","Do not fund a P24 wallet under the local-simulation-only decision.","no P24 wallet funded; separate explicit owner authorization required before live funding", "S", status="blocked", blocked_by="CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 wallet funding.")
 d8a = T(8,"P2","P24 Foundry deploy script review","Review onchain/script deploy script: ContentPolicyGuard -> CreatorTokenFactory -> FeeSplitDistributor -> RevenueAccrual order; constructor args pinned.","script reviewed; args checklist complete", "M", status="done")
-T(8,"P2","P24 Sepolia dry-run rehearsal","forge script --dry-run against Base Sepolia; issue() rehearsal succeeds.","dry-run green; gas profiled", "M", deps=[d8a], status="done")
-T(8,"P2","P24 deploy ceremony (Sepolia)","Broadcast deployment; record addresses/tx; commit onchain/deployments/base-sepolia-p24.json.","manifest committed", "M", deps=[d8a], status="blocked", blocked_by="Founder must authorize contract broadcast + fund deployer wallet on Base Sepolia.")
-T(8,"P2","Sourcify/Etherscan verification","Verify all 4 P24 contracts on Basescan + Sourcify.","verified badges present", "S", status="blocked", blocked_by="Blocked on P24 Sepolia deployment (founder broadcast authorization).")
-T(8,"P2","P24 mainnet deploy decision","Founder go/no-go for mainnet P24 deployment after Sepolia matrix green.","recorded decision", "S", status="blocked", blocked_by="Founder decision: mainnet P24 deployment timing; depends on Sepolia 6-phase matrix 100% green.")
+T(8,"P2","P24 local simulation rehearsal","Run forge script locally; constructor validation and ordering succeed.","simulation green; no deployment evidence", "M", deps=[d8a], status="done")
+T(8,"P2","P24 local execution and import-closure safety gate","Exercise the deploy script only in a local Foundry test; scan its project-local import closure for signer, broadcast, network-write, and persistent-manifest primitives.","offline safety test passes in mandatory PR and root CI; no live deployment evidence", "M", deps=[d8a])
+T(8,"P2","P24 live deployment authorization hold","P24 remains local-simulation-only under CT-01; no live deploy or broadcast.","separate explicit owner authorization and review before any live deployment", "M", deps=[d8a], status="blocked", blocked_by="CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 deployment or broadcast.")
+T(8,"P2","P24 live verification authorization hold","No live P24 verification under CT-01; retain the local simulation path only.","separate explicit owner authorization and review before any live verification", "S", status="blocked", blocked_by="CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 verification.")
+T(8,"P2","P24 mainnet deployment authorization hold","No mainnet P24 deployment action under CT-01.","separate explicit owner authorization and review before any live deployment", "S", status="blocked", blocked_by="CT-01 authorizes local simulation only; separate explicit owner authorization is required before any live P24 deployment.")
 
 # Item 9: bridge (done w05)
 T(9,"P2","P24 bridge module","src/sincor2/defi/p24/bridge.py: exact issue() calldata, eth_call dry-run, caller-supplied signing, never imports eth_account.","12/12 bridge tests green; no eth_account import", "M", status="done")
@@ -207,7 +217,7 @@ T(26,"P3","Idempotent blueprint mounting","Double register() safe.","test green"
 t27 = T(27,"P4","Record invariant tests for all 26 products","Run on-disk suites; record invariant_test entries (passed>0, failed==0) via ledger API.","26 products hold passing invariant_test entries", "L", status="done")
 for pid, name, sku in PRODUCTS:
     T(27,"P4",f"Invariant ledger entry: {name}",f"Genuine seeded invariant/fuzz suite green for {sku}; entry recorded.",
-      f"entry present and _passing_entries finds it", "S", status="done", deps=[t27])
+      "entry present and _passing_entries finds it", "S", status="done", deps=[t27])
 T(27,"P4","Merge-time ledger entry-ID concatenation","w20->w21 entries merged by entry-ID concat, never text-merge; JSON validated.","53+ entries; zero dupes", "S")
 
 # Item 28: fork-sim harness (done w25; 9 honest findings blocked on address pinning)
@@ -215,10 +225,10 @@ t28 = T(28,"P4","Fork-simulation harness","Read-only replay vs Base mainnet at p
 FORK_GREEN = {1,3,4,5,7,8,9,12,15,16,18,20,21,22,24,25,26}
 for pid, name, sku in PRODUCTS:
     if pid in FORK_GREEN:
-        T(28,"P4",f"Fork sim: {name}",f"fork_sim entry recorded for {sku} from live Base data.",f"entry present; passed=1", "S", status="done", deps=[t28])
+        T(28,"P4",f"Fork sim: {name}",f"fork_sim entry recorded for {sku} from live Base data.","entry present; passed=1", "S", status="done", deps=[t28])
     else:
         T(28,"P4",f"Fork sim: {name} (needs address pinning)",f"No onchain counterpart pinned for {sku}; pin official protocol addresses then sim.",
-          f"fork_sim entry recorded", "M", status="blocked", deps=[t28],
+          "fork_sim entry recorded", "M", status="blocked", deps=[t28],
           blocked_by="Founder/auditor must pin official protocol/oracle addresses before an honest fork sim exists.")
 T(28,"P4","Treasury contract characterization","Treasury 0x09E2...9612Ac confirmed contract (23 bytes); USDC 733 wei documented as sim bound.","noted in sim scopes", "S", status="done")
 
@@ -230,33 +240,32 @@ T(29,"P4","SKU canon documentation","docs/DEFI_LEDGER_SKU_CANON.md: canonical mi
 t30 = T(30,"P4","Internal audit-report entries","Genuine manual review of all 26 modules; 6 low/info findings; 0 open criticals; entries carry not_a_third_party_audit=True.","audit->product gate evaluable", "L", status="done")
 for pid, name, sku in PRODUCTS:
     T(30,"P4",f"Audit entry: {name}",f"audit_report entry for {sku} with scope/checklist/findings/gate decision.",
-      f"entry present; 0 open criticals", "S", status="done", deps=[t30])
+      "entry present; 0 open criticals", "S", status="done", deps=[t30])
 T(30,"P4","Third-party audit engagement decision","Founder decides whether to engage external auditor before mainnet.","recorded decision", "S", status="blocked", blocked_by="Founder decision: engage third-party auditor (and which firm) before mainnet.")
 
 # Item 31: live-block decisions (blocked: 19 products)
 for pid, name, sku in PRODUCTS:
     if pid in LIVE_BLOCKED:
         T(31,"P4",f"Live-block decision: {name}",f"Founder: unblock or confirmed keep-blocked for {sku}; if unblocked, re-audit + pinned addresses + oracle verification.",
-          f"recorded decision in products_state.json", "M", status="blocked",
+          "recorded decision in products_state.json", "M", status="blocked",
           blocked_by="Founder decision: release live_block on 19 products (incl. P24) or keep blocked.")
     else:
-        T(31,"P4",f"Live-block decision: {name}",f"{sku} not blocked; confirm product-stage readiness path.",f"decision recorded", "S", status="pending")
+        T(31,"P4",f"Live-block decision: {name}",f"{sku} not blocked; confirm product-stage readiness path.","decision recorded", "S", status="pending")
 T(31,"P4","Address pinning + oracle verification","Pin official protocol/oracle addresses per spec for any unblocked product.","pinned addresses committed", "L", status="blocked", blocked_by="Blocked on live-block unblock decisions (19 products).")
 
 # ============ P5 — AXM money path ============
-# Item 32: arm executor (blocked: founder arming ceremony)
-T(32,"P5","Pin AXM->USDC/WETH V4 pool","Identify and verify the real pool the executor will route through.","pool address pinned + verified", "M", status="blocked", blocked_by="Founder decision: arm conversion executor (item 32) — pool pinning is step 1 of the arming ceremony.")
-T(32,"P5","Fork-simulate conversion path","Simulate swap on fork before arming; slippage/fees within bounds.","sim green", "M", status="blocked", blocked_by="Blocked on item-32 arming decision.")
-T(32,"P5","Forwarder key into Secure Vault","Key stored via approved secure flow; executor reads from vault only.","vault check green", "S", status="blocked", blocked_by="Blocked on item-32 arming decision.")
-T(32,"P5","Arming ceremony: armed=True","Set armed=True only after pool pin + sim + vault key + founder sign-off.","first real onchain conversion settles; treasury receipt verifiable", "S", status="blocked", blocked_by="Founder must authorize arming the fee-conversion executor (money movement).")
-T(32,"P5","Reconcile listener obligations before arming","Pending conversion obligations from fee listener reconciled against receipts.","reconciliation report", "M")
+# Item 32: no live conversion capability; future work requires a new reviewed authorization design.
+T(32,"P5","Canonical fee-conversion authorization design hold","Specify capability, chain/token/target allowlists, limits, approver quorum, expiry, and receipt ownership; do not provision keys or enable execution.","independently reviewed design and explicit owner decisions; no signer or broadcast path", "M", status="blocked", blocked_by="No canonical authorization interface or owner approval exists; legacy armed flags cannot authorize live conversion.")
+T(32,"P5","Conversion-route due diligence (read-only)","Document candidate route/pool facts only; no key access, signing, transaction, or funds movement.","read-only evidence report with explicit unknowns", "M")
+T(32,"P5","Local-only conversion simulation (future gated)","Use synthetic obligations and fake/stubbed RPC only; do not sign, broadcast, custody keys, or execute a live conversion.","offline/local simulation results only; no live transaction evidence", "M", status="blocked", blocked_by="Requires separate review of the canonical authorization design; live conversion remains disabled.")
+T(32,"P5","Reconcile listener obligations (read-only)","Reconcile pending fee-listener obligations against observed receipts without authorizing or executing conversion.","reconciliation report; no conversion or funds movement", "M")
 
 # Item 33: listener (done w19)
 T(33,"P5","Fee-event listener","Polls confirmed AXM transfers to fee recipient; creates 5% obligations; cursor persists; reorg-safe.","75/75 green; executor stays disarmed", "L", status="done")
 T(33,"P5","Residual: pin exact billing address","Every transfer to fee recipient treated as payment until billing address pinned.","address pinned; obligations reconciled vs receipts", "M")
 
 # Item 34: dangerous signal (done w19)
-T(34,"P5","Fail-closed treasury policy","convert_before_treasury_if_needed() returns converted=False with reason until armed.","no path believes conversion happened", "M", status="done")
+T(34,"P5","Fail-closed treasury policy","convert_before_treasury_if_needed() remains converted=False regardless of legacy armed configuration.","no path believes conversion happened; no live conversion authorization", "M", status="done")
 
 # Item 35: money-path copy (done w22)
 T(35,"P5","Honest money-path copy","Remove live-on-V4/80%-routing fiction from /axiom, privacy.html, x402 labels, settlement.py docstring.","no public copy implies unperformed onchain movement", "M", status="done")
@@ -292,15 +301,34 @@ T(0,"X","Deploy-config checklist application","AGENT_HEARTBEAT_TOKEN, ADMIN_PASS
 PUSH_GROUPS = [("P1 housekeeping",4),("P2 P24 wiring",4),("P3 A2A hardening",11),("P4 DeFi gates",5),("P5 AXM money path",3),("planning/docs",5)]
 for gname, count in PUSH_GROUPS:
     T(0,"X",f"Push batch: {gname}","Push the grouped branches with the one-shot PAT; open human-gated PRs, never merge.",f"{count} branches pushed; PRs opened", "M", deps=[t_pat], status="blocked", blocked_by="Human gate: push/PR batch needs founder go-ahead + one-shot PAT.")
-# Sepolia deploy ceremony + test matrix (blocked on founder)
-t_deploy = T(0,"X","Milestone: Base Sepolia deploy ceremony","Deploy auction + P24 + stake/slash contracts per runbooks; founder authorizes each broadcast.","contracts verified onchain", "L", status="blocked", blocked_by="Founder must authorize each contract broadcast + fund wallets.")
+# Sepolia deploy ceremony + test matrix (P24 excluded; other broadcasts remain human-gated)
+t_deploy = T(0,"X","Milestone: Base Sepolia deploy ceremony","Deploy auction + stake/slash contracts per their runbooks; P24 remains local-simulation-only pending separate explicit owner authorization.","authorized non-P24 contracts verified onchain; P24 has no deployment evidence", "L", status="blocked", blocked_by="Founder must separately authorize each non-P24 contract broadcast + fund wallets; P24 live activity requires separate explicit owner authorization.")
 T(0,"X","Six-phase test matrix on Sepolia","Run docs/ops/AUCTION_TEST_MATRIX.md against deployed contracts.","100% green", "L", deps=[t_deploy], status="blocked", blocked_by="Blocked on Sepolia deployment.")
 T(0,"X","Outreach unblock evaluation","Until Sepolia + 6-phase matrix 100% green, copy stays proof-gated.","matrix green -> outreach unlocked", "S", deps=[t_deploy], status="blocked", blocked_by="Blocked on Sepolia deployment + 100% green matrix.")
 
-with open("TASK_DECOMPOSITION.json","w") as f:
-    json.dump({"generated":"2026-09-30","base":"fd96801","tasks":tasks}, f, indent=1)
-print(f"TOTAL TASKS: {len(tasks)}")
-from collections import Counter
-print("by phase:", dict(Counter(t['phase'] for t in tasks)))
-print("by status:", dict(Counter(t['status'] for t in tasks)))
-print("by size:", dict(Counter(t['est_size'] for t in tasks)))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Write a legacy partial task preview; never overwrite the canonical ledger."
+    )
+    parser.add_argument(
+        "--preview-output",
+        required=True,
+        help="explicit path for a preview JSON file (TASK_DECOMPOSITION.json is forbidden)",
+    )
+    args = parser.parse_args()
+    output = Path(args.preview_output).resolve()
+    canonical = Path(__file__).with_name("TASK_DECOMPOSITION.json").resolve()
+    if output == canonical:
+        parser.error("gen_tasks.py is a partial preview only and cannot overwrite TASK_DECOMPOSITION.json")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(
+            {"generated":"2026-09-30","base":"fd96801","preview_only":True,"tasks":tasks},
+            indent=1,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    print(f"PREVIEW TASKS: {len(tasks)} → {output}")
+    print("by phase:", dict(Counter(t['phase'] for t in tasks)))
+    print("by status:", dict(Counter(t['status'] for t in tasks)))
+    print("by size:", dict(Counter(t['est_size'] for t in tasks)))

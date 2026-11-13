@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import math
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -67,12 +68,21 @@ def memory_headroom_and_swap_latency_test(
     engine = ThreeTierVectorEngine(model_version="bench-v1", decay_lambda=1e-4, epsilon=0.01)
     now = time.time()
 
+    # Per-cutover pause samples: drain_and_cutover holds the write lock while
+    # swapping epochs, so each sample is an honest lock-contention datapoint.
+    pause_samples: List[float] = []
+
+    def _cutover(**kwargs: Any) -> str:
+        eid = engine.cutover(**kwargs)
+        pause_samples.append(float(engine.swap.last_pause_ms))
+        return eid
+
     seed_n = max(1024, min(50_000, profile.ops_per_second // 2))
     for i in range(seed_n):
         engine.write(_mk_record(f"seed-{i}", profile.vector_dim, "seed", now))
     engine.compact_warm()
     engine.stage_epoch_from_warm()
-    engine.cutover()
+    _cutover()
 
     base = engine.swap.active_epoch()
     base_bytes = float(engine.swap._estimate_bytes(base) if base is not None else 1.0)  # noqa: SLF001
@@ -121,7 +131,7 @@ def memory_headroom_and_swap_latency_test(
         while not stop.wait(profile.rebuild_interval_seconds):
             engine.compact_warm()
             engine.stage_epoch_from_warm(model_version="bench-v2")
-            engine.cutover(max_pause_ms=5.0)
+            _cutover(max_pause_ms=5.0)
 
     t_ops = threading.Thread(target=mixed_ops, daemon=True)
     t_rebuild = threading.Thread(target=rebuild_worker, daemon=True)
@@ -142,12 +152,21 @@ def memory_headroom_and_swap_latency_test(
         peak_headroom < thresholds.max_memory_factor
         and max_pause < thresholds.max_lock_pause_ms
     )
+    # Nearest-rank p99 over the observed cutover pauses (honest even for
+    # tiny samples: p99 of <100 samples is the max by definition).
+    ordered = sorted(pause_samples)
+    p99_pause = float(ordered[max(0, math.ceil(0.99 * len(ordered)) - 1)]) if ordered else 0.0
     return ValidationResult(
         name="memory_headroom_swap_latency",
         ok=ok,
         metrics={
-            "peak_memory_factor": float(peak_headroom),
-            "lock_pause_ms": float(max_pause),
+            # Contract keys (see test_validation_benchmarks_and_swarm_determinism_contracts):
+            # memory_factor is the peak (active+staged)/base byte ratio observed;
+            # swap_pause_ms is the worst cutover pause; p99_lock_contention_ms
+            # is the nearest-rank p99 of per-cutover lock-hold samples.
+            "memory_factor": float(peak_headroom),
+            "p99_lock_contention_ms": p99_pause,
+            "swap_pause_ms": float(max_pause),
             "ops_per_second_target": float(profile.ops_per_second),
             "read_ratio": float(profile.read_ratio),
         },
@@ -223,6 +242,10 @@ def graph_entropy_and_recall_floor_test(
         name="graph_entropy_recall_floor",
         ok=ok,
         metrics={
+            # Contract keys: "recall" is the recall@10 floor measurement,
+            # "baseline_size" is the baseline graph it was measured against.
+            "recall": recall_at_10,
+            "baseline_size": float(profile.graph_nodes),
             "recall_at_10": recall_at_10,
             "cycles": float(profile.cycles),
             "graph_nodes": float(profile.graph_nodes),
@@ -261,10 +284,18 @@ def alignment_precision_and_drift_check(
 
     drift = float(sum(drifts) / max(1, len(drifts)))
     ok = drift < thresholds.max_top10_drift
+    # Cosine loss of the Procrustes alignment: mean 1 - cos(y_hat, y).
+    # All rows are unit-norm (x normalized, q and r orthogonal), so the
+    # dot product is the cosine similarity.
+    cosine_loss = float(1.0 - np.mean(np.sum(y_hat * y, axis=1)))
     return ValidationResult(
         name="alignment_precision_drift",
         ok=ok,
         metrics={
+            # Contract keys: "topk_drift" is the top-k retrieval drift,
+            # "cosine_loss" is the mean alignment cosine loss above.
+            "topk_drift": drift,
+            "cosine_loss": cosine_loss,
             "top10_drift": drift,
             "n_vectors": float(n_vectors),
         },

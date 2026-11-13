@@ -1,0 +1,26 @@
+=== [1/7] compile circuit ===
+compile_ms=1883
+[32;22m[INFO]  [39;1msnarkJS[0m: # of Wires: 492
+[32;22m[INFO]  [39;1msnarkJS[0m: # of Constraints: 489
+[32;22m[INFO]  [39;1msnarkJS[0m: # of Private Inputs: 4
+[32;22m[INFO]  [39;1msnarkJS[0m: # of Public Inputs: 2
+=== [2/7] powers of tau (bn128, power 13, dev ceremony — NOT production) ===
+ptau_ms=385894
+=== [3/7] PLONK setup ===
+plonk_setup_rc=0 plonk_setup_ms=7171
+=== [4/7] valid witness input (amount=7500 <= limit=10000) ===
+wrote build/input_valid.json: amount=7500 limit=10000 payload_commitment=7703729995404683836328373996480286860124763370058261262236927562103931109242
+=== [5/7] PLONK fullprove (valid) ===
+prove_rc=0 prove_ms=13587
+proof_json_bytes=2251 public_bytes=93
+=== [6/7] verify (valid) ===
+verify_rc=0 verify_ms=967
+[32;22m[INFO]  [39;1msnarkJS[0m: OK!
+=== [7/7] NEGATIVE witness (amount=15000 > limit=10000) must FAIL ===
+wrote build/input_invalid.json: amount=15000 limit=10000 payload_commitment=15472335579550422973503289180974147077991079739108109104392785611164460507293
+negative_witness_rc=1 negative_witness_ms=186
+                    throw new Error(err);
+Error: Error: Assert Failed.
+Error in template PolicyProof_78 line: 54
+NEGATIVE RESULT OK: witness generation failed for amount > limit, as required
+=== spike flow done ===

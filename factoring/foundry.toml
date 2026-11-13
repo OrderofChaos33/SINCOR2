@@ -1,0 +1,23 @@
+# Standalone Foundry profile for the Lane-4 SealFactoring prototype.
+# Deliberately separate from the repo-root foundry.toml: the repo-wide build
+# has a known pre-existing missing-libs failure (Uniswap v4 hooks) that is
+# out of scope for this lane. Everything for this prototype compiles and
+# tests inside this directory only.
+#
+# Run:  cd factoring && ~/.foundry/bin/forge test -vv
+[profile.default]
+src = "contracts"
+out = "out"
+test = "test"
+libs = ["../lib"]
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+evm_version = "cancun"
+remappings = [
+    "@openzeppelin/contracts/=../lib/openzeppelin-contracts/contracts/",
+    "forge-std/=../lib/forge-std/src/",
+]
+
+[fuzz]
+runs = 64

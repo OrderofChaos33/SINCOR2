@@ -44,8 +44,14 @@ class ConsensusDisputeResolver:
                 reason="no_votes",
             )
 
-        invalid_bps = (invalid * 10_000) // total
-        should_slash = invalid_bps >= self.quorum_bps
+        # Quorum as a vote-count threshold: the number of invalid votes needed
+        # is floor(quorum_bps * total / 10_000). A classic 2/3 supermajority
+        # (e.g. 2 of 3 validators at quorum_bps=6700) must satisfy the
+        # quorum — ratio-then-floor arithmetic ((2*10000)//3 = 6666 < 6700)
+        # wrongly made it unreachable. Zero invalid votes can never form a
+        # slash quorum.
+        required_votes = (self.quorum_bps * total) // 10_000
+        should_slash = invalid > 0 and invalid >= required_votes
         if should_slash:
             self.table.quarantine(agent_id, "invalid_execution_proof")
             return DisputeOutcome(

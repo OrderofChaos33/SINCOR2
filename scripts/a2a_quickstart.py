@@ -58,9 +58,17 @@ from sincor2.onchain.stake_ledger import reset_stake_ledger  # noqa: E402
 PORT = 5057
 BASE = f"http://127.0.0.1:{PORT}"
 
+# Test-only ephemeral identity: registration and heartbeats are EIP-191
+# proof-gated (fail-closed) on both the local test app and production.
+# Real agents sign with their own wallet; this throwaway key exists only
+# inside this demo process and never leaves it.
+from eth_account import Account  # noqa: E402
+from eth_account.messages import encode_defunct  # noqa: E402
+
+_signer = Account.create()
 AGENT_ID = f"quickstart-{int(time.time()) % 100000}"
 TAGS = ["lead-enrichment"]
-WALLET = "0x" + "44" * 20
+WALLET = _signer.address
 
 _phases: list[tuple[str, float]] = []
 
@@ -100,22 +108,35 @@ def main() -> int:
     phase("1. register")
     reg = sdk.register(
         AGENT_ID, "Quickstart Agent", TAGS, wallet=WALLET,
-        rpc_callback="https://quickstart.example/rpc")
+        rpc_callback="https://quickstart.example/rpc", signer=_signer)
     done_note(f"registered {reg['agent_id']} "
               f"(probation={reg['probation']}, reputation starts at 0.0)")
 
     phase("2. fund stake")
-    dep = sdk.deposit_stake(AGENT_ID, 2.0)
+    # Identity-bound stake deposits are fail-closed on main (Buildout-51):
+    # the endpoint rejects unsigned deposits (403), so sign with the same
+    # throwaway wallet the agent registered with.
+    dep = sdk.deposit_stake(AGENT_ID, 2.0, signer=_signer)
     done_note(f"deposited 2.0 AXM "
               f"(available_wei={dep['available_wei']})")
 
     phase("3. heartbeat")
-    hb = sdk.heartbeat(AGENT_ID)
+    hb = sdk.heartbeat(AGENT_ID, signer=_signer)
     done_note(f"alive, heartbeat TTL {reg['heartbeat_ttl_s']}s")
 
     phase("4. post sealed task")
+    # Signed poster identity: the anti-self-dealing guard rejects bids on
+    # anonymous (unsigned) bounty tasks (403), so the post must bind the
+    # poster wallet via EIP-191 — same pattern as the sponsored funnel
+    # (PR #506). TEST-ONLY: this signs with the demo's throwaway key, which
+    # never leaves this process; the SDK never sees the private key, only
+    # this caller-supplied sign_text callable.
+    poster_auth = SincorAgentSDK.make_poster_auth(
+        AGENT_ID, "lead-enrichment", int(time.time()),
+        lambda m: "0x" + _signer.sign_message(
+            encode_defunct(text=m)).signature.hex())
     task = sdk.post_task("lead-enrichment", TAGS, bounty_axm=1.5,
-                         sealed=True)
+                         sealed=True, **poster_auth)
     task_id = task["task_id"]
     done_note(f"{task_id}: bounty 1.5 AXM, sealed={task['sealed']}, "
               f"commit_deadline in {COMMIT_WINDOW_MS // 1000}s, "
@@ -129,7 +150,7 @@ def main() -> int:
 
     phase("6. wait for reveal window")
     sdk.wait_for_reveal_window(task_id, timeout_s=120, poll_s=2)
-    sdk.heartbeat(AGENT_ID)  # keep liveness fresh across the wait
+    sdk.heartbeat(AGENT_ID, signer=_signer)  # keep liveness fresh across the wait
     done_note("reveal window open")
 
     phase("7. reveal")

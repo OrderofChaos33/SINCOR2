@@ -54,17 +54,134 @@ except (Exception, SystemExit) as exc:
     PolyclawCoreAgent = None
 
 
+#: Fraction of available capital the decision router may size into a single
+#: trade before the hard notional cap is applied.
+_DEFAULT_MAX_RISK_PCT = 0.08
+
+#: Hard per-trade notional ceiling in USD, overridable via
+#: ``POLYCLAW_MAX_TRADE_USD``. Deliberately conservative: it sits above the
+#: current live bankroll scale (the Bankroll ledger starts at
+#: ``POLYCLAW_CAPITAL_USD``, $50 by default) so it never binds legitimate
+#: small operations, while hard-blocking outsized orders if a capital
+#: source is ever misreported. No single scheduled trade may exceed it.
+_DEFAULT_MAX_TRADE_USD = 100.0
+
+
+def _hub_available_capital():
+    """Capital reported by AccountingHub, or None when unavailable.
+
+    AccountingHub is an onchain (Solidity) component in this stack — there
+    is no Python ``AccountingHub.get_available_capital()`` binding in the
+    repo today. This is the single seam ``resolve_available_capital_usd``
+    consults first: when a binding lands, wire it here and its value wins
+    over the env fallback. Returning None means "not configured" — never
+    an invented number.
+    """
+    try:
+        from sincor2.accounting_hub import AccountingHub
+    except Exception:
+        return None
+    try:
+        return float(AccountingHub().get_available_capital())
+    except Exception as exc:
+        logger.error("AccountingHub capital read failed: %s", exc)
+        return None
+
+
+def resolve_available_capital_usd() -> float:
+    """Resolve the capital the earning cycle may size trades against.
+
+    Sources, in order — the first that yields a value wins:
+
+    1. AccountingHub, via the ``_hub_available_capital`` seam, when a
+       binding is configured.
+    2. Explicit operator configuration: the ``POLYCLAW_CAPITAL`` env var.
+
+    When neither is available the cycle fails CLOSED at 0.0. The decision
+    router sizes positions as ``capital * max_risk_pct * utility``, so 0.0
+    capital means $0 trades. There is deliberately NO default bankroll
+    figure: the previous hardcoded $25,000 default sized real orders
+    against money that did not exist.
+    """
+    hub_value = _hub_available_capital()
+    if hub_value is not None:
+        return max(0.0, float(hub_value))
+
+    raw = os.getenv("POLYCLAW_CAPITAL")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            logger.error(
+                "POLYCLAW_CAPITAL=%r is not a number; failing closed at $0", raw
+            )
+            return 0.0
+
+    logger.warning(
+        "No capital source available (AccountingHub unconfigured, "
+        "POLYCLAW_CAPITAL unset); failing closed at $0"
+    )
+    return 0.0
+
+
+def _max_trade_usd() -> float:
+    """Hard per-trade notional cap from ``POLYCLAW_MAX_TRADE_USD``."""
+    raw = os.getenv("POLYCLAW_MAX_TRADE_USD")
+    if raw is not None and str(raw).strip() != "":
+        try:
+            value = float(raw)
+            if value > 0:
+                return value
+        except (TypeError, ValueError):
+            pass
+        logger.error(
+            "POLYCLAW_MAX_TRADE_USD=%r is not a positive number; "
+            "using the conservative default $%.2f",
+            raw,
+            _DEFAULT_MAX_TRADE_USD,
+        )
+    return _DEFAULT_MAX_TRADE_USD
+
+
+def max_trade_size_usd(available_capital_usd: float, max_risk_pct: float,
+                       hard_cap_usd: float = None) -> float:
+    """Per-trade notional ceiling: min(risk-based size, hard cap).
+
+    The risk-based size mirrors the decision router's sizing formula at
+    full utility (``capital * max_risk_pct``); the hard cap binds on top
+    of it regardless of how large the resolved capital is.
+    """
+    cap = _max_trade_usd() if hard_cap_usd is None else float(hard_cap_usd)
+    risk_based = max(0.0, float(available_capital_usd)) * max(0.0, float(max_risk_pct))
+    return round(min(risk_based, max(0.0, cap)), 2)
+
+
 def get_market_context():
-    """Pull live context from treasury / AccountingHub / config. Super optimized."""
-    # In production this should query your AccountingHub or treasury
-    # For now: sensible defaults + hooks for real data
+    """Build the live market context for one earning cycle.
+
+    Capital is resolved from a real source (see
+    ``resolve_available_capital_usd``) — never a hardcoded bankroll — and
+    the per-trade notional is hard-capped: the context carries
+    ``max_trade_usd`` = min(capital * max_risk_pct, POLYCLAW_MAX_TRADE_USD)
+    plus an effective ``max_risk_pct`` lowered when needed, so the
+    router's size formula (capital * max_risk_pct * utility, utility <= 1)
+    can never produce a trade above the cap.
+    """
+    capital = resolve_available_capital_usd()
+    hard_cap = _max_trade_usd()
+    capped = max_trade_size_usd(capital, _DEFAULT_MAX_RISK_PCT, hard_cap)
+    effective_risk_pct = _DEFAULT_MAX_RISK_PCT
+    if capital > 0:
+        effective_risk_pct = min(_DEFAULT_MAX_RISK_PCT, capped / capital)
     context = {
-        "available_capital_usd": float(os.getenv("POLYCLAW_CAPITAL", 25000)),
-        "max_risk_pct": 0.08,
+        "available_capital_usd": capital,
+        "max_risk_pct": effective_risk_pct,
+        "configured_max_risk_pct": _DEFAULT_MAX_RISK_PCT,
+        "max_trade_usd": capped,
+        "max_trade_hard_cap_usd": hard_cap,
         "market": "polymarket_perps",
         "timestamp": datetime.utcnow().isoformat(),
     }
-    # TODO: Replace with real call to AccountingHub.get_available_capital() or similar
     return context
 
 

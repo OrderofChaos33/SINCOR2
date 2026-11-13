@@ -56,6 +56,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
+from sincor2.mcp_schema_guard import validate_arguments
+
 SERVER_NAME = "sincor-marketplace-mcp"
 SERVER_VERSION = "1.0.0"
 MCP_PROTOCOL_VERSION = "2025-06-18"
@@ -84,13 +86,22 @@ def _request(method: str, path: str,
     """
     url = _base_url() + path
     payload = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    # W-77: sealed-bid commit/reveal require bidder auth.  The MCP server
+    # is a first-party operator tool, so it presents the operator
+    # heartbeat token (same credential as the liveness runner) instead
+    # of per-agent EIP-191 signatures.
+    _op_token = (os.environ.get("SINCOR_HEARTBEAT_TOKEN")
+                 or os.environ.get("AGENT_HEARTBEAT_TOKEN") or "").strip()
+    if _op_token:
+        headers["X-Sincor-Heartbeat"] = _op_token
     req = urllib.request.Request(
         url, data=payload, method=method.upper(),
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
@@ -140,6 +151,14 @@ def _payload_hash(method: str, path: str,
 def _issue_confirmation(tool: str, method: str, path: str,
                         body: Dict[str, Any],
                         summary: str) -> Dict[str, Any]:
+    # Prune expired entries: without this, unconfirmed confirmations
+    # accumulate in _PENDING forever (slow memory exhaustion via repeated
+    # unconfirmed write-tool calls). Pruning here keeps the store bounded
+    # by live (unexpired, unconfirmed) entries only.
+    now = time.time()
+    for stale_id in [aid for aid, e in _PENDING.items()
+                     if now > float(e.get("expires_at", 0))]:
+        _PENDING.pop(stale_id, None)
     action_id = "mcpact_" + secrets.token_hex(8)
     token = secrets.token_urlsafe(32)
     phash = _payload_hash(method, path, body)
@@ -192,6 +211,96 @@ class _Denied(Exception):
     """A write was refused by the confirmation gate (default-deny)."""
 
 
+class PaymentRequired(Exception):
+    """A tool call needs x402 payment before it can run.
+
+    Carries the challenge fields so the dispatcher can return them as a
+    successful result (isError=True) instead of a JSON-RPC -32000 error —
+    MCP clients swallow JSON-RPC errors before the model ever sees them
+    (dev-watch item 80, ScriptMasterLabs 2026-10-02).
+    """
+
+    def __init__(self, price: str, pay_to: str,
+                 accepts: List[str] | None = None) -> None:
+        super().__init__(f"payment required: {price} to {pay_to}")
+        self.price = price
+        self.pay_to = pay_to
+        self.accepts = list(accepts) if accepts else []
+
+
+# ---------------------------------------------------------------------------
+# x402 payment challenge (dev-watch item 80)
+# ---------------------------------------------------------------------------
+#
+# MCP clients (ScriptMasterLabs, 2026-10-02) swallow JSON-RPC errors before
+# the model sees them: returning JSON-RPC error -32000 "Payment Required"
+# from tools/call means the payment challenge (accepts array, price, payTo)
+# NEVER reaches the agent. So the payment-required path returns the
+# challenge as a SUCCESSFUL result dict with isError:true — it passes
+# through result channels that drop error objects.
+
+DEFAULT_X402_PRICE = "0.01"
+DEFAULT_X402_PAY_TO = ""
+DEFAULT_X402_ACCEPTS: List[str] = ["eip3009-usdc-base"]
+
+#: Tool names that require x402 payment before execution. Production wiring
+#: registers the metered tools here (with pricing in PAID_TOOL_PRICING);
+#: the gate raises PaymentRequired unless the caller attaches a valid
+#: ``x402_access_token`` argument.
+PAID_TOOLS: set = set()
+
+#: tool name -> {"price": str, "pay_to": str, "accepts": [str]}
+PAID_TOOL_PRICING: Dict[str, Dict[str, Any]] = {}
+
+
+def register_paid_tool(name: str, *, price: str = DEFAULT_X402_PRICE,
+                       pay_to: str = DEFAULT_X402_PAY_TO,
+                       accepts: List[str] | None = None) -> None:
+    """Mark a tool as payment-gated with its x402 challenge fields."""
+    PAID_TOOLS.add(name)
+    PAID_TOOL_PRICING[name] = {
+        "price": price,
+        "pay_to": pay_to,
+        "accepts": list(accepts) if accepts else list(DEFAULT_X402_ACCEPTS),
+    }
+
+
+def payment_challenge_result(price: str, pay_to: str,
+                             accepts: List[str] | None) -> Dict[str, Any]:
+    """Build the payment challenge as a SUCCESSFUL MCP result.
+
+    Returns a result dict with ``isError: True`` (via _mcp_content) —
+    deliberately NOT a JSON-RPC error object — so the challenge (price,
+    payTo, accepts array, retry instructions) survives MCP clients that
+    drop JSON-RPC errors before the model sees them.
+    """
+    accepts_text = ", ".join(accepts) if accepts else "none specified"
+    challenge = {
+        "status": "payment_required",
+        "price": price,
+        "payTo": pay_to,
+        "accepts": list(accepts) if accepts else [],
+        "retry_instructions": (
+            "This tool requires payment before it can run. Sign an EIP-3009 "
+            f"transferWithAuthorization for {price} payable to {pay_to} "
+            f"(accepts: {accepts_text}), then retry tools/call with the "
+            "authorization attached as the 'x402_access_token' argument."
+        ),
+    }
+    return _mcp_content(challenge, is_error=True)
+
+
+def _require_x402_payment(name: str, arguments: Dict[str, Any]) -> None:
+    """Raise PaymentRequired if a payment-gated tool lacks a token."""
+    if name in PAID_TOOLS and not arguments.get("x402_access_token"):
+        pricing = PAID_TOOL_PRICING.get(name) or {}
+        raise PaymentRequired(
+            price=str(pricing.get("price", DEFAULT_X402_PRICE)),
+            pay_to=str(pricing.get("pay_to", DEFAULT_X402_PAY_TO)),
+            accepts=list(pricing.get("accepts", DEFAULT_X402_ACCEPTS)),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Sealed-bid commitment helper (reuses the canonical implementation)
 # ---------------------------------------------------------------------------
@@ -229,6 +338,7 @@ def _sealed_commitment(price_wei: int, salt: bytes,
 TOOLS: List[Dict[str, Any]] = [
     {
         "name": "list_tasks",
+        "annotations": {"title": "List tasks", "read_only_hint": True},
         "description": (
             "List open marketplace auctions (read-only). Backed by "
             "GET /v1/a2a/auctions — sealed auctions with an onchain anchor. "
@@ -250,6 +360,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_task",
+        "annotations": {"title": "Get task", "read_only_hint": True},
         "description": (
             "Full detail for one auctioned task (read-only): deadlines, "
             "commitment scheme, price bounds, and contract addresses. "
@@ -268,6 +379,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_agent_card",
+        "annotations": {"title": "Get agent card", "read_only_hint": True},
         "description": (
             "Read the marketplace agent-card registry (read-only): the platform "
             "card plus vertical pack cards. Every skill carries a quoteUrl. "
@@ -285,6 +397,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "get_quote",
+        "annotations": {"title": "Get quote", "read_only_hint": True},
         "description": (
             "Price one skill execution in AXM before bidding (read-only). "
             "Backed by GET /api/a2a/quote. Unauthenticated; free-quota callers "
@@ -303,6 +416,13 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "register_agent",
+        "annotations": {
+            "title": "Register agent",
+            "read_only_hint": False,
+            "destructive_hint": False,
+            "idempotent_hint": True,   # re-register with identical args rewrites the same directory record
+            "open_world_hint": False,  # closed world: the SINCOR platform directory only
+        },
         "description": (
             "WRITE — register (or re-register) an agent in the marketplace "
             "directory. Requires explicit operator confirmation per call: the "
@@ -322,11 +442,15 @@ TOOLS: List[Dict[str, Any]] = [
                 "description": {"type": "string"},
                 "version": {"type": "string"},
                 "capability_tags": {"type": "array", "items": {"type": "string"},
-                                    "description": "Required: skill tags, e.g. ['lead-enrichment']."},
+                                    "description": "Skill tags, e.g. ['lead-enrichment'] (the platform requires tags, or an agent_card carrying skills)."},
                 "rpc_callback": {"type": "string",
                                  "description": "Your agent's JSON-RPC URL."},
                 "wallet": {"type": "string",
                            "description": "0x-prefixed 20-byte hex address."},
+                "agent_url": {"type": "string",
+                              "description": "Your agent's base URL; forwarded upstream as its callback URL when rpc_callback is omitted."},
+                "chain_id": {"type": "integer",
+                             "description": "Chain the agent operates on (Base mainnet = 8453); forwarded upstream and recorded as an integer on the registration."},
                 "agent_card": {"type": "object",
                                "description": "Alternative: full A2A agent_card dict (name, description, version, skills[] required)."},
                 "confirmation_token": {"type": "string"},
@@ -336,6 +460,13 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "submit_bid",
+        "annotations": {
+            "title": "Submit bid",
+            "read_only_hint": False,
+            "destructive_hint": False,   # bids lock stake, never delete state
+            "idempotent_hint": False,    # each call may commit a fresh stake-locking commitment
+            "open_world_hint": False,    # closed world: the SINCOR marketplace only
+        },
         "description": (
             "WRITE — place a bid on a marketplace task. Requires explicit "
             "operator confirmation per call (see register_agent). Modes: "
@@ -627,6 +758,21 @@ def _handle_tools_call(rpc_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
     if name not in _TOOL_NAMES:
         return _rpc_error(rpc_id, -32601, f"unknown tool '{name}'")
     try:
+        # Layering (dev-watch 80 + 316): the x402 payment gate stays
+        # OUTERMOST for unpaid calls — its challenge is itself the loud
+        # response, and an unpaid call never executes, so nothing can be
+        # coerced or mis-shaped through it. Every call that passes the
+        # gate (non-paid tools, and paid tools carrying a token) then
+        # goes through dev-watch 316 strict schema validation BEFORE
+        # dispatch: a literal "null", a missing required field, or a
+        # wrong-typed value is rejected (-32602 via the ValueError
+        # handler below), never coerced by the tool implementations.
+        _require_x402_payment(name, arguments)
+        validate_arguments(
+            name,
+            next(t["inputSchema"] for t in TOOLS if t["name"] == name),
+            arguments,
+        )
         if name == "list_tasks":
             result = _tool_list_tasks(arguments)
         elif name == "get_task":
@@ -643,6 +789,12 @@ def _handle_tools_call(rpc_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
             result = _tool_submit_bid(arguments, confirmed)
         else:  # pragma: no cover — guarded by _TOOL_NAMES
             return _rpc_error(rpc_id, -32601, f"unknown tool '{name}'")
+    except PaymentRequired as exc:
+        # Item 80: return the challenge as a SUCCESSFUL result with
+        # isError:true — a JSON-RPC -32000 error would be swallowed by MCP
+        # clients before the model ever sees it.
+        return _rpc_ok(rpc_id, payment_challenge_result(
+            exc.price, exc.pay_to, exc.accepts))
     except _Denied as exc:
         return _rpc_ok(rpc_id, _mcp_content(
             {"status": "denied", "error": str(exc)}, is_error=True))

@@ -25,6 +25,17 @@ The relayer key comes from ``AUCTION_RELAYER_KEY`` only (Secure Vault in
 production).  Contract addresses from ``COMMIT_REVEAL_AUCTION_ADDRESS`` /
 ``EXECUTION_ESCROW_ADDRESS`` / ``AUCTION_RPC_URL`` (shared with
 ``auction_client``).
+
+Relayer constraint (dev-watch 306, zkLink forged-root lesson): a relayer
+is transport, never authority.  This relayer is OUTBOUND only — it signs
+the platform's own poster transactions with the platform key and accepts
+no third-party submitted roots, claims, winners, or prices.  The winner
+and price it funds are read from the source chain (``vickreyResult``) and
+enforced onchain by the poster-only ``selectWinnerAndFund``; a
+caller-supplied claim is never trusted, and any future inbound
+relayer-submitted claim must be cryptographically verified against the
+source chain's expected verification path onchain before any release,
+reverting — never falling back to a permissive path — on failure.
 """
 
 from __future__ import annotations
@@ -195,8 +206,22 @@ class AuctionRelayer:
     # -- poster transactions -------------------------------------------------
     def _send(self, fn, value_wei: int = 0) -> str:
         from eth_account import Account
+        from sincor2.onchain.testnet_preflight import (
+            DEFAULT_MINIMUM_GAS_ETH,
+            enforce_relayer_testnet_gas,
+            eth_to_wei,
+        )
 
         account = Account.from_key(self._relayer_key)
+        minimum_gas_eth = os.environ.get(
+            "AUCTION_SEPOLIA_MIN_GAS_ETH", DEFAULT_MINIMUM_GAS_ETH
+        )
+        minimum_gas_wei = eth_to_wei(minimum_gas_eth)
+        # Read-only chain/balance checks happen before nonce/gas estimation,
+        # signing, and broadcast. Testnet gas must be funded manually.
+        chain_id = enforce_relayer_testnet_gas(
+            self.w3, account.address, minimum_gas_wei
+        )
         tx = fn.build_transaction({
             "from": account.address,
             # "pending" so back-to-back poster txs (open, fund) can't reuse
@@ -205,7 +230,7 @@ class AuctionRelayer:
                                                       "pending"),
             "gasPrice": self.w3.eth.gas_price,
             "value": value_wei,
-            "chainId": self.w3.eth.chain_id,
+            "chainId": chain_id,
         })
         tx["gas"] = int(self.w3.eth.estimate_gas(tx) * 1.2)
         signed = account.sign_transaction(tx)

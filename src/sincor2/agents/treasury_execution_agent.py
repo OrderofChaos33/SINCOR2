@@ -49,8 +49,13 @@ MAX_SINGLE_TX_USD = float(os.getenv("TREASURY_EXEC_MAX_SINGLE_TX_USD", "110.0"))
 MIN_CAPITAL_TO_ACT = float(os.getenv("TREASURY_EXEC_MIN_USD", "20.0"))
 
 HALT_FILE = Path(os.getenv("TREASURY_EXEC_HALT_FILE", "data/TREASURY_EXEC_HALT"))
+HALT_ARMED = Path(os.getenv("TREASURY_EXEC_HALT_ARMED", str(HALT_FILE) + ".armed"))
 INTENT_QUEUE = Path(os.getenv("TREASURY_EXEC_INTENT_QUEUE", "data/treasury_intent_queue.jsonl"))
 AUDIT_LOG = Path(os.getenv("TREASURY_EXEC_AUDIT", "data/treasury_exec_audit.jsonl"))
+
+# Tamper-evidence marker: every trip writes this first line. A halt file
+# WITHOUT the marker is treated as tampered (fail closed = tripped).
+_HALT_MARKER = "SINCOR-TREASURY-HALT-V1"
 
 # Founder HOLD lift: default live if env omitted. Explicit EXECUTE_LIVE=0 still blocks.
 EXECUTE_LIVE = os.getenv("EXECUTE_LIVE", "1").strip().lower() in ("1", "true", "yes")
@@ -60,23 +65,75 @@ def _utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _check_money_effect(**kwargs):
+    """Fail-closed lazy import of the governance money gate (C4).
+
+    If the gate module cannot be imported, the money path is DENIED rather
+    than proceeding unwired — an unwired fail-closed gate is fail-open in
+    practice.
+    """
+    try:
+        from sincor2.governance.money_gate import check_money_effect
+    except ImportError:
+        try:
+            from src.sincor2.governance.money_gate import (  # type: ignore
+                check_money_effect,
+            )
+        except ImportError as exc:
+            logger.critical(
+                "money gate unavailable (%s) — denying money-path action", exc)
+            return (False, "money_gate_unavailable")
+    return check_money_effect(**kwargs)
+
+
 def _ensure_dirs() -> None:
-    for p in (INTENT_QUEUE, AUDIT_LOG, HALT_FILE):
+    for p in (INTENT_QUEUE, AUDIT_LOG, HALT_FILE, HALT_ARMED):
         p.parent.mkdir(parents=True, exist_ok=True)
 
 
 def kill_switch_tripped() -> bool:
-    return HALT_FILE.exists()
+    """Tamper-evident halt check (C5 remediation, 2026-10-08).
+
+    Fail-closed: the halt file must exist AND carry the expected marker.
+    If the armed sentinel exists but the halt file is missing or has
+    unexpected content, a CRITICAL tamper alert is logged and the switch is
+    treated as TRIPPED (an attacker deleting the file cannot re-arm live
+    execution).
+    """
+    if not HALT_FILE.exists():
+        if HALT_ARMED.exists():
+            logger.critical(
+                "TREASURY EXEC KILL SWITCH FILE MISSING while armed sentinel "
+                "exists — possible tampering; treating as TRIPPED")
+            return True
+        return False
+    try:
+        content = HALT_FILE.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.critical(
+            "TREASURY EXEC KILL SWITCH FILE unreadable (%s) — treating as "
+            "TRIPPED", exc)
+        return True
+    if not content.startswith(_HALT_MARKER):
+        logger.critical(
+            "TREASURY EXEC KILL SWITCH FILE has unexpected content "
+            "(tampered or legacy format) — treating as TRIPPED")
+        return True
+    return True
 
 
 def trip_kill_switch(reason: str) -> None:
     _ensure_dirs()
-    HALT_FILE.write_text(f"{_utc()} {reason}\n", encoding="utf-8")
+    HALT_FILE.write_text(f"{_HALT_MARKER}\n{_utc()} {reason}\n", encoding="utf-8")
+    HALT_ARMED.write_text(f"{_utc()}\n", encoding="utf-8")
     logger.critical("TREASURY EXEC KILL SWITCH TRIPPED: %s", reason)
 
 
 def clear_kill_switch() -> None:
     HALT_FILE.unlink(missing_ok=True)
+    HALT_ARMED.unlink(missing_ok=True)
+    logger.warning("TREASURY EXEC KILL SWITCH CLEARED (operator action)")
+    _audit("kill_switch_cleared", {})
 
 
 def _audit(event: str, payload: Dict[str, Any]) -> None:
@@ -317,6 +374,34 @@ class TreasuryExecutionAgent:
             "LIVE mode armed. Exact deposit call-data for SharedLiquidityVault / Morpho "
             "must be supplied by protocol adapter before raw broadcast."
         )
+
+        # C4: route live money intents through the effect boundary BEFORE any
+        # intent is queued for broadcast. Fail-closed: a denied intent aborts
+        # the whole live batch (no partial arming).
+        allowed, gate_reason = _check_money_effect(
+            effect_type="contract.call",
+            payload={
+                "allocations": [
+                    {"strategy_id": a["strategy_id"],
+                     "capital_usd": a["capital_usd"],
+                     "target": a.get("target", "")}
+                    for a in actionable
+                ],
+                "treasury": self.treasury,
+            },
+            agent_id="treasury_execution_agent",
+            risk_tier="critical",
+            idempotency_key=f"treasury-live-{_utc()}",
+            target="treasury_allocation",
+            estimated_cost=sum(float(a["capital_usd"]) for a in actionable),
+            kill_switch_tripped=kill_switch_tripped(),
+        )
+        if not allowed:
+            msg = f"effect boundary denied live treasury intents: {gate_reason}"
+            _audit("blocked_effect_boundary",
+                   {"reason": gate_reason, "allocations": len(actionable)})
+            return ExecutionResult(False, "blocked", capital_usd=capital,
+                                   warnings=warnings, error=msg)
 
         for a in actionable:
             intent = {

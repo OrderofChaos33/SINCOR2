@@ -19,6 +19,14 @@
   --font-display: "Sora", "Inter", -apple-system, sans-serif;
   --maxw: 1180px;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  /* enterprise type + spacing scale (v2) */
+  --fs-display: clamp(46px, 6.6vw, 82px);
+  --fs-h2: clamp(28px, 3.6vw, 42px);
+  --fs-lede: 19px;
+  --fs-body: 16px;
+  --fs-caption: 12px;
+  --sp-1: 8px; --sp-2: 16px; --sp-3: 24px; --sp-4: 40px; --sp-5: 64px;
+  --gold-hairline: rgba(212, 169, 78, 0.28);
 }
 
 * { box-sizing: border-box; }
@@ -45,16 +53,38 @@ body {
   background: rgba(10, 12, 16, 0.86);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(212, 169, 78, 0.12), 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 .sp-nav-inner {
   max-width: var(--maxw); margin: 0 auto; padding: 14px 24px;
   display: flex; align-items: center; gap: 28px;
 }
-.sp-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-weight: 700; letter-spacing: 0.14em; font-size: 15px; }
-.sp-brand img { height: 30px; width: auto; }
+.sp-brand { display: inline-flex; align-items: center; text-decoration: none; }
+/* The hornet lockup already contains the full "SINCOR Business Solutions"
+   lettering, so the brand anchor is image-only — no adjacent wordmark text. */
+.sp-brand img {
+  height: 58px; width: auto; display: block; background: #000;
+  border-radius: 10px; border: 1px solid rgba(212, 169, 78, 0.4);
+  box-shadow: 0 0 20px rgba(212, 169, 78, 0.22);
+}
+.sp-footer .sp-brand img { height: 86px; }
 .sp-links { display: flex; gap: 22px; margin-left: auto; align-items: center; }
 .sp-links a { color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500; }
 .sp-links a:hover { color: var(--gold-bright); }
+.sp-nav-toggle {
+  display: none; margin-left: auto; background: none; border: 1px solid var(--line-strong);
+  border-radius: 10px; color: var(--text); font-size: 18px; padding: 7px 12px; cursor: pointer;
+}
+@media (max-width: 980px) {
+  .sp-nav-toggle { display: block; }
+  .sp-nav-inner { gap: 12px; flex-wrap: wrap; }
+  .sp-links {
+    display: none; flex-basis: 100%; flex-direction: column; align-items: stretch;
+    gap: 2px; margin-left: 0; padding: 8px 0 4px;
+  }
+  .sp-links.open { display: flex; }
+  .sp-links a { padding: 10px 4px; font-size: 15px; }
+}
 
 /* ---------- buttons ---------- */
 .sp-btn {
@@ -64,18 +94,62 @@ body {
 }
 .sp-btn-gold { background: linear-gradient(135deg, var(--gold-bright), var(--gold)); color: #14100a; box-shadow: 0 8px 24px rgba(212, 169, 78, 0.28); }
 .sp-btn-gold:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(212, 169, 78, 0.38); }
+/* Promoted call-to-action: the one button on a page that must be unmissable. */
+.sp-btn-xl {
+  padding: 19px 40px; font-size: 18px; border-radius: 12px; letter-spacing: 0.01em;
+  box-shadow: 0 14px 42px rgba(212, 169, 78, 0.5), 0 0 0 1px rgba(240, 198, 100, 0.35) inset;
+}
+.sp-btn-xl:hover { box-shadow: 0 18px 52px rgba(212, 169, 78, 0.62), 0 0 0 1px rgba(240, 198, 100, 0.5) inset; }
 .sp-btn-ghost { background: transparent; color: var(--text); border-color: var(--line-strong); }
 .sp-btn-ghost:hover { border-color: var(--gold); color: var(--gold-bright); }
 .sp-btn-sm { padding: 9px 18px; font-size: 13.5px; }
+
+/* The ONE dominant conversion action on a surface (v2). Animated gold sheen
+   sweeps the face; hover lifts. Motion is removed under reduced-motion. */
+.sp-cta-primary { position: relative; overflow: hidden; isolation: isolate; }
+.sp-cta-primary::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: ctaSheen 3.4s ease-in-out infinite;
+}
+@keyframes ctaSheen {
+  0%, 55% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+.sp-cta-primary:hover { transform: translateY(-3px); }
 
 /* ---------- hero ---------- */
 .sp-hero { position: relative; overflow: hidden; padding: 110px 0 90px; }
 .sp-hero::before {
   content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(900px 420px at 15% 0%, rgba(212, 169, 78, 0.10), transparent 60%),
-    radial-gradient(700px 380px at 85% 20%, rgba(84, 120, 255, 0.08), transparent 60%);
+    radial-gradient(900px 420px at 15% 0%, rgba(212, 169, 78, 0.13), transparent 60%),
+    radial-gradient(760px 420px at 88% 12%, rgba(212, 169, 78, 0.07), transparent 62%),
+    radial-gradient(1100px 520px at 50% 118%, rgba(212, 169, 78, 0.06), transparent 65%);
   pointer-events: none;
+}
+/* Hairline grid layer — the enterprise depth under the hero (v2). */
+.sp-hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 78%);
+}
+.sp-hero .sp-wrap { position: relative; z-index: 1; }
+/* Locked brand lines on the hero (v2). */
+.sp-edge {
+  font-family: var(--font-display); font-weight: 800; letter-spacing: 0.3em;
+  text-transform: uppercase; font-size: 13px; color: var(--gold-bright);
+  margin: 26px 0 14px; text-shadow: 0 0 22px rgba(240, 198, 100, 0.35);
+}
+.sp-creed {
+  font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim);
+  margin: -6px 0 20px;
 }
 .sp-eyebrow {
   display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.22em;
@@ -84,12 +158,51 @@ body {
   margin-bottom: 22px; background: rgba(212, 169, 78, 0.07);
 }
 .sp-h1 {
-  font-family: var(--font-display); font-size: clamp(38px, 5.4vw, 64px); line-height: 1.08;
-  font-weight: 800; letter-spacing: -0.02em; margin: 0 0 20px; max-width: 16ch;
+  font-family: var(--font-display); font-size: clamp(46px, 6.6vw, 82px); line-height: 1.04;
+  font-weight: 800; letter-spacing: -0.025em; margin: 0 0 22px; max-width: 15ch;
 }
-.sp-h1 .gold { color: var(--gold-bright); }
+.sp-h1 .gold {
+  background: linear-gradient(92deg, #f6d57e 0%, var(--gold) 52%, var(--gold-bright) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 26px rgba(240, 198, 100, 0.28));
+}
 .sp-lede { font-size: 19px; color: var(--text-dim); max-width: 62ch; margin: 0 0 34px; }
 .sp-cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* Slim fact strip — verified facts only, glass tiles (v2). */
+.sp-facts {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: var(--radius);
+  overflow: hidden; margin: 36px 0 0;
+}
+.sp-fact {
+  background: rgba(16, 20, 27, 0.72); backdrop-filter: blur(10px); padding: 16px 20px;
+}
+.sp-fact .fv { font-family: var(--font-display); font-size: 19px; font-weight: 800; color: var(--gold-bright); }
+.sp-fact .fk { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); margin-top: 3px; }
+@media (max-width: 700px) { .sp-facts { grid-template-columns: repeat(2, 1fr); } }
+
+/* Pure-CSS auction-flow visual — the hero's structured anchor (v2). */
+.sp-flow {
+  display: flex; align-items: stretch; gap: 0; margin: 36px 0 0;
+  border: 1px solid var(--gold-hairline); border-radius: 16px;
+  background: linear-gradient(180deg, rgba(20, 26, 35, 0.85), rgba(13, 16, 22, 0.9));
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.sp-flow .step { flex: 1; padding: 20px 22px; position: relative; }
+.sp-flow .step + .step { border-left: 1px solid var(--line); }
+.sp-flow .step::before {
+  content: ""; position: absolute; top: 24px; left: 22px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--gold-bright); box-shadow: 0 0 12px rgba(240, 198, 100, 0.6);
+}
+.sp-flow .step h3 { font-size: 15px; margin: 18px 0 5px; font-family: var(--font-display); }
+.sp-flow .step p { font-size: 13px; color: var(--text-dim); margin: 0; line-height: 1.55; }
+.sp-flow .step .arr { position: absolute; top: 18px; right: 14px; color: var(--gold); font-weight: 800; }
+@media (max-width: 800px) {
+  .sp-flow { flex-direction: column; }
+  .sp-flow .step + .step { border-left: 0; border-top: 1px solid var(--line); }
+  .sp-flow .step .arr { display: none; }
+}
 
 /* ---------- sections ---------- */
 .sp-kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
@@ -198,6 +311,7 @@ a.sp-card:hover { transform: translateY(-4px); border-color: rgba(212, 169, 78, 
 .sp-footer a { display: block; color: var(--text-dim); text-decoration: none; font-size: 14px; margin-bottom: 10px; }
 .sp-footer a:hover { color: var(--gold-bright); }
 .sp-footer .fine { color: var(--text-faint); font-size: 13px; border-top: 1px solid var(--line); padding-top: 24px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.sp-disclaimer { margin-top: 18px; font-size: 11.5px; line-height: 1.6; color: var(--text-faint); max-width: 920px; }
 
 /* ---------- steps ---------- */
 .sp-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; counter-reset: step; }
@@ -225,4 +339,25 @@ a.sp-card:hover { transform: translateY(-4px); border-color: rgba(212, 169, 78, 
   font-size: 13px; font-weight: 600; color: var(--text-dim);
   border: 1px solid var(--line-strong); border-radius: 999px; padding: 7px 16px;
   background: var(--bg-soft);
+}
+
+/* ---------- v2 system: glass hairline, footer sign-off, motion ---------- */
+.sp-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+.sp-signoff {
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold);
+  margin-top: 14px;
+}
+@media (max-width: 640px) {
+  .sp-cta-row .sp-btn { flex: 1 1 100%; text-align: center; }
+  .sp-cta-primary { width: 100%; }
+  .sp-hero { padding: 72px 0 64px; }
+  .sp-section { padding: 64px 0; }
+  .sp-cta-band { padding: 36px 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-cta-primary::after { animation: none; }
+  .sp-cta-primary:hover { transform: none; }
+  .sp-btn:hover, .sp-card:hover, a.sp-card:hover { transform: none; }
+  html { scroll-behavior: auto; }
 }

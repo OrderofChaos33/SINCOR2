@@ -27,6 +27,24 @@ from sincor2.sponsored_stake import (
 
 AGENT = "sponsored-agent-1"
 TAGS = ["lead-enrichment"]
+
+
+def _poster_auth():
+    """Signed poster-auth fields: the anti-gaming guards reject bids on
+    anonymous (unsigned) bounty tasks, so the post must bind a poster
+    wallet (distinct from the bidding agent)."""
+    import time
+
+    from eth_account import Account
+    from eth_account.messages import encode_defunct
+
+    from sincor2.a2a_sdk import SincorAgentSDK
+
+    poster_key = Account.create()
+    return SincorAgentSDK.make_poster_auth(
+        "sponsored-poster", "lead-enrichment", int(time.time()),
+        lambda m: "0x" + poster_key.sign_message(
+            encode_defunct(text=m)).signature.hex())
 WALLET = "0x" + "33" * 20
 AXM = 10**18
 
@@ -51,10 +69,24 @@ def client(ledgers):
     return app.test_client()
 
 
-def _register(client, agent_id=AGENT):
-    r = client.post("/v1/a2a/register", json={
-        "agent_id": agent_id, "capability_tags": TAGS, "wallet": WALLET,
-        "rpc_callback": "https://sponsored.example/rpc"})
+def _register(client, agent_id=AGENT, key=None):
+    body = {"agent_id": agent_id, "capability_tags": TAGS,
+            "rpc_callback": "https://sponsored.example/rpc"}
+    if key is not None:
+        # Signed first-time registration: binds a wallet so the agent can
+        # satisfy the W-77 sealed-bid auth gate.
+        import time as _time
+
+        from eth_account.messages import encode_defunct
+
+        from sincor2.a2a_identity import register_message
+        ts = int(_time.time() * 1000)
+        body["wallet"] = key.address
+        body["registration_wallet"] = key.address
+        body["registration_ts"] = ts
+        body["registration_signature"] = "0x" + key.sign_message(
+            encode_defunct(text=register_message(agent_id, ts))).signature.hex()
+    r = client.post("/v1/a2a/register", json=body)
     assert r.status_code == 201
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
@@ -194,15 +226,18 @@ def test_end_to_end_sponsored_auction_recoups(client, monkeypatch):
     from sincor2.a2a_sdk import FlaskTestTransport, SincorAgentSDK
 
     _enable(monkeypatch)
-    _register(client)
-    sdk = SincorAgentSDK(FlaskTestTransport(client))
+    from eth_account import Account
+    agent_key = Account.create()
+    _register(client, key=agent_key)
+    sdk = SincorAgentSDK(FlaskTestTransport(client), signer=agent_key)
     admin = {"X-Admin-Key": os.environ["ADMIN_PASSWORD"]}
 
     r = client.post("/v1/a2a/admin/sponsored-stake", headers=admin,
                     json={"agent_id": AGENT, "amount_axm": 2.0})
     assert r.status_code == 201
 
-    task = sdk.post_task("lead-enrichment", TAGS, 1.5, sealed=True)
+    task = sdk.post_task("lead-enrichment", TAGS, 1.5, sealed=True,
+                         **_poster_auth())
     task_id = task["task_id"]
     bid = sdk.sealed_commit(task_id, AGENT, 0.9)  # works: fronted stake
     get_fabric().tasks[task_id]["commit_deadline"] = _now_ms() - 1000

@@ -27,6 +27,7 @@ from sincor2.kya.zk_attestations import (
     validate_capability_name,
     verify_attestation,
 )
+from sincor2.kya.credentials import CredentialError, issue_credential, verify_credential
 
 __all__ = [
     "KYARegistry",
@@ -58,4 +59,7 @@ __all__ = [
     "tier_satisfies",
     "validate_capability_name",
     "verify_attestation",
+    "CredentialError",
+    "issue_credential",
+    "verify_credential",
 ]

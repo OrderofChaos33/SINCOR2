@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-"""SINC token whitelist orchestrator — prepare PRs, token lists, and form payloads."""
+"""SINC token whitelist orchestrator — prepare PRs, token lists, and form payloads.
+
+URL-OPEN RULE (dev-watch 314, CVE-2026-119025): this script holds the only
+OS-open call in the repo (``cmd_open_forms`` -> ``webbrowser.open``). A URL
+supplied by a server or third party is NEVER passed into a shell or an
+OS-open helper: scheme + host are validated against ``_OPEN_URL_HOSTS``
+via ``_validate_open_url()`` first, and opening happens via argv /
+exec-file style APIs only, never via a shell string. (Some
+``webbrowser`` controllers compose a shell command line, so even a
+"browser open" is a shell surface.) The URLs opened today come only from
+the static ``TARGETS`` table below — never from the network — and they
+are validated anyway, so a poisoned entry is refused before any open.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +22,7 @@ import subprocess
 import sys
 import textwrap
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -753,18 +766,80 @@ def cmd_launch(_: argparse.Namespace) -> int:
     return 0
 
 
+# Hosts the OS-open helper may ever navigate to: exactly the hosts of the
+# static TARGETS table. A URL whose host is not listed here is refused
+# before opening, however clean it looks (dev-watch 314).
+_OPEN_URL_HOSTS = frozenset(
+    {
+        "github.com",
+        "www.geckoterminal.com",
+        "dexscreener.com",
+        "www.coingecko.com",
+        "coinmarketcap.com",
+        "www.dextools.io",
+        "birdeye.so",
+        "getsincor.com",
+        "base.blockscout.com",
+        "tkn.xyz",
+    }
+)
+
+# Characters that must never appear in a URL handed to an OS-open helper:
+# shell command substitution / quoting / separators (the $(...) and
+# backtick payloads of CVE-2026-119025), plus the backslash that Windows
+# command lines treat as an escape-adjacent character.
+_OPEN_URL_FORBIDDEN_CHARS = frozenset("$`\"';|<>\\()")
+
+
+def _validate_open_url(url: object) -> str | None:
+    """Return ``url`` unchanged iff it is safe to hand to an OS-open helper.
+
+    Refuses (returns None): non-strings, empty values, any whitespace or
+    control character anywhere, any shell metacharacter, a scheme other
+    than exactly ``https``, userinfo, an explicit non-443 port, and any
+    host outside ``_OPEN_URL_HOSTS``. Validation is on the raw string as
+    well as the parsed form, so parser differentials cannot smuggle a
+    payload past the allowlist.
+    """
+    if not isinstance(url, str) or not url:
+        return None
+    if any(ord(ch) <= 0x20 or ord(ch) == 0x7F for ch in url):
+        return None
+    if any(ch in _OPEN_URL_FORBIDDEN_CHARS for ch in url):
+        return None
+    try:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        return None
+    if parts.scheme != "https":
+        return None
+    if parts.username is not None or parts.password is not None:
+        return None
+    if port is not None and port != 443:
+        return None
+    host = parts.hostname
+    if host is None or host.lower() not in _OPEN_URL_HOSTS:
+        return None
+    return url
+
+
 def cmd_open_forms(_: argparse.Namespace) -> int:
     import webbrowser
 
     for t in TARGETS:
         if t.get("type") == "form" and t.get("url"):
-            print(f"Opening {t['name']}: {t['url']}")
-            webbrowser.open(t["url"])
+            safe_url = _validate_open_url(t["url"])
+            if safe_url is None:
+                print(f"Refusing to open unvalidated URL for {t['name']}: {t['url']}")
+                continue
+            print(f"Opening {t['name']}: {safe_url}")
+            webbrowser.open(safe_url)
     form_txt = PR / "forms" / "FORM_PAYLOAD.txt"
     if form_txt.exists():
         print(f"\nForm copy-paste block: {form_txt}")
         try:
-            subprocess.run(["clip"], input=form_txt.read_text(encoding="utf-8"), text=True, check=True, shell=True)
+            subprocess.run(["clip"], input=form_txt.read_text(encoding="utf-8"), text=True, check=True)
             print("(copied to clipboard on Windows)")
         except Exception:
             pass

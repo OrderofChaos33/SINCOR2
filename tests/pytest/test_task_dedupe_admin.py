@@ -20,7 +20,7 @@ def client(tmp_path, monkeypatch):
     reset_fabric()
     monkeypatch.setenv("SINCOR_A2A_TASKS_PATH", str(tmp_path / "tasks.json"))
     monkeypatch.setenv("SINCOR_BOUNTY_POOL_PATH", str(tmp_path / "pool.json"))
-    monkeypatch.setenv("SINCOR_BOUNTY_POOL_ADMIN_KEY", "test-admin-key")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-key")
     monkeypatch.setenv("SINCOR_LAUNCH_BOUNTY_AXM", "100")
     from sincor2.a2a_bounty_pool import reset_bounty_pool
 

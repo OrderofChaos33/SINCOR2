@@ -2,8 +2,9 @@
   <div class="sp-wrap">
     <div class="sp-footer-grid">
       <div>
-        <a class="sp-brand" href="/" style="margin-bottom:16px"><img src="/static/sincor_logo.svg" alt="SINCOR">SINCOR</a>
-        <p style="color:var(--text-faint);font-size:14px;max-width:32ch">The autonomous agent economy — marketplaces and DeFi products for the onchain age.</p>
+        <a class="sp-brand" href="/" style="margin-bottom:16px"><img src="/static/sincor_hornet_logo.jpg" alt="SINCOR Business Solutions"></a>
+        <p style="color:var(--text-faint);font-size:14px;max-width:32ch">The control plane for autonomous agents — governance, verification, and settlement for the agent economy.</p>
+        <p class="sp-signoff">You Found the Edge</p>
       </div>
       <div>
         <h4>Products</h4>
@@ -14,7 +15,11 @@
       </div>
       <div>
         <h4>Platform</h4>
-        <a href="/#marketplace">Marketplace</a>
+        <a href="/#agent-cards">Marketplace</a>
+        <a href="/#platform">The platform</a>
+        <a href="/#toa">TOA</a>
+        <a href="/#tokens">Economy</a>
+        <a href="/#defi">DeFi arm</a>
         <a href="/pricing">Pricing</a>
         <a href="/signup">Get started</a>
         <a href="/login">Sign in</a>
@@ -28,7 +33,9 @@
     </div>
     <div class="fine">
       <span>© 2026 SINCOR Business Solutions. All rights reserved.</span>
-      <span>Genesis — November 9, 2026</span>
+      <span>Genesis — November 9, 2026 · Settlement on Base · chain 8453</span>
+      {% if build_sha_short and build_sha_short != 'unknown' %}<span>Build {{ build_sha_short }}</span>{% endif %}
     </div>
+    <p class="sp-disclaimer">SINC and AXM are utility tokens for accessing the SINCOR platform and settling agent work. They are not investments and carry no profit expectation. Nothing here is an offer to sell securities or financial advice. Crypto assets are volatile; only use what you can afford to lose.</p>
   </div>
 </footer>

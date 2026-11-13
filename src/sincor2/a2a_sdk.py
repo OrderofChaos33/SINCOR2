@@ -50,6 +50,18 @@ class SealedBid:
     commitment: str
 
 
+def _as_signer_account(signer: Any) -> Any:
+    """Normalize a deposit ``signer`` to an eth_account-like object.
+
+    Accepts an eth_account LocalAccount (or anything exposing ``.address``
+    and ``.sign_message``) or a raw private key (hex string or bytes).
+    """
+    if hasattr(signer, "sign_message") and hasattr(signer, "address"):
+        return signer
+    from eth_account import Account
+    return Account.from_key(signer)
+
+
 class RequestsTransport:
     """Real HTTP transport (requests)."""
 
@@ -108,8 +120,23 @@ class FlaskTestTransport:
 class SincorAgentSDK:
     """Agent-facing client for the A2A task market."""
 
-    def __init__(self, transport: Any):
+    def __init__(self, transport: Any, signer: Any = None):
         self.t = transport
+        # Optional default wallet signer (eth_account Account). When set —
+        # directly or remembered from register() — sealed_commit /
+        # sealed_reveal attach the W-77 EIP-191 bidder auth automatically.
+        # With no signer the calls go out unsigned and the server's gate
+        # answers 403 (the gate is never weakened client-side).
+        self._default_signer = signer
+        self._signers: Dict[str, Any] = {}
+
+    def _bid_signer(self, agent_id: str, signer: Any = None) -> Any:
+        """Resolve the wallet signer for a bid call: explicit per-call
+        signer wins, then the key remembered at register() time for this
+        agent, then the construction-time default."""
+        if signer is not None:
+            return signer
+        return self._signers.get(agent_id) or self._default_signer
 
     # -- onboarding -------------------------------------------------------
     def register(self, agent_id: str, name: str,
@@ -121,11 +148,19 @@ class SincorAgentSDK:
         """Register an agent. Reputation is earned-only: any ``reputation``
         you send is ignored; new agents start at 0.0 (probation).
 
-        Re-registration of an existing record is proof-gated server-side:
-        pass ``signer`` (an eth_account Account holding the *registered*
-        wallet's key) and the SDK attaches an EIP-191
-        ``registration_signature`` + ``registration_ts`` authorizing the
-        update. First-time registration ignores the signature fields.
+        Pass ``signer`` (an eth_account Account holding the claimed
+        wallet's key) to attach the EIP-191 proof the server requires:
+
+        * first-time registration: signature over
+          ``SINCOR-REGISTER|<agent_id>|<ts>`` + ``registration_wallet``
+          (fail-closed C3: an unsigned wallet claim is rejected with 403);
+        * re-registration of an existing record: signature by the
+          *registered* wallet over the exact new record contents
+          (G2.2 proof-gated).
+
+        The SDK probes ``GET /v1/a2a/agents`` to pick the right proof
+        format. ``wallet`` must equal ``signer.address`` when both are
+        given, otherwise registration is refused client-side.
         """
         body: Dict[str, Any] = {
             "agent_id": agent_id,
@@ -138,14 +173,49 @@ class SincorAgentSDK:
             "wallet": wallet,
         }
         if signer is not None:
-            from sincor2.a2a_inbound import _now_ms, build_reregistration_message
             from eth_account.messages import encode_defunct
-            ts = _now_ms()
-            message = build_reregistration_message(body, ts)
+            signer_address = getattr(signer, "address", "")
+            if wallet and signer_address.lower() != wallet.lower():
+                raise ValueError(
+                    "signer.address must equal the claimed wallet "
+                    "(server rejects mismatched claims)")
+            wallet = wallet or signer_address
+            body["wallet"] = wallet
+            if self._agent_exists(agent_id):
+                from sincor2.a2a_inbound import _now_ms, build_reregistration_message
+                ts = _now_ms()
+                message = build_reregistration_message(body, ts)
+            else:
+                from sincor2.a2a_identity import register_message
+                import time as _time
+                ts = int(_time.time() * 1000)
+                message = register_message(agent_id, ts)
+                body["registration_wallet"] = wallet
             sig = signer.sign_message(encode_defunct(text=message)).signature
             body["registration_ts"] = ts
             body["registration_signature"] = "0x" + bytes(sig).hex()
-        return self.t.post("/v1/a2a/register", body)
+        result = self.t.post("/v1/a2a/register", body)
+        if signer is not None:
+            # Remember the wallet key for this agent so sealed_commit /
+            # sealed_reveal can satisfy the W-77 bidder-auth gate without
+            # the caller re-supplying it on every call.
+            self._signers[agent_id] = signer
+        return result
+
+    def _agent_exists(self, agent_id: str) -> bool:
+        """Best-effort existence probe for proof-format selection.
+
+        Fail-closed: any probe error is treated as "exists", so the SDK
+        falls back to the re-registration proof rather than minting a
+        duplicate first-registration proof.
+        """
+        try:
+            listing = self.t.get("/v1/a2a/agents")
+            agents = listing.get("agents", []) if isinstance(listing, dict) else []
+            return any(a.get("agent_id") == agent_id for a in agents
+                       if isinstance(a, dict))
+        except Exception:
+            return True
 
     def heartbeat(self, agent_id: str, signer: Any = None,
                   heartbeat_token: Optional[str] = None) -> Dict[str, Any]:
@@ -171,14 +241,66 @@ class SincorAgentSDK:
             headers = {"X-Sincor-Heartbeat": heartbeat_token}
         return self.t.post("/v1/a2a/heartbeat", payload, headers=headers)
 
+    @staticmethod
+    def quota_signature_payload(skill_id: str, input_text: str = "",
+                                timestamp_ms: Optional[int] = None,
+                                for_quote: bool = False) -> Dict[str, str]:
+        """Build the canonical EIP-191 quota message for the caller to sign.
+
+        Free quota is keyed on the wallet recovered from this signature — the
+        self-declared ``caller_id`` no longer grants free calls. Sign the
+        returned ``message`` with the caller's wallet (EIP-191
+        ``personal_sign``), then send ``signature`` + ``quota_ts`` + ``wallet``
+        with the tasks/send (or quote) request. The ``wallet`` claim is
+        required: the server checks the recovered signer equals it (ECDSA
+        recovery returns *some* address for any message/signature pair, so
+        the check is what binds the signature to the message). The SDK never
+        signs: the caller's own wallet tooling (e.g. eth_account) does.
+        """
+        from sincor2.a2a_integration import (
+            quota_message_for_quote,
+            quota_message_for_send,
+        )
+        ts = int(timestamp_ms) if timestamp_ms is not None else int(time.time() * 1000)
+        if for_quote:
+            message = quota_message_for_quote(skill_id, ts)
+        else:
+            message = quota_message_for_send(skill_id, input_text, ts)
+        return {"message": message, "quota_ts": str(ts)}
+
     # -- stake ------------------------------------------------------------
     def deposit_stake(self, agent_id: str, amount_axm: float,
-                      tx_hash: Optional[str] = None) -> Dict[str, Any]:
+                      tx_hash: Optional[str] = None,
+                      signer: Any = None) -> Dict[str, Any]:
         """Self-service stake deposit (offchain AXM ledger). Committing a
         sealed bid locks 50% of the bounty; the commit is rejected (403)
-        when the agent cannot cover it."""
+        when the agent cannot cover it.
+
+        Deposits are identity-bound and fail-closed: ``signer`` must hold
+        the wallet registered on the agent record — an eth_account
+        LocalAccount (or any object with ``.address`` and
+        ``.sign_message``) or a raw private key. Unsigned deposits are
+        rejected by the endpoint (403).
+        """
+        from sincor2.a2a_inbound_market import stake_deposit_message
+
+        if signer is None:
+            raise SDKError(
+                0, {"error": "signer required"},
+                "deposit_stake requires signer=<eth_account account or "
+                "private key>; the endpoint rejects unsigned deposits")
+        account = _as_signer_account(signer)
+        amount_axm = float(amount_axm)
+        amount_wei = int(round(amount_axm * 1e18))
+        expires_at_ms = int(time.time() * 1000) + 5 * 60 * 1000
+        message = stake_deposit_message(agent_id, amount_wei,
+                                        account.address, expires_at_ms)
+        from eth_account.messages import encode_defunct
+        signature = account.sign_message(
+            encode_defunct(text=message)).signature.hex()
         payload: Dict[str, Any] = {
-            "agent_id": agent_id, "amount_axm": float(amount_axm)}
+            "agent_id": agent_id, "amount_axm": amount_axm,
+            "expires_at_ms": expires_at_ms, "signature": signature}
         if tx_hash:
             payload["tx_hash"] = tx_hash
         return self.t.post("/v1/a2a/stake/deposit", payload)
@@ -194,10 +316,13 @@ class SincorAgentSDK:
         """Request P24 creator-token issuance for a registered agent.
 
         Metadata is screened against the content-policy deny-list
-        server-side (violation -> 400 with the ruleset version). P24 is
-        live-blocked, so only dry-run issuance is served until the founder
-        releases the live block; pass dry_run=False only when live
-        issuance is authorized (currently refused with 403)."""
+        server-side (violation -> 400 with the ruleset version). creator_id
+        is bound to the caller's agent_id: omit it to issue under your own
+        agent_id, or pass creator_id == agent_id; any other value is
+        rejected with 403. P24 is live-blocked, so only dry-run issuance is
+        served until the founder releases the live block; pass
+        dry_run=False only when live issuance is authorized (currently
+        refused with 403)."""
         payload: Dict[str, Any] = {
             "agent_id": agent_id, "name": name, "symbol": symbol,
             "description": description, "bio": bio,
@@ -266,6 +391,39 @@ class SincorAgentSDK:
             "auth_nonce": nonce,
         }
 
+    @staticmethod
+    def make_bid_auth(purpose: str, task_id: str, agent_id: str,
+                      payload: str, timestamp: int, signer: Any,
+                      nonce: Optional[str] = None) -> Dict[str, Any]:
+        """Build the W-77 bidder-auth fields for a sealed-bid commit/reveal.
+
+        Signs the server's canonical bid message byte-for-byte
+        (``sincor2.a2a_integration._auth_bid_message``): the EIP-191
+        ``personal_sign`` signature binds purpose (``commit``|``reveal``),
+        task, bidding agent, the action payload (the commitment hex for
+        commit; ``f"{float(bid_axm)}:{nonce}"`` for reveal — the exact
+        string the server rebuilds), timestamp, and a fresh single-use
+        nonce. The recovered wallet must equal the agent's REGISTERED
+        wallet or the server answers 403; unsigned or replayed signatures
+        are rejected the same way. The SDK never sees private keys beyond
+        the ``signer`` object the caller supplies.
+        """
+        import secrets
+
+        from eth_account.messages import encode_defunct
+
+        from sincor2.a2a_integration import _auth_bid_message
+        nonce = nonce or secrets.token_hex(8)
+        ts = int(timestamp)
+        message = _auth_bid_message(str(purpose), str(task_id), str(agent_id),
+                                    str(payload), ts, nonce)
+        sig = signer.sign_message(encode_defunct(text=message)).signature
+        return {
+            "auth_signature": "0x" + bytes(sig).hex(),
+            "auth_timestamp": ts,
+            "auth_nonce": nonce,
+        }
+
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """Public task view (sealed-safe: no bid/commit details)."""
         return self.t.get(f"/v1/a2a/tasks/{task_id}")
@@ -287,30 +445,60 @@ class SincorAgentSDK:
         return "0x" + _shim(price_wei, bytes(salt), agent_id).hex()
 
     def sealed_commit(self, task_id: str, agent_id: str,
-                      bid_axm: float) -> SealedBid:
+                      bid_axm: float, signer: Any = None) -> SealedBid:
         """Commit a sealed bid. Returns a SealedBid handle — keep
         ``salt_hex`` secret until the reveal window opens. One commitment
-        per (task, agent); the commit locks 50% of the bounty in stake."""
+        per (task, agent); the commit locks 50% of the bounty in stake.
+
+        W-77: the commit must carry EIP-191 bidder auth (a signature by the
+        agent's registered wallet over the exact bid message). The SDK
+        attaches it automatically from the ``signer`` given here, the key
+        remembered at ``register()`` time, or the construction-time
+        default — pass none of those and the call goes out unsigned, which
+        the server rejects with 403.
+        """
         salt = _random_salt()
         price_wei = int(round(float(bid_axm) * 1e18))
         commit_hex = self.make_commitment(bid_axm, salt, agent_id)
-        self.t.post("/v1/a2a/bids/commit", {
+        body: Dict[str, Any] = {
             "task_id": task_id, "agent_id": agent_id,
-            "commitment": commit_hex})
+            "commitment": commit_hex}
+        key = self._bid_signer(agent_id, signer)
+        if key is not None:
+            body.update(self.make_bid_auth(
+                "commit", task_id, agent_id, commit_hex,
+                int(time.time()), key))
+        self.t.post("/v1/a2a/bids/commit", body)
         return SealedBid(task_id=task_id, agent_id=agent_id,
                          bid_axm=float(bid_axm), price_wei=price_wei,
                          salt_hex="0x" + salt.hex(),
                          commitment=commit_hex)
 
     def sealed_reveal(self, bid: SealedBid,
-                      estimated_seconds: int = 600) -> Dict[str, Any]:
+                      estimated_seconds: int = 600,
+                      signer: Any = None) -> Dict[str, Any]:
         """Reveal a committed bid. Only valid inside the reveal window
         (after ``commit_deadline``, before ``reveal_deadline``); the server
-        recomputes the commitment in constant time."""
-        return self.t.post("/v1/a2a/bids/reveal", {
+        recomputes the commitment in constant time.
+
+        W-77: same bidder-auth requirement as the commit — the reveal must
+        come from the agent's registered wallet. Signer resolution is the
+        same as :meth:`sealed_commit` (per-call arg, then the
+        register()-time key, then the construction default).
+        """
+        body: Dict[str, Any] = {
             "task_id": bid.task_id, "agent_id": bid.agent_id,
             "bid_axm": bid.bid_axm, "nonce": bid.salt_hex,
-            "estimated_seconds": int(estimated_seconds)})
+            "estimated_seconds": int(estimated_seconds)}
+        key = self._bid_signer(bid.agent_id, signer)
+        if key is not None:
+            # The server rebuilds the signed payload as
+            # f"{float(bid_axm)}:{nonce}" — sign exactly that string.
+            payload = f"{float(bid.bid_axm)}:{bid.salt_hex}"
+            body.update(self.make_bid_auth(
+                "reveal", bid.task_id, bid.agent_id, payload,
+                int(time.time()), key))
+        return self.t.post("/v1/a2a/bids/reveal", body)
 
     def close_auction(self, task_id: str) -> Dict[str, Any]:
         """Permissionless close once the reveal deadline has passed. Ghosts
@@ -319,12 +507,29 @@ class SincorAgentSDK:
         return self.t.post(f"/v1/a2a/tasks/{task_id}/close", {})
 
     def submit_proof(self, task_id: str, agent_id: str,
-                     receipt_hash: str) -> Dict[str, Any]:
+                     receipt_hash: str,
+                     *,
+                     deliverable: Any = None,
+                     evidence: Dict[str, Any] | None = None,
+                     deliverable_uri: str = "",
+                     content_binding_sig: str = "") -> Dict[str, Any]:
         """Winner's proof of completion; stages the payout and settles the
-        task. Adds +0.2 reputation and releases the winner's stake lock."""
-        return self.t.post("/v1/a2a/proofs", {
+        task. Adds +0.2 reputation and releases the winner's stake lock.
+
+        Optional receipt-content binding (item 77): pass ``deliverable``
+        (raw content; the server hashes it) or a pre-built ``evidence``
+        mapping.  Receipt-only evidence is rejected fail-closed.
+        """
+        body: Dict[str, Any] = {
             "task_id": task_id, "agent_id": agent_id,
-            "receipt_hash": receipt_hash})
+            "receipt_hash": receipt_hash}
+        if deliverable is not None:
+            body["deliverable"] = deliverable
+            body["deliverable_uri"] = deliverable_uri
+            body["content_binding_sig"] = content_binding_sig
+        if evidence is not None:
+            body["evidence"] = evidence
+        return self.t.post("/v1/a2a/proofs", body)
 
     # -- waiting ----------------------------------------------------------
     def wait_for(self, description: str,

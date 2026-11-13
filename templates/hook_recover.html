@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recover Hook Floor — SINCOR</title>
+<meta name="description" content="Cancel a SINC hook floor position by signing with MetaMask from the Account 6 wallet. No private key export — the signature happens inside your wallet.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/sincor-pro.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+{% include "_pro_nav.html" %}
+
+<header class="sp-hero">
+  <div class="sp-wrap">
+    <span class="sp-eyebrow">Hook recovery</span>
+    <h1 class="sp-h1">Cancel the hook floor,<br><span class="gold">signed in MetaMask.</span></h1>
+    <p class="sp-lede">This page is for recovering the SINC limit-order hook floor placed from Account 6. The cancellation is authorised by a MetaMask signature from that wallet — your private key never leaves the wallet and is never entered, exported, or uploaded anywhere on this page.</p>
+    <div class="sp-cta-row">
+      <a href="#status" class="sp-btn sp-btn-gold">Check live hook status →</a>
+      <a href="/sinc" class="sp-btn sp-btn-ghost">Back to SINC</a>
+    </div>
+  </div>
+</header>
+
+<section class="sp-section" id="status">
+  <div class="sp-wrap">
+    <div class="sp-kicker">Live status</div>
+    <h2 class="sp-h2">The hook, right now.</h2>
+    <p class="sp-sub">Read live from <span class="mono">/api/hook/status</span> — the same feed the gateway widgets use. Confirm the hook address and chain before you sign anything.</p>
+    <div class="sp-grid c3">
+      <div class="sp-card">
+        <span class="sp-tag">Hook</span>
+        <h3>Hook address</h3>
+        <p id="hook-address" class="mono">Loading…</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Network</span>
+        <h3>Chain</h3>
+        <p id="hook-chain">Loading…</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Token</span>
+        <h3>SINC address</h3>
+        <p id="hook-sinc" class="mono">Loading…</p>
+      </div>
+    </div>
+    <p id="hook-status-note" class="sp-sub" style="margin-top:16px">Fetching live hook status…</p>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section">
+  <div class="sp-wrap">
+    <div class="sp-kicker">How recovery works</div>
+    <h2 class="sp-h2">Three steps, no key export.</h2>
+    <div class="sp-grid c3">
+      <div class="sp-card">
+        <span class="sp-tag">Step 1</span>
+        <h3>Open the right wallet</h3>
+        <p>Unlock MetaMask and switch to Account 6 — the wallet that placed the hook floor. Only a signature from that wallet can authorise its cancellation.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Step 2</span>
+        <h3>Verify the hook above</h3>
+        <p>Match the live hook address and chain in the status panel against the position you intend to cancel. If the panel cannot load, stop and retry later — do not sign blind.</p>
+      </div>
+      <div class="sp-card">
+        <span class="sp-tag">Step 3</span>
+        <h3>Sign the cancellation</h3>
+        <p>Sign the floor-cancel message in MetaMask. Signing is not a transaction: it moves no funds and costs no gas, and the signature is produced inside the wallet.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sp-divider">
+
+<section class="sp-section tight">
+  <div class="sp-wrap">
+    <div class="sp-card" style="border-color:#5a4a1f">
+      <p style="margin:0;font-size:13px;color:var(--text-dim)"><strong style="color:var(--gold)">Safety:</strong> SINCOR will never ask for your private key or seed phrase — not on this page, not by email, not anywhere. Anyone who does is not SINCOR. Recovery works by MetaMask signature only, precisely so no private key export is ever required.</p>
+    </div>
+    <div class="sp-cta-band" style="margin-top:36px">
+      <h2>Done here?</h2>
+      <p>Return to the SINC gateway for access, utility, and live pricing.</p>
+      <div class="sp-cta-row" style="justify-content:center">
+        <a href="/sinc" class="sp-btn sp-btn-gold">Back to SINC →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include "_pro_footer.html" %}
+
+<script>
+(function () {
+  function setText(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+  fetch("/api/hook/status")
+    .then(function (res) {
+      if (!res.ok) throw new Error("status " + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      setText("hook-address", data.hook_address || "Unavailable");
+      setText("hook-chain", data.chain_id ? ("Chain " + data.chain_id) : "Unavailable");
+      setText("hook-sinc", data.sinc_address || "Unavailable");
+      setText("hook-status-note", "Live hook status loaded. Verify it matches the position you intend to cancel before signing.");
+    })
+    .catch(function () {
+      setText("hook-address", "Unavailable");
+      setText("hook-chain", "Unavailable");
+      setText("hook-sinc", "Unavailable");
+      setText("hook-status-note", "Live hook status could not be loaded. Do not sign a cancellation until this panel loads successfully.");
+    });
+})();
+</script>
+
+</body>
+</html>

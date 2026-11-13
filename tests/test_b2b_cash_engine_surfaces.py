@@ -24,8 +24,14 @@ def test_compliance_example_agent_card_uses_getsincor_production_endpoints():
     assert {"compliance-sbom", "compliance-filing", "n8n-workflow-bridge"} <= skill_ids
 
 
-def test_static_agent_card_advertises_healthcare_and_compliance_skills():
-    card = _load_json("static/.well-known/agent-card.json")
+def test_served_agent_card_advertises_healthcare_and_compliance_skills():
+    # Production serves /.well-known/agent-card.json from the DYNAMIC
+    # A2ARouter (a2a_integration.py build_agent_card()), not from any static
+    # file. The unserved static copies (static/.well-known/agent-card.json,
+    # static/.well-known/agent.json) were removed; this pins the served card.
+    from sincor2.a2a_integration import build_agent_card
+
+    card = build_agent_card().to_dict()
     skill_ids = {skill["id"] for skill in card["skills"]}
     assert "healthcare-credential-check" in skill_ids
     assert "compliance-sbom" in skill_ids

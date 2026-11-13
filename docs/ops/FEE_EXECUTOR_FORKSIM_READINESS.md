@@ -2,12 +2,16 @@
 
 **Date:** 2026-09-30
 **Branch:** `xioix/buildout-53-executor-forksim-prep` (base `fd96801`)
-**Status:** Executor REPAIRED and validated on a Base fork (control route).
-**AXM conversion: BLOCKED — no AXM/USDC or AXM/WETH pool exists. Honest verdict: `NO_POOL`.**
+**Historical status (2026-09-30):** executor control-route replay passed on a Base fork.
+**AXM conversion: BLOCKED — no AXM/USDC or AXM/WETH pool existed at the recorded fork block. Honest recorded verdict: `NO_POOL`.**
 
-This document records everything before arming. Nothing here arms the executor,
-uses keys, broadcasts, moves funds, or deploys. The locked fee policy is unchanged:
-**5% platform fee, 100% converted to USDC/WETH before treasury, no burn.**
+> **Superseding safety decision (2026-10-11):** Live fee conversion is not authorized. This historical readiness note is not an execution checklist. Do not provision a forwarder key, fund a wallet, set an armed flag, sign, broadcast, or move treasury funds. The executor now fails closed for live execution until a new canonical authorization interface and explicit owner decisions are separately reviewed.
+
+This document preserves historical read-only/fork-simulation evidence. The historic
+desired fee policy was **5% platform fee, with conversion to USDC/WETH before
+treasury and no burn**; this is not evidence that conversion is implemented,
+authorized, or occurring. Nothing in this document authorizes keys, broadcasts,
+funding, or deployment.
 
 ## Pinned addresses (Base)
 
@@ -86,14 +90,20 @@ Base block `51983899` (WETH→USDC `500/10`, 0.1 WETH):
   explicitly scoped with fake RPC + stub signer); no key material; no live
   `send_transaction` path outside local Anvil.
 
-## What remains (founder steps)
+## Current disposition: fail-closed; no live-execution checklist
 
-1. Create, seed, and verify an AXM/USDC or AXM/WETH pool.
-2. Pin the exact V4 `PoolKey` (fee, spacing, hook).
-3. Re-run read-only discovery and the local fork replay.
-4. Custody the dedicated forwarder key in Secure Vault.
-5. Conduct a founder-approved dust ceremony.
-6. Only after all gates pass, separately authorize `armed=True`.
+The former founder-step list is retired and is **not actionable**. Do not create
+or seed a pool for this executor, prepare or custody a signing key, run a dust
+transaction, set `SINCOR_FEE_EXECUTOR_ARMED=true`, or authorize live conversion
+on the basis of this historical note. The runtime currently rejects live
+execution before any signer, receipt, or broadcast callback.
+
+Any future reconsideration requires a separately scoped owner decision and
+independent review of a canonical authorization interface, chain/token/target
+allowlists, amount and slippage limits, approver quorum, expiry/replay rules,
+receipt ownership, operational monitoring, and rollback/incident procedures.
+Until those gates are met, continue only synthetic offline tests or read-only
+research; no live conversion capability is available.
 
 ## Files
 

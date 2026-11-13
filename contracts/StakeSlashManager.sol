@@ -35,6 +35,13 @@ pragma solidity ^0.8.24;
  *        KYA clean-exit timelock: a rage-quit cannot dodge a pending
  *        ruling. An open dispute hold is enforced off-chain by the Python
  *        layer refusing to request unstake while disputed.
+ *      - Unstake/slash interaction (W-33): slash() executes IMMEDIATELY on
+ *        a valid adjudicator signature (there is no staged
+ *        propose/appeal/execute flow in this contract), so a slash can
+ *        legitimately land inside the 7-day unstake timelock. finalizeUnstake
+ *        therefore finalizes min(pending, stakeOf) -- a slash-shrunk
+ *        balance clamps instead of reverting, so funds can never be
+ *        bricked, and the Unstaked event reports the actual amount paid.
  */
 contract StakeSlashManager {
     // --- types ------------------------------------------------------------
@@ -156,7 +163,15 @@ contract StakeSlashManager {
         uint256 readyAt = unstakeReadyAt[msg.sender];
         if (block.timestamp < readyAt) revert TimelockNotElapsed(readyAt, block.timestamp);
         uint256 current = stakeOf[msg.sender];
-        if (amount > current) revert InsufficientStake();
+        // W-33: an adjudicator slash may land between requestUnstake and
+        // finalizeUnstake, shrinking stakeOf below the requested amount.
+        // Reverting here bricks the withdrawal (funds stuck forever).
+        // Clamp to what is actually there: the user always gets the true
+        // remainder, and the emitted event reports the ACTUAL finalized
+        // amount, never the (possibly larger) requested amount.
+        if (amount > current) {
+            amount = current;
+        }
         unstakePending[msg.sender] = 0;
         unstakeReadyAt[msg.sender] = 0;
         stakeOf[msg.sender] = current - amount;

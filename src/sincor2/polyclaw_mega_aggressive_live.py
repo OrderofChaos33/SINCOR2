@@ -69,7 +69,10 @@ TREASURY_ADDRESS = os.getenv(
     "TREASURY_ADDRESS", "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac"
 )
 
-MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.06"))          # raised for quality
+MIN_EDGE = float(os.getenv("POLYCLAW_MIN_EDGE", "0.04"))
+# NOTE: must stay <= forecasting_engine._MAX_MOMENTUM_ADJ (0.05). The old
+# default of 0.06 exceeded the engine's max achievable edge, so the loop
+# could never fire — it scanned and traded nothing, forever.
 MIN_CONFIDENCE = float(os.getenv("POLYCLAW_MIN_CONFIDENCE", "0.50"))
 KELLY_FRACTION = float(os.getenv("POLYCLAW_KELLY_FRACTION", "0.5"))  # half-Kelly
 # Wager floor = Polymarket's ≈$1 exchange minimum.
@@ -82,6 +85,22 @@ CYCLE_INTERVAL_SEC = int(os.getenv("POLYCLAW_CYCLE_INTERVAL_SEC", "90"))  # 90s 
 # keep working; enable for tighter risk control.
 TOA_GATE_ENABLED = os.getenv("POLYCLAW_TOA_GATE", "false").lower() == "true"
 TOA_GATE_MIN_CONFIDENCE = float(os.getenv("POLYCLAW_TOA_GATE_MIN_CONF", "0.60"))
+
+# Monitor cross-check (Item #4) — the price/state monitors service polls
+# Polymarket's public endpoints into a local store (sincor2.monitor_feed).
+# Before a trade fires, the freshest monitor price for the traded token is
+# compared with the price this loop just read: agreement confirms, a wide
+# divergence vetoes. Veto-only — it can never create a signal or change
+# sizing, and any monitor failure (missing/stale/corrupt data) leaves the
+# cycle behaving exactly as it did before the wiring. On by default.
+MONITOR_CROSSCHECK_ENABLED = os.getenv("POLYCLAW_MONITOR_CROSSCHECK", "true").lower() == "true"
+MONITOR_TOLERANCE = float(os.getenv("POLYCLAW_MONITOR_TOLERANCE", "0.15"))
+
+# Whale-flow strategy — mirror fresh entries from wallets with demonstrated
+# resolved-market edge. Default on; the registry starts empty and fills via
+# whale_flow.discover_whales().
+WHALE_FLOW_ENABLED = os.getenv("POLYCLAW_WHALE_FLOW", "true").lower() == "true"
+WHALE_MIN_WIN_RATE = float(os.getenv("POLYCLAW_WHALE_MIN_WIN_RATE", "0.55"))
 
 
 def _kelly_size(fc: Forecast, side: str, equity: float, cap: float) -> float:
@@ -179,6 +198,61 @@ def _toa_gate_opportunity(fc: Forecast, bankroll_snapshot: Dict[str, Any]) -> Di
         return {"allow": True, "decision": None, "reason": f"toa_gate_error_fail_open:{exc}"}
 
 
+def _monitor_crosscheck(reference_price: float, token_id: str) -> Dict[str, Any]:
+    """Veto-only cross-check of a trade's reference price against the
+    Item #4 monitors' freshest market_state for the traded token.
+
+    Returns {"allow": bool, "state": str, "reason": str,
+    "monitor_price": float or None, "age_seconds": float or None}.
+    States: "confirm" (fresh data agrees), "veto" (fresh data disagrees
+    by more than MONITOR_TOLERANCE — the only blocking state),
+    "no_data" / "stale" / "disabled" / "error" (all allow: behavior is
+    exactly what it was before the monitors were wired in).
+
+    The integration point is deliberate: this sits beside the TOA gate
+    in run_cycle, after a signal has already been produced and sized by
+    the existing path, immediately before place_market_buy. The monitor
+    feed therefore cannot create a signal, cannot resize one, and is
+    consulted only where a veto is still free. Never raises.
+    """
+    if not MONITOR_CROSSCHECK_ENABLED:
+        return {"allow": True, "state": "disabled",
+                "reason": "monitor_crosscheck_disabled",
+                "monitor_price": None, "age_seconds": None}
+    try:
+        from sincor2.monitor_feed import get_monitor_feed
+
+        obs = get_monitor_feed().price_for_token(token_id)
+        if obs is None:
+            return {"allow": True, "state": "no_data",
+                    "reason": "monitor_no_data",
+                    "monitor_price": None, "age_seconds": None}
+        if not obs["fresh"]:
+            return {"allow": True, "state": "stale",
+                    "reason": f"monitor_stale age={obs['age_seconds']:.0f}s",
+                    "monitor_price": obs["value"],
+                    "age_seconds": obs["age_seconds"]}
+        divergence = abs(obs["value"] - float(reference_price))
+        if divergence > MONITOR_TOLERANCE:
+            return {"allow": False, "state": "veto",
+                    "reason": (f"monitor_divergence {divergence:.3f} > "
+                               f"{MONITOR_TOLERANCE:.2f} "
+                               f"(monitor={obs['value']:.3f} "
+                               f"reference={float(reference_price):.3f})"),
+                    "monitor_price": obs["value"],
+                    "age_seconds": obs["age_seconds"]}
+        return {"allow": True, "state": "confirm",
+                "reason": (f"monitor_confirm monitor={obs['value']:.3f} "
+                           f"reference={float(reference_price):.3f}"),
+                "monitor_price": obs["value"],
+                "age_seconds": obs["age_seconds"]}
+    except Exception as exc:
+        logger.debug("monitor cross-check failed open: %s", exc)
+        return {"allow": True, "state": "error",
+                "reason": f"monitor_error_fail_open:{exc}",
+                "monitor_price": None, "age_seconds": None}
+
+
 def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
     """One full scan → size → (optional TOA gate) → execute → record → shadow-score cycle."""
     bankroll = get_bankroll()
@@ -235,6 +309,8 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         opportunities = []
     trades_taken: List[Dict[str, Any]] = []
     toa_blocked = 0
+    monitor_vetoed = 0
+    monitor_confirmed = 0
 
     # Shadow portfolio silently paper-trades the same scan at 25% TOA blend.
     try:
@@ -270,6 +346,18 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         if gate["decision"]:
             logger.info("[TOA-GATE] allowed '%s' — %s", fc.question[:50], gate["reason"])
 
+        # Monitor cross-check before capital commitment (veto-only).
+        # The market state under review is the YES price the edge was
+        # computed against, so the join token is token_id_yes regardless
+        # of which side this trade takes.
+        check = _monitor_crosscheck(fc.market_price, fc.token_id_yes)
+        if not check["allow"]:
+            monitor_vetoed += 1
+            logger.info("[MONITOR] vetoed '%s' — %s", fc.question[:50], check["reason"])
+            continue
+        if check["state"] == "confirm":
+            monitor_confirmed += 1
+
         result = adapter.place_market_buy(token_id, size)
         if not result.success:
             logger.warning("order failed for %s: %s", fc.question[:60], result.error)
@@ -301,18 +389,91 @@ def run_cycle(adapter: Optional[PolymarketAdapter] = None) -> Dict[str, Any]:
         )
 
     final = bankroll.snapshot()
+
+    # Whale-flow strategy: mirror fresh entries from qualified wallets.
+    whale_trades = 0
+    if WHALE_FLOW_ENABLED:
+        try:
+            from sincor2 import whale_flow
+            from sincor2.execution_adapter import _book_ask
+            traded_markets = {t.get("question", "")[:60] for t in trades_taken}
+            for sig in whale_flow.fresh_entries()[:MAX_TRADES_PER_CYCLE]:
+                if sig.question[:60] in traded_markets:
+                    continue  # already traded this market via momentum signal
+                if sig.whale_win_rate < WHALE_MIN_WIN_RATE:
+                    continue
+                ask = _book_ask(sig.token_id)
+                if ask is None or ask <= 0.01 or ask >= 0.99:
+                    continue
+                # Monitor cross-check (veto-only): the freshest monitor
+                # price for the whale's token vs the live ask we would
+                # pay. No monitor row for this token -> unchanged path.
+                check = _monitor_crosscheck(ask, sig.token_id)
+                if not check["allow"]:
+                    monitor_vetoed += 1
+                    logger.info("[MONITOR] vetoed whale entry '%s' — %s",
+                                sig.question[:50], check["reason"])
+                    continue
+                if check["state"] == "confirm":
+                    monitor_confirmed += 1
+                # Kelly on the whale's historical win rate at the current ask.
+                b = (1.0 / ask) - 1.0
+                kelly = (sig.whale_win_rate * (b + 1.0) - 1.0) / b
+                if kelly <= 0:
+                    continue
+                size = round(min(
+                    snapshot["equity"] * kelly * KELLY_FRACTION,
+                    bankroll.max_position_size()), 2)
+                if size < MIN_WAGER_USD:
+                    continue
+                result = adapter.place_market_buy(sig.token_id, size)
+                if not result.success:
+                    logger.warning("whale order failed for %s: %s",
+                                   sig.question[:60], result.error)
+                    continue
+                trade_id = bankroll.record_trade(
+                    token_id=sig.token_id, side=sig.side, size_usd=size,
+                    price=ask, order_id=result.order_id,
+                    simulated=result.simulated, market_id=sig.market_id,
+                )
+                trades_taken.append({
+                    "trade_id": trade_id,
+                    "question": sig.question,
+                    "side": sig.side,
+                    "size_usd": size,
+                    "strategy": "whale_flow",
+                    "whale": sig.wallet[:12],
+                    "whale_pnl": sig.whale_pnl_usd,
+                    "whale_win_rate": sig.whale_win_rate,
+                    "simulated": result.simulated,
+                    "order_id": result.order_id,
+                })
+                whale_trades += 1
+                logger.info(
+                    "%s [WHALE] %s $%.2f on '%s' | whale=%s pnl=$%.0f wr=%.0f%%",
+                    "[DRY]" if result.simulated else "[LIVE]",
+                    sig.side, size, sig.question[:60], sig.wallet[:12],
+                    sig.whale_pnl_usd, sig.whale_win_rate * 100,
+                )
+        except Exception as exc:
+            logger.debug("whale-flow block failed: %s", exc)
+
     _cycle_duration = time.time() - _cycle_t0
     logger.info(
-        "[POLYCLAW] cycle complete in %.1fs | trades=%d opportunities=%d",
-        _cycle_duration, len(trades_taken), len(opportunities)
+        "[POLYCLAW] cycle complete in %.1fs | trades=%d opportunities=%d whale_trades=%d",
+        _cycle_duration, len(trades_taken), len(opportunities), whale_trades
     )
     return {
         "status": "ok",
         "live": adapter.is_live(),
         "opportunities": len(opportunities),
         "trades_taken": trades_taken,
+        "whale_trades": whale_trades,
         "toa_blocked": toa_blocked,
         "toa_gate_enabled": TOA_GATE_ENABLED,
+        "monitor_vetoed": monitor_vetoed,
+        "monitor_confirmed": monitor_confirmed,
+        "monitor_crosscheck_enabled": MONITOR_CROSSCHECK_ENABLED,
         "bankroll": final,
         "ab_test": shadow_portfolio.compare_performance(),
         "treasury": TREASURY_ADDRESS,

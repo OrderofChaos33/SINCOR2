@@ -43,14 +43,16 @@ Sanity: `forge test` on the existing suites
 ```bash
 export RPC_URL="https://sepolia.base.org"   # or your provider URL
 
-# 1. Auction core (no constructor args; deployer becomes owner)
+# 1. Auction core: ONE constructor arg — the guardian Safe (deployer becomes owner).
+# Guardian MUST be the 2-of-3 Safe, never a personal wallet.
 AUCTION=$(forge create contracts/CommitRevealAuction.sol:CommitRevealAuction \
+  --constructor-args <GUARDIAN_SAFE> \
   --rpc-url $RPC_URL --account deployer --via-ir \
   --broadcast | grep "Deployed to" | awk '{print $3}')
 
-# 2. Escrow manager: (auctionCore, adjudicator, minStakeBps, challengerBond)
+# 2. Escrow manager: (auctionCore, adjudicator, minStakeBps, challengerBond, guardian)
 ESCROW=$(forge create contracts/ExecutionEscrowManager.sol:ExecutionEscrowManager \
-  --constructor-args $AUCTION <ADJUDICATOR_ADDRESS> 5000 20000000000000000 \
+  --constructor-args $AUCTION <ADJUDICATOR_ADDRESS> 5000 20000000000000000 <GUARDIAN_SAFE> \
   --rpc-url $RPC_URL --account deployer --via-ir \
   --broadcast | grep "Deployed to" | awk '{print $3}')
 
@@ -64,12 +66,27 @@ cast send $AUCTION "setEscrowManager(address)" $ESCROW \
 ```bash
 forge verify-contract $AUCTION contracts/CommitRevealAuction.sol:CommitRevealAuction \
   --chain-id 84532 --etherscan-api-key $BASESCAN_KEY --via-ir \
-  --compiler-version v0.8.24 --num-of-optimizations 200
+  --compiler-version v0.8.24 --num-of-optimizations 200 \
+  --constructor-args $(cast abi-encode "constructor(address)" <GUARDIAN_SAFE>)
 forge verify-contract $ESCROW contracts/ExecutionEscrowManager.sol:ExecutionEscrowManager \
   --chain-id 84532 --etherscan-api-key $BASESCAN_KEY --via-ir \
   --compiler-version v0.8.24 --num-of-optimizations 200 \
-  --constructor-args $(cast abi-encode "constructor(address,address,uint256,uint256)" \
-    $AUCTION <ADJUDICATOR_ADDRESS> 5000 20000000000000000)
+  --constructor-args $(cast abi-encode "constructor(address,address,uint256,uint256,address)" \
+    $AUCTION <ADJUDICATOR_ADDRESS> 5000 20000000000000000 <GUARDIAN_SAFE>)
+
+## 3b. On-chain parameter verification (read-only — run before the smoke test)
+
+```bash
+# Every line must return the expected value; any mismatch = redeploy, do not proceed.
+cast call $AUCTION "guardianMultisig()(address)" --rpc-url $RPC_URL   # expect <GUARDIAN_SAFE>
+cast call $AUCTION "owner()(address)" --rpc-url $RPC_URL              # expect your deployer EOA
+cast call $AUCTION "escrowManager()(address)" --rpc-url $RPC_URL      # expect $ESCROW (step 3 of section 2 done)
+cast call $ESCROW "auctionCore()(address)" --rpc-url $RPC_URL         # expect $AUCTION
+cast call $ESCROW "adjudicator()(address)" --rpc-url $RPC_URL         # expect <ADJUDICATOR_ADDRESS>
+cast call $ESCROW "minStakeBps()(uint256)" --rpc-url $RPC_URL         # expect 5000
+cast call $ESCROW "challengerBond()(uint256)" --rpc-url $RPC_URL      # expect 20000000000000000 (0.02 ETH)
+cast call $ESCROW "guardianMultisig()(address)" --rpc-url $RPC_URL    # expect <GUARDIAN_SAFE>
+```
 ```
 
 ## 4. Sepolia wiring smoke test (Python, no keys in repo)

@@ -11,6 +11,7 @@ from __future__ import annotations
 from conftest import hb_headers
 
 import json
+import os
 
 import pytest
 from flask import Flask
@@ -42,10 +43,13 @@ def env(tmp_path, monkeypatch):
     client = app.test_client()
 
     def fake_request(method, path, body=None):
+        # W-77: the MCP server presents the operator heartbeat token on
+        # writes (same as production _request); mirror it here.
+        headers = {"X-Sincor-Heartbeat": os.environ.get("AGENT_HEARTBEAT_TOKEN", "")}
         if method.upper() == "GET":
             resp = client.get(path)
         else:
-            resp = client.post(path, json=body)
+            resp = client.post(path, json=body, headers=headers)
         try:
             data = resp.get_json()
         except Exception:
@@ -74,7 +78,6 @@ def _register_agent(client, agent_id, tags=("lead-enrichment",)):
         "agent_id": agent_id,
         "capability_tags": list(tags),
         "rpc_callback": "https://agent.example/rpc",
-        "wallet": "0x" + "11" * 20,
     })
     assert r.status_code in (200, 201), r.get_json()
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
@@ -83,8 +86,12 @@ def _register_agent(client, agent_id, tags=("lead-enrichment",)):
 
 
 def _anchored_sealed_task(skill="lead-enrichment", bounty=2.0):
-    """Sealed task with a stamped auction_id (simulates an onchain anchor)."""
-    task = create_task(skill, tags=[skill], bounty_axm=bounty, sealed=True)
+    """Sealed task with a stamped auction_id (simulates an onchain anchor).
+
+    Named poster: the anti-gaming guards reject bids on anonymous tasks.
+    """
+    task = create_task(skill, tags=[skill], bounty_axm=bounty, sealed=True,
+                       poster_id="mcp-poster")
     task_id = task["task_id"]
     fabric = get_fabric()
     with fabric.lock:
@@ -329,8 +336,9 @@ def test_submit_bid_reveal_flow(env):
 
 def test_submit_bid_legacy_flow(env):
     _register_agent(env, "mcp-legacy")
+    # Named poster: the anti-gaming guards reject bids on anonymous tasks.
     task = create_task("lead-enrichment", tags=["lead-enrichment"],
-                       bounty_axm=1.5, sealed=False)
+                       bounty_axm=1.5, sealed=False, poster_id="mcp-poster")
     args = {"task_id": task["task_id"], "agent_id": "mcp-legacy",
             "bid_axm": 1.0, "mode": "legacy"}
     payload, _ = _call("submit_bid", args)

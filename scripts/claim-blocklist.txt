@@ -1,0 +1,84 @@
+# SINCOR2 marketing-claim blocklist — pre-commit hedge against unproven claims.
+#
+# PURPOSE: knock out compliance/legal risk at the commit. Any staged change
+# that introduces one of these phrases in public-facing copy (README.md,
+# templates/**/*.html) FAILS the commit unless the (file, pattern) pair is
+# already covered in data/claim_register.json by a substantiated
+# disclaimer/policy/roadmap entry. The author must reword, remove, or
+# properly register-and-disclaim the claim before committing. This is the
+# permanent hedge for the 2026-10-17 claim-downgrade decision sheet
+# (40 claims remediated on xioix/compliance-claim-downgrades-2026-10-20):
+# the claims can't come back through a drive-by commit.
+#
+# FORMAT: one rule per line:  <name>: <python-regex>  # reason
+#  - <name> should match data/claim_register.json's pattern name when the
+#    rule overlaps a scanner pattern (24/7, zero-human, certified,
+#    guaranteed, hipaa, soc2, audited, adgm). Rules with their own name
+#    (fdv, millionaire, unlimited, ...) can never be covered by the
+#    register and always block.
+#  - <python-regex> is matched against NORMALIZED prose (see
+#    src/sincor2/claim_scan.py: NFKC, case-folded, dashes/slashes/
+#    zero-width chars collapsed to spaces, digit-grouping commas removed),
+#    so one pattern catches "24/7", "24-7", "24 7", etc.
+#  - Blank lines and lines starting with '#' are ignored.
+#
+# SCOPE: the scanner only inspects rendered prose of staged public-copy
+# files (HTML tags, <script>/<style> bodies and comments are stripped),
+# PLUS <meta> tag content attributes (name="description", og:description,
+# twitter:description, ...) — search engines and social cards render them,
+# so a banned claim in a meta description blocks the same as one in the
+# body. Only customer-visible copy counts: the word "audit" in code
+# comments or docs never triggers. Compliance artifacts are exempt by
+# path: data/ (claim_register.json), docs/, tests/ (fixtures may contain
+# the words), and anything under your_files/ or hidden_files/.
+#
+# ADDING A RULE: add one "name: regex" line below with a trailing
+# "  # reason" comment naming the claim class. Keep patterns narrow:
+# prefer matching the claim ("minimum-output guaranteed") over the
+# innocent word ("minimum"). If a legitimate sentence trips the hook,
+# narrow the pattern — never widen the exemptions.
+
+# --- uptime / always-on assertions (unproven operation claims) ---
+24/7: \b24\s+7\b  # 24/7 in any separator form
+24/7: \b24\s+7\s+365\b  # 24/7/365 variant
+
+# --- zero-oversight autonomy claims ---
+zero-human: \bzero\s*human\b  # "zero human"
+no-human: \bno\s+human\b  # "no human intervention" style zero-oversight claims
+sovereign: \bsovereign\b  # "sovereign" autonomy claims (e.g. "Sovereign A2A")
+
+# --- guarantee / risk-elimination claims ---
+guaranteed: \bguarantee[sd]?\b  # guaranteed, guarantee, guarantees
+zero-risk: \bzero\s+risk\b  # "Zero Risk"
+risk-free: \brisk\s*free\b  # risk-free / risk free
+no-risk: \bno\s+risk\b  # "no risk"
+
+# --- regulated-domain claims (need attestation that doesn't exist) ---
+hipaa: \bhipaa\b  # any HIPAA claim; "HIPAA-aware handling" needs a disclaimer entry
+hitech: \bhitech\b  # HITECH, same bar as HIPAA
+soc2: \bsoc\s*2\b  # SOC 2 attestation claims
+adgm: \badgm\b  # ADGM compliance implications
+
+# --- third-party audit claims (internal reviews are not third-party audits) ---
+audited: \baudited\b  # "audited" as a claim
+audited: \bthird\s*party\s+audit\b  # third-party audit
+audited: \bindependent\s+audit\b  # independent audit
+audited: \bexternal\s+audit\b  # external audit
+audited: \baudit\s+(completed|passed|certified)\b  # "audit completed/passed"
+certified: \bcertif(?:ied|ication|ications|y)\b  # certified / certification
+
+# --- token price / valuation claims ---
+fdv: \bfdv\b  # fully-diluted-valuation claims
+fully-diluted: \bfully\s+diluted\b  # "fully diluted"
+price-floor: \bprice\s+floor\b  # "price floor"
+price-floor: \bfloor\s+price\b  # "floor price"
+price-floor: \$\s*0\.15\b  # the known $0.15 offender; add other declared floors literally
+
+# --- earnings promises ---
+millionaire: \bmillionaire\b  # "make millionaires" style promises
+get-rich: \bget\s+rich\b  # "get rich"
+roi: \broi\b  # ROI promises in customer-facing copy
+
+# --- absolute / weasel superlatives that overstate ---
+unlimited: \bunlimited\b  # "unlimited" anything
+instant: \binstant\b  # "instant" results/setup claims

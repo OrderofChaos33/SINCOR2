@@ -5,6 +5,21 @@ dicts — the caller signs and broadcasts with their own signer), the
 adjudicator-ruling struct-hash builder (byte-identical to the on-chain
 ``slash()`` digest), read helpers, and eth_call dry-run.
 
+Relayer constraint (dev-watch 306, zkLink forged-root lesson):
+  * A relayer is transport, never authority. ``build_slash_tx`` builds a
+    claim that ANYONE may submit to ``StakeSlashManager.slash``; submission
+    confers no authority whatsoever. The claim's only authority is the
+    adjudicator's EIP-191 signature, verified ONCHAIN in ``slash()``
+    (ecrecover over the domain-bound struct hash — typehash + chain id +
+    contract address + every ruling field — against ``adjudicator``, with
+    nonce and expiry checks) BEFORE any token transfer or credit. A claim
+    that fails verification reverts; there is no permissive fallback, here
+    or onchain (``dry_run`` raises on a reverting claim). Never add a path
+    that releases funds on a relayer-submitted root/claim that has not
+    passed that onchain verification. Proven by
+    ``tests/pytest/test_relayer_forged_claim.py``: forged (wrong signer,
+    tampered payload, replayed) claims release zero funds.
+
 Safety rules (hard):
   * This module NEVER reads private keys and NEVER imports eth_account.
     ``build_*_tx`` return unsigned transaction dicts; sign them with

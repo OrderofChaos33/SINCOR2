@@ -29,6 +29,7 @@ from src.sincor2.defi.compliance_automation import (
     TAINT_MAX_HOPS,
     AMLAdapter,
     AuditTrail,
+    ComplianceOracle,
     DepositRejected,
     GatekeeperHook,
     GeoRegistry,
@@ -42,6 +43,7 @@ from src.sincor2.defi.compliance_automation import (
     Unauthorized,
     Verdict,
     DecisionEngine,
+    build_reference_oracle,
     status_payload,
 )
 
@@ -55,8 +57,8 @@ def build_engine() -> DecisionEngine:
     aml = AMLAdapter(sanctions={"bad_actor"}, fund_flows={},
                      list_updated_at=NOW)
     geo = GeoRegistry(admin="geo_admin")
-    eng = DecisionEngine(kyc, aml, geo, guardian="guardian")
-    return eng
+    oracle = ComplianceOracle(kyc, aml, geo)
+    return DecisionEngine(oracle, guardian="guardian")
 
 
 def good_attestation(kyc: KYCAdapter, subject: str = "alice",

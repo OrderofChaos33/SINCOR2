@@ -150,22 +150,57 @@ def init_stripe_routes(app, stripe_processor):
             if success:
                 event_type = event_data.get('event', 'unknown')
                 logger.info(f"[STRIPE] Webhook received: {event_type}")
-                
-                # Route through revenue orchestrator if available
-                if ORCHESTRATOR_AVAILABLE and get_orchestrator:
-                    try:
-                        # Log revenue synchronously (don't block response)
-                        stripe_event = {
-                            'type': event_type,
-                            'data': {'object': event_data}
-                        }
-                        # Store for async processing later
-                        logger.info(f"[REVENUE] Queued for orchestration: {event_type}")
-                    except Exception as e:
-                        logger.warning(f"[ORCHESTRATOR] Warning: {e}")
-                
-                # Also run original fulfillment (backward compatibility)
-                _process_payment_event(event_data)
+
+                # B3: idempotency — persist the Stripe event ID with a UNIQUE
+                # constraint BEFORE processing (insert-or-ignore claim).
+                # Duplicate deliveries are acknowledged without re-fulfillment.
+                # (Lazy import: stripe_routes is imported by mvp_app at boot.)
+                from sincor2.mvp_app import (
+                    claim_stripe_webhook_event,
+                    mark_stripe_webhook_event_processed,
+                    release_stripe_webhook_event_claim,
+                )
+                event_id = (event_data.get('event_id') or '').strip()
+                if not event_id:
+                    logger.error("[STRIPE] Webhook event without event_id — "
+                                 "refusing to process")
+                    return jsonify({'success': False,
+                                    'error': 'Missing Stripe event id'}), 400
+                claim = claim_stripe_webhook_event(event_id, event_type)
+                if claim in ('duplicate_processed', 'duplicate_inflight'):
+                    logger.warning("[STRIPE] Duplicate webhook event %s (%s) — "
+                                   "acknowledged without re-fulfillment",
+                                   event_id, claim)
+                    return jsonify({'success': True, 'duplicate': True}), 200
+                if claim == 'reclaimed':
+                    logger.warning("[STRIPE] Reclaimed stale webhook event %s "
+                                   "from a crashed attempt — reprocessing",
+                                   event_id)
+
+                try:
+                    # Route through revenue orchestrator if available
+                    if ORCHESTRATOR_AVAILABLE and get_orchestrator:
+                        try:
+                            # Log revenue synchronously (don't block response)
+                            stripe_event = {
+                                'type': event_type,
+                                'data': {'object': event_data}
+                            }
+                            # Store for async processing later
+                            logger.info(f"[REVENUE] Queued for orchestration: {event_type}")
+                        except Exception as e:
+                            logger.warning(f"[ORCHESTRATOR] Warning: {e}")
+
+                    # Also run original fulfillment (backward compatibility)
+                    _process_payment_event(event_data)
+                except Exception:
+                    # Processing failed: release the claim so a redelivery
+                    # can retry instead of being acked as a duplicate.
+                    release_stripe_webhook_event_claim(event_id)
+                    raise
+                # B3: fulfillment done — mark processed so redeliveries
+                # are acknowledged as duplicates, never re-fulfilled.
+                mark_stripe_webhook_event_processed(event_id)
                 return jsonify({'success': True}), 200
             else:
                 logger.warning("[STRIPE] Webhook verification failed")
@@ -287,6 +322,45 @@ def _process_payment_event(event_data):
     """Process Stripe events — fulfill orders, send emails, handle lifecycle"""
     event_type     = event_data.get('event')
     customer_email = event_data.get('customer_email', '')
+
+    # C4: route Stripe-signed value events through the effect boundary BEFORE
+    # any provisioning. Fail-closed: a denied intent skips provisioning.
+    # W-80: the treasury HALT file is consulted explicitly — a tripped
+    # (or unreadable/tampered) halt denies provisioning via the money gate.
+    try:
+        from sincor2.governance.money_gate import (
+            check_money_effect,
+            treasury_halt_tripped,
+        )
+    except ImportError:
+        try:
+            from src.sincor2.governance.money_gate import (  # type: ignore
+                check_money_effect,
+                treasury_halt_tripped,
+            )
+        except ImportError as exc:
+            logger.critical(
+                "[FULFILLMENT] money gate unavailable (%s) — event %s DENIED "
+                "(fail closed)", exc, event_type)
+            return
+    allowed, gate_reason = check_money_effect(
+        effect_type="payment.transfer",
+        payload={"event": event_type,
+                 "amount_total": event_data.get("amount_total"),
+                 "session_id": event_data.get("session_id", "")},
+        agent_id="stripe_payment_event",
+        risk_tier="high",
+        idempotency_key="stripe-%s-%s" % (
+            event_type, event_data.get("session_id", "nosession")),
+        target="stripe_event_provisioning",
+        estimated_cost=float((event_data.get("amount_total") or 0)) / 100,
+        kill_switch_tripped=treasury_halt_tripped(),
+    )
+    if not allowed:
+        logger.critical(
+            "[FULFILLMENT] effect boundary denied Stripe event %s: %s",
+            event_type, gate_reason)
+        return
 
     if event_type == 'payment_completed':
         session_id      = event_data.get('session_id', '')

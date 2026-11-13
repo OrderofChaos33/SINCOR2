@@ -233,10 +233,10 @@ def test_scripted_lifecycle_reconciles_to_the_cent():
     lc = OrderLifecycleManager(wallet)
     pos = lc.open_position(_snap(), "YES", 10_000, 0.50, NOW)
     pnl = lc.resolve(pos, outcome_yes=True)
-    # bought 10_000c / 0.50 = 20_000 shares @ 100c = 2_000_000c payout
-    assert pos.payout_cents == 2_000_000
-    assert pnl == 1_990_000
-    assert lc.realized_pnl_cents() == 1_990_000
+    # $100 / $0.50 = 200 shares @ 100c = 20_000c payout
+    assert pos.payout_cents == 20_000
+    assert pnl == 10_000
+    assert lc.realized_pnl_cents() == 10_000
 
 
 def test_losing_position_pays_zero():
@@ -263,8 +263,8 @@ def test_fee_ledger_exact_15bps_and_reconciles():
     wallet = PolyclawWalletAdapter(pm.POLYCLAW_KEY_ID)
     lc = OrderLifecycleManager(wallet)
     pos = lc.open_position(_snap(), "YES", 10_000, 0.50, NOW)
-    lc.resolve(pos, outcome_yes=True)  # pnl = +1_990_000c
-    assert lc.fee_total_cents() == 1_990_000 * 15 // 10_000
+    lc.resolve(pos, outcome_yes=True)  # pnl = +10_000c
+    assert lc.fee_total_cents() == 10_000 * 15 // 10_000
     assert lc.fee_ledger[0].fee_to == TREASURY
     assert lc.fee_ledger_reconciles()
     # no fee on losses
