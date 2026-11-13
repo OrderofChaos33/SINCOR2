@@ -202,6 +202,8 @@ class AnchorStore:
         self.anchor_path = os.path.join(self.base_dir, self.ANCHOR_FILENAME)
         self._lock = threading.Lock()
         self._last_root = GENESIS_ANCHOR_ROOT
+        #: seq_end of the most recent anchor (W-134 partition rule).
+        self._last_seq_end: Optional[int] = None
         self._load()
 
     def _load(self) -> None:
@@ -213,6 +215,7 @@ class AnchorStore:
                         if line:
                             record = json.loads(line)
                             self._last_root = str(record["merkle_root"])
+                            self._last_seq_end = int(record["seq_end"])
             except (ValueError, KeyError, TypeError) as exc:
                 raise AnchorStoreCorruptError(
                     f"anchor log is corrupt: {self.anchor_path}: {exc}"
@@ -244,11 +247,38 @@ class AnchorStore:
         in the order given. An empty epoch is refused (ValueError) —
         no anchor for nothing. The record is appended to the anchor
         log with status ``"PREPARED"``; nothing is submitted anywhere.
+
+        W-134: epochs must PARTITION the log. The record count must
+        match the claimed ``[seq_start, seq_end]`` range, and when a
+        previous anchor exists the new epoch must start exactly at
+        the previous epoch's ``seq_end + 1`` — overlapping epochs
+        (a record anchored twice) and gapped epochs (records never
+        anchored) are refused with ValueError.
         """
         if not records:
             raise ValueError("cannot anchor an empty epoch (no records)")
+        if int(seq_end) < int(seq_start):
+            raise ValueError(
+                f"anchor epoch end {seq_end} precedes its start {seq_start}"
+            )
+        if len(records) != int(seq_end) - int(seq_start) + 1:
+            raise ValueError(
+                f"anchor epoch [{seq_start}, {seq_end}] spans "
+                f"{int(seq_end) - int(seq_start) + 1} seqs but "
+                f"{len(records)} records were given (W-134)"
+            )
         root = merkle_root([str(r["record_hash"]) for r in records])
         with self._lock:
+            if (
+                self._last_seq_end is not None
+                and int(seq_start) != self._last_seq_end + 1
+            ):
+                raise ValueError(
+                    "anchor epochs must partition the log: previous "
+                    f"epoch ended at seq {self._last_seq_end}, so the "
+                    f"next epoch must start at {self._last_seq_end + 1}, "
+                    f"not {seq_start} (W-134)"
+                )
             anchor = {
                 "epoch_id": "epoch_" + uuid.uuid4().hex,
                 "seq_start": seq_start,
@@ -264,6 +294,7 @@ class AnchorStore:
                 fh.flush()
                 os.fsync(fh.fileno())
             self._last_root = root
+            self._last_seq_end = int(seq_end)
             return dict(anchor)
 
     def verify_anchors(self, records: list) -> bool:
@@ -284,6 +315,7 @@ class AnchorStore:
             for record in records:
                 by_seq[int(record["seq"])] = str(record["record_hash"])
             prev_root = GENESIS_ANCHOR_ROOT
+            prev_seq_end: Optional[int] = None
             for anchor in self.read_anchors():
                 if anchor.get("status") != ANCHOR_STATUS_PREPARED:
                     return False
@@ -291,6 +323,13 @@ class AnchorStore:
                     return False
                 seq_start = int(anchor["seq_start"])
                 seq_end = int(anchor["seq_end"])
+                if prev_seq_end is not None and seq_start != prev_seq_end + 1:
+                    # W-134: epochs must partition the log — an overlap
+                    # double-counts records, a gap leaves records
+                    # unanchored; both fail verification even when every
+                    # individual root recomputes.
+                    return False
+                prev_seq_end = seq_end
                 hashes = []
                 for seq in range(seq_start, seq_end + 1):
                     if seq not in by_seq:
