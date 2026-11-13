@@ -126,7 +126,13 @@ def test_professional_stubs_anonymous_401(mvp_client):
 # --------------------------------------------------------------------------
 
 def test_gate_anonymous_sees_gate_before_launch(mvp_client, monkeypatch):
-    monkeypatch.delenv("SINCOR_LAUNCH_DATE", raising=False)
+    # STALE update (founder-authorized 2026-11-08, "Fix everything"; same
+    # launch-boundary class as the w136/b44 gate pins): deleting the env
+    # var falls back to the default 2026-11-09, which is now in the past,
+    # so the gate no longer served. Pin a future launch date; the gate's
+    # "November 9, 2026" copy and countdown string are hardcoded template
+    # text / JSON-LD, so the assertions below still pin the real gate.
+    monkeypatch.setenv("SINCOR_LAUNCH_DATE", "2099-01-01")
     r = mvp_client.get("/", follow_redirects=False)
     assert r.status_code == 200
     html = r.get_data(as_text=True)
@@ -197,7 +203,14 @@ def test_genesis_claim_flow_lifts_gate(mvp_client, monkeypatch, tmp_path):
     # claim (the squat primitive). It now lifts only after the emailed
     # confirmation token is used — the flow driven here. Original
     # intent preserved: a completed (confirmed) claim lifts the gate.
-    monkeypatch.delenv("SINCOR_LAUNCH_DATE", raising=False)
+    # W-138 STALE update: confirmation binds on POST only; the emailed
+    # link's GET renders a neutral page, sets no cookie, and does not
+    # lift the gate.
+    # Launch-boundary STALE update (founder-authorized 2026-11-08, same
+    # class as above): pin a future launch date — with the default
+    # 2026-11-09 now in the past, GET / serves the homepage regardless
+    # of the claim flow and the gate assertions below could not run.
+    monkeypatch.setenv("SINCOR_LAUNCH_DATE", "2099-01-01")
     monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
     from sincor2 import genesis_cohort
 
@@ -215,8 +228,17 @@ def test_genesis_claim_flow_lifts_gate(mvp_client, monkeypatch, tmp_path):
     r = mvp_client.get("/", follow_redirects=False)
     assert r.status_code == 200
     assert GATE_MARKER in r.get_data(as_text=True)
-    # Confirmation sets the cookie.
-    r = mvp_client.get(f"/api/genesis/confirm?token={sender.last_token()}")
+    # Opening the emailed link (GET) sets no cookie and does not lift
+    # the gate — a mail scanner prefetch must change nothing.
+    token = sender.last_token()
+    r = mvp_client.get(f"/api/genesis/confirm?token={token}")
+    assert r.status_code == 200
+    assert "sincor_genesis" not in (r.headers.get("Set-Cookie") or "")
+    r = mvp_client.get("/", follow_redirects=False)
+    assert r.status_code == 200
+    assert GATE_MARKER in r.get_data(as_text=True)
+    # Confirmation via POST sets the cookie.
+    r = mvp_client.post("/api/genesis/confirm", data={"token": token})
     assert r.status_code == 200
     assert "sincor_genesis" in (r.headers.get("Set-Cookie") or "")
     # Cookie now lifts the gate for this browser.

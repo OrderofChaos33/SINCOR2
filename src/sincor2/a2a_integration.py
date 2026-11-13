@@ -2287,6 +2287,56 @@ def build_marketplace_manifest() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# AP2 discovery factory (/.well-known/ap2.json)
+# ---------------------------------------------------------------------------
+
+def build_ap2_discovery_document() -> Dict[str, Any]:
+    """Return the SINCOR AP2 discovery document for /.well-known/ap2.json.
+
+    Content is the staged document from the ap2-seal-adapter package
+    (``src/ap2_seal_adapter/well-known/ap2.json``), served verbatim with
+    exactly one founder-approved change: per that package's
+    INTEGRATION.md, ``status`` is flipped from DRAFT/staged as part of
+    the deploy itself (founder greenlight, 2026-11-11). Every honesty
+    field is preserved exactly — in particular
+    ``settlement.hub_deployed_on_mainnet`` stays False: no
+    SincorSettlementHub contract is deployed on Base mainnet, and
+    settlement is proven locally (eth-tester) only.
+    """
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "ap2_concepts_version": "v0.1 mandate names (IntentMandate / CartMandate / PaymentMandate) as public AP2 concepts; v0.2 renamed these to open/closed Checkout and Payment Mandates",
+        "discovery_url_intended": "https://getsincor.com/.well-known/ap2.json",
+        "input_format": " mandate-shaped JSON objects (dicts / VC-like wrappers with contents or credentialSubject); SD-JWT verification not yet supported",
+        "issuer": "SINCOR Business Solutions",
+        "mandates_accepted": ["IntentMandate", "CartMandate", "PaymentMandate"],
+        "market_claims": "none — third-party market figures circulating in planning documents are UNVERIFIED and are not SINCOR claims",
+        "protocol": "ap2",
+        "settlement": {
+            "asset": "USDC",
+            "asset_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "chain_id": 8453,
+            "eip712_domain": {"name": "SINCOR_SEAL", "version": "1"},
+            "fee_bps": 500,
+            "fee_bps_is_canon": True,
+            "fee_note": "500 bps (5%) is the locked SINCOR fee canon. A 0.5-1% AP2-rail take (50-100 bps) exists only as an unapproved pricing proposal — FOUNDER PRICING DECISION required before any change.",
+            "hub_deployed_on_mainnet": False,
+            "hub_note": "No SincorSettlementHub contract is deployed on Base mainnet. Settlement is proven locally (eth-tester) only.",
+            "network": "base",
+            "rail": "SINCOR SEAL via SincorSettlementHub interface (EIP-712 SealAuthorization)",
+            "scheme": "sincor-seal-v1",
+        },
+        "sigil": {
+            "commitment": "keccak256(taskId || canonical-JSON output)",
+            "expected_schema_hash": "keccak256(canonical-JSON cart contents)",
+        },
+        "status": "LIVE — AP2 discovery document served at https://getsincor.com/.well-known/ap2.json (founder-approved deploy, 2026-11-11); the settlement hub's deployment state is stated in settlement.hub_deployed_on_mainnet.",
+        "verification_enforced_offchain": True,
+        "verification_note": "The Hub records any sigilCommitment it is handed and never checks expectedSchemaHash on-chain; verification is enforced by the settling engine before submission, as in sincor-x402.",
+    }
+
+
+# ---------------------------------------------------------------------------
 # In-memory stores (replace with Redis / DB in production)
 # ---------------------------------------------------------------------------
 # NOTE: this store is process-local and non-persistent. All tasks are lost on
@@ -3553,6 +3603,64 @@ class A2ARouter:
             plus the MCP server entry point. jsonify → application/json."""
             from flask import jsonify
             return jsonify(build_marketplace_manifest())
+
+        # ── Discovery — AP2 document (canonical .json + aliases) ────────────
+        @bp.route("/.well-known/ap2.json", methods=["GET"])
+        @bp.route("/.well-known/ap2", methods=["GET"])
+        @bp.route("/ap2", methods=["GET"])
+        def ap2_discovery():
+            """AP2 discovery document: mandates accepted + SEAL settlement
+            terms for AP2 routers. Same pattern as the agent card above —
+            jsonify(factory) → application/json. The bare /.well-known/ap2
+            path is the founder-greenlit alias and /ap2 is the bare root
+            alias; the .json path is the canonical one named in the
+            document itself (discovery_url_intended). All three paths are
+            served by this one view so the document can never drift."""
+            from flask import jsonify
+            return jsonify(build_ap2_discovery_document())
+
+        # ── Lane 3 — zero-friction external agent registration ──────────
+        @bp.route("/ap2/register", methods=["POST"])
+        def ap2_register():
+            """POST /ap2/register: name + endpoint URL + contact, stored
+            through the existing registration path; the first 20 external
+            registrations are flagged for the introductory AXM
+            micro-bounty. Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.register_external_agent(body)
+            return jsonify(payload), status
+
+        # ── Lane 3 — x402 paid endpoints (in-repo sincor-x402 package) ──
+        @bp.route("/x402-live/quick-scan", methods=["POST"])
+        def x402_quick_scan():
+            """$0.01 quick scan: unauthenticated calls get the package's
+            402 challenge for 0.01 USDC on Base; settlement is
+            facilitator-gated until a facilitator is configured.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.quick_scan(dict(request.headers), body)
+            return jsonify(payload), status
+
+        @bp.route("/audit-express/order", methods=["POST"])
+        def audit_express_order():
+            """Audit Express entry-tier (500 USDC) order intake — the
+            same x402 challenge pattern as the quick scan.
+            Logic lives in sincor2.lane3."""
+            from flask import jsonify, request
+
+            from sincor2 import lane3
+
+            body = request.get_json(force=True, silent=True) or {}
+            status, payload = lane3.audit_order(dict(request.headers), body)
+            return jsonify(payload), status
 
         @bp.route("/docs/a2a", methods=["GET"])
         def a2a_docs():

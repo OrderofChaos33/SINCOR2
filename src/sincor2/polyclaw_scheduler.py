@@ -67,8 +67,8 @@ def _bootstrap_live_client() -> None:
         from sincor2.execution_adapter import PolymarketAdapter
 
         adapter = PolymarketAdapter()
-        # Force full live init: API creds + USDC.e/CTF approvals + CLOB cache.
-        adapter._get_client()
+        # Force full live init: API creds + CLOB balance/allowance cache.
+        adapter.ensure_client()
         _live_adapter = adapter
         _bootstrap_error = None
         logger.info(

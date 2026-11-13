@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Express — SINCOR</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; padding:32px 20px 64px; }
+    .wrap { max-width:860px; margin:0 auto; }
+    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(28px,5vw,40px); margin:16px 0 8px; }
+    h2 { font-size:18px; margin:28px 0 10px; color:#c4b5fd; }
+    p, li { color:var(--muted); line-height:1.7; }
+    ul { padding-left:20px; margin:8px 0 16px; }
+    .card { background:rgba(255,255,255,.04); border:1px solid rgba(139,92,246,.25); border-radius:16px; padding:22px; margin:16px 0; }
+    .warn { border-color:rgba(245,158,11,.55); background:rgba(245,158,11,.06); }
+    .big { font-family:'Sora',sans-serif; font-size:clamp(30px,6vw,44px); color:#fff; line-height:1.15; }
+    code, pre { font-family:'JetBrains Mono',monospace; color:#e2e8f0; }
+    pre { background:#050814; border-radius:12px; padding:16px; overflow:auto; font-size:12px; line-height:1.6; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+    .btn { display:inline-block; padding:12px 18px; border-radius:10px; background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; }
+    .ghost { background:transparent; border:1px solid rgba(139,92,246,.35); color:var(--text); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/">← Home</a>
+    <h1>Audit Express</h1>
+    <p class="big">48-hour AI-assisted Foundry fuzzing &amp; security check.</p>
+    <p>Built for indie teams shipping Solidity on Base: a fast, focused
+       pass over your contracts — Foundry fuzz campaigns, invariant
+       checks, and a line-by-line review of the surfaces that move money —
+       with a written findings report in 48 hours.</p>
+
+    <div class="card warn">
+      <h2>Read this first</h2>
+      <p><strong>This is not a formal audit.</strong> It is a rapid
+         security check: no attestation, and no substitute for a
+         full-scope engagement before you hold other people's money.
+         If you need the deep version, book the 5-day sprint instead.</p>
+    </div>
+
+    <div class="card">
+      <h2>What you get</h2>
+      <ul>
+        <li>Foundry fuzz + invariant campaigns against your test suite and the money-path entry points</li>
+        <li>Review of access control, value flow, and external-call surfaces</li>
+        <li>Findings report: severity-ranked, with reproductions for anything that bites</li>
+        <li>Turnaround: 48 hours from scope confirmation</li>
+      </ul>
+      <h2>Price</h2>
+      <p><strong>500–1,500 USDC</strong>, set by scope (codebase size and
+         surface complexity) and confirmed at intake before work starts —
+         payable over the x402 rail via the published
+         <a href="https://pypi.org/project/sincor-x402/">sincor-x402</a>
+         flow. The order endpoint below issues the live 402 challenge for
+         the 500 USDC entry tier:</p>
+      <pre>curl -X POST https://getsincor.com/audit-express/order \
+  -H 'Content-Type: application/json' \
+  -d '{"repo": "https://github.com/you/contracts", "contact": "you@example.com"}'</pre>
+      <p>Settlement activates when a facilitator is configured; until
+         then the endpoint serves the correct challenge, marked
+         facilitator-gated — try the same pattern live for $0.01 on the
+         <a href="/x402-live">proof wall's quick scan</a>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Need the deep version?</h2>
+      <p>Book the <strong>5-day sprint</strong>: the full rapid Foundry
+         review package for larger codebases. See
+         <a href="/pricing">pricing</a> for the sprint and the rest of
+         the catalog.</p>
+      <div class="row">
+        <a class="btn" href="/pricing">See pricing &amp; the 5-day sprint</a>
+        <a class="btn ghost" href="/x402-live">See the proof wall</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

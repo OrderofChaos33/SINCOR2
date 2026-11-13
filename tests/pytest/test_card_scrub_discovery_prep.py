@@ -6,7 +6,8 @@ Three precise items (branch xioix/card-scrub-bazaar):
    speculative token-price claim ("Forecast SINC token price trajectory
    given the $0.15 floor and volume."). The token is platform access, NOT
    an investment — no price-floor language may appear anywhere in the
-   serialized agent card, and the catalogue stays at 18 skills.
+   serialized agent card, and the catalogue stays at 42 skills
+   (18 when this scrub was written; 18 -> 42 in PR #630, Adopt-24).
 
 2. SMITHERY PREP: ``smithery.yaml`` exists at the repo root and describes
    the REAL MCP server (src/sincor2/mcp_server.py): stdio transport,
@@ -70,11 +71,14 @@ def test_serialized_agent_card_has_no_price_floor_language():
                          re.IGNORECASE)
 
 
-def test_card_still_has_18_skills_and_market_forecast_intact():
+def test_card_still_has_42_skills_and_market_forecast_intact():
     from sincor2.a2a_integration import SINCOR_SKILLS, build_agent_card
 
     card = build_agent_card()
-    assert len(card.skills) == 18
+    # STALE update (founder-authorized 2026-11-08, "Fix everything"): the
+    # catalogue went 18 -> 42 skills in PR #630 (Adopt-24); this pin (and
+    # the test name) still asserted the pre-adoption count of 18.
+    assert len(card.skills) == 42
     ids = [s.id for s in SINCOR_SKILLS]
     assert len(ids) == len(set(ids))
     mf = next(s for s in card.skills if s.id == "market-forecast")

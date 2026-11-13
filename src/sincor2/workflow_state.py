@@ -19,7 +19,11 @@ This module is the durable state layer those workflows plug into:
 * **Checkpoints** — named, versioned snapshots of a run's JSON state.
   Versions are monotonic per (run, name). Writes accept an
   ``expected_version`` for optimistic concurrency: a stale writer gets
-  :class:`VersionConflict`, never a silent overwrite.
+  :class:`VersionConflict`, never a silent overwrite. Only the latest
+  ``CHECKPOINT_VERSIONS_KEPT`` versions per (run, name) are retained —
+  each row is a full state copy, so unpruned history grows without
+  bound; :meth:`WorkflowStateStore.prune_checkpoints` trims databases
+  written before retention existed.
 * **Resume** — :meth:`WorkflowStateStore.resume` loads the latest
   checkpoint and replays the events recorded after it through a reducer,
   so a *different* worker can pick a run up exactly where the previous
@@ -72,6 +76,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 __all__ = [
+    "CHECKPOINT_VERSIONS_KEPT",
     "GENESIS_PREV_HASH",
     "BOARD_CHECKPOINT_NAME",
     "BOARD_RUN_ID",
@@ -107,6 +112,16 @@ GENESIS_PREV_HASH = "0" * 64
 #: a pathological lock-holder surfaces as WorkflowStateError instead of
 #: an infinite loop or a raw sqlite error.
 _SNAPSHOT_MAX_ATTEMPTS = 100
+
+#: Checkpoint retention: only the latest this-many versions per
+#: (run_id, name) are kept. Every checkpoint row carries a FULL copy of
+#: the state JSON, and the marketplace stores snapshot on every save —
+#: without pruning, the checkpoint DB grows by one full state per save
+#: forever (2026-11-11: marketplace_checkpoints.db filled the 5 GB
+#: production volume and every write began failing with Errno 28).
+#: Events are NOT pruned: for snapshot runs they carry only small
+#: digest payloads, and the hash chain must stay verifiable end-to-end.
+CHECKPOINT_VERSIONS_KEPT = 3
 
 _EVENT_PATCH = "state_patch"
 
@@ -448,6 +463,43 @@ class SQLiteStateBackend(StateBackend):
                 ).fetchall()
             return [_checkpoint_from_row(r) for r in rows]
 
+    # -- checkpoint retention -----------------------------------------
+    def _delete_old_checkpoints(self, run_id, name, keep):
+        """Delete all but the latest ``keep`` versions of (run_id, name).
+
+        Caller must hold ``self._lock``; the DELETE runs on this
+        connection inside the caller's transaction, so an insert and
+        its prune commit or roll back together. The threshold is the
+        keep-th highest version: rows strictly below it go. When
+        ``keep`` or fewer versions exist the subquery yields NULL and
+        nothing is deleted — the latest version is never removed.
+        """
+        self._conn.execute(
+            "DELETE FROM ws_checkpoints"
+            " WHERE run_id = ? AND name = ? AND version < ("
+            " SELECT version FROM ws_checkpoints"
+            " WHERE run_id = ? AND name = ?"
+            " ORDER BY version DESC LIMIT 1 OFFSET ?)",
+            (run_id, name, run_id, name, keep - 1))
+
+    def prune_checkpoints(self, keep=CHECKPOINT_VERSIONS_KEPT):
+        """Delete every checkpoint version beyond the latest ``keep``
+        per (run_id, name), across ALL runs and names; returns the
+        number of rows deleted. Events are never touched, so every
+        run's hash chain stays verifiable. Maintenance for databases
+        bloated before insert-time retention existed."""
+        if keep < 1:
+            raise ValueError("keep must be >= 1")
+        with self._lock, self._conn:
+            cur = self._conn.execute(
+                "DELETE FROM ws_checkpoints WHERE version < ("
+                " SELECT c2.version FROM ws_checkpoints AS c2"
+                " WHERE c2.run_id = ws_checkpoints.run_id"
+                " AND c2.name = ws_checkpoints.name"
+                " ORDER BY c2.version DESC LIMIT 1 OFFSET ?)",
+                (keep - 1,))
+            return cur.rowcount
+
     def insert_checkpoint(self, checkpoint):
         with self._lock:
             try:
@@ -461,6 +513,9 @@ class SQLiteStateBackend(StateBackend):
                          json.dumps(checkpoint["state"], sort_keys=True),
                          checkpoint["event_seq"], checkpoint["created_at"]),
                     )
+                    self._delete_old_checkpoints(
+                        checkpoint["run_id"], checkpoint["name"],
+                        CHECKPOINT_VERSIONS_KEPT)
             except sqlite3.IntegrityError as exc:
                 raise VersionConflict(
                     f"checkpoint version already exists: "
@@ -541,6 +596,10 @@ class SQLiteStateBackend(StateBackend):
                             (run_id, name, version,
                              json.dumps(state, sort_keys=True),
                              seq, created_at))
+                        # Same transaction: prune old versions so the
+                        # insert + prune commit or roll back as a unit.
+                        self._delete_old_checkpoints(
+                            run_id, name, CHECKPOINT_VERSIONS_KEPT)
                     return event, checkpoint
                 except (sqlite3.IntegrityError,
                         sqlite3.OperationalError) as exc:
@@ -778,6 +837,23 @@ class WorkflowStateStore:
         self._require_run(run_id)
         return [Checkpoint(**row) for row in
                 self._backend.list_checkpoints(run_id, name)]
+
+    def prune_checkpoints(self, keep: int = CHECKPOINT_VERSIONS_KEPT
+                          ) -> int:
+        """Trim stored checkpoints to the latest ``keep`` versions per
+        (run, name) across ALL runs; returns the number of rows
+        deleted. Maintenance for databases bloated before insert-time
+        retention existed — new writes prune themselves. Events are
+        never pruned, so every run's hash chain stays verifiable and
+        the verified restore path is unaffected. Backends without a
+        prune primitive (cf. the optional ``insert_snapshot``) make
+        this a no-op returning 0."""
+        if keep < 1:
+            raise ValueError("keep must be >= 1")
+        pruner = getattr(self._backend, "prune_checkpoints", None)
+        if pruner is None:
+            return 0
+        return pruner(keep)
 
     def load_checkpoint(self, run_id: str, name: Optional[str] = None,
                         version: Optional[int] = None) -> Checkpoint:
