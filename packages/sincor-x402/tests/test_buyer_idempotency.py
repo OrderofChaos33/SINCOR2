@@ -17,7 +17,7 @@ def _buyer(endpoint, signer, **kw):
     counter = kw.pop("counter", {})
     buyer = VerifiedBuyer(BUYER, signer, max_payment_usd=1.00,
                           transport=endpoint_transport(endpoint, counter),
-                          **kw)
+                          journal_path=":memory:", **kw)
     return buyer, counter
 
 
@@ -43,7 +43,8 @@ def test_retry_storm_after_ambiguous_outcome_never_repays(endpoint, signer):
             return 500, {}, b"gateway exploded"  # payment may have settled
         return status, hdrs, raw
 
-    buyer = VerifiedBuyer(BUYER, signer, transport=ambiguous_transport)
+    buyer = VerifiedBuyer(BUYER, signer, transport=ambiguous_transport,
+                          journal_path=":memory:")
     with pytest.raises(AmbiguousPayment):
         buyer.fetch(URL, instruction_id="storm-2", body={"q": "x"})
     for _ in range(39):
@@ -67,7 +68,8 @@ def test_midflight_failure_resends_same_signed_payload(endpoint, signer):
             raise ConnectionError("connection dropped after send")
         return real_transport(method, url, body, headers)
 
-    buyer = VerifiedBuyer(BUYER, signer, transport=flaky_transport)
+    buyer = VerifiedBuyer(BUYER, signer, transport=flaky_transport,
+                          journal_path=":memory:")
     with pytest.raises(ConnectionError):
         buyer.fetch(URL, instruction_id="storm-3", body={"q": "x"})
     out = buyer.fetch(URL, instruction_id="storm-3", body={"q": "x"})
@@ -120,7 +122,8 @@ def test_velocity_cap_is_per_payee():
 
 def test_payment_cap_refuses_before_signing(endpoint, signer):
     stingy = VerifiedBuyer(BUYER, signer, max_payment_usd=0.001,  # call is $0.01
-                           transport=endpoint_transport(endpoint, {}))
+                           transport=endpoint_transport(endpoint, {}),
+                           journal_path=":memory:")
     with pytest.raises(PaymentCapExceeded):
         stingy.fetch(URL, instruction_id="cap-1", body={"q": "x"})
     assert signer.calls == 0
@@ -129,7 +132,8 @@ def test_payment_cap_refuses_before_signing(endpoint, signer):
 def test_free_200_needs_no_payment(endpoint, signer):
     def free_transport(method, url, body, headers):
         return 200, {}, b'{"free": true}'
-    buyer = VerifiedBuyer(BUYER, signer, transport=free_transport)
+    buyer = VerifiedBuyer(BUYER, signer, transport=free_transport,
+                          journal_path=":memory:")
     out = buyer.fetch(URL, instruction_id="free-1", body=None)
     assert out == {"ok": True, "paid": False, "data": {"free": True}}
     assert signer.calls == 0
@@ -143,7 +147,8 @@ def test_unsupported_accepts_entry_rejected(signer):
             "maxAmountRequired": "1000", "asset": "SomeToken",
             "payTo": "xyz", "maxTimeoutSeconds": 60}]}
         return 402, {}, _json.dumps(body402).encode()
-    buyer = VerifiedBuyer(BUYER, signer, transport=weird_transport)
+    buyer = VerifiedBuyer(BUYER, signer, transport=weird_transport,
+                          journal_path=":memory:")
     with pytest.raises(Exception):
         buyer.fetch(URL, instruction_id="unsup-1", body={})
     assert signer.calls == 0

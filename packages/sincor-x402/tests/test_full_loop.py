@@ -94,7 +94,8 @@ def test_buyer_to_server_full_loop(endpoint, platform, signer):
     counter = {}
     buyer = VerifiedBuyer("0x1111111111111111111111111111111111111111",
                           signer, max_payment_usd=1.00,
-                          transport=endpoint_transport(endpoint, counter))
+                          transport=endpoint_transport(endpoint, counter),
+                          journal_path=":memory:")
     out = buyer.fetch("http://inprocess/summarize",
                       instruction_id="instr-loop-1",
                       body={"q": "hello"})
