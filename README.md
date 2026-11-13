@@ -38,6 +38,12 @@ When coordinating distributed swarms against complex, shifting environments, age
 [![Examples](https://img.shields.io/badge/Examples-Agent%20Cards%20%26%20Workflows-FF6F00)](examples/README.md)
 [![Base](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
 
+[![PR checks](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/pr-ci.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/pr-ci.yml)
+[![CI](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/ci.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/ci.yml)
+[![onchain-ci](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/onchain-ci.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/onchain-ci.yml)
+[![Security Checks](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/security.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/security.yml)
+[![CodeQL](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/codeql.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/codeql.yml)
+
 **Production-targeted A2A marketplace and multi-agent orchestration for interoperable, revenue-generating agents.**
 
 SINCOR2 is a production-targeted, full-stack autonomous agent platform designed to orchestrate, secure, and settle high-frequency Agent-to-Agent (A2A) commerce. Engineered to operate with minimal human intervention (target state), the system provides a comprehensive infrastructure for autonomous agent swarms to scale, settle work, and self-optimize.
@@ -337,12 +343,12 @@ SINCOR's lead architecture is not the marketplace — it is the **human-in-the-l
 - **EscalationEnvelope** (schema `escalation-envelope/1.0`): source agent + context, the triggered rule (policy id, rule, detail), a state snapshot, evidence references, action choices (approve / override / escalate), and a risk block carrying violations, capital **exposure**, the recommended action, and required signers.
 - **State machine:** PENDING → APPROVED | OVERRIDDEN | ESCALATED | DENIED | EXPIRED; illegal transitions raise; an override requires a non-empty note.
 - **Co-sign quorum.** When `required_signers` is set, each required role must attest the same decision kind from a distinct actor; outsider decisions are advisory only, and a DENY from any required signer is an immediate veto.
-- **Detector-hit stamping.** The envelope carries detector hits as stamped rules — e.g. a sanctions-screen result is represented as policy `sanctions-screen`, rule `ofac-match` — so compliance signals use the same gate format as every other risk signal. The live wiring of the sanctions screen into the gate is built on branch `xioix/esc-wire-sanctions`, pending merge; on main, the envelope format is in place and detector hits arrive via caller-supplied context.
+- **Detector-hit stamping.** The envelope carries detector hits as stamped rules — e.g. a sanctions-screen result is represented as policy `sanctions-screen`, rule `ofac-match` — so compliance signals use the same gate format as every other risk signal. The sanctions screen is wired into the gate on main (part of the same stack landing), so compliance signals use the same gate format as every other risk signal.
 - **Audit trail.** An append-only, hash-chained JSONL audit log (sha256) records every decision.
 
-### Phase 2 — Signing + Merkle anchoring (built, not yet merged)
+### Phase 2 — Signing + Merkle anchoring (merged on main, PR #615)
 
-Pillars 2.1 + 2.4 of the founder's Cryptographic Control Plane directive, implemented on branch `xioix/phase2-signing-merkle` (commit `735e5cb9`, coordinator-verified: 124/124 tests plus the smoke suite at build time) and awaiting the founder's merge:
+Pillars 2.1 + 2.4 of the founder's Cryptographic Control Plane directive, merged to main as part of the control-plane stack landing (PR #615, 2026-11-04). (The build was coordinator-verified at 124/124 tests plus the smoke suite before landing.) Live signing activation is an operator step — the signer loads only from the configured key file; with no signer configured, behavior is byte-for-byte Phase 1.
 
 - **Ed25519 audit-record signing (2.1).** New audit records are signed over their canonical bytes (record hash included). Keys load only from a file path in `SINCOR_ESCALATION_SIGNING_KEY_FILE` (0600, refuses overwrite) — never from chat, env values, or the repo. A bad signature or wrong key verifies as False and never raises. With no signer configured, behavior is byte-for-byte Phase 1.
 - **Merkle epoch anchoring (2.4).** Audit records batch into Merkle epochs (sha256 roots, inclusion proofs) over a hash-chained anchor store. Anchor status is **PREPARED**: on-chain submission is founder-gated and deliberately not built, so no root is claimed anchored until one is actually broadcast.
@@ -354,7 +360,11 @@ The ZK design is locked (PLONK-class SNARKs for EVM/Base; signature verification
 
 ### Claim-honesty status
 
-The control-plane **primitives** — escalation envelopes, risk scoring, co-sign quorum, hash-chained audit log — are merged on main (PR #610). The **unified escalation envelope** that binds every execution path through one gate is **in build**: the layer is not described as "production-wired" until every path actually routes through it, Phase 2 signing/Merkle anchoring and the sanctions-screen wiring are not described as merged until they land on main, and no audit root is described as "anchored on-chain" until one is broadcast.
+The control-plane stack — escalation envelopes, risk scoring, co-sign quorum, hash-chained audit log, Phase 2 signing + Merkle anchoring, and the sanctions-screen wiring — is merged on main (PRs #610–#615). The **unified escalation envelope** that binds every execution path through one gate is **in build**: the layer is not described as "production-wired" until every path actually routes through it, live signing activates only when an operator configures the key file, and no audit root is described as "anchored on-chain" until one is broadcast.
+
+### Verify a receipt
+
+Every escalation decision produces a **receipt** anyone can check without trusting SINCOR: the signed audit record (hash-chained, Ed25519 signature over its canonical bytes) plus a Merkle inclusion proof tying its record hash to an epoch root from the anchor store. Verification is three recomputations: (1) the record's SHA-256 over its canonical form equals its stated `record_hash`; (2) the Ed25519 signature verifies against the signer key carried in the record; (3) the inclusion proof folds from the record hash to the stated epoch root. Change one byte anywhere and a check fails. A standalone, single-file offline verifier page (no libraries, no network calls) implements exactly these checks against receipts produced by this codebase, with genuine and deliberately tampered samples — ask the founder for the current copy, or reimplement from `src/sincor2/escalation.py` and `src/sincor2/merkle_anchor.py`, which are the format's source of truth.
 
 ---
 
