@@ -1,0 +1,59 @@
+--- a/src/sincor_x402/hub_engine.py
++++ b/src/sincor_x402/hub_engine.py
+@@ -61,6 +61,7 @@
+ import base64
+ import binascii
+ import json
++import os
+ import re
+ import time
+ from dataclasses import dataclass
+@@ -76,6 +77,14 @@
+ SEAL_DOMAIN_VERSION = "1"
+ SEAL_PRIMARY_TYPE = "SealAuthorization"
+ 
++# Deployed SincorSettlementHub addresses by chain id. Filled in when the
++# Hub is deployed (see the settlement-hub deploy package): placeholders
++# until then — an unresolved chain raises rather than guessing an address.
++HUB_DEPLOYMENTS: dict[int, str] = {
++    8453: "<MAINNET_HUB_ADDRESS>",   # Base mainnet
++    84532: "<SEPOLIA_HUB_ADDRESS>",  # Base Sepolia (rehearsal)
++}
++
+ SEAL_MESSAGE_TYPES: dict[str, list[dict[str, str]]] = {
+     "SealAuthorization": [
+         {"name": "taskId", "type": "bytes32"},
+@@ -360,7 +369,7 @@
+     def __init__(
+         self,
+         *,
+-        hub_address: str,
++        hub_address: str | None = None,
+         relayer_address: str,
+         relayer_signer: TxSignerFn,
+         verifier: Verifier | None = None,
+@@ -376,13 +385,23 @@
+             from web3 import Web3
+             w3 = Web3(Web3.HTTPProvider(rpc_url))
+         self.w3 = w3
+-        self.hub_address = _checksum(hub_address)
+         self.relayer_address = _checksum(relayer_address)
+         self._relayer_signer = relayer_signer
+         self.verifier: Verifier = verifier or ReferenceVerifier()
+         self.chain_id = int(chain_id) if chain_id is not None \
+             else int(w3.eth.chain_id)
+         self.gas = int(gas)
++        if hub_address is None:
++            # Resolve from the environment override first, then the
++            # deployed-addresses registry for this chain.
++            hub_address = os.environ.get("SINCOR_HUB_ADDRESS") \
++                or HUB_DEPLOYMENTS.get(self.chain_id)
++            if not hub_address or hub_address.startswith("<"):
++                raise ValueError(
++                    f"no SincorSettlementHub address known for chain "
++                    f"{self.chain_id}: pass hub_address explicitly or set "
++                    f"SINCOR_HUB_ADDRESS")
++        self.hub_address = _checksum(hub_address)
+         self._hub = w3.eth.contract(address=self.hub_address, abi=HUB_ABI)
+         if usdc_address is None:
+             usdc_address = self._hub.functions.usdc().call()
