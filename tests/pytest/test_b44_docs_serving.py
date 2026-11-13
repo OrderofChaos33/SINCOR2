@@ -125,6 +125,41 @@ def test_missing_doc_still_404s_when_no_root_has_it(discovery_client,
     monkeypatch.setattr(discovery, "_PROJECT_ROOT", str(bare))
     monkeypatch.chdir(bare)
 
+    # The resolver consults more roots than the two patched attributes:
+    # _repo_doc_candidates walks EVERY ancestor of the module's location
+    # (here: bare/pkg, bare, then tmp_path, the pytest basetemp chain,
+    # $TMPDIR, the home directory, up to /), then _PROJECT_ROOT, then the
+    # cwd. The patched attributes and the chdir control the last two, and
+    # the in-tree ancestors are empty by construction — but the walk's
+    # out-of-tree roots are shared filesystem this test cannot clean. A
+    # docs/TRUST_STACK.md dropped into any of them (by another test, a
+    # parallel run, or leftover state) makes the "missing" doc resolve,
+    # and this test failed in full-suite context only (200, not 404)
+    # while passing standalone. Close those roots: enumerate the
+    # resolver's own candidates under the patched state and deny
+    # existence for exactly the candidates outside the controlled tree.
+    # In-tree candidates and every other path still go through the real
+    # isfile, the resolver's walk/order/NotFound logic runs unchanged,
+    # and the 404 below is asserted at full strength.
+    controlled = os.path.normpath(str(bare)) + os.sep
+    outside = {
+        os.path.normpath(candidate)
+        for candidate in discovery._repo_doc_candidates("TRUST_STACK.md")
+        if not os.path.normpath(candidate).startswith(controlled)
+    }
+    real_isfile = os.path.isfile
+
+    def _guarded_isfile(path):
+        try:
+            key = os.path.normpath(os.fspath(path))
+        except TypeError:
+            return real_isfile(path)
+        if key in outside:
+            return False
+        return real_isfile(path)
+
+    monkeypatch.setattr(os.path, "isfile", _guarded_isfile)
+
     r = client.get("/docs/TRUST_STACK.md")
     assert r.status_code == 404
 

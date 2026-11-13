@@ -3,8 +3,9 @@
 Scans the public-claim sources (README.md, product-page templates,
 data/sku_catalog.json, config/x402_pricing.yaml, and the Python copy
 modules that publish SINC token copy — mvp_blueprints/sinc.py,
-onchain/constants.py, value_engine.py, and the launch_content_engine
-stats/spotlight/SEO modules) for assertion-of-fact patterns and
+onchain/constants.py, value_engine.py, the launch_content_engine
+stats/spotlight/SEO modules, and content_agent.py, whose brand
+strings feed published content) for assertion-of-fact patterns and
 classifies each hit. Shared by the claim-register generator
 and tests/pytest/test_marketing_claims.py so the register and the
 blocking test can never disagree about what was found.
@@ -52,7 +53,8 @@ def source_files(root: Optional[str] = None) -> List[str]:
     files = [os.path.join(root, "README.md")]
     files += sorted(glob.glob(os.path.join(root, "templates", "**", "*.html"), recursive=True))
     files += [os.path.join(root, "data", "sku_catalog.json"),
-              os.path.join(root, "config", "x402_pricing.yaml")]
+              os.path.join(root, "config", "x402_pricing.yaml"),
+              os.path.join(root, "src", "sincor2", "content_agent.py")]
     # Python copy modules that publish SINC token claims (cleanup wave 2):
     # their strings feed live endpoints and drafted posts, so planted
     # price claims there must be caught the same as in templates.

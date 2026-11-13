@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from flask import Blueprint
 
+from sincor2.onchain.constants import SINC_TOKEN as _CANONICAL_SINC
+
 bp = Blueprint("mvp_sinc", __name__)
 
 
@@ -75,8 +77,6 @@ def api_acceptance_status():
         logger.warning('[ACCEPTANCE] status error: %s', e)
         return jsonify({'error': str(e)}), 500
 
-
-from sincor2.onchain.constants import SINC_TOKEN as _CANONICAL_SINC
 
 SINC_TOKEN = _CANONICAL_SINC
 SINC_LOGO_URL = 'https://raw.githubusercontent.com/OrderofChaos33/SINCOR2/main/static/tokenlists/assets/logo-256.png'

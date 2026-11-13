@@ -10,6 +10,7 @@ from pathlib import Path
 import yaml
 from flask import Blueprint, Response, abort, jsonify, request
 
+from sincor2.a2a_rate_limits import a2a_rate_limit_check
 from sincor2.wardrobe.ids import valid_agent_id, wardrobe_path
 
 bp = Blueprint("mvp_wardrobe", __name__)
@@ -17,8 +18,6 @@ bp = Blueprint("mvp_wardrobe", __name__)
 # A2A abuse-class rate limits (policies in sincor2.a2a_rate_limits). Only
 # ENDPOINT_POLICY routes are limited; the token-authed heartbeat gets the
 # heartbeat tier as a brute-force backstop, agent reads get the read tier.
-from sincor2.a2a_rate_limits import a2a_rate_limit_check
-
 bp.before_request(a2a_rate_limit_check)
 
 ROOT = Path(__file__).resolve().parents[3]

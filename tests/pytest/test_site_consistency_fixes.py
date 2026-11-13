@@ -141,6 +141,10 @@ def test_starter_template_has_no_mojibake():
 def test_professional_page_has_no_false_marketplace_agent_count():
     body = _render("product_professional.html")
     assert "50+ marketplace agents" not in body
+    # STALE update (founder-authorized 2026-11-08, "Fix everything"): the
+    # catalogue went 18 -> 42 skills in PR #630 (Adopt-24); the template
+    # correctly says "42 live skills" and this pin lagged two increments
+    # behind (17 -> 42).
     assert "42 live skills" in body
 
 

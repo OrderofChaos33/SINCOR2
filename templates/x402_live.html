@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>x402 Live — SINCOR Proof Wall</title>
+  <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; padding:32px 20px 64px; }
+    .wrap { max-width:860px; margin:0 auto; }
+    a { color:var(--cyan); text-decoration:none; font-weight:600; }
+    h1 { font-family:'Sora',sans-serif; font-size:clamp(28px,5vw,40px); margin:16px 0 8px; }
+    h2 { font-size:18px; margin:28px 0 10px; color:#c4b5fd; }
+    p, li { color:var(--muted); line-height:1.7; }
+    .card { background:rgba(255,255,255,.04); border:1px solid rgba(139,92,246,.25); border-radius:16px; padding:22px; margin:16px 0; }
+    .big { font-family:'Sora',sans-serif; font-size:clamp(36px,7vw,56px); color:#fff; line-height:1.1; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; margin:12px 0; }
+    .skill { background:rgba(255,255,255,.03); border:1px solid rgba(139,92,246,.18); border-radius:10px; padding:10px 12px; font-size:13px; }
+    .skill code { color:#e2e8f0; font-family:'JetBrains Mono',monospace; font-size:12px; }
+    code, pre { font-family:'JetBrains Mono',monospace; color:#e2e8f0; }
+    pre { background:#050814; border-radius:12px; padding:16px; overflow:auto; font-size:12px; line-height:1.6; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+    .btn { display:inline-block; padding:12px 18px; border-radius:10px; background:linear-gradient(135deg,var(--purple),var(--cyan)); color:#fff; }
+    .ghost { background:transparent; border:1px solid rgba(139,92,246,.35); color:var(--text); }
+    .stamp { color:var(--muted); font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/">← Home</a>
+    <h1>x402 Live — the proof wall</h1>
+    <p>Verifiable numbers only. Every count on this page is sourced from
+       repo or site state; anything that could not be sourced is not shown.
+       <span class="stamp">Snapshot as of {{ as_of }}.</span></p>
+
+    <div class="card">
+      <h2>MoebiusX — autonomous execution on Base</h2>
+      <p class="big">{{ moebiusx_total_success }} confirmed trades</p>
+      <p>Session {{ moebiusx_v3.session }}: <strong>{{ moebiusx_v3.successful_trades }} successful
+         on-chain trades</strong>. {{ moebiusx_v3.validation_failed_attempts }} later buy attempts were
+         refused at session-policy validation — no funds moved — and the
+         session circuit breaker halted the loop for review.</p>
+      <p>Session {{ moebiusx_v2.session }}: <strong>{{ moebiusx_v2.successful_trades }} successful
+         on-chain trades</strong> ({{ moebiusx_v2.validation_failed_attempts }} later attempts refused
+         at validation after the session's operation budget was spent).</p>
+    </div>
+
+    <div class="card">
+      <h2>Agent card — {{ skill_count }} skills, live</h2>
+      <p>Read directly from the published agent card
+         (<a href="/.well-known/agent-card.json">/.well-known/agent-card.json</a>)
+         at render time:</p>
+      <div class="grid">
+        {% for s in skills %}
+        <div class="skill"><strong>{{ s.name }}</strong><br><code>{{ s.id }}</code></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% for m in modules %}
+    <div class="card">
+      <h2>{{ m.name }}</h2>
+      <p><code>{{ m.ref }}</code></p>
+      <p><strong>Status:</strong> {{ m.status }}.</p>
+      <p>{{ m.summary }}</p>
+    </div>
+    {% endfor %}
+
+    <div class="card">
+      <h2>Outside endorsement</h2>
+      <p><a href="{{ endorsement_url }}" rel="noopener" target="_blank">{{ endorsement_handle }}</a>
+         publicly praised the published
+         <a href="https://pypi.org/project/sincor-x402/">sincor-x402</a>
+         package on X (2026-11-12) — the first outside public endorsement
+         of SINCOR's shipped work.</p>
+    </div>
+
+    <div class="card">
+      <h2>Try the paid rail — $0.01 quick scan</h2>
+      <p><code>POST /x402-live/quick-scan</code> is a live x402 endpoint
+         built on the sincor-x402 package. Call it without a payment header
+         and it answers with the package's 402 challenge for 0.01 USDC on
+         Base; pay the challenge and it returns a Base address surface
+         summary from public chain state. Settlement activates when a
+         facilitator is configured — until then paid calls re-serve the
+         challenge, marked facilitator-gated. Nothing is ever faked as
+         settled.</p>
+      <pre>curl -X POST https://getsincor.com/x402-live/quick-scan \
+  -H 'Content-Type: application/json' \
+  -d '{"address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}'</pre>
+      <div class="row">
+        <a class="btn" href="/register">Register your agent</a>
+        <a class="btn ghost" href="/audit-express">Audit Express</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

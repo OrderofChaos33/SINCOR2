@@ -122,3 +122,31 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+
+[tool.ruff.lint]
+# The CI workflow installs unpinned ruff, and newer releases widen the
+# default rule set (ruff 0.17 selects ~409 rules, incl. pyupgrade / pylint /
+# bandit, vs 0.1.8's E4/E7/E9/F). Pin the gate to the classic default set so
+# the check is identical on every ruff version.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# Blueprint modules bind mvp_app globals at import via _bind_mvp(), which
+# copies every public name from sincor2.mvp_app into the module namespace
+# (verified 2026-11-12: all 77 flagged names exist in the live mvp_app
+# namespace). The F821s are architectural false positives, scoped per file
+# — there is no repo-wide F821 ignore.
+"src/sincor2/mvp_blueprints/admin.py" = ["F821"]
+"src/sincor2/mvp_blueprints/auth.py" = ["F821"]
+"src/sincor2/mvp_blueprints/billing.py" = ["F821"]
+"src/sincor2/mvp_blueprints/health.py" = ["F821"]
+"src/sincor2/mvp_blueprints/launch.py" = ["F821"]
+"src/sincor2/mvp_blueprints/ops.py" = ["F821"]
+"src/sincor2/mvp_blueprints/pages.py" = ["F821"]
+"src/sincor2/mvp_blueprints/sinc.py" = ["F821"]
+"src/sincor2/mvp_blueprints/webbuilder.py" = ["F821"]
+# Blueprint-registration imports in mvp_app are intentionally interleaved
+# with app.register_blueprint() calls: route registration ORDER is
+# load-bearing (see the comments at each import site). E402 is scoped for
+# this file only.
+"src/sincor2/mvp_app.py" = ["E402"]

@@ -70,6 +70,7 @@ operator has not reconciled must never be silently forgotten.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -106,6 +107,54 @@ _SAVE_STATE_KEYS = frozenset({
     "reserve_wei", "funded_wei", "spent_wei", "allocations",
     "history", "history_writes", "saved_at",
 })
+
+# W-141: the journal anchor. _save() persists only the last
+# _JOURNAL_RETAIN entries, but verify_ledger() must reconcile the
+# pool's FULL lifetime. Entries trimmed out of the retained window are
+# folded into a persisted anchor — their replay totals plus a SHA-256
+# hash chain over their exact contents — so verification is
+# anchor (folded prefix) + retained-suffix replay, with exact coverage
+# (anchor writes + retained entries == total writes) and a chain check
+# (anchor digest extended over the suffix must land on the persisted
+# head digest). Trimming therefore no longer blinds verification.
+_JOURNAL_RETAIN = 500
+_JOURNAL_GENESIS_DIGEST = hashlib.sha256(
+    b"sincor2-bounty-pool-journal-v1").hexdigest()
+_JOURNAL_ACTIONS = ("fund", "allocate", "release", "spend")
+
+
+def _journal_chain_extend(digest_hex: str, entry: Dict[str, Any]) -> str:
+    """Extend the journal hash chain by one entry (canonical JSON)."""
+    canon = json.dumps(entry, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(
+        bytes.fromhex(digest_hex) + canon.encode("utf-8")).hexdigest()
+
+
+def _replay_totals(entries: List[Dict[str, Any]]):
+    """(funded, allocated, spent) replay totals for journal entries.
+
+    Mirrors verify_ledger()'s action arithmetic exactly. Returns None
+    when an entry carries an unknown action (replay impossible).
+    """
+    funded = allocated = spent = 0
+    for e in entries:
+        action = e.get("action")
+        try:
+            amt = int(e.get("amount_wei") or 0)
+        except (TypeError, ValueError):
+            amt = 0
+        if action == "fund":
+            funded += amt
+        elif action == "allocate":
+            allocated += amt
+        elif action == "release":
+            allocated -= amt
+        elif action == "spend":
+            allocated -= amt
+            spent += amt
+        else:
+            return None
+    return funded, allocated, spent
 
 
 def _obligation_from_task(task: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -194,12 +243,28 @@ class BountyPool:
         self._allocations: Dict[str, Dict[str, Any]] = {}
         self._history: List[Dict[str, Any]] = []
         # Total history records ever written (persists across restarts).
-        # _save() trims in-memory history to the last 500 entries, so
-        # len(self._history) < self._history_writes means the journal was
-        # trimmed and a full replay is impossible -> verify_ledger()
-        # reports inconclusive instead of a false pass.
+        # _save() retains only the last _JOURNAL_RETAIN entries; the
+        # trimmed prefix is folded into the W-141 anchor below, so
+        # verify_ledger() still reconciles the full lifetime (anchor +
+        # retained suffix) instead of going inconclusive on any pool
+        # that has ever passed the retention window.
         self._history_writes = 0
         self._history_maybe_trimmed = False
+        # W-141 anchor: replay totals + hash-chain digest over the
+        # leading journal entries folded out of the retained window.
+        self._anchor_writes = 0
+        self._anchor_funded_wei = 0
+        self._anchor_allocated_wei = 0
+        self._anchor_spent_wei = 0
+        self._anchor_digest = _JOURNAL_GENESIS_DIGEST
+        # True only when the anchor was synthesized from record state
+        # at load (pre-anchor ledger whose trimmed entries are gone);
+        # surfaced in verify_ledger()'s result so the checkpoint's
+        # provenance is never misrepresented as journal-folded.
+        self._anchor_bootstrapped = False
+        # Hash-chain head over EVERY journal entry ever recorded
+        # (anchor prefix + retained suffix); persisted on every save.
+        self._journal_head_digest = _JOURNAL_GENESIS_DIGEST
         # Set by _load() when the persisted file exists but yields no
         # usable state (corrupt JSON / unreadable, or a stateless file
         # carrying none of the _save() keys): the in-memory state is
@@ -292,6 +357,102 @@ class BountyPool:
                 self._history_writes = max(0, int(hw))
             except (TypeError, ValueError):
                 self._history_maybe_trimmed = bool(self._history)
+        # W-141 anchor restore. Files written before the anchor existed
+        # (counter present, no anchor keys) go through the bootstrap in
+        # _bootstrap_journal_anchor(); pre-counter files stay
+        # maybe-trimmed (their gap cannot even be sized).
+        anchor = raw.get("journal_anchor")
+        if isinstance(anchor, dict):
+            try:
+                self._anchor_writes = max(0, int(anchor.get("writes") or 0))
+                self._anchor_funded_wei = int(anchor.get("funded_wei") or 0)
+                self._anchor_allocated_wei = int(
+                    anchor.get("allocated_wei") or 0)
+                self._anchor_spent_wei = int(anchor.get("spent_wei") or 0)
+            except (TypeError, ValueError):
+                self._history_maybe_trimmed = True
+            digest = anchor.get("digest")
+            if isinstance(digest, str) and digest:
+                self._anchor_digest = digest
+            self._anchor_bootstrapped = bool(anchor.get("bootstrapped"))
+            head = raw.get("journal_head_digest")
+            if isinstance(head, str) and head:
+                self._journal_head_digest = head
+            else:
+                # Anchor without a persisted head: rebuild the head by
+                # chaining the retained suffix onto the anchor digest.
+                head = self._anchor_digest
+                for e in self._history:
+                    head = _journal_chain_extend(head, e)
+                self._journal_head_digest = head
+        elif not self._history_maybe_trimmed:
+            self._bootstrap_journal_anchor()
+
+    def _bootstrap_journal_anchor(self) -> None:
+        """W-141 migration for pre-anchor ledger payloads.
+
+        Called from _apply_payload() when the write counter exists but
+        no anchor does (a file written before the anchor shipped):
+
+        * Journal never actually trimmed (len == writes): the full
+          history is in hand — chain it from genesis. Full strength,
+          nothing synthesized.
+        * Journal already trimmed (len < writes) — the live W-141
+          shape: the folded entries are gone, so the anchor is
+          synthesized as records minus retained-suffix replay and
+          marked bootstrapped. Guarded: it engages only when the
+          records are internally consistent (spent counter == sum of
+          spent-state allocation records) and every synthesized anchor
+          total is non-negative. Anything else leaves the journal
+          maybe-trimmed (inconclusive), exactly as before the fix.
+        """
+        writes = self._history_writes
+        retained = self._history
+        if len(retained) == writes:
+            head = _JOURNAL_GENESIS_DIGEST
+            for e in retained:
+                head = _journal_chain_extend(head, e)
+            self._journal_head_digest = head
+            return
+        if len(retained) > writes:
+            self._history_maybe_trimmed = True
+            return
+        suffix = _replay_totals(retained)
+        if suffix is None:
+            self._history_maybe_trimmed = True
+            return
+        record_spent = sum(
+            int(a.get("amount_wei") or 0)
+            for a in self._allocations.values()
+            if a.get("state") == "spent")
+        if record_spent != self._spent_wei:
+            self._history_maybe_trimmed = True
+            return
+        s_funded, s_allocated, s_spent = suffix
+        a_funded = self._funded_wei - s_funded
+        a_allocated = self._allocated_wei() - s_allocated
+        a_spent = self._spent_wei - s_spent
+        if a_funded < 0 or a_allocated < 0 or a_spent < 0:
+            self._history_maybe_trimmed = True
+            return
+        self._anchor_writes = writes - len(retained)
+        self._anchor_funded_wei = a_funded
+        self._anchor_allocated_wei = a_allocated
+        self._anchor_spent_wei = a_spent
+        self._anchor_digest = hashlib.sha256(
+            ("sincor2-bounty-pool-journal-bootstrap-v1|"
+             f"{self._anchor_writes}|{a_funded}|{a_allocated}|{a_spent}"
+             ).encode("utf-8")).hexdigest()
+        self._anchor_bootstrapped = True
+        head = self._anchor_digest
+        for e in retained:
+            head = _journal_chain_extend(head, e)
+        self._journal_head_digest = head
+        logger.warning(
+            "bounty pool ledger %s: pre-anchor journal was trimmed "
+            "(%d of %d entries retained); bootstrapped a W-141 anchor "
+            "from record state covering the first %d writes",
+            self.path, len(retained), writes, self._anchor_writes)
 
     def _restore_from_checkpoint(self) -> bool:
         """Missing-JSON boot path: restore the exact last-saved state
@@ -432,8 +593,41 @@ class BountyPool:
             return obligations, f"task store unreadable ({exc})"
         return obligations, None
 
+    def _fold_journal_anchor(self) -> None:
+        """Fold journal entries beyond the retained window into the
+        W-141 anchor. Runs at save time (callers hold the pool lock, or
+        it is boot) BEFORE the payload is built: the folded entries'
+        replay totals and hash-chain segment move into the anchor and
+        the entries leave the retained window, in memory and on disk
+        alike, so len(_history) stays bounded by _JOURNAL_RETAIN and
+        anchor writes + retained entries == total writes, exactly.
+
+        An entry with an unknown action is never folded: the window
+        grows past retention instead, so verify_ledger() reports the
+        unknown action as inconclusive rather than laundering an
+        unreplayable prefix into a trusted anchor.
+        """
+        excess = len(self._history) - _JOURNAL_RETAIN
+        if excess <= 0:
+            return
+        folding = self._history[:excess]
+        totals = _replay_totals(folding)
+        if totals is None:
+            return
+        funded, allocated, spent = totals
+        digest = self._anchor_digest
+        for entry in folding:
+            digest = _journal_chain_extend(digest, entry)
+        self._anchor_funded_wei += funded
+        self._anchor_allocated_wei += allocated
+        self._anchor_spent_wei += spent
+        self._anchor_digest = digest
+        self._anchor_writes += excess
+        del self._history[:excess]
+
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._fold_journal_anchor()
         tmp = self.path.with_name(self.path.name + ".tmp")
         payload = {
             "reserve_wei": str(self.reserve_wei),
@@ -443,8 +637,17 @@ class BountyPool:
                 aid: {**a, "amount_wei": str(int(a.get("amount_wei") or 0))}
                 for aid, a in self._allocations.items()
             },
-            "history": self._history[-500:],
+            "history": self._history[-_JOURNAL_RETAIN:],
             "history_writes": self._history_writes,
+            "journal_anchor": {
+                "writes": self._anchor_writes,
+                "funded_wei": str(self._anchor_funded_wei),
+                "allocated_wei": str(self._anchor_allocated_wei),
+                "spent_wei": str(self._anchor_spent_wei),
+                "digest": self._anchor_digest,
+                "bootstrapped": self._anchor_bootstrapped,
+            },
+            "journal_head_digest": self._journal_head_digest,
             "saved_at": _now_ms(),
         }
         tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -617,6 +820,8 @@ class BountyPool:
                  "at": _now_ms(), "detail": detail}
         self._history.append(entry)
         self._history_writes += 1
+        self._journal_head_digest = _journal_chain_extend(
+            self._journal_head_digest, entry)
 
     def verify_ledger(self) -> Dict[str, Any]:
         """Reconcile the append-only history journal against record state.
@@ -635,45 +840,67 @@ class BountyPool:
         allocation records; a drift mutant zeroing spent_wei previously
         passed verify green while inflating available.
 
+        W-141 extension: the replay no longer needs the full journal in
+        hand. Entries trimmed out of the retained window were folded
+        into a persisted anchor (replay totals + hash chain) at save
+        time, so verification is anchor totals + retained-suffix
+        replay, gated on exact coverage (anchor writes + retained
+        entries == total writes) and on the hash chain (anchor digest
+        extended over the suffix must land on the recorded head
+        digest). A pre-anchor ledger file whose journal was already
+        trimmed gets a record-bootstrapped anchor at load (flagged in
+        the result); without one, trimming is no longer a reason to
+        report inconclusive.
+
         Returns {"ok": bool, "discrepancies": [...], "inconclusive": str|None}.
-        ``inconclusive`` is set (instead of a false pass) when the
-        in-memory journal does not cover the pool's full lifetime, e.g.
-        after loading a file whose history was trimmed to the last 500
-        entries, or when an unknown action appears in the journal.
+        ``inconclusive`` is set (instead of a false pass) only when the
+        journal genuinely cannot cover the pool's lifetime — a
+        pre-counter journal, a coverage gap, a failed anchor bootstrap
+        — or when an unknown action appears in the journal.
         """
         with self._lock:
             discrepancies = []
             inconclusive = None
-            if self._history_maybe_trimmed or (
-                    self._history_writes
-                    and len(self._history) < self._history_writes):
+            if self._history_maybe_trimmed:
                 inconclusive = (
-                    "journal trimmed (loaded history shorter than total "
-                    "writes); replay cannot cover full lifetime")
+                    "journal predates the write counter (or failed "
+                    "anchor bootstrap); replay cannot cover full "
+                    "lifetime")
+            elif (self._anchor_writes + len(self._history)
+                    != self._history_writes):
+                inconclusive = (
+                    "journal coverage gap: anchor writes "
+                    f"({self._anchor_writes}) + retained entries "
+                    f"({len(self._history)}) != total writes "
+                    f"({self._history_writes}); replay cannot cover "
+                    "full lifetime")
             else:
-                journal_funded = 0
-                journal_allocated = 0
-                journal_spent = 0
+                # Hash chain: the anchor digest extended over the
+                # retained suffix must land on the recorded head
+                # digest — a spliced or edited retained entry breaks
+                # it even when the totals were edited to match.
+                head = self._anchor_digest
                 for e in self._history:
-                    action = e.get("action")
-                    try:
-                        amt = int(e.get("amount_wei") or 0)
-                    except (TypeError, ValueError):
-                        amt = 0
-                    if action == "fund":
-                        journal_funded += amt
-                    elif action == "allocate":
-                        journal_allocated += amt
-                    elif action == "release":
-                        journal_allocated -= amt
-                    elif action == "spend":
-                        journal_allocated -= amt
-                        journal_spent += amt
-                    else:
-                        inconclusive = (
-                            f"unknown journal action {action!r}; "
-                            "replay incomplete")
-                        break
+                    head = _journal_chain_extend(head, e)
+                if head != self._journal_head_digest:
+                    discrepancies.append(
+                        "journal chain: retained entries do not chain "
+                        "from the anchor digest to the recorded head "
+                        "digest (journal edited or spliced)")
+                suffix = _replay_totals(self._history)
+                if suffix is None:
+                    journal_funded = journal_allocated = journal_spent = 0
+                    for e in self._history:
+                        if e.get("action") not in _JOURNAL_ACTIONS:
+                            inconclusive = (
+                                f"unknown journal action "
+                                f"{e.get('action')!r}; replay incomplete")
+                            break
+                else:
+                    journal_funded = self._anchor_funded_wei + suffix[0]
+                    journal_allocated = (self._anchor_allocated_wei
+                                         + suffix[1])
+                    journal_spent = self._anchor_spent_wei + suffix[2]
                 if inconclusive is None:
                     if journal_funded != self._funded_wei:
                         discrepancies.append(
@@ -698,7 +925,9 @@ class BountyPool:
                             f"counter={self._spent_wei}")
             return {"ok": not discrepancies and inconclusive is None,
                     "discrepancies": discrepancies,
-                    "inconclusive": inconclusive}
+                    "inconclusive": inconclusive,
+                    "anchor": {"writes": self._anchor_writes,
+                               "bootstrapped": self._anchor_bootstrapped}}
 
     def _allocated_wei(self) -> int:
         return sum(int(a.get("amount_wei") or 0)

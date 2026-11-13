@@ -55,7 +55,10 @@ def test_agent_card_json_regardless_of_accept(mvp_client, headers):
     payload = resp.get_json()
     assert payload is not None
     assert payload.get("name")
-    assert len(payload.get("skills") or []) == 18
+    # STALE update (founder-authorized 2026-11-08, "Fix everything"; same
+    # stale class as the card-scrub pin): the served catalogue went
+    # 18 -> 42 skills in PR #630 (Adopt-24); this pin still asserted 18.
+    assert len(payload.get("skills") or []) == 42
 
 
 def test_agent_card_html_explainer_still_at_agent_card(mvp_client):

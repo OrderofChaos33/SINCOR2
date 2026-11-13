@@ -87,7 +87,13 @@ def test_error_path_still_uses_err_element():
 # Render-level: the gate still serves the claim form, with the new handler
 # ---------------------------------------------------------------------------
 
-def test_gate_renders_claim_form_and_pending_handler(mvp_client):
+def test_gate_renders_claim_form_and_pending_handler(mvp_client, monkeypatch):
+    # STALE update (founder-authorized 2026-11-08, "Fix everything"): this
+    # test pins the pre-launch gate, but the default SINCOR_LAUNCH_DATE
+    # (2026-11-09) passed at the 2026-11-09 00:00 UTC launch boundary, so
+    # GET / now correctly serves home.html instead of the gate. Pin a
+    # future launch date so the gate behavior stays genuinely tested.
+    monkeypatch.setenv("SINCOR_LAUNCH_DATE", "2099-01-01")
     r = mvp_client.get("/", follow_redirects=False)
     assert r.status_code == 200
     html = r.get_data(as_text=True)
