@@ -79,6 +79,18 @@ interface ISincorSettlementHub {
 ///                        or the attestation amountCap exceeds the per-account
 ///                        policy cap fixed at install time
 ///
+///         W-148 (hunt 47): "release" also covers allowance grants
+///         (approve / increaseAllowance / permit) and calls into contracts
+///         holding a hook-tracked allowance — both move funds out of the
+///         account without a transfer selector ever reaching the hook.
+///         For grants and holder calls the attestation's `payee` is the
+///         spender / holder being exposed to the funds.
+///
+///         W-149 (hunt 47): onUninstall deletes ALL account-scoped state
+///         (pending attestations, used digests/nonces, allowance tracking,
+///         config), so rotating a verifier via uninstall + reinstall
+///         actually revokes everything the old verifier signed.
+///
 ///         Scope honesty: this module gates RELEASE on a verification
 ///         attestation only. It does not slash, does not hold stake, and does
 ///         not decide whether work was actually good — the SIGIL verifier
@@ -131,6 +143,13 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
 
     bytes4 internal constant ERC20_TRANSFER = 0xa9059cbb; // transfer(address,uint256)
     bytes4 internal constant ERC20_TRANSFER_FROM = 0x23b872dd; // transferFrom(address,address,uint256)
+    // W-148: allowance-granting selectors are fund releases in substance —
+    // an approve() hands a third party the power to pull funds OUT of the
+    // account via transferFrom without this hook ever seeing a transfer.
+    bytes4 internal constant ERC20_APPROVE = 0x095ea7b3; // approve(address,uint256)
+    bytes4 internal constant ERC20_INCREASE_ALLOWANCE = 0x39509351; // increaseAllowance(address,uint256)
+    bytes4 internal constant ERC20_DECREASE_ALLOWANCE = 0xa457c2d7; // decreaseAllowance(address,uint256)
+    bytes4 internal constant ERC2612_PERMIT = 0xd505accf; // permit(address,address,uint256,uint256,uint8,bytes32,bytes32)
 
     /// @notice A SIGIL verification commitment, signed by the account's
     ///         configured verifier key via EIP-712 (SEAL-style typed data).
@@ -179,6 +198,52 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
     mapping(address => mapping(bytes32 => bool)) public usedDigest;
     /// account => nonce => used (replay protection)
     mapping(address => mapping(uint256 => bool)) public usedNonce;
+
+    // ------------------------------------------------------------------
+    // W-148 allowance tracking. Every allowance the account grants THROUGH
+    // a hook-gated execution is recorded here, so that (a) the grant itself
+    // is gated as a release (see _preCheckGrant) and (b) a later call INTO
+    // a contract holding an allowance is also gated as a release — the
+    // holder can pull via transferFrom inside that call without this hook
+    // ever seeing a transfer/transferFrom selector (see
+    // _gateAllowanceHolderCall). Allowances granted OUTSIDE hook-gated
+    // executions (before install, or via a path this hook does not gate)
+    // are not visible to the hook and remain an install-time concern.
+    // ------------------------------------------------------------------
+    /// account => token => spender => allowance granted through this hook
+    mapping(address => mapping(address => mapping(address => uint256))) public allowanceOf;
+    /// account => spender => true while the spender holds any tracked
+    /// allowance > 0 on any token
+    mapping(address => mapping(address => bool)) public isAllowanceHolder;
+    /// account => spender => tokens with a tracked allowance > 0
+    mapping(address => mapping(address => address[])) internal _holderTokensOf;
+    /// account => spender => token => (index in _holderTokensOf + 1)
+    mapping(address => mapping(address => mapping(address => uint256))) internal _holderTokenIndex;
+    /// account => spenders holding any tracked allowance
+    mapping(address => address[]) internal _holderSpendersOf;
+    /// account => spender => (index in _holderSpendersOf + 1)
+    mapping(address => mapping(address => uint256)) internal _holderSpenderIndex;
+
+    // ------------------------------------------------------------------
+    // W-149 enumerable account-scoped state. Mappings are not enumerable,
+    // so the module keeps index lists of every pending-attestation key,
+    // digest, and nonce it records for an account; onUninstall walks the
+    // lists and deletes EVERYTHING, so no attestation, replay marker, or
+    // allowance survives an uninstall (e.g. a verifier-key rotation).
+    // ------------------------------------------------------------------
+    struct PendingKey {
+        address token;
+        address payee;
+    }
+
+    /// account => live pending-attestation keys
+    mapping(address => PendingKey[]) internal _pendingKeysOf;
+    /// account => keccak256(token, payee) => (index in _pendingKeysOf + 1)
+    mapping(address => mapping(bytes32 => uint256)) internal _pendingKeyIndex;
+    /// account => every attestation digest ever registered (incl. consumed)
+    mapping(address => bytes32[]) internal _digestsOf;
+    /// account => every attestation nonce ever registered (incl. consumed)
+    mapping(address => uint256[]) internal _noncesOf;
 
     event ModuleInstalled(
         address indexed account, address indexed verifier, uint256 maxCap, uint256 unverifiedThreshold, address settlementHub
@@ -242,9 +307,52 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         emit ModuleInstalled(account, verifier, maxCap, unverifiedThreshold, settlementHub);
     }
 
+    /// @notice Uninstall wipes ALL account-scoped state (W-149): config,
+    ///         every pending attestation, every used-digest / used-nonce
+    ///         replay marker, and all W-148 allowance tracking. Before this
+    ///         fix only the config was deleted, so a pending attestation
+    ///         signed by a rotated-away (e.g. compromised) verifier stayed
+    ///         live AND consumable under the new config, and its stale
+    ///         entry blocked fresh registrations for the same
+    ///         (token, payee). After uninstall the account's state in this
+    ///         module is exactly as if it had never installed.
     function onUninstall(bytes calldata) external override {
         address account = msg.sender;
         if (!configOf[account].initialized) revert NotInstalled(account);
+
+        PendingKey[] storage keys = _pendingKeysOf[account];
+        for (uint256 i = 0; i < keys.length; i++) {
+            delete pendingOf[account][keys[i].token][keys[i].payee];
+            delete _pendingKeyIndex[account][_pendingKeyHash(keys[i].token, keys[i].payee)];
+        }
+        delete _pendingKeysOf[account];
+
+        bytes32[] storage digests = _digestsOf[account];
+        for (uint256 i = 0; i < digests.length; i++) {
+            delete usedDigest[account][digests[i]];
+        }
+        delete _digestsOf[account];
+
+        uint256[] storage nonces = _noncesOf[account];
+        for (uint256 i = 0; i < nonces.length; i++) {
+            delete usedNonce[account][nonces[i]];
+        }
+        delete _noncesOf[account];
+
+        address[] storage spenders = _holderSpendersOf[account];
+        for (uint256 i = 0; i < spenders.length; i++) {
+            address spender = spenders[i];
+            address[] storage toks = _holderTokensOf[account][spender];
+            for (uint256 j = 0; j < toks.length; j++) {
+                delete allowanceOf[account][toks[j]][spender];
+                delete _holderTokenIndex[account][spender][toks[j]];
+            }
+            delete _holderTokensOf[account][spender];
+            delete isAllowanceHolder[account][spender];
+            delete _holderSpenderIndex[account][spender];
+        }
+        delete _holderSpendersOf[account];
+
         delete configOf[account];
         emit ModuleUninstalled(account);
     }
@@ -291,6 +399,7 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         // Replacing an expired pending attestation frees its nonce/digest
         // bookkeeping is intentionally NOT done: expired digests stay marked
         // used so an expired attestation can never be re-presented.
+        bool slotWasEmpty = !pending.exists;
 
         pendingOf[att.account][att.token][att.payee] = PendingAttestation({
             digest: digest,
@@ -304,6 +413,12 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         usedDigest[att.account][digest] = true;
         usedNonce[att.account][att.nonce] = true;
 
+        // W-149 index lists: onUninstall walks these to wipe every
+        // account-scoped entry (mappings are not enumerable on their own).
+        if (slotWasEmpty) _addPendingKey(att.account, att.token, att.payee);
+        _digestsOf[att.account].push(digest);
+        _noncesOf[att.account].push(att.nonce);
+
         emit AttestationRegistered(att.account, digest, att.payee, att.token, att.amountCap, att.expiry, att.nonce);
     }
 
@@ -314,6 +429,7 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         if (!pending.exists) revert NoValidAttestation(account, token, payee);
         bytes32 digest = pending.digest;
         delete pendingOf[account][token][payee];
+        _removePendingKey(account, token, payee);
         emit AttestationRevoked(account, digest);
     }
 
@@ -345,13 +461,24 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
     /// @notice Called by the smart account (msg.sender) before execution.
     /// @dev    `msgData` is the ERC-7579 single-call packed execution:
     ///         abi.encodePacked(target, value, innerCallData). A call is a
-    ///         fund release iff value > 0 (native) or innerCallData is an
-    ///         ERC20 transfer / transferFrom out of the account. Non-release
-    ///         calls are not gated and return empty hookData. A release is
-    ///         allowed only against a pending, unexpired attestation whose
-    ///         (token, payee) match and whose amountCap covers the amount;
-    ///         the attestation is consumed here (single-use), so a replayed
-    ///         execution finds nothing and reverts.
+    ///         fund release iff ANY of:
+    ///           (a) value > 0 (native), or innerCallData is an ERC20
+    ///               transfer / transferFrom out of the account;
+    ///           (b) W-148: innerCallData GRANTS or grows an allowance over
+    ///               the account's tokens (approve / increaseAllowance /
+    ///               EIP-2612 permit with owner == account) — the grant is
+    ///               gated on the RESULTING allowance, with the spender in
+    ///               the attestation's `payee` slot;
+    ///           (c) W-148: the call target is a contract holding a tracked
+    ///               allowance from the account — it can pull funds via
+    ///               transferFrom inside the call, so the call is gated per
+    ///               token on the outstanding allowance.
+    ///         Non-release calls are not gated and return empty hookData.
+    ///         A release is allowed only against a pending, unexpired
+    ///         attestation whose (token, payee) match and whose amountCap
+    ///         covers the amount; the attestation is consumed here
+    ///         (single-use), so a replayed execution finds nothing and
+    ///         reverts.
     ///         Trade-off, stated plainly: consumption happens in preCheck, so
     ///         if the execution itself later fails, the attestation is still
     ///         burned and the verifier must issue a fresh one. That is the
@@ -362,9 +489,32 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         address account = msg.sender;
         AccountConfig memory cfg = configOf[account];
         if (!cfg.initialized) revert NotInstalled(account);
+        if (msgData.length < 52) revert MalformedExecution();
+        address target = address(bytes20(msgData[0:20]));
+        uint256 value = uint256(bytes32(msgData[20:52]));
+        bytes calldata inner = msgData[52:];
+
+        // W-148 (b): allowance-granting calls are gated as releases and the
+        // grant is recorded for holder-call gating and uninstall wipe.
+        if (value == 0 && inner.length >= 4) {
+            bytes4 selector = bytes4(inner[0:4]);
+            if (
+                selector == ERC20_APPROVE || selector == ERC20_INCREASE_ALLOWANCE
+                    || selector == ERC20_DECREASE_ALLOWANCE || selector == ERC2612_PERMIT
+            ) {
+                return _preCheckGrant(account, cfg, target, selector, inner);
+            }
+        }
 
         (address token, address payee, uint256 amount, bool isRelease) = _decodeRelease(account, msgData);
-        if (!isRelease) return bytes("");
+        if (!isRelease) {
+            // W-148 (c): a call into an allowance holder can pull funds via
+            // transferFrom without showing this hook a transfer selector.
+            if (isAllowanceHolder[account][target]) {
+                return _gateAllowanceHolderCall(account, cfg, target);
+            }
+            return bytes("");
+        }
 
         // Unverified threshold, applied to the DECODED amount. For an ERC20
         // transfer/transferFrom execution the ETH msgValue is 0, so any
@@ -374,6 +524,21 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         // execution calldata (raw units of the moved asset).
         if (amount <= cfg.unverifiedThreshold) return bytes("");
 
+        bytes32 digest = _consumeAttestation(account, cfg, token, payee, amount);
+        return abi.encode(digest);
+    }
+
+    /// @dev Gate one release of `amount` of `token` to `payee` against the
+    ///      pending attestation for (account, token, payee) and consume it.
+    ///      Shared by direct releases, allowance grants, and allowance-
+    ///      holder calls so all three enforce identical checks.
+    function _consumeAttestation(
+        address account,
+        AccountConfig memory cfg,
+        address token,
+        address payee,
+        uint256 amount
+    ) internal returns (bytes32 digest) {
         PendingAttestation storage pending = pendingOf[account][token][payee];
         if (!pending.exists) revert NoValidAttestation(account, token, payee);
         if (block.timestamp >= pending.expiry) revert AttestationExpired(pending.expiry, block.timestamp);
@@ -394,10 +559,186 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
             if (!recorded) revert CommitmentNotRecorded(pending.taskSpecHash);
         }
 
-        bytes32 digest = pending.digest;
+        digest = pending.digest;
         delete pendingOf[account][token][payee];
+        _removePendingKey(account, token, payee);
         emit AttestationConsumed(account, digest, payee, token, amount);
-        return abi.encode(digest);
+    }
+
+    /// @dev W-148: gate an allowance-granting call (target = the token).
+    ///      approve / permit SET the allowance; increaseAllowance GROWS it;
+    ///      the gated amount is the RESULTING total allowance, so repeated
+    ///      sub-threshold increases cannot accumulate ungated exposure.
+    ///      The spender occupies the attestation's payee slot: a verifier
+    ///      attestation for (token, spender) authorizes exposing up to
+    ///      amountCap of token to that spender. decreaseAllowance only ever
+    ///      shrinks exposure and is never gated. A permit whose owner is
+    ///      not the account grants an allowance over someone ELSE's tokens
+    ///      and is not a release of this account's funds.
+    function _preCheckGrant(
+        address account,
+        AccountConfig memory cfg,
+        address token,
+        bytes4 selector,
+        bytes calldata inner
+    ) internal returns (bytes memory) {
+        address spender;
+        uint256 newAllowance;
+        bool isGrant = true;
+
+        if (selector == ERC20_APPROVE) {
+            if (inner.length < 68) revert MalformedExecution();
+            spender = address(bytes20(inner[16:36]));
+            newAllowance = uint256(bytes32(inner[36:68]));
+        } else if (selector == ERC20_INCREASE_ALLOWANCE) {
+            if (inner.length < 68) revert MalformedExecution();
+            spender = address(bytes20(inner[16:36]));
+            newAllowance = allowanceOf[account][token][spender] + uint256(bytes32(inner[36:68]));
+        } else if (selector == ERC20_DECREASE_ALLOWANCE) {
+            if (inner.length < 68) revert MalformedExecution();
+            spender = address(bytes20(inner[16:36]));
+            uint256 current = allowanceOf[account][token][spender];
+            uint256 delta = uint256(bytes32(inner[36:68]));
+            newAllowance = current > delta ? current - delta : 0;
+            isGrant = false;
+        } else {
+            // ERC2612_PERMIT: (owner, spender, value, deadline, v, r, s)
+            if (inner.length < 228) revert MalformedExecution();
+            address owner = address(bytes20(inner[16:36]));
+            if (owner != account) return bytes("");
+            spender = address(bytes20(inner[48:68]));
+            newAllowance = uint256(bytes32(inner[68:100]));
+        }
+
+        bytes32 digest;
+        bool consumed = false;
+        if (isGrant && newAllowance > cfg.unverifiedThreshold) {
+            digest = _consumeAttestation(account, cfg, token, spender, newAllowance);
+            consumed = true;
+        }
+        _setAllowance(account, token, spender, newAllowance);
+        return consumed ? abi.encode(digest) : bytes("");
+    }
+
+    /// @dev W-148: gate a call into a contract that holds a tracked
+    ///      allowance from the account. The holder can pull up to the
+    ///      outstanding allowance of EACH token inside this one call, so
+    ///      every token whose outstanding allowance exceeds the unverified
+    ///      threshold needs its own attestation (payee = the holder),
+    ///      consumed here. Allowances at/below the threshold stay
+    ///      unverified by design, exactly like direct releases.
+    function _gateAllowanceHolderCall(address account, AccountConfig memory cfg, address holder)
+        internal
+        returns (bytes memory)
+    {
+        address[] storage tokens = _holderTokensOf[account][holder];
+        bytes32 lastDigest;
+        bool consumedAny = false;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            uint256 exposure = allowanceOf[account][tokens[i]][holder];
+            if (exposure <= cfg.unverifiedThreshold) continue;
+            lastDigest = _consumeAttestation(account, cfg, tokens[i], holder, exposure);
+            consumedAny = true;
+        }
+        return consumedAny ? abi.encode(lastDigest) : bytes("");
+    }
+
+    /// @dev Record an allowance granted through a hook-gated execution and
+    ///      maintain the holder indexes used by _gateAllowanceHolderCall
+    ///      and onUninstall. Recorded in preCheck: if the execution later
+    ///      fails, the record overstates the real allowance — the safe
+    ///      direction (more calls gated, never fewer).
+    function _setAllowance(address account, address token, address spender, uint256 newAllowance) internal {
+        uint256 old = allowanceOf[account][token][spender];
+        if (old == newAllowance) return;
+        allowanceOf[account][token][spender] = newAllowance;
+
+        if (old == 0 && newAllowance > 0) {
+            if (_holderTokenIndex[account][spender][token] == 0) {
+                _holderTokensOf[account][spender].push(token);
+                _holderTokenIndex[account][spender][token] = _holderTokensOf[account][spender].length;
+            }
+            if (!isAllowanceHolder[account][spender]) {
+                isAllowanceHolder[account][spender] = true;
+                if (_holderSpenderIndex[account][spender] == 0) {
+                    _holderSpendersOf[account].push(spender);
+                    _holderSpenderIndex[account][spender] = _holderSpendersOf[account].length;
+                }
+            }
+        } else if (newAllowance == 0) {
+            _removeHolderToken(account, spender, token);
+            if (_holderTokensOf[account][spender].length == 0 && isAllowanceHolder[account][spender]) {
+                isAllowanceHolder[account][spender] = false;
+                _removeSpender(account, spender);
+            }
+        }
+    }
+
+    function _removeHolderToken(address account, address spender, address token) internal {
+        uint256 idxPlus = _holderTokenIndex[account][spender][token];
+        if (idxPlus == 0) return;
+        uint256 idx = idxPlus - 1;
+        address[] storage tokens = _holderTokensOf[account][spender];
+        uint256 last = tokens.length - 1;
+        if (idx != last) {
+            address moved = tokens[last];
+            tokens[idx] = moved;
+            _holderTokenIndex[account][spender][moved] = idx + 1;
+        }
+        tokens.pop();
+        delete _holderTokenIndex[account][spender][token];
+    }
+
+    function _removeSpender(address account, address spender) internal {
+        uint256 idxPlus = _holderSpenderIndex[account][spender];
+        if (idxPlus == 0) return;
+        uint256 idx = idxPlus - 1;
+        address[] storage spenders = _holderSpendersOf[account];
+        uint256 last = spenders.length - 1;
+        if (idx != last) {
+            address moved = spenders[last];
+            spenders[idx] = moved;
+            _holderSpenderIndex[account][moved] = idx + 1;
+        }
+        spenders.pop();
+        delete _holderSpenderIndex[account][spender];
+    }
+
+    /// @notice Tokens on which `spender` currently holds a tracked
+    ///         allowance > 0 from `account` (W-148 tracking).
+    function holderTokensOf(address account, address spender) external view returns (address[] memory) {
+        return _holderTokensOf[account][spender];
+    }
+
+    // ------------------------------------------------------------------
+    // W-149 pending-key index maintenance
+    // ------------------------------------------------------------------
+
+    function _pendingKeyHash(address token, address payee) internal pure returns (bytes32) {
+        return keccak256(abi.encode(token, payee));
+    }
+
+    function _addPendingKey(address account, address token, address payee) internal {
+        bytes32 h = _pendingKeyHash(token, payee);
+        if (_pendingKeyIndex[account][h] != 0) return;
+        _pendingKeysOf[account].push(PendingKey({token: token, payee: payee}));
+        _pendingKeyIndex[account][h] = _pendingKeysOf[account].length;
+    }
+
+    function _removePendingKey(address account, address token, address payee) internal {
+        bytes32 h = _pendingKeyHash(token, payee);
+        uint256 idxPlus = _pendingKeyIndex[account][h];
+        if (idxPlus == 0) return;
+        uint256 idx = idxPlus - 1;
+        PendingKey[] storage keys = _pendingKeysOf[account];
+        uint256 last = keys.length - 1;
+        if (idx != last) {
+            PendingKey memory moved = keys[last];
+            keys[idx] = moved;
+            _pendingKeyIndex[account][_pendingKeyHash(moved.token, moved.payee)] = idx + 1;
+        }
+        keys.pop();
+        delete _pendingKeyIndex[account][h];
     }
 
     /// @notice No post-execution state to settle: consumption in preCheck is
