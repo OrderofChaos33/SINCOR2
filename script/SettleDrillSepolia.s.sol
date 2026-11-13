@@ -31,7 +31,11 @@ contract SettleDrillSepolia is Script {
     address internal constant DEFAULT_PROVIDER = address(0xD2111);
 
     function run() external {
-        uint256 buyerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        uint256 buyerKey = vm.envOr("DEPLOYER_PRIVATE_KEY", uint256(0));
+        require(
+            buyerKey != 0,
+            unicode"DEPLOYER_PRIVATE_KEY not set — export it in THIS shell session first (deploy package Sepolia step 4)"
+        );
         address buyer = vm.addr(buyerKey);
         address hubAddr = vm.envAddress("HUB_ADDRESS");
         address provider = vm.envOr("HUB_PROVIDER", DEFAULT_PROVIDER);
@@ -60,7 +64,7 @@ contract SettleDrillSepolia is Script {
             provider: provider,
             amount: amount,
             expectedSchemaHash: schemaHash,
-            deadline: block.timestamp + 10 minutes,
+            deadline: block.timestamp + 30 minutes,
             nonce: hub.nonces(buyer)
         });
 

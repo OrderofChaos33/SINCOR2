@@ -7,7 +7,12 @@ import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 /// @notice Unit + negative tests for the production SincorSettlementHub.
 ///         SEALs are signed in-test with vm.sign; the digest is computed
-///         exactly as the contract computes it (DOMAIN_SEPARATOR + SEAL_TYPEHASH).
+///         INDEPENDENTLY from hardcoded literals (domain name "SINCOR_SEAL",
+///         version "1", and the full SealAuthorization type string), never
+///         from hub.DOMAIN_SEPARATOR() / hub.SEAL_TYPEHASH() at signing
+///         time. This pins the EIP-712 identity: if the contract's domain
+///         or type string changes, the independently computed values will
+///         not match the contract's and these tests must fail.
 ///         Check order pinned by the sincor-x402 Python suite:
 ///         deadline -> sigil zero -> nonce -> signature.
 contract SincorSettlementHubTest is Test {
@@ -74,10 +79,34 @@ contract SincorSettlementHubTest is Test {
         });
     }
 
+    // ---- independent EIP-712 identity (hardcoded literals) ------------------
+    // These helpers compute the typehash and domain separator from literals
+    // ONLY, so a change to the contract's strings breaks signing here.
+
+    function _expectedSealTypehash() internal pure returns (bytes32) {
+        return keccak256(
+            bytes(
+                "SealAuthorization(bytes32 taskId,address buyer,address provider,uint256 amount,bytes32 expectedSchemaHash,uint256 deadline,uint256 nonce)"
+            )
+        );
+    }
+
+    function _expectedDomainSeparator() internal view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("SINCOR_SEAL")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(hub)
+            )
+        );
+    }
+
     function _digest(SincorSettlementHub.SealAuthorization memory seal) internal view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
-                hub.SEAL_TYPEHASH(),
+                _expectedSealTypehash(),
                 seal.taskId,
                 seal.buyer,
                 seal.provider,
@@ -87,7 +116,7 @@ contract SincorSettlementHubTest is Test {
                 seal.nonce
             )
         );
-        return keccak256(abi.encodePacked("\x19\x01", hub.DOMAIN_SEPARATOR(), structHash));
+        return keccak256(abi.encodePacked("\x19\x01", _expectedDomainSeparator(), structHash));
     }
 
     function _sign(SincorSettlementHub.SealAuthorization memory seal, uint256 key)
@@ -99,9 +128,17 @@ contract SincorSettlementHubTest is Test {
     }
 
     function _settle(SincorSettlementHub.SealAuthorization memory seal, uint256 key) internal returns (bool) {
+        return _settleWithSigil(seal, key, sigil);
+    }
+
+    function _settleWithSigil(
+        SincorSettlementHub.SealAuthorization memory seal,
+        uint256 key,
+        bytes32 sigilCommitment
+    ) internal returns (bool) {
         (uint8 v, bytes32 r, bytes32 s) = _sign(seal, key);
         vm.prank(relayer);
-        return hub.verifyAndSettleSeal(seal, sigil, v, r, s);
+        return hub.verifyAndSettleSeal(seal, sigilCommitment, v, r, s);
     }
 
     // ---- surface / config ----------------------------------------------------
@@ -111,6 +148,28 @@ contract SincorSettlementHubTest is Test {
         assertEq(hub.feeTreasury(), treasury);
         assertEq(hub.protocolFeeBps(), 500);
         assertEq(hub.nonces(buyer), 0);
+    }
+
+    /// @notice Pins the EIP-712 identity independently: the expected
+    ///         typehash and domain separator are computed in-test from
+    ///         hardcoded literals and must match the contract's values.
+    function test_EIP712Identity_PinnedToLiterals() public view {
+        assertEq(hub.SEAL_TYPEHASH(), _expectedSealTypehash());
+        assertEq(hub.DOMAIN_SEPARATOR(), _expectedDomainSeparator());
+    }
+
+    // ---- sigil overwrite (last-writer-wins, pinned) ---------------------------
+
+    function test_SigilOverwrite_LastWriterWins_Pinned() public {
+        bytes32 sigilA = keccak256("sigil-A");
+        bytes32 sigilB = keccak256("sigil-B");
+
+        assertTrue(_settleWithSigil(_seal(buyer, provider, 10_000, 0), buyerKey, sigilA));
+        assertTrue(hub.isTaskVerified(taskId, sigilA));
+
+        assertTrue(_settleWithSigil(_seal(buyer, provider, 10_000, 1), buyerKey, sigilB));
+        assertTrue(hub.isTaskVerified(taskId, sigilB));
+        assertFalse(hub.isTaskVerified(taskId, sigilA));
     }
 
     // ---- happy path ----------------------------------------------------------

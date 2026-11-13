@@ -38,6 +38,13 @@ import {MockUSDC} from "./mocks/MockUSDC.sol";
 /// No stage is theatrical: every handoff is a real contract call and every
 /// balance/state assertion ties the hub leg's funds to the escrow leg's
 /// release (same token, same 10_000 amount, buyer balance 0 -> 10_000 -> 0).
+///
+/// EIP-712: the signing digest is computed INDEPENDENTLY from hardcoded
+/// literals (domain name "SINCOR_SEAL", version "1", and the full
+/// SealAuthorization type string), never from hub.DOMAIN_SEPARATOR() /
+/// hub.SEAL_TYPEHASH() at signing time. This pins the EIP-712 identity:
+/// if the contract's domain or type string changes, the independently
+/// computed values will not match the contract's and this test must fail.
 contract SincorSettlementHubIntegrationTest is Test {
     MockUSDC public usdc;
     SincorTaskEscrow public escrow;
@@ -66,6 +73,28 @@ contract SincorSettlementHubIntegrationTest is Test {
 
     function _status(uint256 id) internal view returns (SincorTaskEscrow.TaskStatus st) {
         (,,,,, st) = escrow.tasks(id);
+    }
+
+    // ---- independent EIP-712 identity (hardcoded literals) ------------------
+
+    function _expectedSealTypehash() internal pure returns (bytes32) {
+        return keccak256(
+            bytes(
+                "SealAuthorization(bytes32 taskId,address buyer,address provider,uint256 amount,bytes32 expectedSchemaHash,uint256 deadline,uint256 nonce)"
+            )
+        );
+    }
+
+    function _expectedDomainSeparator() internal view returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("SINCOR_SEAL")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(hub)
+            )
+        );
     }
 
     function test_FullLoop_EscrowReleaseFundsHubSettlement() public {
@@ -123,9 +152,13 @@ contract SincorSettlementHubIntegrationTest is Test {
             deadline: block.timestamp + 1 hours,
             nonce: hub.nonces(buyer)
         });
+        // Pin the EIP-712 identity independently before signing.
+        assertEq(hub.SEAL_TYPEHASH(), _expectedSealTypehash());
+        assertEq(hub.DOMAIN_SEPARATOR(), _expectedDomainSeparator());
+
         bytes32 structHash = keccak256(
             abi.encode(
-                hub.SEAL_TYPEHASH(),
+                _expectedSealTypehash(),
                 seal.taskId,
                 seal.buyer,
                 seal.provider,
@@ -135,7 +168,7 @@ contract SincorSettlementHubIntegrationTest is Test {
                 seal.nonce
             )
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", hub.DOMAIN_SEPARATOR(), structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", _expectedDomainSeparator(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buyerKey, digest);
 
         vm.prank(relayer); // third party — not the buyer, not the sponsor
