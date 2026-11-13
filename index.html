@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoebiusX — Owner Action 2: Send &amp; Swap (REAL FUNDS)</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 680px; color: #111; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 28px; }
+  .card { border: 1px solid #ccc; border-radius: 10px; padding: 12px; margin: 12px 0; }
+  .warn { border-color: #c00; background: #fff5f5; }
+  .real { border-color: #b8860b; background: #fffaf0; }
+  button { font-size: 16px; padding: 12px 16px; margin: 6px 0; width: 100%; border-radius: 8px; border: 1px solid #333; background: #111; color: #fff; }
+  button.secondary { background: #fff; color: #111; }
+  button:disabled { opacity: .4; }
+  code, .mono { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .ok { color: #087008; } .bad { color: #c00; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td { border-top: 1px solid #eee; padding: 4px 6px; vertical-align: top; }
+  td:first-child { color: #555; width: 38%; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h1>MoebiusX — owner action 2: send &amp; swap (REAL FUNDS) — phone version</h1>
+<p><b>Open this page in your normal phone browser.</b> Tap Connect and choose <b>Rainbow</b> in the WalletConnect popup — Rainbow opens so you can approve the connection, the Step-1 transaction, and the Step-2 signature. This page <b>never</b> asks for the typed-data signing route and <b>never</b> asks for any private key.</p>
+<p><b>What this is:</b> yesterday the agent wallet's spare ETH was sent out to your own wallet (Option B). The goal was the other outcome — that ETH as USDC <i>inside</i> the agent wallet, where the trader can use it. This page finishes that conversion in <b>two taps inside your wallet app</b>, nothing else:</p>
+<ul>
+  <li><b>Step 1 moves <span id="xferTop"></span> from your wallet into the agent wallet</b> — a plain transaction this page asks your wallet to send. You approve it in Rainbow like any other send.</li>
+  <li><b>Step 2 signs the swap of <span id="swapTop"></span> to USDC inside the agent wallet</b> — one <code>personal_sign</code> over a prepared operation. The USDC it buys — <b>never less than <span id="minTop"></span></b> (build-time spot − 1%; the operation reverts instead of filling below that) — lands in the agent wallet itself.</li>
+  <li><b>The agent wallet keeps a 0.0007 ETH gas reserve</b> — that part of the balance is never swapped.</li>
+</ul>
+<p><b>Nothing moves when you sign in Step 2</b> — the signature is off-chain; the operator submits the operation afterwards, and only after re-checking on-chain that the Step-1 transfer landed exactly and the operation number is unchanged. If anything has drifted, the operator's relay refuses and submits nothing.</p>
+<p><b>Base Mainnet only (chain 8453).</b> This page works with real ETH on Base.
+The only external code this page loads is the WalletConnect connection library and the ethers signature-check library (both from the unpkg CDN) — used solely to reach your wallet and to check your signature against your wallet address on this page as a first look only. Balance checks read the Base public RPC named in the packet. Neither can change the figures below. <b>Whatever Rainbow returns is kept</b> — this page never deletes a signature; the copy box unlocks the moment a signature comes back, and the operator re-checks everything server-side before anything is submitted.</p>
+
+<div class="card real">
+  <h2>Figure sheet — rendered from the embedded packet</h2>
+  <table><tbody id="sheetBody"></tbody></table>
+  <p class="mono" id="generatedNote"></p>
+</div>
+
+<div class="card warn">
+  <h2>⚠ Do-not-sign rule</h2>
+  <p>Compare Rainbow's screens against this sheet before approving anything:</p>
+  <ul id="checkList"></ul>
+  <p>If anything on Rainbow's screen differs — <b>do not approve</b>. Stop and tell the operator.
+  That check working is the product.</p>
+</div>
+
+<div class="card">
+  <h2>0 · Connect</h2>
+  <button id="connectBtn" class="secondary">Connect wallet (Base Mainnet)</button>
+  <div id="connStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>Step 1 · Send <span id="xferAmt1"></span> to the agent wallet</h2>
+  <p>This button asks your wallet to send <b>exactly <span id="xferAmt2"></span></b> from your wallet to the agent wallet — this exact address, and no other:</p>
+  <p class="mono" id="destAddr" style="font-size:13px;"></p>
+  <p>Rainbow will show the send for your approval. After it confirms, this page watches the agent wallet's balance and unlocks Step 2 by itself — leave the page open, or come back to it; the balance check runs again on Connect.</p>
+  <button id="sendBtn" disabled>Step 1 — Send to the agent wallet</button>
+  <div id="sendStatus" class="mono"></div>
+  <div id="balStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>Step 2 · Sign the swap to USDC (stays in the agent wallet)</h2>
+  <p>One <code>personal_sign</code> of the swap operation hash. This signature authorizes ONE
+  batched operation inside your agent wallet: wrap <b><span id="amtA2"></span></b> into WETH, then swap it
+  all to USDC on the same Uniswap V3 router the trader uses, paid back into the agent wallet itself.
+  At the build-time price that is about <b><span id="estA2"></span></b>, and the operation
+  <b>cannot fill below <span id="minA2"></span></b> — it reverts instead. A 0.0007 ETH reserve stays
+  in the account to cover the operation's own gas charge.</p>
+  <p>Swap operation hash — Rainbow must show exactly this:</p>
+  <p class="mono" id="hashA2" style="font-size:13px;"></p>
+  <button id="signBtn" disabled>Step 2 — Sign the swap to USDC</button>
+  <div id="sigStatus" class="mono"></div>
+</div>
+
+<div class="card">
+  <h2>Send the signature to the operator</h2>
+  <button id="downloadSigBtn" class="secondary" disabled>⬇ Download owner-action2-signature.json</button>
+  <p>On a phone the download can be hard to retrieve — use the copy box instead:</p>
+  <textarea id="sigOut" readonly rows="6" style="width:100%;font-family:ui-monospace,monospace;font-size:11px;" placeholder="Your Step-2 signature appears here the moment Rainbow returns it — the operation hash and the signature"></textarea>
+  <button id="copySigBtn" class="secondary" disabled>📋 Copy signature</button>
+  <p>Send the downloaded file — or the copied JSON — back to the operator. The operator submits the swap only after the Step-1 transfer has landed exactly.</p>
+</div>
+
+<script id="packet-json" type="application/json">{"kind":"moebiusx-owner-action/requests","round":2,"status":"PREPARED — NOT SIGNED, NOT BROADCAST, NO FUNDS MOVED","purpose":"Kit 1's executed Option B moved the agent wallet's spare native ETH OUT to the founder EOA. The founder's intent was the conversion: that ETH as USDC inside the agent wallet, where the trader can use it. This kit completes the conversion with ONLY wallet-app interactions on one page — no manual sends, no private keys: Step 1, the page asks the founder's connected wallet to send a plain transaction of exactly 0.0175 ETH from the founder EOA into the agent account; Step 2, the founder personal_signs ONE prepared owner (sudo) swap userOp, built against the post-transfer state, that wraps the ETH and swaps it to USDC inside the agent account.","generatedAt":"2026-11-13T14:33:05.369Z","freshnessNote":"The swap op pins the CURRENT sudo nonce and the exact expected post-transfer balance below. A plain inbound transfer does not consume the account's userOp nonce, so the nonce read at build is the nonce the op executes with. The relay REFUSES unless, at submit time, the live sudo nonce still equals the op nonce AND the live account balance exactly equals the expected post-transfer balance — a missing, partial, or extra Step-1 transfer, or any other balance/nonce drift, is a refusal and this packet must be regenerated and re-signed. The hash the founder signs pins every figure — nothing can be altered after signing.","network":{"chainId":8453,"chainIdHex":"0x2105","name":"Base","rpcUrl":"https://mainnet.base.org","explorer":"https://basescan.org","currencySymbol":"ETH"},"founder":"0x9763c76151caf39d8c33adb1ca42993eefd7599e","accountAddress":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","entryPoint":"0x0000000071727De22E5E9d8BAf0edAc6f37da032","signingMethod":"Step 1: eth_sendTransaction from the connected wallet (must equal the founder EOA) — a plain transfer of exactly 0.0175 ETH to the agent account. Step 2: personal_sign over the swap op's userOpHash (raw 32 bytes) — the exact form this account validated onchain for the v3 setup op and kit 1's Option B. The typed-data route is never used.","step1":{"type":"eth_sendTransaction","from":"0x9763c76151caf39d8c33adb1ca42993eefd7599e","to":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","valueWei":"17500000000000000","valueHex":"0x3e2c284391c000","valueEth":"0.0175","expectedAccountBalanceAfterWei":"18191172350000000","expectedAccountBalanceAfterEth":"0.01819117235"},"chainSnapshotAtGeneration":{"block":"56950048","baseFeeWei":"5221312","accountEthWei":"691172350000000","expectedPostTransferEthWei":"18191172350000000","accountUsdcRaw":"8460000","accountWethWei":"6829466996570889","wethRouterAllowanceWei":"9944565789542926756","sudoNonce":"913479994650515257524606220465835134743662536739504622017003723935449092","sqrtPriceX96":"3513690378102112211461510"},"figures":{"accountEthBalanceNow":"0.00069117235 ETH","step1Transfer":"0.0175 ETH (founder EOA -> agent wallet, plain transaction from the wallet app)","expectedPostTransferBalance":"0.01819117235 ETH","reserveKeptInAccount":"0.0007 ETH (covers the op's own worst-case EntryPoint prefund of 0.000195 ETH at the packet fee caps)","swapAmount":"0.01749117235 ETH","ethPriceUsdAtBuild":"$1966.834471 (pinned pool slot0 spot)","optionA2":{"label":"Swap to USDC (inside the agent wallet)","mechanics":"One batched owner op: WETH.deposit(0.01749117235 ETH) then SwapRouter02.exactInputSingle WETH -> USDC, recipient = the agent account itself","estimatedUsdcAtSpot":"34.40224 USDC","guaranteedMinimumUsdc":"34.058217 USDC (spot - 1%; the op reverts rather than fill below this)","afterBalance":"agent wallet USDC rises by the filled amount; the ETH left in the account is the 0.0007 ETH reserve minus the op's actual gas cost"}},"venue":{"router":"0x2626664c2603336E57B271c5C0b26F421741e481","feeTier":500,"pool":"0xd0b53D9277642d899DF5C87A3966A349A798F224","usdc":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913","weth":"0x4200000000000000000000000000000000000006"},"options":{"A2":{"label":"Swap to USDC","description":"personal_sign this hash to authorize the wrap+swap op (Option A2) — valid only once the Step-1 transfer has landed and the agent account holds exactly the expected post-transfer balance.","userOpHash":"0x44cc442d0e3c6728d0ac771df03b6d6e37c7bfe63dd282c7707c755acc6c0aca","userOp":{"sender":"0xb8Aa30Ad72d79Da4D7Be7edc8fa380f746CBC50e","nonce":"0x845adb2c711129d4f3966735ed98a9f09fc4ce5700000000000000000004","callData":"0xe9ae5c530100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000004200000000000000000000000000000000000006000000000000000000000000000000000000000000000000003e2420eaa07b8000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000004d0e30db0000000000000000000000000000000000000000000000000000000000000000000000000000000002626664c2603336e57b271c5c0b26f421741e4810000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000004200000000000000000000000000000000000006000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000000000000000000000000000000001f4000000000000000000000000b8aa30ad72d79da4d7be7edc8fa380f746cbc50e000000000000000000000000000000000000000000000000003e2420eaa07b80000000000000000000000000000000000000000000000000000000000207afe9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","callGasLimit":"0xc3500","verificationGasLimit":"0xf4240","preVerificationGas":"0x249f0","maxFeePerGas":"0x5f5e100","maxPriorityFeePerGas":"0x989680"}}}}</script>
+<script src="https://unpkg.com/@walletconnect/ethereum-provider@2.21.1/dist/index.umd.js"></script>
+<script src="https://unpkg.com/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+<script>
+const PACKET = JSON.parse(document.getElementById("packet-json").textContent);
+const $ = (id) => document.getElementById(id);
+// TWO wallet-app taps: Step 1 is a plain eth_sendTransaction of
+// exactly PACKET.step1.valueEth from the founder EOA to the agent
+// account; Step 2 is ONE personal_sign over the prepared swap op's
+// userOpHash (raw 32 bytes) — the signature form this account
+// validated onchain for the v3 setup op and kit 1's Option B. The
+// typed-data route is never requested by this page.
+// This page NEVER discards a signature: whatever Rainbow returns is
+// stored, shown in the copy box, and copy/download unlock immediately.
+// The on-page recovery check is a first look only — the operator
+// re-verifies server-side (hash, nonce, exact balance, recovery)
+// before anything is submitted.
+// The connected wallet MUST equal the founder EOA: both buttons stay
+// disabled otherwise, the send re-checks the sender, and Step 2 stays
+// locked until the agent account's on-chain balance reaches the
+// packet's expected post-transfer balance.
+const HASH_A2 = "0x44cc442d0e3c6728d0ac771df03b6d6e37c7bfe63dd282c7707c755acc6c0aca";
+const LS_KEY = "moebiusx-owner-action2-v1";
+const chosen = {};
+// Stale keys from older pages and stale WalletConnect sessions on this
+// shared origin are wiped so the connection below starts fresh; this
+// page's own key is kept (and restored below).
+try {
+  const kill = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && (k.startsWith("wc@") || k.toLowerCase().includes("walletconnect") || (k.startsWith("moebiusx-") && k !== LS_KEY))) kill.push(k); }
+  kill.forEach((k) => localStorage.removeItem(k));
+} catch (e) {}
+function persistChosen() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(chosen)); } catch (e) {}
+  if (chosen.signature) {
+    $("sigOut").value = JSON.stringify({
+      kind: "moebiusx-owner-action/signature",
+      option: "A2",
+      userOpHash: chosen.userOpHash,
+      signature: chosen.signature,
+    }, null, 2);
+    $("downloadSigBtn").disabled = false; $("copySigBtn").disabled = false;
+  }
+}
+function recoverOver(hashBytes, sig) {
+  // Returns the address the personal_sign signature recovers to (over the
+  // given 32-byte hash), or null when the checker library is unavailable or
+  // the signature cannot be parsed. Never throws.
+  try {
+    if (!window.ethers || !window.ethers.verifyMessage) return null;
+    return window.ethers.verifyMessage(window.ethers.getBytes(hashBytes), sig);
+  } catch (e) { return null; }
+}
+function reportSigStatus(sig) {
+  const el = $("sigStatus");
+  const rec = recoverOver(HASH_A2, sig);
+  if (rec && rec.toLowerCase() === PACKET.founder.toLowerCase()) {
+    el.innerHTML = "<span class='ok'>✓ Step-2 signature verified against your wallet</span> — it is in the copy box below.";
+  } else if (rec) {
+    el.innerHTML = "<span class='bad'>⚠ Rainbow signed from a DIFFERENT address: " + rec + "</span><br>" +
+      "Your account is " + PACKET.founder + ". <b>The signature is still kept in the copy box below — send it to the operator</b>, " +
+      "who will inspect it. Do not keep retrying.";
+  } else {
+    el.innerHTML = "<span class='ok'>Step-2 signature received.</span> The on-page checker could not run — " +
+      "<b>it is kept in the copy box below; send it anyway</b>; the operator verifies it server-side.";
+  }
+}
+let account = null;
+let activeProvider = null;
+let wcProvider = null;
+let step1Done = false;
+let pollTimer = null;
+const getEth = () => window.ethereum;
+const WC_PROJECT_ID = "9c4b700dd46cd03cabd4ccf6f61acbce";
+async function getWcProvider() {
+  if (wcProvider) return wcProvider;
+  const ns = window["@walletconnect/ethereum-provider"];
+  const EP = (ns && ns.EthereumProvider) || window.EthereumProvider;
+  if (!EP || !EP.init) throw new Error("WalletConnect library failed to load — check your connection and reload the page.");
+  wcProvider = await EP.init({
+    projectId: WC_PROJECT_ID,
+    chains: [PACKET.network.chainId],
+    showQrModal: true,
+    methods: ["personal_sign", "eth_sendTransaction"],
+    events: ["chainChanged", "accountsChanged"],
+  });
+  return wcProvider;
+}
+
+function fmtEth(wei) {
+  try { return window.ethers ? window.ethers.formatEther(wei) : String(wei); } catch (e) { return String(wei); }
+}
+async function readAgentBalance() {
+  // Balance of the AGENT ACCOUNT (not the connected wallet). Prefer the
+  // connected provider's eth_getBalance; fall back to a direct JSON-RPC
+  // read against the packet's public RPC. Returns a BigInt (wei) or null.
+  const addr = PACKET.accountAddress;
+  if (activeProvider) {
+    try { return BigInt(await activeProvider.request({ method: "eth_getBalance", params: [addr, "latest"] })); } catch (e) {}
+  }
+  try {
+    const r = await fetch(PACKET.network.rpcUrl, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [addr, "latest"] }),
+    });
+    const j = await r.json();
+    if (j && j.result) return BigInt(j.result);
+  } catch (e) {}
+  return null;
+}
+async function checkStep1() {
+  const bal = await readAgentBalance();
+  const el = $("balStatus");
+  if (bal === null) { el.textContent = "Balance check unavailable right now — Step 2 unlocks when the check can read the agent wallet."; return; }
+  const expected = BigInt(PACKET.step1.expectedAccountBalanceAfterWei);
+  if (bal >= expected) {
+    step1Done = true;
+    el.innerHTML = "<span class='ok'>✓ Step 1 confirmed on-chain: agent wallet holds " + fmtEth(bal) + " ETH (expected " + PACKET.step1.expectedAccountBalanceAfterEth + "). Step 2 is unlocked.</span>";
+    $("sendBtn").disabled = true;
+    if (account && account.toLowerCase() === PACKET.founder.toLowerCase()) $("signBtn").disabled = false;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  } else {
+    el.textContent = "Agent wallet balance now: " + fmtEth(bal) + " ETH — Step 2 unlocks at " + PACKET.step1.expectedAccountBalanceAfterEth + " ETH (after the Step-1 send confirms).";
+  }
+}
+function startPolling() {
+  checkStep1();
+  if (!pollTimer) pollTimer = setInterval(checkStep1, 4000);
+}
+
+function renderSheet() {
+  const f = PACKET.figures, snap = PACKET.chainSnapshotAtGeneration, s1 = PACKET.step1;
+  const rows = [
+    ["Network", "Base Mainnet (chain " + PACKET.network.chainId + ")"],
+    ["Owner (you)", PACKET.founder],
+    ["Agent wallet (smart account)", PACKET.accountAddress + " (already deployed)"],
+    ["Agent wallet ETH right now", f.accountEthBalanceNow + " (at packet build)"],
+    ["Step 1 — you send", s1.valueEth + " ETH from your wallet to the agent wallet (plain transaction)"],
+    ["Agent wallet ETH after Step 1", s1.expectedAccountBalanceAfterEth + " ETH (Step 2's operation is built on exactly this)"],
+    ["Step 2 — swap amount", f.swapAmount],
+    ["Reserve that stays behind", f.reserveKeptInAccount],
+    ["ETH price at build", f.ethPriceUsdAtBuild + " (block " + snap.block + ")"],
+    ["Step 2 — swap to USDC", "Wrap + swap inside the agent wallet: about " + f.optionA2.estimatedUsdcAtSpot + ", never below " + f.optionA2.guaranteedMinimumUsdc],
+    ["Operation number (nonce)", snap.sudoNonce + " — pinned in the hash you sign; the operator's relay re-checks it live"],
+  ];
+  $("sheetBody").innerHTML = rows.map(([k, val]) =>
+    "<tr><td>" + k + "</td><td class='mono'>" + val + "</td></tr>").join("");
+  $("generatedNote").textContent = "Packet generated: " + PACKET.generatedAt + " · " + PACKET.freshnessNote;
+  $("checkList").innerHTML = [
+    "Connected wallet must be " + PACKET.founder + " — this page refuses any other wallet",
+    "Step 1: Rainbow must show a send of exactly " + s1.valueEth + " ETH to the agent wallet " + PACKET.accountAddress + " — letter-for-letter",
+    "Step 2: the hash Rainbow shows must match the swap operation hash printed in the Step-2 card",
+    "Step 2 signs a swap of " + f.swapAmount + " to USDC inside the agent wallet — minimum " + f.optionA2.guaranteedMinimumUsdc + " or it reverts; 0.0007 ETH always stays behind as the gas reserve",
+  ].map((x) => "<li>" + x + "</li>").join("");
+  $("xferTop").textContent = s1.valueEth + " ETH";
+  $("swapTop").textContent = f.swapAmount;
+  $("minTop").textContent = f.optionA2.guaranteedMinimumUsdc;
+  $("xferAmt1").textContent = s1.valueEth + " ETH";
+  $("xferAmt2").textContent = s1.valueEth + " ETH";
+  $("destAddr").textContent = PACKET.accountAddress;
+  $("amtA2").textContent = f.swapAmount;
+  $("estA2").textContent = f.optionA2.estimatedUsdcAtSpot;
+  $("minA2").textContent = f.optionA2.guaranteedMinimumUsdc;
+  $("hashA2").textContent = HASH_A2;
+}
+renderSheet();
+
+async function ensureChain() {
+  const eth = activeProvider || getEth();
+  const n = PACKET.network;
+  const chainId = await eth.request({ method: "eth_chainId" });
+  if (chainId !== n.chainIdHex) {
+    try {
+      await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: n.chainIdHex }] });
+    } catch (e) {
+      await eth.request({ method: "wallet_addEthereumChain", params: [{
+        chainId: n.chainIdHex, chainName: n.name,
+        rpcUrls: [n.rpcUrl], blockExplorerUrls: [n.explorer],
+        nativeCurrency: { name: "Ether", symbol: n.currencySymbol, decimals: 18 },
+      }]});
+    }
+  }
+}
+
+$("connectBtn").addEventListener("click", async () => {
+  const st = $("connStatus");
+  try {
+    let accts;
+    if (getEth()) {
+      activeProvider = getEth();
+      accts = await activeProvider.request({ method: "eth_requestAccounts" });
+    } else {
+      st.textContent = "Opening WalletConnect — choose Rainbow in the popup and approve the connection in Rainbow…";
+      const p = await getWcProvider();
+      await p.connect();
+      activeProvider = p;
+      accts = p.accounts;
+    }
+    account = accts && accts[0];
+    if (!account) { st.innerHTML = "<span class='bad'>✗ The wallet returned no account — stop, do not sign.</span>"; return; }
+    await ensureChain();
+    const okAddr = account && account.toLowerCase() === PACKET.founder.toLowerCase();
+    st.innerHTML = "Connected: <span class='mono'>" + account + "</span> " +
+      (okAddr ? "<span class='ok'>✓ matches the founder wallet address</span>"
+              : "<span class='bad'>✗ NOT the founder wallet address — this page refuses to continue with any other wallet</span>");
+    if (okAddr) { $("sendBtn").disabled = false; startPolling(); }
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("sendBtn").addEventListener("click", async () => {
+  const st = $("sendStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rainbow first."; return; }
+    if (account.toLowerCase() !== PACKET.founder.toLowerCase()) {
+      st.innerHTML = "<span class='bad'>✗ Connected wallet is NOT the founder wallet — refused.</span>"; return;
+    }
+    st.textContent = "Opening Rainbow — approve the send of exactly " + PACKET.step1.valueEth + " ETH to the agent wallet…";
+    const txHash = await activeProvider.request({
+      method: "eth_sendTransaction",
+      params: [{ from: account, to: PACKET.accountAddress, value: PACKET.step1.valueHex }],
+    });
+    if (!txHash) { st.innerHTML = "<span class='bad'>✗ Rainbow returned no transaction hash — nothing was sent.</span>"; return; }
+    st.innerHTML = "<span class='ok'>✓ Send submitted: " + txHash + "</span><br>Watching the agent wallet balance — Step 2 unlocks when it lands.";
+    startPolling();
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+$("signBtn").addEventListener("click", async () => {
+  const st = $("sigStatus");
+  try {
+    if (!account) { st.textContent = "Connect Rainbow first."; return; }
+    if (account.toLowerCase() !== PACKET.founder.toLowerCase()) {
+      st.innerHTML = "<span class='bad'>✗ Connected wallet is NOT the founder wallet — refused.</span>"; return;
+    }
+    if (!step1Done) { st.textContent = "Step 1 has not landed yet — Step 2 unlocks when the agent wallet balance reaches " + PACKET.step1.expectedAccountBalanceAfterEth + " ETH."; return; }
+    const sig = await activeProvider.request({
+      method: "personal_sign",
+      params: [HASH_A2, account],
+    });
+    if (!sig) { st.innerHTML = "<span class='bad'>✗ Rainbow returned no signature — nothing was signed.</span>"; return; }
+    chosen.option = "A2";
+    chosen.userOpHash = HASH_A2;
+    chosen.signature = sig;
+    persistChosen();
+    reportSigStatus(sig);
+  } catch (e) { st.innerHTML = "<span class='bad'>✗ " + (e.message || e) + "</span>"; }
+});
+
+function download(name, obj) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }));
+  a.download = name; a.click();
+}
+$("downloadSigBtn").addEventListener("click", () => download("owner-action2-signature.json", {
+  kind: "moebiusx-owner-action/signature",
+  option: "A2",
+  userOpHash: chosen.userOpHash,
+  signature: chosen.signature,
+}));
+$("copySigBtn").addEventListener("click", async () => {
+  const t = $("sigOut"); t.select();
+  try { await navigator.clipboard.writeText(t.value); $("copySigBtn").textContent = "✓ Copied"; }
+  catch (e) { document.execCommand("copy"); $("copySigBtn").textContent = "✓ Copied (select-all fallback)"; }
+});
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+  if (saved.signature && saved.option === "A2") {
+    chosen.option = saved.option; chosen.userOpHash = saved.userOpHash; chosen.signature = saved.signature;
+    reportSigStatus(saved.signature);
+    $("sigStatus").innerHTML += "<br>(restored from this browser)";
+  }
+} catch (e) {}
+persistChosen();
+</script>
+</body>
+</html>
