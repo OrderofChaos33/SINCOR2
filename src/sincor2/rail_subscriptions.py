@@ -24,8 +24,15 @@ State machine (derived on read, persisted lazily — no cron needed):
               out, access continues, nothing is charged automatically.
   grace       period_end + 3d < now <= period_end + 7d. Last-chance window,
               access continues.
-  canceled    past grace, or explicit cancel_subscription(). Access
-              revoked: effective_plan() -> "none", enforced through
+  cancel_pending
+              explicit cancel_subscription() during a paid period
+              (Terms §5): renewal is stopped and outstanding renewal
+              challenges are voided (W-106), but access continues
+              until period_end, when the subscription becomes
+              canceled outright — no past_due/grace tail.
+  canceled    past grace, or a cancel_subscription() that lands
+              after the paid period has ended. Access revoked:
+              effective_plan() -> "none", enforced through
               plan_gate.allow()'s existing rank checks via gate().
 
 Wallet <-> plan binding: issue_renewal_challenge() records the challenge
@@ -382,6 +389,17 @@ def _derive_status(row: Dict[str, Any], now: datetime) -> str:
     """Derive the current status from the period clock (no cron needed)."""
     if row.get("status") == "canceled":
         return "canceled"  # explicit cancel sticks until a new payment
+    if row.get("status") == "cancel_pending":
+        # Terms §5: a cancellation takes effect at the end of the
+        # current billing period. The paid period is honored until
+        # period_end; after it the subscription is canceled outright
+        # — a cancelled subscription does NOT slide into the
+        # past_due/grace dunning windows.
+        try:
+            period_end = _parse_iso(row["period_end"])
+        except ValueError:
+            return "canceled"  # corrupt clock — fail closed
+        return "cancel_pending" if now <= period_end else "canceled"
     try:
         period_end = _parse_iso(row["period_end"])
     except ValueError:
@@ -418,9 +436,13 @@ def subscription_status(wallet: str) -> Dict[str, Any]:
     derived = _derive_status(row, now)
     if derived != row["status"]:
         updates: Dict[str, Any] = {"status": derived}
-        if derived == "canceled":
+        if derived == "canceled" and not (
+                row.get("canceled_at") or "").strip():
             # W-106: stamp when the cancel took effect so settle can
             # distinguish pre-cancel challenges from fresh purchases.
+            # A cancel_pending row already carries the ORIGINAL cancel
+            # stamp — never overwrite it with the period-end time, or
+            # the fresh-purchase dividing line would move.
             updates["canceled_at"] = _utc_now_iso()
         _update_row(w, **updates)
         row = _get_row(w) or row
@@ -428,8 +450,13 @@ def subscription_status(wallet: str) -> Dict[str, Any]:
         "wallet": w,
         "plan_id": row["plan_id"],
         "status": derived,
+        # cancel_pending keeps the paid plan until period_end (Terms
+        # §5); it is deliberately NOT in _access_statuses(), which
+        # also drives renewal reminders — a cancelled subscription
+        # must not be reminded to renew.
         "effective_plan": row["plan_id"]
-        if derived in _access_statuses() else "none",
+        if derived in _access_statuses() + ("cancel_pending",)
+        else "none",
         "period_index": row["period_index"],
         "period_start": row["period_start"],
         "period_end": row["period_end"],
@@ -849,18 +876,32 @@ def _is_canceled_status(stored: Any) -> bool:
     return (stored or "").strip().lower() == "canceled"
 
 
+def _is_cancel_recorded_status(stored: Any) -> bool:
+    """Normalized: has a cancel been recorded for this row?
+
+    Covers the terminal "canceled" state AND the Terms §5
+    "cancel_pending" state (cancel recorded, paid period still
+    running). W-106's pre-cancel-challenge discrimination keys off
+    canceled_at in both states: a challenge issued before the cancel
+    is dead, one issued after it is a genuinely fresh purchase.
+    """
+    return (stored or "").strip().lower() in (
+        "canceled", "cancel_pending")
+
+
 def _challenge_voided_by_cancel(challenge_id: str, wallet: str, *,
                                 already_extended: bool = False) -> bool:
     """Fresh-read W-106 check: is this challenge dead because of a cancel?
 
     Re-reads the challenge row and the subscription row at call time —
     never values loaded earlier in a settle. True when the challenge
-    was voided by cancel_subscription(), or when the subscription is
-    stored canceled and this challenge predates that cancel (a
-    challenge issued AFTER the cancel is a genuinely fresh purchase
-    and is not voided by it). The already-extended carve-out is
-    ack-only: a settle that already applied its period keeps its
-    duplicate ack and applies nothing new, so it is never refused.
+    was voided by cancel_subscription(), or when a cancel is recorded
+    for the subscription (stored "canceled" or "cancel_pending") and
+    this challenge predates that cancel (a challenge issued AFTER the
+    cancel is a genuinely fresh purchase and is not voided by it).
+    The already-extended carve-out is ack-only: a settle that already
+    applied its period keeps its duplicate ack and applies nothing
+    new, so it is never refused.
     """
     if already_extended:
         return False
@@ -873,7 +914,7 @@ def _challenge_voided_by_cancel(challenge_id: str, wallet: str, *,
             challenge_id)
         return True
     sub_row = _get_row(wallet)
-    if sub_row and _is_canceled_status(sub_row.get("status")):
+    if sub_row and _is_cancel_recorded_status(sub_row.get("status")):
         canceled_raw = (sub_row.get("canceled_at")
                         or sub_row.get("updated_at") or "")
         try:
@@ -981,7 +1022,7 @@ def _apply_period(*, settle_id: str, wallet: str, plan_id: str,
                     "SELECT status, canceled_at, updated_at FROM "
                     "rail_subscriptions WHERE wallet=?",
                     (wallet.lower(),)).fetchone()
-                if sub_now is not None and _is_canceled_status(
+                if sub_now is not None and _is_cancel_recorded_status(
                         sub_now["status"]):
                     canceled_raw = (sub_now["canceled_at"]
                                     or sub_now["updated_at"] or "")
@@ -1382,12 +1423,13 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
     settle = _get_sub_settle(settle_id)
     verify_result: Optional[Dict[str, Any]] = None
 
-    # W-106: a canceled subscription's outstanding challenges are dead.
+    # W-106: a cancelled subscription's outstanding challenges are dead.
     # (a) cancel_subscription() voids them — a voided challenge can no
     # longer settle or resurrect the subscription. (b) Belt-and-braces:
     # even without a recorded void (legacy rows), a challenge issued
-    # before the stored cancel took effect is refused; only a challenge
-    # issued AFTER the cancel — a genuinely fresh purchase — may settle.
+    # before the recorded cancel took effect (stored "canceled" or
+    # "cancel_pending") is refused; only a challenge issued AFTER the
+    # cancel — a genuinely fresh purchase — may settle.
     # A challenge that already extended a period keeps its duplicate ack
     # (it applies nothing new), so the carve-out below is ack-only.
     # NOTE: this top check alone is NOT sufficient — a cancel can land
@@ -1585,19 +1627,35 @@ def settle_renewal(challenge_id: str, tx_hash: str, wallet: str, *,
 
 # --- Cancellation -------------------------------------------------------------------
 def cancel_subscription(wallet: str) -> Dict[str, Any]:
-    """Cancel immediately: access revoked, platform record cancelled.
+    """Cancel at period end (Terms §5): renewal stops now, access is
+    retained until the end of the already-paid period, then expires.
+
+    The published Terms promise "Cancellation takes effect at the end
+    of your current billing period. You will retain access until that
+    date." A cancel that lands during a paid period therefore records
+    "cancel_pending": the plan stays effective until period_end, then
+    _derive_status flips the row to "canceled" (no past_due/grace
+    tail). The platform mirror is left active for the same window so
+    the two stores agree; like a lapsed subscription's mirror, it is
+    not separately flipped at period end. A cancel that lands after
+    the paid period has already ended has nothing left to honor and
+    is effective immediately (stored "canceled", platform record
+    cancelled) — the pre-fix behavior for that case.
 
     W-106: cancelling also VOIDS every outstanding renewal challenge for
     the wallet, so a challenge issued before the cancel can no longer
     settle afterwards and resurrect the subscription (settle_renewal
     refuses voided challenges, and refuses any pre-cancel challenge
-    against a stored canceled row). A genuinely fresh purchase — a new
-    challenge issued after the cancel — is unaffected and still settles.
+    against a row with a recorded cancel). A genuinely fresh purchase
+    — a new challenge issued after the cancel — is unaffected and
+    still settles, including during the paid-through window, where it
+    reactivates the subscription.
     """
     import sincor2.platform_payments as pp
 
     w = (wallet or "").strip().lower()
-    now_iso = _utc_now_iso()
+    now = _utc_now()
+    now_iso = now.isoformat()
     conn = _connect()
     try:
         conn.execute(
@@ -1607,13 +1665,29 @@ def cancel_subscription(wallet: str) -> Dict[str, Any]:
         conn.commit()
     finally:
         conn.close()
-    if _get_row(w):
-        _update_row(w, status="canceled", canceled_at=now_iso)
+    row = _get_row(w)
+    if row:
+        # A re-cancel keeps the ORIGINAL cancel stamp: canceled_at is
+        # the W-106 dividing line between pre-cancel challenges (dead)
+        # and fresh purchases (live), and it must not move.
+        stamp = (row.get("canceled_at") or "").strip() or now_iso
         try:
-            pp.cancel_wallet_subscriptions(w)
-        except Exception as exc:
-            logger.error("[RAIL-SUB] platform cancel failed for %s: %s",
-                         w, exc)
+            period_end = _parse_iso(row["period_end"])
+        except ValueError:
+            period_end = None  # corrupt clock — fail closed, immediate
+        if _is_canceled_status(row.get("status")):
+            target = "canceled"  # already terminal; stays terminal
+        elif period_end is not None and now <= period_end:
+            target = "cancel_pending"  # paid period still running
+        else:
+            target = "canceled"  # paid period already over
+        _update_row(w, status=target, canceled_at=stamp)
+        if target == "canceled":
+            try:
+                pp.cancel_wallet_subscriptions(w)
+            except Exception as exc:
+                logger.error("[RAIL-SUB] platform cancel failed for %s: %s",
+                             w, exc)
     return subscription_status(w)
 
 
