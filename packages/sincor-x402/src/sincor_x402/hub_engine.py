@@ -10,28 +10,33 @@ founder's 2026-11-11 spec drop (vendored reference:
   with scheme ``"sincor-seal-v1"``. The seal nonce is read from the Hub's
   ``nonces(buyer)``.
 * Settler side: ``verify_and_settle`` submits
-  ``verifyAndSettleSeal(seal, sigilCommitment, v, r, s)`` through an
-  injected relayer signer. Keys never enter or are stored by this package:
-  both the buyer SEAL signer and the relayer transaction signer are
-  injected callables, exactly like ``VerifiedBuyer``'s signer.
+  ``verifyAndSettleSeal(seal, v, r, s)`` through an injected relayer
+  signer. Keys never enter or are stored by this package: both the buyer
+  SEAL signer and the relayer transaction signer are injected callables,
+  exactly like ``VerifiedBuyer``'s signer.
 
 Trust model — read this before believing the word "verified"
 ----------------------------------------------------------------
-**The Hub does not verify work output.** It records whatever
-``sigilCommitment`` the settlement submitter hands it, and it never checks
+**The Hub does not verify work output.** Since the W-150 fix
+(2026-11-13), the SIGIL commitment is a field of the buyer-signed SEAL
+struct: the Hub records exactly the commitment the buyer signed, a
+settlement submitter cannot substitute another one, and a zero-amount
+seal reverts on-chain (``SealAmountZero``) instead of recording a
+"verified" sigil for a payment of nothing. The Hub still never checks
 the delivered output against the seal's ``expectedSchemaHash`` on-chain
 (the hash is signed, but unenforced). ``isTaskVerified(taskId, sigil)``
-on-chain therefore only proves "someone settled this task with this
-commitment recorded" — nothing more.
+on-chain therefore proves "a nonzero settlement was recorded for this
+task under the buyer-signed commitment" — nothing more.
 
 The enforcement layer is THIS engine, off-chain, before submission:
 ``verify_and_settle`` recomputes the SIGIL commitment from the delivered
-result, requires the seal's ``expectedSchemaHash`` to equal the committed
-spec hash, and runs the package's ``Verifier`` seam against the committed
-spec. **If verification fails, the engine refuses to submit — the Hub is
-never called.** A deployment that lets arbitrary callers submit settlements
-directly to the Hub bypasses that enforcement entirely; the Hub alone is
-not a verification system.
+result, requires it to equal the commitment inside the buyer-signed
+seal, requires the seal's ``expectedSchemaHash`` to equal the committed
+spec hash, and runs the package's ``Verifier`` seam against the
+committed spec. **If verification fails, the engine refuses to submit —
+the Hub is never called.** A deployment that lets arbitrary callers
+submit settlements directly to the Hub bypasses the output-verification
+layer entirely; the Hub alone is not a verification system.
 
 SIGIL canon on the Hub path: ``keccak256(taskId ‖ canonical-JSON output)``
 where ``taskId`` is the raw 32-byte task id and the JSON is this package's
@@ -83,6 +88,7 @@ SEAL_MESSAGE_TYPES: dict[str, list[dict[str, str]]] = {
         {"name": "provider", "type": "address"},
         {"name": "amount", "type": "uint256"},
         {"name": "expectedSchemaHash", "type": "bytes32"},
+        {"name": "sigilCommitment", "type": "bytes32"},
         {"name": "deadline", "type": "uint256"},
         {"name": "nonce", "type": "uint256"},
     ]
@@ -124,12 +130,12 @@ HUB_ABI: list[dict[str, Any]] = [
             {"internalType": "uint256", "name": "amount", "type": "uint256"},
             {"internalType": "bytes32", "name": "expectedSchemaHash",
              "type": "bytes32"},
+            {"internalType": "bytes32", "name": "sigilCommitment",
+             "type": "bytes32"},
             {"internalType": "uint256", "name": "deadline", "type": "uint256"},
             {"internalType": "uint256", "name": "nonce", "type": "uint256"}],
          "internalType": "struct SincorSettlementHub.SealAuthorization",
          "name": "seal", "type": "tuple"},
-        {"internalType": "bytes32", "name": "sigilCommitment",
-         "type": "bytes32"},
         {"internalType": "uint8", "name": "v", "type": "uint8"},
         {"internalType": "bytes32", "name": "r", "type": "bytes32"},
         {"internalType": "bytes32", "name": "s", "type": "bytes32"}],
@@ -155,6 +161,7 @@ HUB_ABI: list[dict[str, Any]] = [
     {"inputs": [], "name": "InvalidNonce", "type": "error"},
     {"inputs": [], "name": "InvalidSealSignature", "type": "error"},
     {"inputs": [], "name": "SigilCommitmentZero", "type": "error"},
+    {"inputs": [], "name": "SealAmountZero", "type": "error"},
     {"inputs": [], "name": "UsdcTransferFailed", "type": "error"},
 ]
 
@@ -173,7 +180,8 @@ ERC20_ABI: list[dict[str, Any]] = [
 ]
 
 _HUB_ERROR_NAMES = ("SealExpired", "InvalidNonce", "InvalidSealSignature",
-                    "SigilCommitmentZero", "UsdcTransferFailed")
+                    "SigilCommitmentZero", "SealAmountZero",
+                    "UsdcTransferFailed")
 
 
 def _keccak256(data: bytes) -> bytes:
@@ -290,6 +298,7 @@ class SealEnvelope:
     provider: str
     amount: int
     expected_schema_hash: bytes
+    sigil_commitment: bytes
     deadline: int
     nonce: int
     v: int
@@ -300,6 +309,7 @@ class SealEnvelope:
         """The SealAuthorization struct as a positional tuple for web3."""
         return (self.task_id, _checksum(self.buyer), _checksum(self.provider),
                 int(self.amount), self.expected_schema_hash,
+                self.sigil_commitment,
                 int(self.deadline), int(self.nonce))
 
     @classmethod
@@ -326,6 +336,7 @@ class SealEnvelope:
                 provider=str(payload["provider"]),
                 amount=int(payload["amount"]),
                 expected_schema_hash=to_bytes32(payload["expectedSchemaHash"]),
+                sigil_commitment=to_bytes32(payload["sigilCommitment"]),
                 deadline=int(payload["deadline"]),
                 nonce=int(payload["nonce"]),
                 v=int(payload["v"]),
@@ -409,6 +420,7 @@ class HubSettlementEngine:
         provider_address: str,
         amount_atomic: int,
         expected_schema_hash: Any,
+        sigil_commitment: Any,
         deadline: int,
         nonce: int,
     ) -> dict[str, Any]:
@@ -428,6 +440,7 @@ class HubSettlementEngine:
                 "provider": _checksum(provider_address),
                 "amount": int(amount_atomic),
                 "expectedSchemaHash": to_bytes32(expected_schema_hash),
+                "sigilCommitment": to_bytes32(sigil_commitment),
                 "deadline": int(deadline),
                 "nonce": int(nonce),
             },
@@ -442,6 +455,7 @@ class HubSettlementEngine:
         provider_address: str,
         amount_atomic: int,
         expected_schema_hash: Any,
+        sigil_commitment: Any,
         ttl_seconds: int = 600,
         deadline: int | None = None,
     ) -> str:
@@ -450,6 +464,12 @@ class HubSettlementEngine:
         The nonce is read fresh from the Hub (``nonces(buyer)``); each seal
         is single-use. The buyer's key stays with the injected
         ``buyer_signer`` — this method never sees key material.
+
+        W-150: ``sigil_commitment`` is INSIDE the signed envelope — it is
+        the exact output commitment the buyer agrees to have recorded.
+        The buyer (or the buyer's agent, after verifying the delivered
+        output) computes it with :func:`compute_sigil_commitment`; a
+        settler cannot record any other commitment under this seal.
         """
         buyer = _checksum(buyer_address)
         nonce = self.current_nonce(buyer)
@@ -458,7 +478,8 @@ class HubSettlementEngine:
         typed_data = self.build_seal_typed_data(
             buyer_address=buyer, task_id=task_id,
             provider_address=provider_address, amount_atomic=amount_atomic,
-            expected_schema_hash=expected_schema_hash, deadline=deadline,
+            expected_schema_hash=expected_schema_hash,
+            sigil_commitment=sigil_commitment, deadline=deadline,
             nonce=nonce)
         signature = buyer_signer(typed_data)
         if not signature:
@@ -475,6 +496,7 @@ class HubSettlementEngine:
                 "provider": _checksum(provider_address),
                 "amount": int(amount_atomic),
                 "expectedSchemaHash": "0x" + msg["expectedSchemaHash"].hex(),
+                "sigilCommitment": "0x" + msg["sigilCommitment"].hex(),
                 "deadline": int(deadline),
                 "nonce": int(nonce),
                 "v": int(v),
@@ -526,14 +548,15 @@ class HubSettlementEngine:
 
         1. Parse the SEAL envelope.
         2. Recompute the SIGIL commitment (keccak canon) from the envelope's
-           taskId and the delivered result; a caller-supplied commitment
-           that disagrees is refused.
+           taskId and the delivered result; require it to equal the
+           commitment INSIDE the buyer-signed seal (W-150: the Hub records
+           the signed commitment, so settling any other output under this
+           seal is impossible — refuse here rather than revert on-chain).
+           A caller-supplied commitment that disagrees is also refused.
         3. Require the seal's ``expectedSchemaHash`` to equal the committed
            ``spec_hash`` — the buyer signed for THIS spec, no other.
         4. Run the ``Verifier`` seam against the committed spec. **On
-           failure, raise VerificationFailed and never touch the Hub** —
-           this refusal is the enforcement layer, because the Hub itself
-           records any commitment it is handed.
+           failure, raise VerificationFailed and never touch the Hub.**
         5. Allowance preflight (``AllowanceInsufficient``).
         6. Simulate the Hub call, then submit via the injected relayer
            signer and parse the ``SealSettled`` event.
@@ -541,6 +564,12 @@ class HubSettlementEngine:
         envelope = SealEnvelope.parse(payment_header_b64)
 
         computed_sigil = compute_sigil_commitment(envelope.task_id, result)
+        signed_sigil = "0x" + envelope.sigil_commitment.hex()
+        if signed_sigil.lower() != computed_sigil.lower():
+            raise VerificationFailed(
+                "the delivered result's commitment does not match the "
+                "sigilCommitment inside the buyer-signed seal; the buyer "
+                "did not sign to record this output — refusing to submit")
         if sigil_commitment is not None:
             supplied = "0x" + to_bytes32(sigil_commitment).hex()
             if supplied.lower() != computed_sigil.lower():
@@ -562,9 +591,8 @@ class HubSettlementEngine:
         self.check_allowance(envelope.buyer, envelope.amount)
 
         seal = envelope.seal_tuple()
-        sigil_b32 = to_bytes32(computed_sigil)
         call = self._hub.functions.verifyAndSettleSeal(
-            seal, sigil_b32, envelope.v, envelope.r, envelope.s)
+            seal, envelope.v, envelope.r, envelope.s)
         # Simulate first: a reverting settlement fails here with the Hub's
         # custom error decoded, before any relayer gas is spent.
         try:

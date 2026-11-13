@@ -431,17 +431,18 @@ contract SigilThresholdAndHubTest is Test {
             provider: payee,
             amount: amount,
             expectedSchemaHash: keccak256("schema-v1"),
+            sigilCommitment: commitment, // W-150: buyer-signed, inside the struct
             deadline: block.timestamp + 1 hours,
             nonce: 0
         });
         bytes32 structHash = keccak256(
-            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.deadline, seal.nonce)
+            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.sigilCommitment, seal.deadline, seal.nonce)
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", hub.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s_) = vm.sign(buyerPk, digest);
         vm.prank(buyer);
         usdc.approve(address(hub), amount);
-        hub.verifyAndSettleSeal(seal, commitment, v, r, s_);
+        hub.verifyAndSettleSeal(seal, v, r, s_);
     }
 
     // ------------------------------------------------------ threshold fix
@@ -536,17 +537,18 @@ contract SigilThresholdAndHubTest is Test {
         usdc.mint(buyer, 100_000_000);
         SincorSettlementHub.SealAuthorization memory seal = SincorSettlementHub.SealAuthorization({
             taskId: taskId, buyer: buyer, provider: payee, amount: 100_000_000,
-            expectedSchemaHash: keccak256("schema-v1"), deadline: block.timestamp + 1 hours, nonce: 0
+            expectedSchemaHash: keccak256("schema-v1"), sigilCommitment: keccak256("sigil-bad"),
+            deadline: block.timestamp + 1 hours, nonce: 0
         });
         bytes32 structHash = keccak256(
-            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.deadline, seal.nonce)
+            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.sigilCommitment, seal.deadline, seal.nonce)
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", hub.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s_) = vm.sign(0xDEAD, digest); // not the buyer
         vm.prank(buyer);
         usdc.approve(address(hub), 100_000_000);
         vm.expectRevert(SincorSettlementHub.InvalidSealSignature.selector);
-        hub.verifyAndSettleSeal(seal, keccak256("sigil-bad"), v, r, s_);
+        hub.verifyAndSettleSeal(seal, v, r, s_);
         assertFalse(hub.isTaskVerified(taskId, keccak256("sigil-bad")));
     }
 
@@ -557,16 +559,17 @@ contract SigilThresholdAndHubTest is Test {
         usdc.mint(buyer, 100_000_000);
         SincorSettlementHub.SealAuthorization memory seal = SincorSettlementHub.SealAuthorization({
             taskId: taskId, buyer: buyer, provider: payee, amount: 100_000_000,
-            expectedSchemaHash: keccak256("schema-v1"), deadline: block.timestamp - 1, nonce: 0
+            expectedSchemaHash: keccak256("schema-v1"), sigilCommitment: keccak256("sigil-old"),
+            deadline: block.timestamp - 1, nonce: 0
         });
         bytes32 structHash = keccak256(
-            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.deadline, seal.nonce)
+            abi.encode(hub.SEAL_TYPEHASH(), seal.taskId, seal.buyer, seal.provider, seal.amount, seal.expectedSchemaHash, seal.sigilCommitment, seal.deadline, seal.nonce)
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", hub.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s_) = vm.sign(buyerPk, digest);
         vm.prank(buyer);
         usdc.approve(address(hub), 100_000_000);
         vm.expectRevert(SincorSettlementHub.SealExpired.selector);
-        hub.verifyAndSettleSeal(seal, keccak256("sigil-old"), v, r, s_);
+        hub.verifyAndSettleSeal(seal, v, r, s_);
     }
 }
