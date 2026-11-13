@@ -226,8 +226,9 @@ def _db_path() -> Path:
     Shares the revenue ledger file (SINCOR_REVENUE_DB) with the pack rail
     so operators keep one place to look.
     """
-    return Path(os.environ.get("SINCOR_REVENUE_DB")
-                or "data/revenue/revenue_ledger.db")
+    from sincor2.data_paths import revenue_ledger_db_path
+
+    return revenue_ledger_db_path()
 
 
 def _connect() -> sqlite3.Connection:

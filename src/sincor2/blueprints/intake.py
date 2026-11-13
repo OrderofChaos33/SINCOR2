@@ -146,13 +146,13 @@ _IN_PROGRESS_RANK = _STATUS_RANK["in_progress"]
 def _intake_db_path() -> Path:
     """The rail ledger file holding pack intakes.
 
-    Mirrors rail_routes._rail_db_path: SINCOR_REVENUE_DB wins, else the
-    revenue_orchestrator default. Imported lazily so this module stays
-    import-light like rail_delivery.
+    Mirrors rail_routes._rail_db_path via the shared canonical resolver:
+    SINCOR_REVENUE_DB wins, else the ledger under SINCOR_DATA_DIR.
+    Imported lazily so this module stays import-light like rail_delivery.
     """
-    from sincor2.revenue_orchestrator import REVENUE_DB
+    from sincor2.data_paths import revenue_ledger_db_path
 
-    return Path(os.environ.get("SINCOR_REVENUE_DB") or REVENUE_DB)
+    return revenue_ledger_db_path()
 
 
 def _fields_for_sku(pack_sku: str) -> Tuple[str, ...]:
