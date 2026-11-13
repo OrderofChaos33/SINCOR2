@@ -5,26 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Site Index — SINCOR Business Solutions</title>
   <link rel="icon" href="/static/sincor_nav_icon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --bg:#050814; --card:#0d1220; --border:rgba(255,255,255,0.07); --blue:#3b82f6; --blue-light:#60a5fa; --cyan:#22d3ee; --green:#10b981; --purple:#a78bfa; --gold:#f59e0b; --text:#e2e8f0; --muted:#64748b; }
-    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; min-height: 100vh; }
-    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); background: rgba(5,8,20,0.96); backdrop-filter: blur(12px); }
+    :root { --bg:#0a0c10; --card:#141a23; --border:rgba(255,255,255,0.07); --blue:#f0c664; --blue-light:#d4a94e; --gold-bright:#f0c664; --green:#3ddc84; --gold:#f0c664; --gold:#d4a94e; --text:#e2e8f0; --muted:#64748b; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+    h1, h2 { font-family:'Sora',sans-serif; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); background: rgba(10,12,16,0.96); backdrop-filter: blur(12px); }
     .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
     .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
-    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--gold-bright)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .hero { padding: 60px 48px 40px; text-align: center; }
     h1 { font-size: 48px; font-weight: 700; margin-bottom: 12px; }
-    .grad { background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .grad { background: linear-gradient(135deg, var(--blue-light), var(--gold-bright)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .sub { color: var(--muted); font-size: 16px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; max-width: 1200px; margin: 48px auto; padding: 0 48px; }
     .section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
     .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
     .section-title.blue { color: var(--blue-light); }
-    .section-title.cyan { color: var(--cyan); }
+    .section-title.cyan { color: var(--gold-bright); }
     .section-title.green { color: var(--green); }
-    .section-title.purple { color: var(--purple); }
+    .section-title.purple { color: var(--gold); }
     .section-title.gold { color: var(--gold); }
     .section-title.muted { color: var(--muted); }
     .link-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); text-decoration: none; transition: background 0.15s; border-radius: 6px; padding: 8px 6px; }
@@ -35,10 +36,10 @@
     .link-name { font-size: 14px; font-weight: 600; color: var(--text); }
     .link-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .link-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
-    .badge-live { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
-    .badge-new { background: rgba(59,130,246,0.15); color: var(--blue-light); border: 1px solid rgba(59,130,246,0.3); }
-    .badge-hot { background: rgba(245,158,11,0.15); color: var(--gold); border: 1px solid rgba(245,158,11,0.3); }
-    .badge-api { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+    .badge-live { background: rgba(61,220,132,0.15); color: var(--green); border: 1px solid rgba(61,220,132,0.3); }
+    .badge-new { background: rgba(240,198,100,0.15); color: var(--blue-light); border: 1px solid rgba(240,198,100,0.3); }
+    .badge-hot { background: rgba(212,169,78,0.15); color: var(--gold); border: 1px solid rgba(212,169,78,0.3); }
+    .badge-api { background: rgba(240,198,100,0.15); color: var(--gold); border: 1px solid rgba(240,198,100,0.3); }
     footer { border-top: 1px solid var(--border); padding: 24px 48px; text-align: center; color: var(--muted); font-size: 13px; }
     @media(max-width:768px){ nav{padding:16px 20px;} .grid{padding:0 20px;} .hero{padding:40px 20px 24px;} }
   </style>

@@ -9,27 +9,28 @@
   <meta property="og:title" content="Replace Your Entire Marketing Team With 42 AI Agents">
   <meta property="og:description" content="$297/mo. No hiring. No payroll. Agents handle outreach, content, social, sales, analytics — designed for continuous operation. Start today.">
   <meta property="og:image" content="/static/sincor_logo_new.jpg">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050814; --card: #0d1220; --border: rgba(255,255,255,0.07);
-      --blue: #3b82f6; --blue-light: #60a5fa; --cyan: #22d3ee;
-      --green: #10b981; --red: #ef4444; --gold: #f59e0b;
+      --bg: #0a0c10; --card: #141a23; --border: rgba(255,255,255,0.07);
+      --blue: #f0c664; --blue-light: #d4a94e; --gold-bright: #f0c664;
+      --green: #3ddc84; --red: #ef4444; --gold: #d4a94e;
       --text: #e2e8f0; --muted: #64748b;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; line-height: 1.6; }
+    h1, h2 { font-family:'Sora',sans-serif; }
 
     /* NAV */
-    nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 48px; border-bottom: 1px solid var(--border); background: rgba(5,8,20,0.97); position: sticky; top: 0; z-index: 100; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 48px; border-bottom: 1px solid var(--border); background: rgba(10,12,16,0.97); position: sticky; top: 0; z-index: 100; }
     .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
     .nav-logo img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
-    .nav-logo span { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-logo span { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--blue-light), var(--gold-bright)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .nav-cta { background: var(--green); color: #000; padding: 10px 24px; border-radius: 8px; font-weight: 800; font-size: 14px; text-decoration: none; }
 
     /* HERO */
     .hero { padding: 80px 48px 64px; max-width: 900px; margin: 0 auto; text-align: center; position: relative; }
-    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 600px; background: radial-gradient(ellipse at center top, rgba(16,185,129,0.12) 0%, transparent 60%); pointer-events: none; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 600px; background: radial-gradient(ellipse at center top, rgba(61,220,132,0.12) 0%, transparent 60%); pointer-events: none; }
     .urgent-bar { display: inline-flex; align-items: center; gap: 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 6px 18px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 28px; }
     .pulse { width: 7px; height: 7px; background: var(--red); border-radius: 50%; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(1.5);} }
@@ -37,8 +38,8 @@
     .green { color: var(--green); }
     .hero-sub { font-size: 20px; color: var(--muted); max-width: 620px; margin: 0 auto 40px; }
     .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
-    .btn-primary { background: var(--green); color: #000; padding: 18px 44px; border-radius: 10px; font-size: 18px; font-weight: 800; text-decoration: none; display: inline-block; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(16,185,129,0.4); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(16,185,129,0.6); }
+    .btn-primary { background: var(--green); color: #000; padding: 18px 44px; border-radius: 10px; font-size: 18px; font-weight: 800; text-decoration: none; display: inline-block; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(61,220,132,0.4); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(61,220,132,0.6); }
     .btn-secondary { border: 1px solid rgba(255,255,255,0.15); color: var(--text); padding: 18px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; }
     .trust-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
     .trust-item { display: flex; align-items: center; gap: 6px; }
@@ -56,7 +57,7 @@
     .vs-col { padding: 0; }
     .vs-header { padding: 18px 24px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .vs-header.bad { background: rgba(239,68,68,0.1); color: #fca5a5; border-right: 1px solid var(--border); }
-    .vs-header.good { background: rgba(16,185,129,0.1); color: var(--green); }
+    .vs-header.good { background: rgba(61,220,132,0.1); color: var(--green); }
     .vs-row-bad, .vs-row-good { padding: 14px 24px; font-size: 14px; display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid var(--border); }
     .vs-row-bad { border-right: 1px solid var(--border); color: var(--muted); }
     .vs-row-good { color: var(--text); }
@@ -65,7 +66,7 @@
     /* AGENT GRID */
     .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .agent-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; text-align: center; transition: border-color 0.2s, transform 0.2s; }
-    .agent-card:hover { border-color: rgba(16,185,129,0.3); transform: translateY(-2px); }
+    .agent-card:hover { border-color: rgba(61,220,132,0.3); transform: translateY(-2px); }
     .agent-emoji { font-size: 28px; margin-bottom: 10px; }
     .agent-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
     .agent-task { font-size: 11px; color: var(--muted); }
@@ -73,7 +74,7 @@
     /* PRICING */
     .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
     .price-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px 30px; position: relative; }
-    .price-card.featured { border-color: var(--green); box-shadow: 0 0 40px rgba(16,185,129,0.15); }
+    .price-card.featured { border-color: var(--green); box-shadow: 0 0 40px rgba(61,220,132,0.15); }
     .popular-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 4px 18px; border-radius: 20px; font-size: 12px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
     .price-tier { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
     .price-amount { font-size: 52px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
@@ -89,7 +90,7 @@
     .hiring-cost { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; color: #fca5a5; }
 
     /* ROI CALC */
-    .roi-box { background: var(--card); border: 1px solid rgba(16,185,129,0.25); border-radius: 20px; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+    .roi-box { background: var(--card); border: 1px solid rgba(61,220,132,0.25); border-radius: 20px; padding: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
     .roi-number { font-size: 64px; font-weight: 800; color: var(--green); line-height: 1; }
     .roi-label { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
     .roi-sub { font-size: 14px; color: var(--muted); }
@@ -111,7 +112,7 @@
     .faq-item.open .faq-arrow { transform: rotate(180deg); }
 
     /* FINAL CTA */
-    .final-cta { padding: 80px 48px; text-align: center; background: radial-gradient(ellipse at center, rgba(16,185,129,0.08) 0%, transparent 60%); }
+    .final-cta { padding: 80px 48px; text-align: center; background: radial-gradient(ellipse at center, rgba(61,220,132,0.08) 0%, transparent 60%); }
     .final-cta h2 { font-size: clamp(32px, 5vw, 56px); font-weight: 800; margin-bottom: 20px; }
     .final-cta p { font-size: 18px; color: var(--muted); margin-bottom: 40px; }
     footer { border-top: 1px solid var(--border); padding: 28px 48px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
@@ -219,7 +220,7 @@
     <div class="agent-card"><div class="agent-emoji">🛍️</div><div class="agent-name">Product Agent</div><div class="agent-task">Feature + roadmap input</div></div>
     <div class="agent-card"><div class="agent-emoji">🏆</div><div class="agent-name">Competitor Agent</div><div class="agent-task">Competitive intel daily</div></div>
     <div class="agent-card"><div class="agent-emoji">📞</div><div class="agent-name">Follow-Up Agent</div><div class="agent-task">Never lets leads go cold</div></div>
-    <div class="agent-card" style="border-color:rgba(16,185,129,0.2);"><div class="agent-emoji">➕</div><div class="agent-name">+27 More</div><div class="agent-task">Enterprise tier — full 42-agent swarm</div></div>
+    <div class="agent-card" style="border-color:rgba(61,220,132,0.2);"><div class="agent-emoji">➕</div><div class="agent-name">+27 More</div><div class="agent-task">Enterprise tier — full 42-agent swarm</div></div>
   </div>
 </div>
 

@@ -15,22 +15,22 @@
   <meta property="og:description" content="Find SMBs with no website. Build custom sites. Market and close autonomously.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-      --bg: #0a0e27;
-      --bg-dark: #050814;
-      --surface: #0f1629;
-      --surface-light: #1a2038;
-      --border: rgba(139,92,246,0.12);
-      --border-bright: rgba(6,182,212,0.35);
-      --purple: #8b5cf6;
-      --purple-light: #c4b5fd;
-      --cyan: #06b6d4;
+      --bg: #0a0c10;
+      --bg-dark: #0a0c10;
+      --surface: #10141b;
+      --surface-light: #1a2230;
+      --border: rgba(212,169,78,0.12);
+      --border-bright: rgba(240,198,100,0.35);
+      --gold: #d4a94e;
+      --gold-bright: #f0c664;
+      --gold-bright: #f0c664;
       --pink: #ec4899;
-      --green: #10b981;
-      --amber: #f59e0b;
+      --green: #3ddc84;
+      --amber: #d4a94e;
       --text: #f1f5f9;
       --text-dim: #cbd5e1;
       --text-muted: #94a3b8;
@@ -39,7 +39,7 @@
     body {
       background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
       color: var(--text);
-      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       font-size: 17px;
       line-height: 1.65;
       overflow-x: hidden;
@@ -49,8 +49,8 @@
       content: '';
       position: fixed; inset: 0;
       background:
-        radial-gradient(circle at 15% 40%, rgba(6,182,212,0.09) 0%, transparent 45%),
-        radial-gradient(circle at 85% 20%, rgba(139,92,246,0.12) 0%, transparent 40%);
+        radial-gradient(circle at 15% 40%, rgba(240,198,100,0.09) 0%, transparent 45%),
+        radial-gradient(circle at 85% 20%, rgba(212,169,78,0.12) 0%, transparent 40%);
       pointer-events: none; z-index: 0;
     }
     main { position: relative; z-index: 1; }
@@ -64,7 +64,7 @@
     }
     .nav-logo {
       font-family: 'Sora', sans-serif; font-weight: 700; font-size: 20px;
-      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       text-decoration: none; display: flex; align-items: center; gap: 10px;
     }
@@ -74,23 +74,23 @@
       padding: 8px 14px; border-radius: 8px; letter-spacing: 0.04em; text-transform: uppercase;
       transition: color 0.2s, background 0.2s;
     }
-    .nav-links a:hover { color: var(--text); background: rgba(139,92,246,0.1); }
+    .nav-links a:hover { color: var(--text); background: rgba(212,169,78,0.1); }
     .nav-cta {
-      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      background: linear-gradient(135deg, var(--gold), #d4a94e);
       color: white; padding: 10px 20px; border-radius: 10px; font-weight: 700;
       font-size: 13px; text-decoration: none; white-space: nowrap;
-      box-shadow: 0 0 24px rgba(139,92,246,0.35);
+      box-shadow: 0 0 24px rgba(212,169,78,0.35);
     }
     section { padding: 72px 32px; max-width: 1140px; margin: 0 auto; }
     .label {
       font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--cyan); margin-bottom: 12px;
+      color: var(--gold-bright); margin-bottom: 12px;
     }
     h1, h2, h3 { font-family: 'Sora', sans-serif; line-height: 1.15; }
     h1 { font-size: clamp(36px, 6vw, 62px); margin-bottom: 20px; }
     h2 { font-size: clamp(28px, 4vw, 40px); margin-bottom: 14px; }
     .grad {
-      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .hero { padding-top: 56px; padding-bottom: 40px; }
@@ -99,8 +99,8 @@
     }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3);
-      color: var(--cyan); padding: 6px 14px; border-radius: 20px;
+      background: rgba(240,198,100,0.1); border: 1px solid rgba(240,198,100,0.3);
+      color: var(--gold-bright); padding: 6px 14px; border-radius: 20px;
       font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
       margin-bottom: 20px;
     }
@@ -112,13 +112,13 @@
     .hero-sub { color: var(--text-muted); font-size: 18px; max-width: 560px; margin-bottom: 28px; }
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
     .btn-primary {
-      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      background: linear-gradient(135deg, var(--gold), #d4a94e);
       color: white; padding: 14px 28px; border-radius: 10px; font-weight: 700;
       text-decoration: none; font-size: 15px;
-      box-shadow: 0 0 30px rgba(139,92,246,0.4);
+      box-shadow: 0 0 30px rgba(212,169,78,0.4);
     }
     .btn-ghost {
-      border: 1px solid var(--border-bright); color: var(--cyan);
+      border: 1px solid var(--border-bright); color: var(--gold-bright);
       padding: 14px 24px; border-radius: 10px; font-weight: 600; text-decoration: none;
     }
     .hero-metrics {
@@ -130,31 +130,31 @@
     }
     .metric-num {
       font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700;
-      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .metric-lbl { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
     .pipeline-panel {
-      background: #060a14; border: 1px solid rgba(6,182,212,0.25); border-radius: 16px;
+      background: #060a14; border: 1px solid rgba(240,198,100,0.25); border-radius: 16px;
       overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.45);
     }
     .pipeline-head {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px; background: rgba(15,22,41,0.9); border-bottom: 1px solid var(--border);
+      padding: 12px 16px; background: rgba(20,26,35,0.9); border-bottom: 1px solid var(--border);
       font-size: 12px; color: var(--text-muted);
     }
     .pipeline-dots { display: flex; gap: 6px; }
     .pipeline-dots span { width: 10px; height: 10px; border-radius: 50%; }
     .pipeline-dots span:nth-child(1){background:#ef4444}
-    .pipeline-dots span:nth-child(2){background:#f59e0b}
-    .pipeline-dots span:nth-child(3){background:#10b981}
+    .pipeline-dots span:nth-child(2){background:#d4a94e}
+    .pipeline-dots span:nth-child(3){background:#3ddc84}
     .pipeline-body {
       padding: 18px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
       line-height: 1.7; min-height: 320px; color: #a5b4c8;
     }
     .pipeline-body .ok { color: var(--green); }
     .pipeline-body .warn { color: var(--amber); }
-    .pipeline-body .hi { color: var(--cyan); }
+    .pipeline-body .hi { color: var(--gold-bright); }
     .pipeline-body .dim { color: #64748b; }
     .problem-grid {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;
@@ -175,12 +175,12 @@
     .agent-card:hover { border-color: var(--border-bright); transform: translateY(-3px); }
     .agent-card::after {
       content: ''; position: absolute; top: 0; right: 0; width: 80px; height: 80px;
-      background: radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%);
+      background: radial-gradient(circle, rgba(212,169,78,0.15), transparent 70%);
     }
-    .agent-role { font-size: 11px; color: var(--cyan); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+    .agent-role { font-size: 11px; color: var(--gold-bright); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
     .agent-name { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .agent-desc { font-size: 14px; color: var(--text-muted); }
-    .agent-out { margin-top: 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--purple-light); }
+    .agent-out { margin-top: 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--gold-bright); }
     .flow {
       display: flex; align-items: stretch; gap: 0; margin-top: 36px; flex-wrap: wrap;
     }
@@ -188,14 +188,14 @@
       flex: 1; min-width: 160px; text-align: center; padding: 20px 12px; position: relative;
     }
     .flow-step:not(:last-child)::after {
-      content: '→'; position: absolute; right: -8px; top: 28px; color: var(--purple-light); font-size: 20px;
+      content: '→'; position: absolute; right: -8px; top: 28px; color: var(--gold-bright); font-size: 20px;
     }
     .flow-num {
       width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 12px;
-      background: linear-gradient(135deg, var(--purple), #6d28d9);
+      background: linear-gradient(135deg, var(--gold), #d4a94e);
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-family: 'JetBrains Mono', monospace;
-      box-shadow: 0 0 20px rgba(139,92,246,0.35);
+      box-shadow: 0 0 20px rgba(212,169,78,0.35);
     }
     .flow-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
     .flow-desc { font-size: 13px; color: var(--text-muted); }
@@ -206,12 +206,12 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
     }
     .preview-mock {
-      height: 160px; background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+      height: 160px; background: linear-gradient(145deg, #1e293b 0%, #141a23 100%);
       display: flex; flex-direction: column; justify-content: flex-end; padding: 16px;
       border-bottom: 1px solid var(--border);
     }
     .preview-mock .biz { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 18px; }
-    .preview-mock .tag { font-size: 11px; color: var(--cyan); margin-top: 4px; }
+    .preview-mock .tag { font-size: 11px; color: var(--gold-bright); margin-top: 4px; }
     .preview-meta { padding: 16px; font-size: 13px; color: var(--text-muted); }
     .preview-meta strong { color: var(--text); display: block; margin-bottom: 4px; }
     .roi-table {
@@ -224,12 +224,12 @@
     .roi-table .bad { color: var(--pink); }
     .roi-table .good { color: var(--green); font-weight: 600; }
     .pricing-box {
-      margin-top: 36px; background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(6,182,212,0.08));
+      margin-top: 36px; background: linear-gradient(135deg, rgba(212,169,78,0.12), rgba(240,198,100,0.08));
       border: 1px solid var(--border-bright); border-radius: 20px; padding: 40px; text-align: center;
     }
     .pricing-box .price {
       font-family: 'JetBrains Mono', monospace; font-size: 56px; font-weight: 700;
-      background: linear-gradient(135deg, var(--purple-light), var(--cyan));
+      background: linear-gradient(135deg, var(--gold-bright), var(--gold-bright));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .faq details {
@@ -243,7 +243,7 @@
       border-top: 1px solid var(--border); padding: 40px 32px; text-align: center;
       color: var(--text-muted); font-size: 12px;
     }
-    footer a { color: var(--purple-light); text-decoration: none; }
+    footer a { color: var(--gold-bright); text-decoration: none; }
     @media (max-width: 900px) {
       .hero-grid { grid-template-columns: 1fr; }
       .flow-step:not(:last-child)::after { display: none; }
@@ -255,7 +255,7 @@
 
 <nav>
   <a href="/" class="nav-logo">
-    <img src="/static/sincor_nav_icon.png" alt="" width="36" height="36" style="border-radius:50%;border:2px solid rgba(139,92,246,0.4);">
+    <img src="/static/sincor_nav_icon.png" alt="" width="36" height="36" style="border-radius:50%;border:2px solid rgba(212,169,78,0.4);">
     SINCOR
   </a>
   <ul class="nav-links">
@@ -382,21 +382,21 @@
     </p>
     <div class="preview-grid">
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#1a2a4a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a2230,#141a23);">
           <div class="biz">1 · Preview domain</div>
           <div class="tag">getsincor.com/preview/your-slug</div>
         </div>
         <div class="preview-meta"><strong>Share before DNS</strong>Owner reviews staging link. Outreach agents send preview, not production.</div>
       </div>
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#2a1a4a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#141a23,#141a23);">
           <div class="biz">2 · DNS instructions</div>
           <div class="tag">CNAME → studio.getsincor.com</div>
         </div>
         <div class="preview-meta"><strong>Autonomous verify</strong>Sage polls DNS. Apex + www supported with primary URL + 301 redirects.</div>
       </div>
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#1a4a3a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a4a3a,#141a23);">
           <div class="biz">3 · Go live + grow</div>
           <div class="tag">Echo · 30-day launch calendar</div>
         </div>
@@ -425,21 +425,21 @@
     <h2>Production deliverables, not mockups</h2>
     <div class="preview-grid">
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#1a3a2a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a3a2a,#141a23);">
           <div class="biz">Green Valley Landscaping</div>
           <div class="tag">Built in 6h 12m · Lighthouse 94</div>
         </div>
         <div class="preview-meta"><strong>5 pages + booking CTA</strong>Service areas, before/after gallery, review embed, click-to-call, LocalBusiness schema.</div>
       </div>
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#2a1a3a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#2a1a3a,#141a23);">
           <div class="biz">Riverside Auto Detail</div>
           <div class="tag">Facebook-only → full site · closed $1,200</div>
         </div>
         <div class="preview-meta"><strong>Outreach + preview close</strong>Owner received staged link day 1, paid day 2, live day 3 with launch posts scheduled.</div>
       </div>
       <div class="preview-card">
-        <div class="preview-mock" style="background:linear-gradient(145deg,#1a2a3a,#0f172a);">
+        <div class="preview-mock" style="background:linear-gradient(145deg,#1a2230,#141a23);">
           <div class="biz">Summit HVAC Services</div>
           <div class="tag">Territory batch · 8 sites/week capacity</div>
         </div>
@@ -468,11 +468,11 @@
     <h2>Run it on Professional or Enterprise</h2>
     <p style="color:var(--text-muted);">WebBuilder is a vertical config — same SINCOR infrastructure, pre-wired agent roster and playbooks.</p>
     <div class="pricing-box">
-      <div style="font-size:14px;color:var(--cyan);font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Recommended</div>
+      <div style="font-size:14px;color:var(--gold-bright);font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Recommended</div>
       <div class="price">$997</div>
       <div style="color:var(--text-muted);margin:8px 0 24px;">/month · 24 agents · WebBuilder vertical included</div>
       <a href="/signup?plan=professional&vertical=webbuilder" class="btn-primary" style="display:inline-block;">Start WebBuilder Swarm →</a>
-      <p style="margin-top:16px;font-size:13px;color:var(--text-muted);">Or <a href="/signup?plan=starter" style="color:var(--cyan);">Starter ($297)</a> for lighter discovery · <a href="/buy?plan=enterprise" style="color:var(--cyan);">Enterprise</a> for white-label</p>
+      <p style="margin-top:16px;font-size:13px;color:var(--text-muted);">Or <a href="/signup?plan=starter" style="color:var(--gold-bright);">Starter ($297)</a> for lighter discovery · <a href="/buy?plan=enterprise" style="color:var(--gold-bright);">Enterprise</a> for white-label</p>
     </div>
   </section>
 
