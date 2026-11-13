@@ -685,8 +685,12 @@ echo "=== SINCOR pre-commit: child_process guard (dev-watch 302) ==="
 # destructured-require spellings, same-line declaration+call, and
 # renamed bindings ({exec: run} / {exec as run} — the local name is
 # what gets called). Dynamic dispatch stays the accepted residual.
+# Scan scope: the git index (tracked + staged files) only — gitignored
+# vendored dirs (lib/ Foundry installs, out/, cache/) are not repo
+# content and cannot be committed, so their upstream scripts must not
+# trip this guard (they made every commit fail once lib/ was present).
 python3 - <<'PYEOF2'
-import re, sys
+import re, subprocess, sys
 from pathlib import Path
 
 _SUFFIXES = {".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"}
@@ -721,12 +725,43 @@ def _destructured_locals(group):
             names.add(local)
     return names
 
+def _repo_js_files():
+    """JS/TS files that are actually this repo's content.
+
+    Enumerate the git index (tracked + staged) instead of walking the
+    whole working tree: an unfiltered rglob also descends into
+    gitignored vendored installs (lib/forge-std,
+    lib/openzeppelin-contracts — required locally to compile the
+    Foundry contracts), whose upstream scripts trip this guard and
+    make every commit impossible on a tree with the libs installed.
+    Gitignored content cannot be committed, so it is out of scope for
+    a commit gate. Tracked files are scanned exactly as before
+    (node_modules/.git stay excluded), so a real violation in any
+    tracked JS/TS file is still caught. Fallback for a non-git
+    export: walk the tree but skip the vendored/build dirs."""
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "-z"], capture_output=True, check=True
+        ).stdout.decode("utf-8", "replace")
+        candidates = [Path(n) for n in out.split("\0") if n]
+    except Exception:
+        candidates = [
+            p
+            for p in Path(".").rglob("*")
+            if not {"node_modules", ".git", "lib", "out", "cache"}.intersection(
+                p.parts
+            )
+        ]
+    return [
+        p
+        for p in sorted(candidates)
+        if p.suffix in _SUFFIXES
+        and p.is_file()
+        and not {"node_modules", ".git"}.intersection(p.parts)
+    ]
+
 violations = []
-for path in sorted(Path(".").rglob("*")):
-    if path.suffix not in _SUFFIXES or not path.is_file():
-        continue
-    if {"node_modules", ".git"}.intersection(path.parts):
-        continue
+for path in _repo_js_files():
     source = path.read_text(encoding="utf-8", errors="replace")
     aliases = {"child_process"}
     for pat in _ALIAS_PATTERNS:
