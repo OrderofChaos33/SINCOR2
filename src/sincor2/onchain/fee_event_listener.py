@@ -87,9 +87,19 @@ TRANSFER_TOPIC = "0x" + keccak(b"Transfer(address,address,uint256)").hex()
 BPS_DENOM = 10_000
 
 # Blocks rewound when a reorg is detected at the cursor.
-REORG_WINDOW = 64
-# Cap on blocks scanned per run_once() so one run cannot exceed RPC limits.
-MAX_BLOCKS_PER_SCAN = 2_000
+# Base Denim (2026-11-05) produces 200 ms blocks, so the window is sized
+# in blocks to cover ~2 minutes of chain history: 640 blocks x 0.2 s =
+# 128 s.  The pre-Denim value (64) covered ~13 s at Denim rates — too
+# shallow to rewind past a reorg and rescan the affected range.
+REORG_WINDOW = 640
+# Cap on blocks scanned per run_once() so one run cannot exceed RPC
+# limits.  At Denim's 5 blocks/sec, 2,000 blocks covered only ~6.7
+# minutes of chain per scan: after an outage the catch-up advanced one
+# ~7-minute slice per 30 s poll (~13x real time) and every mid-catch-up
+# RPC failure restarted a much smaller unit of progress.  10,000 blocks
+# = ~33 minutes of chain per scan (~111x drain at the 30 s poll), and it
+# matches the 10k-block eth_getLogs range public Base RPCs accept.
+MAX_BLOCKS_PER_SCAN = 10_000
 
 
 def _default_cursor_path() -> str:
