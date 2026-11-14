@@ -1121,6 +1121,20 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
         )
     if expired:
         _save_tasks(fabric)
+    # Pool allocation reconciliation: the inline release/spend calls
+    # in this lifecycle (here, close_auction, submit_proof, the sybil
+    # hold paths, admin delete) are fail-safe — a swallowed failure or
+    # a restart between the task-state save and the pool save strands
+    # the allocation in "allocated" forever and available_axm stays
+    # understated.  Sweep for stranded allocations on this function's
+    # existing cadence (it already runs on agent heartbeats and board
+    # reads).  Fail-safe like everything else here: never bricks
+    # expiry on accounting.
+    try:
+        from sincor2.a2a_pool_reconciliation import reconcile_allocations
+        reconcile_allocations(apply=True)
+    except Exception as err:
+        logger.warning("pool allocation reconciliation failed: %s", err)
     return expired
 
 
