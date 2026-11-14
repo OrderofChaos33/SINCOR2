@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime, timezone
-from flask import Blueprint
+from flask import Blueprint, current_app, jsonify, make_response
 
 bp = Blueprint("mvp_pages", __name__)
 
@@ -197,6 +197,40 @@ def genesis_confirm_api():
             max_age=365 * 86400, httponly=True, samesite="Lax",
         )
     return resp, status
+
+
+@bp.route("/api/genesis/counts", methods=["GET"])
+@limiter.limit("60 per minute")
+def genesis_counts_api():
+    """Public signup counts — AGGREGATES ONLY, no per-record data.
+
+    The public companion to the admin-gated GET /api/waitlist/stats.
+    Both numbers are read-only totals from the same counters the
+    admin surfaces use: genesis_cohort.genesis_count() for confirmed
+    genesis members (the same value the homepage gate renders
+    server-side), and WaitlistManager.get_signup_stats() — which is
+    aggregates-only by construction — read through app.extensions
+    exactly like blueprints/waitlist.py reads it. No emails, names,
+    wallet addresses, or per-record rows exist in this response.
+
+    Neither counter raises: an unreachable store degrades its count
+    to 0 instead of failing the request (the _genesis_count contract
+    the homepage already relies on). Cacheable for 60s at the edge,
+    mirroring /api/price/official.
+    """
+    counts = {"genesis_signups": _genesis_count(), "waitlist_signups": 0}
+    try:
+        manager = current_app.extensions.get("waitlist_manager")
+        if manager is not None:
+            counts["waitlist_signups"] = int(
+                manager.get_signup_stats()["total_signups"]
+            )
+    except Exception:
+        counts["waitlist_signups"] = 0
+    resp = make_response(jsonify(counts))
+    resp.headers["Cache-Control"] = "public, max-age=60"
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp, 200
 
 
 @bp.route("/genesis")
