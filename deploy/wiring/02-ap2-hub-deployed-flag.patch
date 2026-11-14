@@ -1,0 +1,26 @@
+--- a/src/sincor2/a2a_integration.py
++++ b/src/sincor2/a2a_integration.py
+@@ -2299,9 +2299,9 @@
+     INTEGRATION.md, ``status`` is flipped from DRAFT/staged as part of
+     the deploy itself (founder greenlight, 2026-11-11). Every honesty
+     field is preserved exactly — in particular
+-    ``settlement.hub_deployed_on_mainnet`` stays False: no
+-    SincorSettlementHub contract is deployed on Base mainnet, and
+-    settlement is proven locally (eth-tester) only.
++    ``settlement.hub_deployed_on_mainnet`` is True: the
++    SincorSettlementHub contract is deployed on Base mainnet at
++    <MAINNET_HUB_ADDRESS> (see the settlement-hub deploy package).
+     """
+     return {
+         "$schema": "https://json-schema.org/draft/2020-12/schema",
+@@ -2320,8 +2320,8 @@
+             "fee_bps": 500,
+             "fee_bps_is_canon": True,
+             "fee_note": "500 bps (5%) is the locked SINCOR fee canon. A 0.5-1% AP2-rail take (50-100 bps) exists only as an unapproved pricing proposal — FOUNDER PRICING DECISION required before any change.",
+-            "hub_deployed_on_mainnet": False,
+-            "hub_note": "No SincorSettlementHub contract is deployed on Base mainnet. Settlement is proven locally (eth-tester) only.",
++            "hub_deployed_on_mainnet": True,
++            "hub_note": "SincorSettlementHub is deployed on Base mainnet at <MAINNET_HUB_ADDRESS>. Settlement settles USDC on Base via verifyAndSettleSeal (95% provider / 5% treasury).",
+             "network": "base",
+             "rail": "SINCOR SEAL via SincorSettlementHub interface (EIP-712 SealAuthorization)",
+             "scheme": "sincor-seal-v1",
