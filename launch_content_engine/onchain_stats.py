@@ -41,7 +41,9 @@ RPC_CANDIDATES = [
     "https://base-rpc.publicnode.com",
 ]
 RPC_CANDIDATES = [u for u in RPC_CANDIDATES if u]
-SINC_FLOOR_USD = float(os.environ.get("SINC_FLOOR_USD", "0.15"))
+# SINC is the platform access token: 1B fixed supply. SINCOR publishes
+# supply and contract facts here — no token price or valuation.
+SINC_TOTAL_SUPPLY = 1_000_000_000
 ROUTER = "0x11b86E85cC5170F4165c89ccb11332133B29E283"
 
 
@@ -98,17 +100,16 @@ def fetch_stats() -> dict:
     sinc_pm = _safe_call("balanceOf", SINC, POOL_MANAGER)
     sinc_safe = _safe_call("balanceOf", SINC, SAFE)
     eth_usd = float(os.environ.get("ETH_USD", "3000"))
-    hook_floor_usd = SINC_FLOOR_USD
     rpc_ok = sinc_pm > 0 or sinc_safe > 0
     return {
         "sinc_in_hook_pm_m": round(sinc_pm / 1e6, 2),
         "sinc_in_safe": round(sinc_safe, 0),
-        "official_floor_usd": hook_floor_usd,
-        "hook_floor_usd": hook_floor_usd,
+        "sinc_total_supply": SINC_TOTAL_SUPPLY,
         "eth_usd": eth_usd,
         "price_note": (
-            f"Official SINC price ${hook_floor_usd:.2f} ($150M FDV / 1B tokens). "
-            "Pay at https://getsincor.com/buy."
+            "SINC is the platform access token with 1B fixed supply, "
+            "available at https://getsincor.com/buy. "
+            "SINCOR does not publish a token price or valuation."
         ),
         "rpc_ok": rpc_ok,
         "sinc_token": SINC,
@@ -120,28 +121,39 @@ def fetch_stats() -> dict:
 
 
 def build_official_price_payload(stats: dict | None = None) -> dict:
-    """Canonical pricing — $0.15 floor ($150M / 1B SINC) plus live on-chain facts."""
+    """Canonical SINC token facts plus live on-chain facts.
+
+    SINC is platform access with 1B fixed supply. This payload publishes
+    supply, contract and inventory facts only — no token price or
+    valuation — and ignores any price fields a caller passes in stats.
+    """
     s = stats or fetch_stats()
-    floor = float(s.get("official_floor_usd", SINC_FLOOR_USD))
     payload = {
         "source": "sincor_official",
         "updated": "live",
-        "official_floor_usd": floor,
-        "minimum_buy_usd_per_sinc": floor,
-        "official_buy": {
-            "price_usd": floor,
+        "token": {
+            "symbol": "SINC",
+            "address": s.get("sinc_token", SINC),
+            "chain_id": 8453,
+            "decimals": 8,
+            "total_supply": s.get("sinc_total_supply", SINC_TOTAL_SUPPLY),
+        },
+        "access": {
             "buy_url": "https://getsincor.com/buy",
-            "note": f"Official SINC price ${floor:.2f} — $150M valuation / 1B supply.",
+            "note": (
+                "SINC is the platform access token — 1B fixed supply. "
+                "SINCOR does not publish a token price or valuation."
+            ),
         },
         "aggregator_guidance": {
-            "display_price_usd": floor,
             "ignore_rogue_v2_pair": s.get("rogue_v2_pair"),
             "official_buy_url": "https://getsincor.com/buy",
             "price_api": "https://getsincor.com/api/price/official",
-            "message": f"SINC official price is ${floor:.2f} ($150M / 1B tokens).",
+            "message": (
+                "SINC is platform access — 1B fixed supply, "
+                "no published price."
+            ),
         },
-        "spot_usd": floor,
-        "hook_floor_usd": floor,
         "note": s.get("price_note"),
         "buy_url": "https://getsincor.com/buy",
         "eth_usd": s.get("eth_usd"),
@@ -158,7 +170,7 @@ def draft_post() -> str:
     s = fetch_stats()
     return (
         f"SINCOR on-chain snapshot (Base, agent-reported):\n"
-        f"• Official SINC price ${s['official_floor_usd']:.2f} ($150M FDV / 1B)\n"
+        f"• SINC: platform access token, 1B fixed supply, no published price\n"
         f"• ~{s['sinc_in_hook_pm_m']}M SINC in v4 hook limit orders\n"
         f"• Safe ops wallet: {s['sinc_in_safe']:,.0f} SINC\n"
         f"Verified token: {s['sinc_token'][:10]}…\n"

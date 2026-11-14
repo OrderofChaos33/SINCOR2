@@ -43,7 +43,7 @@ def sinc_recover_hook():
 
 @bp.route('/api/price/official')
 def api_price_official():
-    """Canonical pricing — $0.15 floor ($150M FDV / 1B SINC)."""
+    """Canonical SINC token facts — platform access, 1B fixed supply."""
     try:
         from launch_content_engine.onchain_stats import build_official_price_payload
         payload = build_official_price_payload()

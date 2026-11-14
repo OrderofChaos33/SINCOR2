@@ -52,7 +52,7 @@ def fetch_value_summary() -> dict:
             "status": "live",
             "sinc_m": hook_m,
             "url": "https://getsincor.com/buy",
-            "note": f"~{hook_m}M SINC on hook walls. Official floor $0.15 ($150M / 1B).",
+            "note": f"~{hook_m}M SINC on hook walls. SINC is platform access — 1B fixed supply.",
         },
         {
             "id": "platform",
@@ -86,17 +86,15 @@ def social_pack(wallet: str | None = None) -> dict:
     v = fetch_value_summary()
     buy = "https://getsincor.com/buy"
     hook_m = v.get("sinc_in_hook_pm_m", HOOK_FLOOR_SINC_M)
-    floor = v.get("official_floor_usd", 0.15)
 
     tweet = (
-        f"SINC on Base — $0.15 floor ($150M FDV / 1B tokens).\n"
-        f"• Official price ${floor:.2f}/SINC\n"
+        f"SINC on Base — platform access token, 1B fixed supply.\n"
         f"• ~{hook_m}M SINC on v4 hook walls\n"
         f"Checkout: {buy}"
     )
     telegram = (
-        f"SINC live on Base. Official price ${floor:.2f} "
-        f"($150M valuation / 1 billion tokens). Checkout: {buy}"
+        f"SINC live on Base. Platform access token — 1 billion fixed "
+        f"supply. Checkout: {buy}"
     )
     farcaster = tweet[:320]
 
