@@ -35,7 +35,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import sys
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -284,6 +286,8 @@ QUICK_SCAN_AMOUNT_ATOMIC = "10000"        # 0.01 USDC (6 decimals)
 AUDIT_ORDER_AMOUNT_ATOMIC = "500000000"   # 500 USDC — Audit Express entry tier
 BASE_CHAIN_ID = 8453
 _FACILITATOR_ENV = "SINCOR_X402_FACILITATOR_URL"
+_CDP_HOSTS_ENV = "SINCOR_X402_CDP_HOSTS"
+_DEFAULT_CDP_HOSTS = ("api.cdp.coinbase.com",)
 
 
 def _load_sincor_x402():
@@ -300,46 +304,205 @@ def _load_sincor_x402():
     return sincor_x402
 
 
+def _cdp_allowlist() -> frozenset:
+    """Hosts that may receive CDP credentials. Default: Coinbase's
+    CDP API host only. ``SINCOR_X402_CDP_HOSTS`` (comma-separated
+    hostnames) REPLACES the default when set — an operator who
+    points the facilitator anywhere else must name that host
+    explicitly before any credential is sent to it."""
+    raw = (os.environ.get(_CDP_HOSTS_ENV) or "").strip()
+    hosts = set()
+    if raw:
+        for entry in raw.split(","):
+            entry = entry.strip().lower()
+            if not entry:
+                continue
+            if "://" in entry:
+                entry = urlparse(entry).hostname or ""
+            else:
+                entry = entry.split(":", 1)[0]
+            if entry:
+                hosts.add(entry)
+    return frozenset(hosts) if hosts else frozenset(_DEFAULT_CDP_HOSTS)
+
+
+def _credentials_allowed(url: str) -> bool:
+    """CDP credentials are attached ONLY to an HTTPS URL whose host
+    is on the allowlist. Any other facilitator URL — plain HTTP, or
+    a host the operator has not explicitly allowlisted — is called
+    with NO Authorization header, ever: a credential sent to an
+    arbitrary configured host is a credential handed to whoever
+    controls, or can redirect, that host (CWE-522)."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").lower()
+    return bool(host) and host in _cdp_allowlist()
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Fail closed on redirects for credentialed requests.
+
+    urllib's default redirect handler re-sends the request —
+    including the Authorization header — to the redirect target,
+    which may be a different origin. A facilitator never
+    legitimately redirects these API POSTs, so any 3xx on a
+    credentialed call is an error, never a forwarding opportunity:
+    returning None here makes urllib raise HTTPError instead."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class _HttpFacilitator:
-    """Minimal facilitator client for a configured x402 facilitator.
+    """Facilitator client for a configured x402 facilitator.
 
     Implements the package's FacilitatorClient protocol against the
-    standard facilitator ``/verify`` endpoint. Fails closed: any
-    transport error, malformed response, or missing payment reference
-    is a verification failure, never a success.
+    standard facilitator contract (the x402 spec's facilitator API,
+    spoken by Coinbase CDP at
+    ``https://api.cdp.coinbase.com/platform/v2/x402`` and by the
+    keyless testnet facilitator at ``https://x402.org/facilitator``):
+
+      POST {base}/verify  {paymentPayload, paymentRequirements}
+        -> {"isValid": bool, "invalidReason": str, "payer": str}
+      POST {base}/settle  (same body)
+        -> {"success": bool, "errorReason": str, "payer": str,
+            "transaction": str, "network": str}
+
+    /verify alone moves nothing and returns NO payment reference —
+    the EIP-3009 authorization is consumed only by /settle, which
+    executes the transferWithAuthorization on-chain. verify_and_hold
+    therefore runs verify THEN settle, and derives the payment_ref
+    deterministically from the canonical authorization using the
+    package's own derivation (``sincor_x402.facilitator``), so the
+    ref satisfies the W-146 consumption contract identically for
+    every facilitator. Fails closed at every step: malformed
+    authorization, transport error, invalid verify, or failed
+    settle is a verification failure, never a success.
+
+    Auth: CDP facilitators require a per-request Bearer JWT minted
+    from CDP_API_KEY_ID + CDP_API_KEY_SECRET (EC key PEM -> ES256),
+    scoped by the JWT ``uris`` claim to the exact method+host+path —
+    the same credential names and scheme as sincor2.onramp. A raw
+    CDP_API_KEY is sent as a Bearer token fallback. No credentials
+    -> no auth header (the testnet facilitator needs none). Env
+    values are never logged or returned.
+
+    Credential safety (Strix finding, PR #691): credentials are
+    attached ONLY when the request URL is HTTPS and its host is on
+    the CDP allowlist (default ``api.cdp.coinbase.com``, overridable
+    via ``SINCOR_X402_CDP_HOSTS``) — any other host is called with
+    no Authorization header at all. Credentialed requests also
+    refuse redirects outright: urllib's default handler would
+    re-send the Authorization header to the redirect target, so a
+    compromised or redirecting facilitator could otherwise harvest
+    the operator's long-lived CDP key (CWE-522).
     """
 
     def __init__(self, base_url: str) -> None:
-        self._verify_url = base_url.rstrip("/") + "/verify"
+        self._base_url = base_url.rstrip("/")
+        self._verify_url = self._base_url + "/verify"
+        self._settle_url = self._base_url + "/settle"
+
+    def _auth_headers(self, url: str) -> Dict[str, str]:
+        if not _credentials_allowed(url):
+            return {}
+        key_id = (os.environ.get("CDP_API_KEY_ID") or "").strip()
+        secret = (os.environ.get("CDP_API_KEY_SECRET") or "").strip()
+        raw = (os.environ.get("CDP_API_KEY") or "").strip()
+        if key_id and secret and "BEGIN" in secret \
+                and "PRIVATE KEY" in secret:
+            try:
+                import jwt as pyjwt
+            except Exception:
+                return {}
+            parsed = urlparse(url)
+            now = int(time.time())
+            token = pyjwt.encode(
+                {"iss": "cdp", "nbf": now, "exp": now + 120,
+                 "sub": key_id,
+                 "uris": [f"POST {parsed.netloc}{parsed.path}"]},
+                secret, algorithm="ES256",
+                headers={"kid": key_id, "nonce": secrets.token_hex(16)})
+            return {"Authorization": f"Bearer {token}"}
+        if raw:
+            return {"Authorization": f"Bearer {raw}"}
+        return {}
+
+    def _post(self, url: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        headers = {"Content-Type": "application/json"}
+        headers.update(self._auth_headers(url))
+        req = urllib.request.Request(
+            url, data=json.dumps(body).encode("utf-8"),
+            headers=headers, method="POST")
+        if "Authorization" in headers:
+            # Credentialed request: use an opener that refuses
+            # redirects, so the credential can never be forwarded
+            # to a redirect target on another origin.
+            opener = urllib.request.build_opener(_NoRedirectHandler())
+        else:
+            opener = urllib.request.build_opener()
+        with opener.open(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
 
     def verify_and_hold(self, *, payment_payload, requirement):
         import sincor_x402
+        from sincor_x402.facilitator import (
+            _normalize_authorization,
+            _normalize_signature,
+            _stable_payment_ref,
+        )
 
+        # Derive the deterministic payment_ref FIRST, from the
+        # canonical authorization — a malformed authorization fails
+        # closed here, before the facilitator is ever called (the
+        # same rule LocalFacilitator enforces).
         try:
-            payload = json.dumps({
-                "paymentPayload": payment_payload,
-                "paymentRequirements": requirement.to_accepts_dict(),
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                self._verify_url, data=payload,
-                headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+            payload = payment_payload.get("payload") or {}
+            normalized_auth = _normalize_authorization(
+                payload.get("authorization") or {})
+            normalized_sig = _normalize_signature(
+                payload.get("signature") or "")
+            payment_ref = _stable_payment_ref(
+                normalized_auth, normalized_sig)
+        except Exception as exc:
+            return sincor_x402.FacilitatorResult(
+                False, error=f"malformed_authorization: {exc}")
+
+        body = {
+            "paymentPayload": payment_payload,
+            "paymentRequirements": requirement.to_accepts_dict(),
+        }
+        try:
+            verify = self._post(self._verify_url, body)
         except Exception as exc:
             return sincor_x402.FacilitatorResult(
                 False, error=f"facilitator_unreachable: {exc}")
-        ok = bool(data.get("isValid", data.get("ok")))
-        ref = data.get("payment_ref") or data.get("paymentRef") or ""
-        if ok and not str(ref).strip():
+        if not bool(verify.get("isValid", verify.get("ok"))):
             return sincor_x402.FacilitatorResult(
-                False, error="facilitator returned success without a "
-                             "payment reference")
+                False,
+                payer=str(verify.get("payer") or ""),
+                error=str(verify.get("invalidReason")
+                          or verify.get("error") or "payment_invalid"))
+        # Settlement is what consumes the authorization and moves the
+        # funds; a verified-but-unsettled payment must never open an
+        # escrow (that was the old verify-only client's hole).
+        try:
+            settle = self._post(self._settle_url, body)
+        except Exception as exc:
+            return sincor_x402.FacilitatorResult(
+                False, error=f"facilitator_settle_unreachable: {exc}")
+        if not bool(settle.get("success", settle.get("ok"))):
+            return sincor_x402.FacilitatorResult(
+                False,
+                payer=str(settle.get("payer")
+                          or verify.get("payer") or ""),
+                error=str(settle.get("errorReason")
+                          or settle.get("error") or "settlement_failed"))
+        payer = str(settle.get("payer") or verify.get("payer")
+                    or normalized_auth["from"])
         return sincor_x402.FacilitatorResult(
-            ok,
-            payer=str(data.get("payer") or ""),
-            payment_ref=str(ref),
-            error=str(data.get("invalidReason") or data.get("error") or ""),
-        )
+            True, payer=payer, payment_ref=payment_ref)
 
 
 def _resolve_facilitator(sx) -> Tuple[Any, bool]:
