@@ -2332,7 +2332,7 @@ def build_ap2_discovery_document() -> Dict[str, Any]:
         },
         "status": "LIVE — AP2 discovery document served at https://getsincor.com/.well-known/ap2.json (founder-approved deploy, 2026-11-11); the settlement hub's deployment state is stated in settlement.hub_deployed_on_mainnet.",
         "verification_enforced_offchain": True,
-        "verification_note": "The Hub records any sigilCommitment it is handed and never checks expectedSchemaHash on-chain; verification is enforced by the settling engine before submission, as in sincor-x402.",
+        "verification_note": "Since the W-150 fix, the Hub records only the sigilCommitment bound into the buyer-signed SEAL and rejects zero-amount seals on-chain; it still never checks expectedSchemaHash on-chain, so output verification is additionally enforced by the settling engine before submission, as in sincor-x402.",
     }
 
 

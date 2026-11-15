@@ -26,7 +26,7 @@ interface IERC7579Hook is IERC7579Module {
 ///      Hub is the source of truth). The hook only ever CALLS
 ///      `isTaskVerified(bytes32, bytes32)`. The draft hook sketch declared a
 ///      `verifyAndSettleSeal(bytes32,bytes32,bytes)` that does not exist on
-///      the Hub; the Hub's real signature is the 5-argument form below
+///      the Hub; the Hub's real signature is the 4-argument form below
 ///      (settlement is the facilitator's call, never the hook's).
 interface ISincorSettlementHub {
     struct SealAuthorization {
@@ -35,15 +35,18 @@ interface ISincorSettlementHub {
         address provider;
         uint256 amount;
         bytes32 expectedSchemaHash;
+        bytes32 sigilCommitment;
         uint256 deadline;
         uint256 nonce;
     }
 
     function isTaskVerified(bytes32 taskId, bytes32 expectedSigil) external view returns (bool);
 
+    // W-150 (2026-11-13): the sigil commitment moved INTO the signed
+    // struct above; verifyAndSettleSeal no longer takes a separate
+    // submitter-supplied sigilCommitment parameter.
     function verifyAndSettleSeal(
         SealAuthorization calldata seal,
-        bytes32 sigilCommitment,
         uint8 v,
         bytes32 r,
         bytes32 s
