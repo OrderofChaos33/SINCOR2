@@ -37,6 +37,18 @@ Security model (adversarial self-review baked into the tests):
   and must be registered before use; data bytes are decoded against the
   registered schema's field layout, so bytes meant for one schema are
   rejected under another.
+* Label binding (W-170): ``subject_label``/``attester_label`` are NOT
+  covered by the signature or the UID, so verification binds them to
+  the identity registry — a label verifies only if it is exactly the
+  registered agent id of the recipient/attester address it describes
+  (``""`` when that address is unregistered). The graph keys subjects
+  and attesters by label, so an unbound label would let anyone
+  re-point a signed vouch at a different agent after issuance.
+* Decoded-range re-validation (W-171): ``abi_decode`` enforces only
+  the ABI type width (a uint8 happily carries 255). Verification
+  re-runs the encode-side semantic ranges (score/quality 0..100,
+  tier 1..3) over the decoded values, so a hand-crafted payload that
+  bypassed ``encode_schema_data`` is rejected instead of ingested.
 
 Shape compatibility note for CNP-2 (ZK KYA attestations, unmerged
 branch): every attestation exposes ``summary()`` returning
@@ -234,6 +246,36 @@ def decode_schema_data(schema: ReputationSchema,
         else:
             out[name] = value
     return out
+
+
+def _validate_decoded(schema: ReputationSchema,
+                      decoded: Dict[str, Any]) -> None:
+    """Re-run encode-side validation over already-decoded values.
+
+    ``abi_decode`` enforces only the ABI type width; the semantic
+    ranges (score/quality 0..100, tier 1..3) live in ``_validate_int``
+    and are checked at encode time. Verification calls this on the
+    decoded payload (W-171) so hand-crafted data that never went
+    through ``encode_schema_data`` cannot smuggle out-of-range values
+    past the bounds. Raises ``ValueError`` on the first violation.
+    """
+    for typ, name in schema.fields:
+        value = decoded[name]
+        if typ.startswith("uint"):
+            _validate_int(typ, name, value)
+        elif typ == "bytes32":
+            _coerce_bytes32(value, name)
+        elif typ == "bool":
+            if not isinstance(value, bool):
+                raise ValueError(f"{name}: bool needs bool")
+        elif typ == "string":
+            if not isinstance(value, str):
+                raise ValueError(f"{name}: string needs str")
+        elif typ == "address":
+            if not is_address(value):
+                raise ValueError(f"{name}: invalid address")
+        else:
+            raise ValueError(f"unsupported schema type {typ}")
 
 
 # ---------------------------------------------------------------------------
@@ -560,15 +602,32 @@ class EASClient:
         if self.compute_uid(digest, att.attester) != att.uid:
             # Any field (data, time, salt, ...) was tampered with post-sign.
             return VerificationResult(False, "uid_mismatch")
+        # W-170: the labels are covered by neither the signature nor
+        # the UID, and the graph keys subjects/attesters by label — so
+        # bind each label to the registry entry for the address it
+        # describes. A relabelled attestation (signed vouch for Carol
+        # re-pointed at Bob, attester re-named to Mallory) fails here
+        # even though its signature and UID are untouched.
+        if att.subject_label != self.label_of(att.recipient):
+            return VerificationResult(False, "subject_label_mismatch")
+        if att.attester_label != self.label_of(att.attester):
+            return VerificationResult(False, "attester_label_mismatch")
         if att.time > moment + self.clock_skew_sec:
             return VerificationResult(False, "future_dated")
         if (att.expiration_time != NO_EXPIRATION
                 and att.expiration_time <= moment):
             return VerificationResult(False, "expired")
         try:
-            decode_schema_data(schema, att.data)
+            decoded = decode_schema_data(schema, att.data)
         except ValueError:
             return VerificationResult(False, "data_schema_mismatch")
+        try:
+            # W-171: decode alone accepts any in-width value (score
+            # 255 in a uint8); re-run the encode-side semantic ranges
+            # so hand-crafted payloads are rejected, not ingested.
+            _validate_decoded(schema, decoded)
+        except ValueError:
+            return VerificationResult(False, "data_out_of_range")
         if att.uid in self._revoked:
             return VerificationResult(False, "revoked")
         return VerificationResult(True, "ok", attester=att.attester)

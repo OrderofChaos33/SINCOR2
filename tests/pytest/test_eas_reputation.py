@@ -5,7 +5,9 @@ Run:  PYTHONPATH=src:. python -m pytest tests/pytest/test_eas_reputation.py
 """
 
 import pytest
+from eth_abi import encode as abi_encode
 from eth_account import Account
+from eth_account.messages import encode_typed_data
 
 from sincor2.eas_reputation import (
     SCHEMA_EXECUTION_OUTCOME,
@@ -16,6 +18,7 @@ from sincor2.eas_reputation import (
     Attestation,
     AttestationGraph,
     EASClient,
+    _eip712_envelope,
     decode_schema_data,
     encode_schema_data,
     schema_uid,
@@ -405,3 +408,177 @@ def test_offchain_domain_is_not_real_eas():
     pinned = EASClient(chain_id=8453,
                        verifying_contract="0x" + "aa" * 20)
     assert pinned.verifying_contract == to_checksum_address("0x" + "aa" * 20)
+
+
+# ---------------------------------------------------------------------------
+# W-170 / W-171 regression (hunt-50): label binding + decoded ranges
+# ---------------------------------------------------------------------------
+
+def _resign(client, att, key):
+    """Re-sign ``att`` in place after tampering (the attacker's own key).
+
+    Mirrors the PoC: the attacker can always produce a *valid* signature
+    over tampered data with their own key — the fix must come from the
+    label binding / range re-validation, not from signature failure.
+    """
+    env = _eip712_envelope(client.chain_id, client.verifying_contract,
+                           "Attest", client._message(att))
+    att.signature = bytes(Account.sign_message(
+        encode_typed_data(full_message=env), private_key=key).signature)
+    att.uid = client.compute_uid(client.signing_digest(att), att.attester)
+    return att
+
+
+def test_w170_relabelled_vouch_redirects_nowhere(client, keys, graph):
+    # PoC part A: Alice's signed vouch for Carol, relabelled
+    # subject->Bob and attester_label->Mallory. Signature and UID are
+    # untouched by the relabel, so only the registry binding stops it.
+    att = client.create_attestation(
+        keys["alice"].key.hex(), "agent-carol", SCHEMA_VOUCH.uid,
+        vouch_data(score=10, task=1), at=NOW)
+    d = att.to_dict()
+    d["subject_label"] = "agent-bob"
+    d["attester_label"] = "agent-mallory"
+    forged = Attestation.from_dict(d)
+    result = client.verify_attestation(forged, now=NOW)
+    assert not result.ok and result.reason == "subject_label_mismatch"
+    assert not graph.ingest(forged, now=NOW).ok
+    assert len(graph) == 0
+    assert graph.aggregate_vouch_score("agent-bob", now=NOW) == 0.0
+    # The genuine vouch still lands on Carol, credited to Alice.
+    assert graph.ingest(att, now=NOW).ok
+    assert graph.aggregate_vouch_score("agent-carol",
+                                       now=NOW) == pytest.approx(0.10)
+    assert graph.attester_diversity("agent-carol", now=NOW) == 1
+
+
+def test_w170_relabelled_attester_rejected(client, keys, graph):
+    att = make_vouch(client, keys, "alice", "carol")
+    d = att.to_dict()
+    d["attester_label"] = "agent-mallory"
+    forged = Attestation.from_dict(d)
+    result = client.verify_attestation(forged, now=NOW)
+    assert not result.ok and result.reason == "attester_label_mismatch"
+    assert not graph.ingest(forged, now=NOW).ok
+    assert len(graph) == 0
+
+
+def test_w170_cleared_or_swapped_labels_rejected(client, keys):
+    att = make_vouch(client, keys, "alice", "bob")
+    for field_name, bad in (("subject_label", ""),
+                            ("subject_label", "agent-carol"),
+                            ("attester_label", ""),
+                            ("attester_label", "agent-carol")):
+        d = att.to_dict()
+        d[field_name] = bad
+        result = client.verify_attestation(Attestation.from_dict(d),
+                                            now=NOW)
+        assert not result.ok, (field_name, bad)
+        assert result.reason.endswith("_label_mismatch")
+
+
+def test_w170_separator_bearing_labels_stay_distinct():
+    # Labels are opaque registry keys: ids containing separators must
+    # round-trip distinctly ("a|b"->"c" must never read as "a"->"b|c").
+    c = EASClient(chain_id=1)
+    accts = {label: Account.create()
+             for label in ("a|b", "b|c", "a", "c")}
+    for label, acct in accts.items():
+        c.register_agent(label, acct.address)
+    g = AttestationGraph(c)
+    att1 = c.create_attestation(accts["a|b"].key.hex(), "c",
+                                SCHEMA_VOUCH.uid,
+                                vouch_data(score=40, task=1), at=NOW)
+    att2 = c.create_attestation(accts["a"].key.hex(), "b|c",
+                                SCHEMA_VOUCH.uid,
+                                vouch_data(score=60, task=2), at=NOW)
+    assert c.verify_attestation(att1, now=NOW).ok
+    assert c.verify_attestation(att2, now=NOW).ok
+    assert g.ingest(att1, now=NOW).ok
+    assert g.ingest(att2, now=NOW).ok
+    assert g.aggregate_vouch_score("c", now=NOW) == pytest.approx(0.40)
+    assert g.aggregate_vouch_score("b|c", now=NOW) == pytest.approx(0.60)
+    assert g.aggregate_vouch_score("a", now=NOW) == 0.0
+    assert g.aggregate_vouch_score("a|b", now=NOW) == 0.0
+    # Re-pointing the "a|b"->"c" vouch at "a" is a label mismatch.
+    d = att1.to_dict()
+    d["subject_label"] = "a"
+    forged = Attestation.from_dict(d)
+    result = c.verify_attestation(forged, now=NOW)
+    assert not result.ok and result.reason == "subject_label_mismatch"
+
+
+@pytest.mark.parametrize("label", ["agent-x", "a|b", "with space",
+                                   "a:b", "||", "trailing|", "ünïcode"])
+def test_w170_label_roundtrip_property(label):
+    # For every accepted (registered) label, the create -> serialize ->
+    # restore -> verify round-trip preserves the label exactly and the
+    # attestation verifies against the same subject it was issued for.
+    c = EASClient(chain_id=1)
+    attester, subject = Account.create(), Account.create()
+    c.register_agent("attester-1", attester.address)
+    c.register_agent(label, subject.address)
+    att = c.create_attestation(attester.key.hex(), label,
+                               SCHEMA_VOUCH.uid, vouch_data(score=33),
+                               at=NOW)
+    restored = Attestation.from_dict(att.to_dict())
+    assert restored.subject_label == label
+    assert restored.recipient == subject.address
+    assert c.verify_attestation(restored, now=NOW).ok
+
+
+def test_w171_out_of_range_score_rejected_at_verify(client, keys,
+                                                      graph):
+    # PoC part B: Mallory hand-crafts score=255 (valid uint8, invalid
+    # score) and signs it herself for Bob — encode-side bounds never
+    # ran. Verify must re-check the decoded range.
+    att = make_vouch(client, keys, "mallory", "bob", score=100, task=2)
+    att.data = abi_encode(
+        ["uint8", "bytes32", "bytes32"],
+        [255, bytes.fromhex(_b32(2)[2:]),
+         bytes.fromhex(_b32(1002)[2:])])
+    _resign(client, att, keys["mallory"].key)
+    result = client.verify_attestation(att, now=NOW)
+    assert not result.ok and result.reason == "data_out_of_range"
+    assert not graph.ingest(att, now=NOW).ok
+    assert graph.aggregate_vouch_score("agent-bob", now=NOW) == 0.0
+
+
+def test_w171_out_of_range_quality_and_tier_rejected(client, keys):
+    att = client.create_attestation(
+        keys["alice"].key.hex(), "agent-bob",
+        SCHEMA_EXECUTION_OUTCOME.uid,
+        {"quality": 90, "upheld_disputes": 0, "task_id": _b32(3),
+         "payload_hash": _b32(4)}, at=NOW)
+    att.data = abi_encode(
+        ["uint8", "uint8", "bytes32", "bytes32"],
+        [255, 0, bytes.fromhex(_b32(3)[2:]),
+         bytes.fromhex(_b32(4)[2:])])
+    _resign(client, att, keys["alice"].key)
+    result = client.verify_attestation(att, now=NOW)
+    assert not result.ok and result.reason == "data_out_of_range"
+
+    att2 = client.create_attestation(
+        keys["carol"].key.hex(), "agent-dave", SCHEMA_KYA_TIER.uid,
+        {"tier": 2, "kya_ref": _b32(5), "payload_hash": _b32(6)},
+        at=NOW)
+    att2.data = abi_encode(
+        ["uint8", "bytes32", "bytes32"],
+        [99, bytes.fromhex(_b32(5)[2:]),
+         bytes.fromhex(_b32(6)[2:])])
+    _resign(client, att2, keys["carol"].key)
+    result2 = client.verify_attestation(att2, now=NOW)
+    assert not result2.ok and result2.reason == "data_out_of_range"
+
+
+def test_w171_boundary_values_still_verify(client, keys):
+    for score in (0, 100):
+        att = make_vouch(client, keys, "alice", "bob", score=score,
+                         task=score + 11)
+        assert client.verify_attestation(att, now=NOW).ok
+    for tier in (1, 3):
+        att = client.create_attestation(
+            keys["carol"].key.hex(), "agent-dave", SCHEMA_KYA_TIER.uid,
+            {"tier": tier, "kya_ref": _b32(5), "payload_hash": _b32(6)},
+            at=NOW)
+        assert client.verify_attestation(att, now=NOW).ok
