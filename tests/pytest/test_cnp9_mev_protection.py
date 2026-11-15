@@ -39,6 +39,7 @@ from sincor2.mev_protected_routing import (
 SKILL = "cnp9-skill"
 H = "agent_h"  # honest bidder
 M = "agent_m"  # mempool sniffer / sniper
+POSTER = "cnp9-poster"  # identified task poster (never a bidder)
 
 
 @pytest.fixture
@@ -71,7 +72,12 @@ def _commitment(bid_axm, nonce, agent_id):
 
 
 def _sealed_task(fabric_env):
-    task = create_task(skill=SKILL, tags=[SKILL], bounty_axm=1.5, sealed=True)
+    # The anti-gaming guard rejects bids on anonymous bounty tasks
+    # (poster_id absent -> self-dealing cannot be ruled out), so bind an
+    # identified poster distinct from both bidders (same pattern as
+    # test_axm_antigaming's poster_id="poster1").
+    task = create_task(skill=SKILL, tags=[SKILL], bounty_axm=1.5, sealed=True,
+                       poster_id=POSTER)
     return task["task_id"]
 
 
