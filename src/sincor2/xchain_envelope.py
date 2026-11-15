@@ -31,7 +31,14 @@ Security properties (adversarial self-review, 2026-10-02):
   ``local_chain_id``; a value of 0 or a mismatch is a hard error, never a
   warning (mirrors W-3 in ``marketplace/contract_net/eip712.py``).
 - R-3 nonce reuse: ``EnvelopeValidator.mark_consumed``/``validate`` reject
-  any already-consumed nonce for the same signer on the same chain.
+  any already-consumed nonce for the same signer on the same chain. The
+  consumed-nonce ledger is DURABLE when configured (``ledger_path``
+  argument or the ``SINCOR_XCHAIN_NONCE_LEDGER_PATH`` env var): spent
+  nonces are fsynced to disk before ``validate`` returns, so a process
+  restart cannot reopen them (W-156). A configured ledger that cannot be
+  read or written fails closed — validation raises rather than falling
+  back to an empty ledger. With no ledger configured the validator is
+  in-memory only (dev/tests); a production executor MUST configure one.
 - R-4 signature malleability: signatures must be canonical low-S
   (``s <= secp256k1_n // 2``); eth_account's recovery is wrapped with an
   explicit check so an (r, n-s, v^1) sibling can never verify.
@@ -49,6 +56,8 @@ Security properties (adversarial self-review, 2026-10-02):
 from __future__ import annotations
 
 import json
+import os
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, Set, Tuple
@@ -72,6 +81,12 @@ ENVELOPE_TYPE = (
 
 # secp256k1 group order; canonical (low-S) signatures require s <= n // 2.
 SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+# Env var naming the durable consumed-nonce ledger file for
+# EnvelopeValidator (mirrors SINCOR_STAKE_LEDGER_PATH in stake_ledger.py).
+NONCE_LEDGER_ENV_VAR = "SINCOR_XCHAIN_NONCE_LEDGER_PATH"
+
+NONCE_LEDGER_FORMAT_VERSION = 1
 
 MAX_UINT256 = (1 << 256) - 1
 
@@ -97,6 +112,14 @@ class ChainIdMismatchError(EnvelopeError):
 
 class NonceReuseError(EnvelopeError):
     """A nonce already consumed for this signer on this chain (R-3)."""
+
+
+class NonceLedgerError(EnvelopeError):
+    """The durable consumed-nonce ledger is unreadable or unwritable.
+
+    Raised instead of ever falling back to an empty ledger: a validator
+    that cannot see its spent nonces must fail closed (W-156).
+    """
 
 
 class ExpiredEnvelopeError(EnvelopeError):
@@ -381,6 +404,186 @@ def verify_envelope(
 
 
 # ---------------------------------------------------------------------------
+# Durable consumed-nonce ledger (W-156)
+# ---------------------------------------------------------------------------
+
+
+class FileNonceLedger:
+    """JSON-file store for consumed envelope nonces, shared across restarts.
+
+    Follows the repo's durable-store idiom (stake_ledger / ofac_sdn):
+    every state change is written to a temp file, fsynced, and atomically
+    ``os.replace``d over the ledger, then the directory is fsynced — so a
+    crash mid-write can never tear the file or lose a spent nonce that was
+    already acknowledged. An ``fcntl`` flock on a sidecar lock file
+    serializes writers across processes, and readers re-read the file
+    before checking so one process sees another's spent nonces.
+
+    Fail closed: a ledger file that exists but cannot be parsed, has the
+    wrong shape, or belongs to a different chain raises
+    :class:`NonceLedgerError` — it is never silently treated as empty.
+    """
+
+    def __init__(self, path: str, chain_id: int) -> None:
+        self.path = os.path.expanduser(path)
+        self.chain_id = int(chain_id)
+        # Validate readability/shape up front so a misconfigured executor
+        # fails at startup, not at the first disbursement.
+        self.load()
+
+    # -- reading --------------------------------------------------------
+    def load(self) -> Tuple[Set[Tuple[str, int]], Set[str]]:
+        """Return ``(consumed_nonces, consumed_envelope_ids)`` from disk.
+
+        A missing file is a fresh ledger (empty). Anything else that goes
+        wrong raises :class:`NonceLedgerError`.
+        """
+        if not os.path.exists(self.path):
+            return set(), set()
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except (OSError, ValueError) as exc:
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} is unreadable ({exc}); failing closed"
+            ) from exc
+        if not isinstance(raw, dict):
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} has unexpected shape; failing closed"
+            )
+        if raw.get("version") != NONCE_LEDGER_FORMAT_VERSION:
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} has unsupported version "
+                f"{raw.get('version')!r}; failing closed"
+            )
+        if raw.get("chain_id") != self.chain_id:
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} is for chain {raw.get('chain_id')!r}, "
+                f"not {self.chain_id}; failing closed"
+            )
+        nonces_raw = raw.get("nonces")
+        ids_raw = raw.get("envelope_ids")
+        if not isinstance(nonces_raw, dict) or not isinstance(ids_raw, list):
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} has unexpected shape; failing closed"
+            )
+        nonces: Set[Tuple[str, int]] = set()
+        try:
+            for signer, values in nonces_raw.items():
+                if not isinstance(values, list):
+                    raise ValueError("nonce list is not a list")
+                for value in values:
+                    nonces.add((str(signer).lower(), int(value)))
+            ids = {str(v) for v in ids_raw}
+        except (TypeError, ValueError) as exc:
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} has malformed entries ({exc}); "
+                "failing closed"
+            ) from exc
+        return nonces, ids
+
+    # -- writing --------------------------------------------------------
+    def record(
+        self,
+        nonces: Set[Tuple[str, int]],
+        envelope_ids: Set[str],
+    ) -> None:
+        """Persist the full consumed sets atomically (fsync + replace).
+
+        Raises :class:`NonceLedgerError` on any I/O failure; the caller
+        must treat the nonce as NOT consumed in that case.
+        """
+        by_signer: Dict[str, list] = {}
+        for signer, nonce in nonces:
+            by_signer.setdefault(signer, []).append(nonce)
+        data = {
+            "version": NONCE_LEDGER_FORMAT_VERSION,
+            "chain_id": self.chain_id,
+            "nonces": {s: sorted(v) for s, v in sorted(by_signer.items())},
+            "envelope_ids": sorted(envelope_ids),
+        }
+        directory = os.path.dirname(os.path.abspath(self.path))
+        tmp = f"{self.path}.tmp.{os.getpid()}"
+        try:
+            os.makedirs(directory, exist_ok=True)
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, separators=(",", ":"))
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self.path)
+            # Fsync the directory so the rename itself survives a crash.
+            dir_fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            try:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            except OSError:
+                pass
+            raise NonceLedgerError(
+                f"nonce ledger {self.path} could not be written ({exc}); "
+                "failing closed"
+            ) from exc
+
+    # -- cross-process lock ----------------------------------------------
+    def locked(self) -> "_LedgerFileLock":
+        """Exclusive flock on a sidecar file (best-effort where fcntl is
+        unavailable, mirroring agent_billing.py)."""
+        return _LedgerFileLock(self.path + ".lock")
+
+
+class _LedgerFileLock:
+    def __init__(self, lock_path: str) -> None:
+        self._lock_path = lock_path
+        self._fd: Optional[int] = None
+
+    def __enter__(self) -> "_LedgerFileLock":
+        try:
+            directory = os.path.dirname(os.path.abspath(self._lock_path))
+            os.makedirs(directory, exist_ok=True)
+            self._fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            import fcntl
+
+            fcntl.flock(self._fd, fcntl.LOCK_EX)
+        except Exception:
+            # No fcntl / no lock file: proceed under the in-process lock
+            # alone rather than failing validation outright.
+            if self._fd is not None:
+                try:
+                    os.close(self._fd)
+                except OSError:
+                    pass
+                self._fd = None
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        if self._fd is not None:
+            try:
+                import fcntl
+
+                fcntl.flock(self._fd, fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                os.close(self._fd)
+            except OSError:
+                pass
+            self._fd = None
+
+
+def _resolve_ledger_path(ledger_path: Optional[str]) -> Optional[str]:
+    """Ledger path resolution: explicit argument, then env var, else None
+    (in-memory only). Mirrors SINCOR_STAKE_LEDGER_PATH in stake_ledger.py."""
+    if ledger_path:
+        return ledger_path
+    env = os.environ.get(NONCE_LEDGER_ENV_VAR, "").strip()
+    return env or None
+
+
+# ---------------------------------------------------------------------------
 # Validator (nonce ledger + expiry + chain binding)
 # ---------------------------------------------------------------------------
 
@@ -389,9 +592,17 @@ class EnvelopeValidator:
     """Stateful validator for a single destination chain.
 
     Keeps a consumed-nonce ledger ``(signer, nonce)`` and a consumed
-    envelope-id set so no envelope can execute twice (R-3). In production
-    the ledger must be durable (DB); this in-memory implementation is for
-    validation and tests.
+    envelope-id set so no envelope can execute twice (R-3).
+
+    The ledger is durable when ``ledger_path`` is given or the
+    ``SINCOR_XCHAIN_NONCE_LEDGER_PATH`` env var is set: spent nonces are
+    persisted (fsync + atomic replace) inside ``mark_consumed`` — i.e.
+    BEFORE ``validate`` returns success and before any executor may treat
+    the envelope as disbursable — and re-read on every check, so neither
+    a restart nor a second process can reopen a spent nonce (W-156).
+    A configured-but-unreadable/unwritable ledger fails closed. With no
+    ledger configured the validator is in-memory only (dev/tests); a
+    production executor MUST configure one.
     """
 
     def __init__(
@@ -400,6 +611,7 @@ class EnvelopeValidator:
         *,
         verifying_contract: str = DEFAULT_VERIFYING_CONTRACT,
         clock: Optional[Any] = None,
+        ledger_path: Optional[str] = None,
     ) -> None:
         if not isinstance(local_chain_id, int) or isinstance(local_chain_id, bool) or local_chain_id <= 0:
             raise ChainIdMismatchError("validator requires an explicit nonzero local_chain_id")
@@ -408,19 +620,66 @@ class EnvelopeValidator:
         self._clock = clock or time.time
         self._consumed_nonces: Set[Tuple[str, int]] = set()
         self._consumed_envelope_ids: Set[str] = set()
+        self._lock = threading.RLock()
+        self._ledger: Optional[FileNonceLedger] = None
+        resolved = _resolve_ledger_path(ledger_path)
+        if resolved is not None:
+            self._ledger = FileNonceLedger(resolved, local_chain_id)
+            nonces, ids = self._ledger.load()
+            self._consumed_nonces |= nonces
+            self._consumed_envelope_ids |= ids
+
+    @property
+    def ledger_path(self) -> Optional[str]:
+        return self._ledger.path if self._ledger is not None else None
 
     # -- ledger ---------------------------------------------------------
+    def _refresh_ledger(self) -> None:
+        """Union the on-disk ledger into memory (call with ``_lock`` held).
+
+        Lets this validator see nonces spent by another process since it
+        last looked, so the replay guard holds across workers/restarts.
+        """
+        if self._ledger is None:
+            return
+        with self._ledger.locked():
+            nonces, ids = self._ledger.load()
+        self._consumed_nonces |= nonces
+        self._consumed_envelope_ids |= ids
+
     def is_nonce_consumed(self, signer: str, nonce: int) -> bool:
-        return (signer.lower(), int(nonce)) in self._consumed_nonces
+        with self._lock:
+            self._refresh_ledger()
+            return (signer.lower(), int(nonce)) in self._consumed_nonces
 
     def mark_consumed(self, envelope: XChainEnvelope) -> None:
         key = (envelope.signer.lower(), envelope.nonce)
-        if key in self._consumed_nonces or envelope.envelope_id in self._consumed_envelope_ids:
-            raise NonceReuseError(
-                f"nonce {envelope.nonce} already consumed for {envelope.signer}"
-            )
-        self._consumed_nonces.add(key)
-        self._consumed_envelope_ids.add(envelope.envelope_id)
+        with self._lock:
+            self._refresh_ledger()
+            if key in self._consumed_nonces or envelope.envelope_id in self._consumed_envelope_ids:
+                raise NonceReuseError(
+                    f"nonce {envelope.nonce} already consumed for {envelope.signer}"
+                )
+            self._consumed_nonces.add(key)
+            self._consumed_envelope_ids.add(envelope.envelope_id)
+            if self._ledger is not None:
+                try:
+                    with self._ledger.locked():
+                        # Merge anything another process recorded while we
+                        # held no file lock, then persist the union.
+                        nonces, ids = self._ledger.load()
+                        self._consumed_nonces |= nonces
+                        self._consumed_envelope_ids |= ids
+                        self._ledger.record(
+                            self._consumed_nonces, self._consumed_envelope_ids
+                        )
+                except Exception:
+                    # The nonce is NOT durable: roll back the in-memory
+                    # mark so this call fails closed and the envelope is
+                    # never treated as consumed/validated.
+                    self._consumed_nonces.discard(key)
+                    self._consumed_envelope_ids.discard(envelope.envelope_id)
+                    raise
 
     # -- validation -----------------------------------------------------
     def validate(
@@ -448,16 +707,25 @@ class EnvelopeValidator:
             verifying_contract=self.verifying_contract,
         )
         key = (envelope.signer.lower(), envelope.nonce)
-        if key in self._consumed_nonces or envelope.envelope_id in self._consumed_envelope_ids:
-            raise NonceReuseError(
-                f"nonce {envelope.nonce} already consumed for {envelope.signer}"
-            )
-        if mark_consumed:
-            self.mark_consumed(envelope)
+        with self._lock:
+            # Re-read the durable ledger before judging freshness so a
+            # nonce spent by a previous process (pre-restart) or a peer
+            # process is rejected exactly like an in-process replay.
+            self._refresh_ledger()
+            if key in self._consumed_nonces or envelope.envelope_id in self._consumed_envelope_ids:
+                raise NonceReuseError(
+                    f"nonce {envelope.nonce} already consumed for {envelope.signer}"
+                )
+            if mark_consumed:
+                # Persists durably (when configured) before returning, so
+                # a crash after this point cannot reopen the nonce.
+                self.mark_consumed(envelope)
         return recovered
 
     def consumed_count(self) -> int:
-        return len(self._consumed_nonces)
+        with self._lock:
+            self._refresh_ledger()
+            return len(self._consumed_nonces)
 
 
 # ---------------------------------------------------------------------------
