@@ -354,6 +354,134 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
         return None
 
 
+# --- W-155: settle-response-loss recovery ---------------------------------
+#
+# /settle executes the transferWithAuthorization on-chain and only
+# THEN answers. If that answer is lost in transit (timeout, reset,
+# proxy failure), the buyer's authorization is consumed and the
+# treasury is paid, yet the client sees only a transport error — and
+# on retry the facilitator rejects the settle because the nonce is
+# already used. Without a recovery path that is a permanent failure
+# for a buyer who HAS paid (the M1 timeout double-charge pattern on
+# the seller side). The recovery below resolves the authorization's
+# on-chain state before any failure is declared. It is proof-based,
+# never facilitator-word-based: success requires ALL of
+#
+#   1. USDC ``authorizationState(authorizer, nonce)`` == true (the
+#      nonce is consumed — necessary, but NOT sufficient: a buyer
+#      can also consume their own nonce via cancelAuthorization
+#      without paying anyone);
+#   2. an ``AuthorizationUsed`` event for exactly this authorizer +
+#      nonce on the asset contract (emitted only by an executed
+#      transferWithAuthorization / receiveWithAuthorization — a
+#      cancellation emits AuthorizationCanceled instead); and
+#   3. in that same transaction, a USDC ``Transfer`` of exactly the
+#      authorized value from the authorized sender to the authorized
+#      recipient.
+#
+# Anything less — RPC error, missing log, mismatched transfer —
+# fails closed and the original settle failure stands. A recovered
+# success carries the SAME deterministic payment_ref derived from
+# the authorization, so the platform's W-146 consumption opens
+# exactly one escrow no matter how many times the buyer retries.
+
+# authorizationState(address,bytes32) on the EIP-3009 asset contract.
+_AUTHORIZATION_STATE_SELECTOR = "0xe94a0102"
+# AuthorizationUsed(address,bytes32) event topic.
+_AUTHORIZATION_USED_TOPIC = \
+    "0x98de503528ee59b575ef0c0a2576a82497bfc029a5685b209e9ec333479b10a5"
+# Transfer(address,address,uint256) event topic.
+_TRANSFER_TOPIC = \
+    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+# Log search for the AuthorizationUsed event: walk back from the
+# chain head in bounded chunks (public RPCs cap eth_getLogs ranges),
+# far enough to cover any realistic retry delay (~46 hours of Base
+# blocks at 2s/block) without an unbounded scan.
+_SETTLE_LOG_CHUNK_BLOCKS = 10_000
+_SETTLE_LOG_MAX_BLOCKS = 200_000
+# Settle rejection wording that indicates the authorization may
+# already be consumed (as opposed to a definitive verdict like an
+# invalid signature or insufficient funds, where no chain state
+# could change the answer). A hint only OPENS the recovery check;
+# the on-chain proof above is what can turn it into a success.
+_SETTLED_REJECTION_HINTS = (
+    "already", "nonce", "used", "consumed",
+    "authorization_state", "authorization state",
+)
+
+
+def _settle_rejection_suggests_consumed(reason: str) -> bool:
+    text = (reason or "").lower()
+    return any(hint in text for hint in _SETTLED_REJECTION_HINTS)
+
+
+def _topic_address(address: str) -> str:
+    """An address as a 32-byte log topic / ABI word (lowercase)."""
+    return "0x" + "0" * 24 + address[2:].lower()
+
+
+def _settlement_proof_onchain(asset: str, auth: Dict[str, Any]) -> bool:
+    """True only if the EIP-3009 authorization `auth` (normalized)
+    was consumed by an executed transfer of exactly the authorized
+    amount from the authorized sender to the authorized recipient
+    on the asset contract at `asset`. Fails closed on any error or
+    missing evidence. Reads go through the module's ``_base_rpc``
+    seam, like every other Lane 3 chain read."""
+    try:
+        authorizer = auth["from"]
+        nonce = auth["nonce"]
+        call_data = (
+            _AUTHORIZATION_STATE_SELECTOR
+            + _topic_address(authorizer)[2:]
+            + nonce[2:])
+        state = _base_rpc(
+            "eth_call", [{"to": asset, "data": call_data}, "latest"])
+        if not state or int(state, 16) != 1:
+            return False
+        latest = int(_base_rpc("eth_blockNumber", []), 16)
+        tx_hash = None
+        searched = 0
+        to_block = latest
+        while searched < _SETTLE_LOG_MAX_BLOCKS and to_block >= 0:
+            from_block = max(
+                0, to_block - _SETTLE_LOG_CHUNK_BLOCKS + 1)
+            logs = _base_rpc("eth_getLogs", [{
+                "address": asset,
+                "topics": [
+                    _AUTHORIZATION_USED_TOPIC,
+                    _topic_address(authorizer),
+                    nonce,
+                ],
+                "fromBlock": hex(from_block),
+                "toBlock": hex(to_block),
+            }]) or []
+            if logs:
+                tx_hash = logs[0].get("transactionHash")
+                break
+            searched += to_block - from_block + 1
+            to_block = from_block - 1
+        if not tx_hash:
+            return False
+        receipt = _base_rpc(
+            "eth_getTransactionReceipt", [tx_hash]) or {}
+        for log in receipt.get("logs") or []:
+            topics = log.get("topics") or []
+            if (
+                str(log.get("address") or "").lower() == asset.lower()
+                and len(topics) >= 3
+                and str(topics[0]).lower() == _TRANSFER_TOPIC
+                and str(topics[1]).lower()
+                    == _topic_address(auth["from"])
+                and str(topics[2]).lower() == _topic_address(auth["to"])
+                and int(log.get("data") or "0x0", 16)
+                    == int(auth["value"])
+            ):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 class _HttpFacilitator:
     """Facilitator client for a configured x402 facilitator.
 
@@ -397,6 +525,17 @@ class _HttpFacilitator:
     re-send the Authorization header to the redirect target, so a
     compromised or redirecting facilitator could otherwise harvest
     the operator's long-lived CDP key (CWE-522).
+
+    Settle-response-loss recovery (W-155): a /settle that executes
+    on-chain but whose response is lost leaves the buyer paid and
+    the authorization consumed; a retry is then rejected as
+    already-settled. On a settle transport error, or on a settle
+    rejection indicating the authorization is already consumed,
+    verify_and_hold resolves the authorization's on-chain state
+    (``_settlement_proof_onchain``) before declaring failure, and
+    returns success with the same stable payment_ref when — and
+    only when — the chain proves the exact authorized transfer
+    landed, so the escrow still opens exactly once.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -445,6 +584,18 @@ class _HttpFacilitator:
         with opener.open(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
+    def _recovered_settlement(self, normalized_auth, requirement) -> bool:
+        """W-155 recovery gate: chain proof that this authorization
+        already settled. Consulted only after the facilitator's
+        settle answer was lost or reported the authorization as
+        consumed; never weakens the facilitator path — /verify has
+        already validated signature, amount, recipient, and window
+        for THIS call before this check can run."""
+        asset = str(getattr(requirement, "asset", "") or "")
+        if not asset:
+            return False
+        return _settlement_proof_onchain(asset, normalized_auth)
+
     def verify_and_hold(self, *, payment_payload, requirement):
         import sincor_x402
         from sincor_x402.facilitator import (
@@ -490,15 +641,41 @@ class _HttpFacilitator:
         try:
             settle = self._post(self._settle_url, body)
         except Exception as exc:
+            # W-155: the settle may have executed on-chain before its
+            # response was lost. Resolve the authorization's chain
+            # state before declaring failure — if the exact transfer
+            # landed, this payment HAS settled and the buyer is owed
+            # the resource, with the same stable payment_ref.
+            if self._recovered_settlement(normalized_auth, requirement):
+                return sincor_x402.FacilitatorResult(
+                    True,
+                    payer=str(verify.get("payer")
+                              or normalized_auth["from"]),
+                    payment_ref=payment_ref)
             return sincor_x402.FacilitatorResult(
                 False, error=f"facilitator_settle_unreachable: {exc}")
         if not bool(settle.get("success", settle.get("ok"))):
+            reason = str(settle.get("errorReason")
+                         or settle.get("error") or "settlement_failed")
+            # W-155: an already-settled / nonce-consumed rejection on
+            # a retry means an earlier settle (whose response never
+            # reached us, or whose caller never saw ours) already
+            # moved the funds. Recover it from chain state instead
+            # of demanding a second payment.
+            if _settle_rejection_suggests_consumed(reason) \
+                    and self._recovered_settlement(
+                        normalized_auth, requirement):
+                return sincor_x402.FacilitatorResult(
+                    True,
+                    payer=str(settle.get("payer")
+                              or verify.get("payer")
+                              or normalized_auth["from"]),
+                    payment_ref=payment_ref)
             return sincor_x402.FacilitatorResult(
                 False,
                 payer=str(settle.get("payer")
                           or verify.get("payer") or ""),
-                error=str(settle.get("errorReason")
-                          or settle.get("error") or "settlement_failed"))
+                error=reason)
         payer = str(settle.get("payer") or verify.get("payer")
                     or normalized_auth["from"])
         return sincor_x402.FacilitatorResult(
