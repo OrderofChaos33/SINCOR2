@@ -67,11 +67,17 @@ class VerifiedEndpoint:
         facilitator: FacilitatorClient | None = None,
         verifier: Verifier | None = None,
         timeout_seconds: float = 30.0,
+        extensions: dict[str, Any] | None = None,
     ) -> None:
         self._func = func
         # The server's OWN retained requirement — the single source of truth
         # for the hedge and for every facilitator call.
         self.requirement = requirement
+        # Optional x402 extensions block (e.g. extensions.bazaar discovery
+        # metadata, built by sincor_x402.discovery.build_bazaar_extension).
+        # Advertised verbatim on every 402 this endpoint serves; it never
+        # feeds the hedge or any settlement decision.
+        self.extensions = extensions
         self.terms = EscrowTerms(requirement=requirement, spec=spec,
                                  timeout_seconds=timeout_seconds)
         self.platform: PlatformClient = platform or LocalReferencePlatform()
@@ -88,6 +94,8 @@ class VerifiedEndpoint:
             "accepts": [self.requirement.to_accepts_dict()],
             "escrow": self.terms.to_dict(),
         }
+        if self.extensions is not None:
+            body["extensions"] = self.extensions
         return HandlerResponse(402, body, {"Content-Type": "application/json"})
 
     # -- accepts[] hedge ---------------------------------------------------
@@ -135,10 +143,13 @@ class VerifiedEndpoint:
         try:
             requirement = self.match_accepted(payment_payload)
         except AcceptsMismatch as exc:
-            return HandlerResponse(
-                402, {"ok": False, "error": "accepts_mismatch",
-                      "detail": str(exc),
-                      "accepts": [self.requirement.to_accepts_dict()]}, {})
+            mismatch_body: dict[str, Any] = {
+                "ok": False, "error": "accepts_mismatch",
+                "detail": str(exc),
+                "accepts": [self.requirement.to_accepts_dict()]}
+            if self.extensions is not None:
+                mismatch_body["extensions"] = self.extensions
+            return HandlerResponse(402, mismatch_body, {})
 
         fac = self.facilitator.verify_and_hold(
             payment_payload=payment_payload, requirement=requirement)
