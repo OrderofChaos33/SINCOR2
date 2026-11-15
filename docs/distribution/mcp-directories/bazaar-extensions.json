@@ -1,0 +1,1123 @@
+{
+ "about": "Bazaar discovery declarations for SINCOR's paid x402 endpoints, recorded in the SERVED shape (extensions.bazaar: info + schema) and generated from the same builders that construct the live 402 challenges \u2014 sincor2.x402_payments.build_payment_payload for the /x402/<resource> surface and sincor_x402 + sincor2.lane3 for the two Lane-3 endpoints. tests/pytest/test_bazaar_extensions_wiring.py asserts this file equals the code-generated declarations, so it cannot drift. Supersedes the 2026-10-26 prepared declarations, which used the discovery-catalog shape (input/output as siblings of info, an accepts echo, GET methods) that the current x402 extension spec does not define. Indexing additionally requires a paid call settled through the CDP Facilitator (founder-gated); declarations alone do not list an endpoint.",
+ "resources": {
+  "wallet-sanctions-screen": {
+   "resource": "https://getsincor.com/x402/wallet-sanctions-screen",
+   "method": "POST",
+   "description": "Single-read OFAC SDN sanctions screen for one wallet address on Base with x402 settlement. Use when you need a pre-transaction sanctions check on an unknown wallet.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "address": "0x0000000000000000000000000000000000000000",
+       "wallet": "0x0000000000000000000000000000000000000000",
+       "wallet_address": "0x0000000000000000000000000000000000000000"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "address": "0x0000000000000000000000000000000000000000",
+       "verdict": "clean",
+       "status": "screened",
+       "screened": true,
+       "stale": false,
+       "match": null,
+       "detail": "address not on OFAC SDN list"
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "address": {
+           "type": "string",
+           "description": "Wallet address to screen (0x...); 'wallet' and 'wallet_address' are accepted aliases"
+          },
+          "wallet": {
+           "type": "string"
+          },
+          "wallet_address": {
+           "type": "string"
+          }
+         }
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "kya-trust-score": {
+   "resource": "https://getsincor.com/x402/kya-trust-score",
+   "method": "POST",
+   "description": "Single-read KYA agent trust score with auditable component breakdown from the SINCOR registry, stake ledger, and settlement history on Base with x402 settlement. Use when you need to decide whether to transact with an agent wallet.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "agent_id": "",
+       "wallet": "0x0000000000000000000000000000000000000000"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "agent_id": "",
+       "wallet": "0x0000000000000000000000000000000000000000",
+       "score": 0,
+       "components": {}
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "agent_id": {
+           "type": "string"
+          },
+          "wallet": {
+           "type": "string",
+           "description": "Agent wallet address"
+          }
+         }
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "polymarket-whale-signal": {
+   "resource": "https://getsincor.com/x402/polymarket-whale-signal",
+   "method": "POST",
+   "description": "Single-read fresh entries from tracked Polymarket whale wallets with per-wallet resolved-market track record on Base with x402 settlement. Use when you need current tracked-whale flow as data; historical statistics only, no claim about future results.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "wallet": "0x0000000000000000000000000000000000000000",
+       "market_id": "",
+       "window_minutes": 0
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "status": "no_fresh_signals",
+       "signals": []
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "wallet": {
+           "type": "string"
+          },
+          "market_id": {
+           "type": "string"
+          },
+          "window_minutes": {
+           "type": "integer"
+          }
+         }
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "toa-micro-decision": {
+   "resource": "https://getsincor.com/x402/toa-micro-decision",
+   "method": "POST",
+   "description": "Single TOA ranked-choice decision with confidence, escalate-below-threshold, and hard-gate refusal on Base with x402 settlement. Use when you need one ranked choice with a confidence number inside a larger workflow.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "options": [
+        {
+         "label": "Option A"
+        },
+        {
+         "label": "Option B"
+        }
+       ]
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "ranked_options": [],
+       "confidence": 0.0
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "options": {
+           "type": "array",
+           "items": {
+            "type": "object"
+           }
+          },
+          "context": {
+           "type": "object"
+          },
+          "decision_id": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "options"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "market-data-read": {
+   "resource": "https://getsincor.com/x402/market-data-read",
+   "method": "POST",
+   "description": "Single Chainlink price read with round provenance and staleness flag on Base with x402 settlement. Use when you need one current price with its round id and timestamp inside a larger workflow.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "pair": "ETH/USD",
+       "mode": "price"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "pair": "ETH/USD",
+       "mode": "price",
+       "source": "chainlink",
+       "price": "2500.00",
+       "round_id": "0",
+       "stale": false
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "pair": {
+           "type": "string",
+           "enum": [
+            "ETH/USD",
+            "USDC/USD"
+           ],
+           "description": "Chainlink pair, e.g. ETH/USD"
+          },
+          "mode": {
+           "type": "string",
+           "enum": [
+            "price"
+           ],
+           "default": "price",
+           "description": "Read mode; default 'price'"
+          }
+         },
+         "required": [
+          "pair"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "local-business-site-check": {
+   "resource": "https://getsincor.com/x402/local-business-site-check",
+   "method": "POST",
+   "description": "Single honest site-quality read for a local business: build_recommended with evidenced deficiencies, no_build_needed, or unknown on Base with x402 settlement. Use when prospecting a local business and you need to know whether its site needs a rebuild before pitching one.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "url": "https://example.com",
+       "business_name": "Example Co"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "url": "https://example.com",
+       "verdict": "unknown",
+       "deficiencies": []
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "url": {
+           "type": "string"
+          },
+          "business_name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "url"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "web-search-read": {
+   "resource": "https://getsincor.com/x402/web-search-read",
+   "method": "POST",
+   "description": "Single web search or page read with source URLs and fetch timestamps on Base with x402 settlement. Use when you need current web results or the extracted text of one page inside a larger workflow.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "mode": "search",
+       "query": "x402 protocol news"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "ok": true,
+       "resource": "web-search-read",
+       "mode": "search",
+       "query": "x402 protocol news",
+       "results": [],
+       "count": 0,
+       "retrieved_at": "2026-01-01T00:00:00Z"
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "mode": {
+           "type": "string",
+           "enum": [
+            "search",
+            "read"
+           ],
+           "description": "'search' (requires query) or 'read' (requires url)"
+          },
+          "query": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "mode"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "healthcare-credential-check": {
+   "resource": "https://getsincor.com/x402/healthcare-credential-check",
+   "method": "POST",
+   "description": "Paid healthcare credential verification on Base with AgentKit/x402 settlement",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "provider_npi": "1234567890"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "npi_valid": true,
+       "licence_status": "active"
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "provider_npi": {
+           "type": "string",
+           "description": "10-digit National Provider Identifier"
+          },
+          "provider_name": {
+           "type": "string"
+          },
+          "payer_ids": {
+           "type": "array",
+           "items": {
+            "type": "string"
+           }
+          }
+         },
+         "required": [
+          "provider_npi"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "enum": [
+          "json"
+         ]
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "quick-scan": {
+   "resource": "https://getsincor.com/x402-live/quick-scan",
+   "method": "POST",
+   "description": "SINCOR quick scan: Base address surface summary (contract check, code size, balance, chain state) for 0.01 USDC. Body: {\"address\": \"0x\u2026\"}.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "address": "0x0000000000000000000000000000000000000000"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "address": "0x0000000000000000000000000000000000000000",
+       "chain_id": 8453,
+       "network": "base",
+       "is_contract": false,
+       "code_size_bytes": 0,
+       "balance_wei": "0",
+       "balance_eth": 0.0,
+       "is_usdc_contract": false,
+       "block_number": 0,
+       "source": "public Base JSON-RPC state"
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "address": {
+           "type": "string",
+           "description": "Base address to inspect (0x-prefixed 20-byte hex)"
+          }
+         },
+         "required": [
+          "address"
+         ]
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string"
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  },
+  "audit-express": {
+   "resource": "https://getsincor.com/audit-express/order",
+   "method": "POST",
+   "description": "Audit Express entry reservation: 48-hour AI-assisted Foundry fuzzing & security check. Final scope price (500\u20131500 USDC) confirmed at intake. Not a formal audit.",
+   "bazaar": {
+    "info": {
+     "input": {
+      "type": "http",
+      "method": "POST",
+      "bodyType": "json",
+      "body": {
+       "contact": "you@example.com",
+       "repo": "https://github.com/example/repo"
+      }
+     },
+     "output": {
+      "type": "json",
+      "example": {
+       "order_ref": "audit-express-000000000000",
+       "status": "intake_received",
+       "tier": "audit-express",
+       "contact": "you@example.com",
+       "repo": "https://github.com/example/repo"
+      }
+     }
+    },
+    "schema": {
+     "$schema": "https://json-schema.org/draft/2020-12/schema",
+     "type": "object",
+     "properties": {
+      "input": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string",
+         "const": "http"
+        },
+        "method": {
+         "type": "string",
+         "enum": [
+          "POST",
+          "PUT",
+          "PATCH"
+         ]
+        },
+        "bodyType": {
+         "type": "string",
+         "enum": [
+          "json",
+          "form-data",
+          "text"
+         ]
+        },
+        "body": {
+         "type": "object",
+         "properties": {
+          "contact": {
+           "type": "string",
+           "description": "Contact for scope and price confirmation (email or handle)"
+          },
+          "repo": {
+           "type": "string",
+           "description": "Repository to review (URL); 'repo_url' is accepted as an alias"
+          },
+          "repo_url": {
+           "type": "string"
+          }
+         }
+        },
+        "queryParams": {
+         "type": "object"
+        },
+        "headers": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "string"
+         }
+        }
+       },
+       "required": [
+        "type",
+        "method",
+        "bodyType",
+        "body"
+       ],
+       "additionalProperties": false
+      },
+      "output": {
+       "type": "object",
+       "properties": {
+        "type": {
+         "type": "string"
+        },
+        "example": {
+         "type": "object"
+        }
+       },
+       "required": [
+        "type"
+       ]
+      }
+     },
+     "required": [
+      "input"
+     ]
+    }
+   }
+  }
+ }
+}
