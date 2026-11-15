@@ -112,7 +112,9 @@ DIGITAL_SKUS: Dict[str, Dict[str, Any]] = {
 
 
 def _digital_intake_db_path() -> Path:
-    return Path(os.environ.get("SINCOR_REVENUE_DB") or REVENUE_DB)
+    from sincor2.data_paths import revenue_ledger_db_path
+
+    return revenue_ledger_db_path()
 
 
 def issue_delivery_token() -> str:
