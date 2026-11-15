@@ -10,6 +10,7 @@ Run: PYTHONPATH=src:. ~/.venvs/sincor2/bin/python -m pytest
        tests/pytest/test_streaming_bids.py -q
 """
 
+import hashlib
 import random
 import threading
 
@@ -17,6 +18,7 @@ import pytest
 
 from sincor2.onchain.bidder_client import commitment, random_salt
 from sincor2.streaming_bids import (
+    LIFECYCLE_PROOF_PREFIX,
     StreamConfig,
     StreamingBidManager,
 )
@@ -49,10 +51,10 @@ def mgr(**kw):
 
 
 def open_ok(m, aid=AID_A, agent="agent-1", deadline_offset=3600.0,
-            min_inc=0):
+            min_inc=0, auth_proof=None):
     now = m._clock()
     r = m.open_stream(aid, agent, commit_deadline_ts=now + deadline_offset,
-                      min_increment_wei=min_inc)
+                      min_increment_wei=min_inc, auth_proof=auth_proof)
     assert r.ok, r
     return r
 
@@ -442,6 +444,9 @@ def test_privacy_store_holds_no_plaintext():
 # ---------------------------------------------------------------------------
 
 def test_auth_verifier_enforced():
+    # W-162: the verifier gates the whole lifecycle, not just submits.
+    # An identity the verifier rejects can no longer even open a stream
+    # (previously it could open and was only stopped at submit time).
     seen = []
 
     def verifier(agent_id, auction_hex, comm):
@@ -452,15 +457,44 @@ def test_auth_verifier_enforced():
                             config=StreamConfig(
                                 min_update_interval_seconds=0),
                             auth_verifier=verifier)
-    open_ok(m)  # agent-1 stream
-    open_ok(m, agent="agent-2")
+    # W-163: with a verifier set, stream terms come from the record.
+    assert m.register_auction(
+        AID_A, commit_deadline_ts=m._clock() + 3600).ok
+    open_ok(m, auth_proof=b"\x01" * 32)  # agent-1 stream
+    r = m.open_stream(AID_A, "agent-2",
+                      commit_deadline_ts=m._clock() + 3600,
+                      auth_proof=b"\x01" * 32)
+    assert not r.ok and r.reason == "auth_failed"
+    # A missing proof fails closed too.
+    r = m.open_stream(AID_A, "agent-1", commit_deadline_ts=m._clock() + 3600)
+    assert not r.ok and r.reason == "auth_failed"
     c = commitment(100, seeded_salts(1)[0], "agent-1", AID_A, CHAIN_ID)
     assert m.submit_update(AID_A, "agent-1", c).ok
     c2 = commitment(100, seeded_salts(1, seed=5)[0], "agent-2", AID_A,
                     CHAIN_ID)
     r = m.submit_update(AID_A, "agent-2", c2)
-    assert not r.ok and r.reason == "auth_failed"
+    assert not r.ok and r.reason == "unknown_stream"  # never opened
     assert seen and seen[0][0] == "agent-1"
+
+
+def test_auth_revocation_between_open_and_submit_rejects():
+    # The submit-time check is not redundant with the open-time check:
+    # a credential revoked mid-window must stop further updates.
+    allowed = {"agent-1"}
+
+    def verifier(agent_id, auction_hex, comm):
+        return agent_id in allowed
+
+    m = StreamingBidManager(clock=FakeClock(),
+                            config=StreamConfig(
+                                min_update_interval_seconds=0),
+                            auth_verifier=verifier)
+    assert m.register_auction(
+        AID_A, commit_deadline_ts=m._clock() + 3600).ok
+    open_ok(m, auth_proof=b"\x01" * 32)
+    allowed.clear()  # credential revoked after the stream opened
+    r = m.submit_update(AID_A, "agent-1", b"\x05" * 32)
+    assert not r.ok and r.reason == "auth_failed"
 
 
 def test_auth_verifier_crash_rejects():
@@ -471,9 +505,15 @@ def test_auth_verifier_crash_rejects():
                             config=StreamConfig(
                                 min_update_interval_seconds=0),
                             auth_verifier=boom)
-    open_ok(m)
-    r = m.submit_update(AID_A, "agent-1", b"\x04" * 32)
+    # W-162: a crashing verifier fails closed at open time already —
+    # no stream is created and nothing is ever accepted.
+    r = m.open_stream(AID_A, "agent-1",
+                      commit_deadline_ts=m._clock() + 3600,
+                      auth_proof=b"\x01" * 32)
     assert not r.ok and r.reason == "auth_failed"
+    assert m.stream_summary(AID_A) == {}
+    r = m.submit_update(AID_A, "agent-1", b"\x04" * 32)
+    assert not r.ok and r.reason == "unknown_stream"
 
 
 def test_production_requires_auth_verifier(monkeypatch):
@@ -521,3 +561,207 @@ def test_stream_config_validation():
         StreamConfig(min_update_interval_seconds=-1).validate()
     with pytest.raises(ValueError):
         StreamConfig(max_streams_per_auction=0).validate()
+
+
+# ---------------------------------------------------------------------------
+# W-162 / W-163 regression — PoC50-C attacks under production wiring
+#
+# Production model: an auth_verifier is set and the auction's terms are
+# registered before streams open.  Lifecycle operations (open/close)
+# require the agent's own proof token — a credential only that agent
+# can present.  (A deployment verifier must use an unforgeable,
+# domain-separated credential for this; the sha256 token here models
+# possession.)  For submit_update the module passes the commitment as
+# the proof, per the module's existing submit contract.
+# ---------------------------------------------------------------------------
+
+_REGISTERED_AGENTS = {"legit-victim", "legit-alice", "legit-bob"}
+
+
+def _lifecycle_proof(agent_id):
+    return hashlib.sha256(f"lifecycle-proof:{agent_id}".encode()).digest()
+
+
+def _prod_verifier(agent_id, auction_hex, proof):
+    if agent_id not in _REGISTERED_AGENTS:
+        return False
+    if proof.startswith(LIFECYCLE_PROOF_PREFIX):
+        # Lifecycle operation: the domain-tagged proof must be the
+        # identity holder's own token.  A streamed commitment presented
+        # as an auth_proof lands here (tagged by the manager) and fails,
+        # because it is not the lifecycle token.
+        return proof == LIFECYCLE_PROOF_PREFIX + _lifecycle_proof(agent_id)
+    # submit_update path: proof is the update's commitment itself.
+    return isinstance(proof, (bytes, bytearray)) and len(proof) == 32
+
+
+def prod_mgr(clock=None, **cfg_kw):
+    clock = clock or FakeClock()
+    cfg_kw.setdefault("min_update_interval_seconds", 0)
+    m = StreamingBidManager(config=StreamConfig(**cfg_kw), clock=clock,
+                            auth_verifier=_prod_verifier)
+    return m, clock
+
+
+def test_w162_squat_rejected_and_victim_unharmed():
+    # PoC C1: attacker squats the victim's stream with hostile terms.
+    m, clock = prod_mgr()
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 100,
+                              min_increment_wei=100).ok
+    # Attacker presents no proof, then a proof for the wrong identity.
+    r = m.open_stream(AID_A, "legit-victim",
+                      commit_deadline_ts=clock() + 5,
+                      min_increment_wei=10**18)
+    assert not r.ok and r.reason == "auth_failed"
+    r = m.open_stream(AID_A, "legit-victim",
+                      commit_deadline_ts=clock() + 5,
+                      min_increment_wei=10**18,
+                      auth_proof=_lifecycle_proof("mallory"))
+    assert not r.ok and r.reason == "auth_failed"
+    assert m.stream_summary(AID_A) == {}
+    # The victim opens their own stream; the record's terms govern even
+    # though the opener kwargs ask for something else entirely.
+    r = m.open_stream(AID_A, "legit-victim",
+                      commit_deadline_ts=clock() + 999_999,
+                      min_increment_wei=0,
+                      auth_proof=_lifecycle_proof("legit-victim"))
+    assert r.ok
+    summary = m.stream_summary(AID_A)["legit-victim"]
+    assert summary["commit_deadline_ts"] == clock() + 100
+    assert summary["min_increment_wei"] == 100
+    # Victim submits inside the real window — the squat achieved nothing.
+    salt = seeded_salts(1)[0]
+    r = m.submit_update(AID_A, "legit-victim",
+                        commitment(1000, salt, "legit-victim", AID_A,
+                                   CHAIN_ID))
+    assert r.ok
+
+
+def test_w162_hostile_close_rejected():
+    # PoC C2: attacker closes the victim's stream (irreversible DoS).
+    m, clock = prod_mgr()
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 3600).ok
+    assert m.open_stream(AID_A, "legit-victim",
+                         auth_proof=_lifecycle_proof("legit-victim")).ok
+    salt = seeded_salts(1)[0]
+    assert m.submit_update(
+        AID_A, "legit-victim",
+        commitment(500, salt, "legit-victim", AID_A, CHAIN_ID)).ok
+    # No credential at all, then someone else's credential: both fail
+    # and the stream stays open.
+    r = m.close_stream(AID_A, "legit-victim")
+    assert not r.ok and r.reason == "auth_failed"
+    r = m.close_stream(AID_A, "legit-victim",
+                       auth_proof=_lifecycle_proof("legit-alice"))
+    assert not r.ok and r.reason == "auth_failed"
+    # The victim's own streamed commitment (public via reveal_package)
+    # is not a lifecycle credential either.
+    stolen = m.reveal_package(AID_A, "legit-victim")[-1]
+    r = m.close_stream(AID_A, "legit-victim", auth_proof=stolen)
+    assert not r.ok and r.reason == "auth_failed"
+    assert m.stream_summary(AID_A)["legit-victim"]["open"] is True
+    salt2 = seeded_salts(1, seed=8)[0]
+    assert m.submit_update(
+        AID_A, "legit-victim",
+        commitment(600, salt2, "legit-victim", AID_A, CHAIN_ID)).ok
+    # The owner can still close it.
+    assert m.close_stream(
+        AID_A, "legit-victim",
+        auth_proof=_lifecycle_proof("legit-victim")).ok
+    r = m.submit_update(AID_A, "legit-victim", b"\x06" * 32)
+    assert not r.ok and r.reason == "stream_closed"
+
+
+def test_w162_sybil_cap_exhaustion_rejected():
+    # PoC C3: sybil opens fill max_streams_per_auction, locking out
+    # legitimate agents.  With a verifier set, unregistered identities
+    # cannot open at all, so the cap is never consumed by them.
+    m, clock = prod_mgr(max_streams_per_auction=4)
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 3600).ok
+    for i in range(4):
+        r = m.open_stream(AID_A, f"sybil-{i}",
+                          auth_proof=_lifecycle_proof(f"sybil-{i}"))
+        assert not r.ok and r.reason == "auth_failed", r
+    assert m.stream_summary(AID_A) == {}
+    r = m.open_stream(AID_A, "legit-alice",
+                      auth_proof=_lifecycle_proof("legit-alice"))
+    assert r.ok
+
+
+def test_w163_opener_declared_terms_ignored():
+    # PoC C4: opener declares deadline now+999999 and min_increment=0;
+    # updates then validate 400s past the real 100s window and a 1-wei
+    # grind chain fully validates.  With terms from the record, the
+    # real deadline binds and the grind is voided at reveal.
+    m, clock = prod_mgr()
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 100,
+                              min_increment_wei=100).ok
+    r = m.open_stream(AID_A, "legit-alice",
+                      commit_deadline_ts=clock() + 999_999,
+                      min_increment_wei=0,
+                      auth_proof=_lifecycle_proof("legit-alice"))
+    assert r.ok
+    summary = m.stream_summary(AID_A)["legit-alice"]
+    assert summary["commit_deadline_ts"] == clock() + 100
+    assert summary["min_increment_wei"] == 100
+    prices, salts = [1000, 1001, 1002], seeded_salts(3, seed=77)
+    for p, s in zip(prices, salts):
+        assert m.submit_update(
+            AID_A, "legit-alice",
+            commitment(p, s, "legit-alice", AID_A, CHAIN_ID)).ok
+    v = m.validate_reveal_chain(AID_A, "legit-alice", prices, salts,
+                                CHAIN_ID)
+    assert not v.ok and v.effective_price == 1000
+    assert any("increment_too_small" in f for f in v.failures)
+    # Past the auction's real window, updates are refused — the
+    # opener's fantasy deadline buys nothing.
+    clock.advance(500.0)
+    r = m.submit_update(AID_A, "legit-alice", b"\x07" * 32)
+    assert not r.ok and r.reason == "window_closed"
+
+
+def test_w163_unregistered_auction_rejected_in_production_mode():
+    m, clock = prod_mgr()
+    r = m.open_stream(AID_A, "legit-alice",
+                      commit_deadline_ts=clock() + 3600,
+                      auth_proof=_lifecycle_proof("legit-alice"))
+    assert not r.ok and r.reason == "unknown_auction"
+
+
+def test_register_auction_first_write_wins():
+    m, clock = mgr()
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 100,
+                              min_increment_wei=5).ok
+    # Identical re-registration is an idempotent no-op.
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 100,
+                              min_increment_wei=5).ok
+    # Conflicting re-registration is rejected; the original stands.
+    r = m.register_auction(AID_A, commit_deadline_ts=clock() + 999,
+                           min_increment_wei=0)
+    assert not r.ok and r.reason == "auction_terms_conflict"
+    terms = m.auction_terms(AID_A)
+    assert terms.commit_deadline_ts == clock() + 100
+    assert terms.min_increment_wei == 5
+
+
+def test_production_legitimate_flow_end_to_end():
+    # The full honest flow still works under production wiring:
+    # register -> authenticated open -> streamed updates -> reveal
+    # validation -> settlement handoff -> authenticated close.
+    m, clock = prod_mgr()
+    assert m.register_auction(AID_A, commit_deadline_ts=clock() + 3600,
+                              min_increment_wei=50).ok
+    assert m.open_stream(AID_A, "legit-alice",
+                         auth_proof=_lifecycle_proof("legit-alice")).ok
+    prices = [1000, 1200, 1150]  # moves of 200 and 50 >= 50
+    salts = seeded_salts(3, seed=2024)
+    stream_chain(m, AID_A, "legit-alice", prices, salts)
+    v = m.validate_reveal_chain(AID_A, "legit-alice", prices, salts,
+                                CHAIN_ID)
+    assert v.ok and v.effective_price == 1150
+    fb = m.effective_final_bid(AID_A, "legit-alice", prices, salts,
+                               CHAIN_ID)
+    assert fb.ok and fb.price_wei == 1150 and fb.seq == 2
+    assert m.close_stream(
+        AID_A, "legit-alice",
+        auth_proof=_lifecycle_proof("legit-alice")).ok
