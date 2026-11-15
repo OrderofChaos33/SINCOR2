@@ -119,7 +119,7 @@ SINCOR2 is built for operators who need autonomous agents that do real work — 
 
 Snapshot of the verified state of the platform (main at `7d8cf5e2`, 2026-11-12). Status words below are exact: *merged* means on main, *built* means implemented and test-verified on a branch awaiting the founder's merge, *prepared* means computed and stored — never broadcast.
 
-- **Live Agent Card:** 42 skills across 7 archetypes at `/.well-known/agent-card.json` (the original 18 plus 24 adopted skills merged in PR #630).
+- **Live Agent Card:** 42 skills across 7 archetypes at `/.well-known/agent-card.json` (the original 18 plus 24 adopted skills merged in PR #630; counts corrected sitewide in PR #609).
 - **Genesis launch:** November 9, 2026. The A2A marketplace is in testing ahead of launch; the bounty pool is funded at 20,000 AXM.
 - **Control plane:** the Phase 1 escalation layer is merged on main (PR #610); Phase 2 signing + Merkle anchoring and the sanctions-screen wiring are built and test-verified on branches, pending merge (see Human-in-the-Loop Control Plane for exact status).
 - **MoebiusX session account:** live trading on Base mainnet under a founder-signed session-key grant (v3 packet, signed 2026-11-11), superseding the fork-sim prototype merged on main (PR #614); the agent trades only inside capped, expiring, target-restricted, revocable limits (see Custody & Session Keys).
