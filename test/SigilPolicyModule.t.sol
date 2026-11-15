@@ -4,6 +4,7 @@ pragma solidity ^0.8.27;
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SigilPolicyModule} from "../contracts/modules/SigilPolicyModule.sol";
 import {SincorSettlementHub} from "../contracts/modules/SincorSettlementHub.sol";
 import {ISincorSettlementHub} from "../contracts/modules/SigilPolicyModule.sol";
@@ -568,5 +569,364 @@ contract SigilThresholdAndHubTest is Test {
         usdc.approve(address(hub), 100_000_000);
         vm.expectRevert(SincorSettlementHub.SealExpired.selector);
         hub.verifyAndSettleSeal(seal, keccak256("sigil-old"), v, r, s_);
+    }
+}
+
+/// @notice Third-party puller for the W-148 regression tests: pulls tokens
+/// out of the account via whatever allowance it holds. The hook only ever
+/// sees a call to drain() — never a transfer/transferFrom selector.
+contract W148Drainer {
+    function drain(address token, address from, address to, uint256 amount) external {
+        IERC20(token).transferFrom(from, to, amount);
+    }
+}
+
+/// @notice ERC20 with explicit increase/decreaseAllowance (removed from
+/// OZ v5's IERC20 surface but live on many tokens, and both are
+/// allowance-granting selectors the hook must decode).
+contract MockAllowanceToken is ERC20 {
+    constructor() ERC20("MockAllowance", "MCKA") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
+        _approve(msg.sender, spender, allowance(msg.sender, spender) + addedValue);
+        return true;
+    }
+
+    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
+        uint256 current = allowance(msg.sender, spender);
+        require(current >= subtractedValue, "decreased below zero");
+        _approve(msg.sender, spender, current - subtractedValue);
+        return true;
+    }
+}
+
+/// @notice Regression tests for red-team hunt 47 findings W-148 (approve +
+/// indirect-pull bypass) and W-149 (stale pending survives uninstall +
+/// verifier rotation). Both hunt PoCs reproduced against the pre-fix
+/// module — the account drained with zero attestations, and a V1-signed
+/// pending attestation paid out under a rotated V2 verifier — and fail
+/// closed against this build.
+contract SigilW148W149FixTest is Test {
+    SigilPolicyModule public module;
+    MockERC7579Account public account;
+    MockToken public token;
+    MockAllowanceToken public allowToken;
+    W148Drainer public drainer;
+
+    uint256 public verifierPk = 0xA11CE5;
+    uint256 public verifierV2Pk = 0xB22CE5;
+    address public verifier;
+    address public sessionKey = address(0x5E5510);
+    address public payee = address(0x9A11);
+    address public payee2 = address(0x9A22);
+    address public attacker = address(0xA77A);
+
+    uint256 public constant POLICY_CAP = 10 ether;
+    uint256 public nonceCounter;
+
+    function setUp() public {
+        verifier = vm.addr(verifierPk);
+        module = new SigilPolicyModule();
+        account = new MockERC7579Account(module, sessionKey);
+        token = new MockToken();
+        allowToken = new MockAllowanceToken();
+        drainer = new W148Drainer();
+        vm.deal(address(account), 100 ether);
+        token.mint(address(account), 100 ether);
+        allowToken.mint(address(account), 100 ether);
+        vm.prank(address(account));
+        account.installHook(abi.encode(verifier, POLICY_CAP, uint256(0), address(0)));
+    }
+
+    // ------------------------------------------------------------- helpers
+
+    function _att(address token_, address payee_, uint256 cap)
+        internal
+        returns (SigilPolicyModule.SigilAttestation memory att)
+    {
+        att = SigilPolicyModule.SigilAttestation({
+            account: address(account),
+            taskSpecHash: keccak256("task-spec-1"),
+            resultCommitment: keccak256("result-1"),
+            payee: payee_,
+            token: token_,
+            amountCap: cap,
+            expiry: uint64(block.timestamp + 1 hours),
+            nonce: ++nonceCounter
+        });
+    }
+
+    function _sign(SigilPolicyModule.SigilAttestation memory att, uint256 pk) internal view returns (bytes memory) {
+        bytes32 digest = module.attestationDigest(att);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _register(address token_, address payee_, uint256 cap, uint256 pk)
+        internal
+        returns (SigilPolicyModule.SigilAttestation memory att)
+    {
+        att = _att(token_, payee_, cap);
+        module.registerAttestation(att, _sign(att, pk));
+    }
+
+    function _approveCall(address token_, address spender, uint256 amount) internal pure returns (bytes memory) {
+        return abi.encodePacked(token_, uint256(0), abi.encodeWithSelector(IERC20.approve.selector, spender, amount));
+    }
+
+    function _drainCall(uint256 amount) internal view returns (bytes memory) {
+        return abi.encodePacked(
+            address(drainer),
+            uint256(0),
+            abi.encodeWithSelector(
+                W148Drainer.drain.selector, address(token), address(account), attacker, amount
+            )
+        );
+    }
+
+    function _erc20Transfer(address to, uint256 amount) internal view returns (bytes memory) {
+        return abi.encodePacked(
+            address(token), uint256(0), abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+        );
+    }
+
+    // -------------------------------------------------------------- W-148
+
+    function test_W148_ApproveWithoutAttestationReverts() public {
+        vm.prank(sessionKey);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SigilPolicyModule.NoValidAttestation.selector, address(account), address(token), address(drainer)
+            )
+        );
+        account.execute(_approveCall(address(token), address(drainer), 6 ether));
+        assertEq(token.allowance(address(account), address(drainer)), 0);
+        assertFalse(module.isAllowanceHolder(address(account), address(drainer)));
+    }
+
+    function test_W148_ApproveWithAttestationExecutesAndTracks() public {
+        _register(address(token), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(token), address(drainer), 6 ether));
+
+        assertEq(token.allowance(address(account), address(drainer)), 6 ether);
+        assertEq(module.allowanceOf(address(account), address(token), address(drainer)), 6 ether);
+        assertTrue(module.isAllowanceHolder(address(account), address(drainer)));
+        address[] memory toks = module.holderTokensOf(address(account), address(drainer));
+        assertEq(toks.length, 1);
+        assertEq(toks[0], address(token));
+    }
+
+    function test_W148_HolderCallWithoutAttestationReverts() public {
+        _register(address(token), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(token), address(drainer), 6 ether));
+
+        // The drainer now holds a live allowance, so a call INTO it is a
+        // release: without a second attestation it must revert. This is
+        // the exact second step of the hunt-47 PoC drain.
+        vm.prank(sessionKey);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SigilPolicyModule.NoValidAttestation.selector, address(account), address(token), address(drainer)
+            )
+        );
+        account.execute(_drainCall(6 ether));
+        assertEq(token.balanceOf(attacker), 0);
+        assertEq(token.balanceOf(address(account)), 100 ether);
+    }
+
+    function test_W148_HolderCallWithAttestationExecutes() public {
+        _register(address(token), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(token), address(drainer), 6 ether));
+
+        _register(address(token), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_drainCall(6 ether));
+        assertEq(token.balanceOf(attacker), 6 ether);
+        assertEq(token.balanceOf(address(account)), 94 ether);
+    }
+
+    function test_W148_IncreaseAllowanceGatedOnResultingTotal() public {
+        _register(address(allowToken), address(drainer), 3 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(allowToken), address(drainer), 3 ether));
+
+        // Tracked allowance is 3; increasing by 4 makes the exposure 7, so
+        // an attestation capped at 5 must NOT authorize the increase.
+        _register(address(allowToken), address(drainer), 5 ether, verifierPk);
+        bytes memory inc = abi.encodePacked(
+            address(allowToken),
+            uint256(0),
+            abi.encodeWithSelector(bytes4(0x39509351), address(drainer), 4 ether) // increaseAllowance
+        );
+        vm.prank(sessionKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilPolicyModule.OverAttestationCap.selector, 7 ether, 5 ether));
+        account.execute(inc);
+
+        // Revoke the undersized pending attestation; one covering the
+        // resulting total lets the increase through.
+        vm.prank(address(account));
+        module.revokeAttestation(address(allowToken), address(drainer));
+        _register(address(allowToken), address(drainer), 7 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(inc);
+        assertEq(module.allowanceOf(address(account), address(allowToken), address(drainer)), 7 ether);
+        assertEq(allowToken.allowance(address(account), address(drainer)), 7 ether);
+    }
+
+    function test_W148_DecreaseAllowanceUngatedAndClearsHolder() public {
+        _register(address(allowToken), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(allowToken), address(drainer), 6 ether));
+        assertTrue(module.isAllowanceHolder(address(account), address(drainer)));
+
+        bytes memory dec = abi.encodePacked(
+            address(allowToken),
+            uint256(0),
+            abi.encodeWithSelector(bytes4(0xa457c2d7), address(drainer), 6 ether) // decreaseAllowance
+        );
+        vm.prank(sessionKey);
+        account.execute(dec); // no attestation: shrinking exposure is never gated
+        assertEq(module.allowanceOf(address(account), address(allowToken), address(drainer)), 0);
+        assertFalse(module.isAllowanceHolder(address(account), address(drainer)));
+        assertEq(module.holderTokensOf(address(account), address(drainer)).length, 0);
+        assertEq(allowToken.allowance(address(account), address(drainer)), 0);
+    }
+
+    function test_W148_PermitForOtherOwnerPassesUngated() public {
+        // A permit granting an allowance over SOMEONE ELSE's tokens is not
+        // a release of this account's funds.
+        bytes memory inner = abi.encodeWithSelector(
+            IERC20Permit.permit.selector,
+            payee,
+            address(drainer),
+            6 ether,
+            block.timestamp + 1 hours,
+            uint8(27),
+            bytes32(0),
+            bytes32(0)
+        );
+        vm.prank(address(account));
+        bytes memory hookData = module.preCheck(address(0), 0, abi.encodePacked(address(token), uint256(0), inner));
+        assertEq(hookData.length, 0);
+        assertFalse(module.isAllowanceHolder(address(account), address(drainer)));
+    }
+
+    function test_W148_PermitForAccountGatedAsGrant() public {
+        bytes memory inner = abi.encodeWithSelector(
+            IERC20Permit.permit.selector,
+            address(account),
+            address(drainer),
+            6 ether,
+            block.timestamp + 1 hours,
+            uint8(27),
+            bytes32(0),
+            bytes32(0)
+        );
+        vm.prank(address(account));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SigilPolicyModule.NoValidAttestation.selector, address(account), address(token), address(drainer)
+            )
+        );
+        module.preCheck(address(0), 0, abi.encodePacked(address(token), uint256(0), inner));
+    }
+
+    function test_W148_BelowThresholdApproveTrackedAndHolderCallUngated() public {
+        MockERC7579Account acct2 = new MockERC7579Account(module, sessionKey);
+        token.mint(address(acct2), 50 ether);
+        vm.prank(address(acct2));
+        acct2.installHook(abi.encode(verifier, 100 ether, 10 ether, address(0))); // threshold 10 ether
+
+        vm.prank(sessionKey);
+        acct2.execute(_approveCall(address(token), address(drainer), 5 ether)); // 5 <= threshold: ungated
+        assertEq(module.allowanceOf(address(acct2), address(token), address(drainer)), 5 ether);
+
+        bytes memory drainCall = abi.encodePacked(
+            address(drainer),
+            uint256(0),
+            abi.encodeWithSelector(
+                W148Drainer.drain.selector, address(token), address(acct2), attacker, 5 ether
+            )
+        );
+        vm.prank(sessionKey);
+        acct2.execute(drainCall); // exposure 5 <= threshold: ungated by design
+        assertEq(token.balanceOf(attacker), 5 ether);
+    }
+
+    // -------------------------------------------------------------- W-149
+
+    /// Full lifecycle: install -> attest -> execute -> uninstall ->
+    /// reinstall under a rotated verifier, asserting the uninstall wiped
+    /// every account-scoped entry (the hunt-47 fix requirement).
+    function test_W149_UninstallWipesAllStateAndReinstallIsClean() public {
+        // Attestation A: registered, never consumed.
+        SigilPolicyModule.SigilAttestation memory attA = _register(address(token), payee, 5 ether, verifierPk);
+        // Attestation B: registered and consumed by a native payment, so a
+        // used digest + used nonce exist in the replay markers.
+        SigilPolicyModule.SigilAttestation memory attB = _register(address(0), payee, 2 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(abi.encodePacked(payee, uint256(1 ether), bytes("")));
+        assertEq(payee.balance, 1 ether);
+        // Attestation C: registered for another payee, never consumed.
+        SigilPolicyModule.SigilAttestation memory attC = _register(address(token), payee2, 5 ether, verifierPk);
+
+        vm.prank(address(account));
+        account.uninstallHook();
+        assertFalse(module.isInitialized(address(account)));
+
+        (,,,,,, bool existsA) = module.pendingOf(address(account), address(token), payee);
+        (,,,,,, bool existsC) = module.pendingOf(address(account), address(token), payee2);
+        assertFalse(existsA, "pending A wiped");
+        assertFalse(existsC, "pending C wiped");
+        assertFalse(module.usedDigest(address(account), module.attestationDigest(attA)), "digest A wiped");
+        assertFalse(module.usedDigest(address(account), module.attestationDigest(attB)), "digest B wiped");
+        assertFalse(module.usedNonce(address(account), attA.nonce), "nonce A wiped");
+        assertFalse(module.usedNonce(address(account), attB.nonce), "nonce B wiped");
+        assertFalse(module.usedNonce(address(account), attC.nonce), "nonce C wiped");
+
+        // Reinstall under the ROTATED verifier V2.
+        vm.prank(address(account));
+        account.installHook(abi.encode(vm.addr(verifierV2Pk), POLICY_CAP, uint256(0), address(0)));
+
+        // The stale V1 attestation is dead: its digest/nonce markers are
+        // gone, so registration reaches the signer check and fails there —
+        // and nothing V1-signed is consumable under V2 (the PoC's hole).
+        bytes memory sigA = _sign(attA, verifierPk);
+        vm.expectRevert(abi.encodeWithSelector(SigilPolicyModule.WrongSigner.selector, verifier));
+        module.registerAttestation(attA, sigA);
+
+        // A fresh V2 attestation may reuse attA's nonce (wiped) — the stale
+        // entry no longer blocks registration — and the payment executes.
+        SigilPolicyModule.SigilAttestation memory attD = _att(address(token), payee, 5 ether);
+        attD.nonce = attA.nonce;
+        module.registerAttestation(attD, _sign(attD, verifierV2Pk));
+        vm.prank(sessionKey);
+        account.execute(_erc20Transfer(payee, 3 ether));
+        assertEq(token.balanceOf(payee), 3 ether);
+    }
+
+    function test_W149_UninstallWipesAllowanceTracking() public {
+        _register(address(token), address(drainer), 6 ether, verifierPk);
+        vm.prank(sessionKey);
+        account.execute(_approveCall(address(token), address(drainer), 6 ether));
+        assertEq(module.allowanceOf(address(account), address(token), address(drainer)), 6 ether);
+        assertTrue(module.isAllowanceHolder(address(account), address(drainer)));
+
+        vm.prank(address(account));
+        account.uninstallHook();
+        assertEq(module.allowanceOf(address(account), address(token), address(drainer)), 0);
+        assertFalse(module.isAllowanceHolder(address(account), address(drainer)));
+        assertEq(module.holderTokensOf(address(account), address(drainer)).length, 0);
+        // The ERC20 allowance itself lives on the token contract and is NOT
+        // the module's to revoke; uninstall wipes the module's tracking and
+        // gating state, which is the W-149 fix scope.
+        assertEq(token.allowance(address(account), address(drainer)), 6 ether);
     }
 }
