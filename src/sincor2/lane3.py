@@ -8,7 +8,10 @@ no new money-movement code, no on-chain transfers:
    repo/site state. The MoebiusX tallies are a build-time snapshot (the
    deployed site cannot read the trading kits) and the page is stamped
    "as of" the snapshot date; the skill count/list is read live from the
-   agent card builder.
+   agent card builder. The "Live activity" section is fed separately by
+   :func:`proof_wall_live_feed` from the append-only verified-event
+   store (``sincor2.proof_events``) — events are never blended into
+   the snapshot tallies.
 
 2. Zero-friction external agent registration (GET /register page +
    POST /ap2/register): validates name / endpoint URL / contact, then
@@ -96,6 +99,38 @@ MODULE_SUMMARIES = [
 ]
 
 
+def proof_wall_live_feed() -> Dict[str, Any]:
+    """Live-activity feed for the proof wall: verified settlement
+    events from the append-only store (sincor2.proof_events), newest
+    first, with totals split by origin.
+
+    The snapshot constants above remain the historical record until
+    the event store covers the same history; event totals are reported
+    as their own labeled counts and are NEVER added into the snapshot
+    tallies (no double-counting). When the store is empty the feed is
+    empty and the page renders the spec's empty-state sentence; when
+    the store is unreadable the feed degrades the same way with
+    ``events_available`` False — the page never errors and never
+    invents data."""
+    from sincor2 import proof_events
+
+    try:
+        return {
+            "events": proof_events.list_events(limit=25),
+            "event_totals": proof_events.totals(),
+            "events_available": True,
+        }
+    except Exception:  # noqa: BLE001 - corrupt store degrades, never 500s
+        return {
+            "events": [],
+            "event_totals": {
+                "total": 0,
+                "by_origin": {o: 0 for o in sorted(proof_events.ORIGINS)},
+            },
+            "events_available": False,
+        }
+
+
 def proof_wall_data() -> Dict[str, Any]:
     """Data for the /x402-live proof wall. Skill data is read live from
     the agent card builder so the count can never drift from the card."""
@@ -103,7 +138,7 @@ def proof_wall_data() -> Dict[str, Any]:
 
     card = build_agent_card()
     skills = [{"id": s.id, "name": s.name} for s in card.skills]
-    return {
+    data = {
         "as_of": PROOF_WALL_AS_OF,
         "moebiusx_v2": MOEBIUSX_V2,
         "moebiusx_v3": MOEBIUSX_V3,
@@ -116,6 +151,8 @@ def proof_wall_data() -> Dict[str, Any]:
         "endorsement_url": ENDORSEMENT_URL,
         "endorsement_handle": ENDORSEMENT_HANDLE,
     }
+    data.update(proof_wall_live_feed())
+    return data
 
 
 # ── External agent registration + introductory bounty flag ──────────────────
