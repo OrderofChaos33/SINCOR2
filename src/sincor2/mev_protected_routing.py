@@ -42,6 +42,7 @@ Threat model: docs/architecture/CNP9_MEV_THREAT_MODEL.md
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import hmac as _hmac
 import json
@@ -165,6 +166,27 @@ class RoutingEnvelope:
         return _hmac.compare_digest(expected, self.mac)
 
 
+def _snapshot_envelope(envelope: RoutingEnvelope) -> RoutingEnvelope:
+    """Deep copy of an envelope for crossing the backend trust boundary.
+
+    ``RoutingEnvelope`` is frozen, but its ``payload`` dict is mutable —
+    handing out (or storing) the caller's object lets anyone holding a
+    reference rewrite a queued envelope after admission (W-172). Every
+    envelope entering or leaving a backend queue goes through here so
+    no external reference to queued state ever exists.
+    """
+    return RoutingEnvelope(
+        protocol_version=envelope.protocol_version,
+        envelope_id=envelope.envelope_id,
+        task_id=envelope.task_id,
+        agent_id=envelope.agent_id,
+        kind=envelope.kind,
+        payload=copy.deepcopy(envelope.payload),
+        issued_at_ms=envelope.issued_at_ms,
+        mac=envelope.mac,
+    )
+
+
 @dataclass
 class RoutingReceipt:
     """Audit record for one routed envelope.
@@ -211,7 +233,11 @@ class PrivateRouterBackend(ABC):
 
     @abstractmethod
     def pending_view(self) -> List[RoutingEnvelope]:
-        """What a public observer can read before inclusion."""
+        """What a public observer can read before inclusion.
+
+        Returned envelopes are snapshots (deep copies): an observer can
+        read them but can never mutate the queued originals (W-172).
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -229,6 +255,11 @@ class LocalPublicMempoolBackend(PrivateRouterBackend):
     Models today's reality — commit/reveal envelopes broadcast in the
     clear are visible to searchers before inclusion. Used as the control
     arm in front-running simulations.
+
+    World-READABLE is not world-WRITABLE: the queue stores a snapshot
+    of each submitted envelope and ``pending_view`` hands out fresh
+    snapshots, so an observer holding a viewed envelope holds no live
+    reference into the queue (W-172).
     """
 
     name = "public-mempool-sim"
@@ -240,11 +271,11 @@ class LocalPublicMempoolBackend(PrivateRouterBackend):
 
     def submit(self, envelope: RoutingEnvelope) -> None:
         with self._lock:
-            self._pending.append(envelope)
+            self._pending.append(_snapshot_envelope(envelope))
 
     def pending_view(self) -> List[RoutingEnvelope]:
         with self._lock:
-            return list(self._pending)
+            return [_snapshot_envelope(env) for env in self._pending]
 
     def take_for_inclusion(self) -> Optional[RoutingEnvelope]:
         with self._lock:
@@ -275,7 +306,9 @@ class LocalPrivateRoutingBackend(PrivateRouterBackend):
 
     def submit(self, envelope: RoutingEnvelope) -> None:
         with self._lock:
-            self._queue.append(envelope)
+            # Snapshot on the way in (W-172): the queue never holds an
+            # object a submitter can still mutate after the fact.
+            self._queue.append(_snapshot_envelope(envelope))
 
     def pending_view(self) -> List[RoutingEnvelope]:
         # Deliberately empty: no public observer exists on this path.
@@ -406,7 +439,10 @@ class MEVProtectedRouter:
       5. window / task policy per kind (commit vs reveal discipline)
     Only then is the envelope handed to the backend. Inclusion applies the
     envelope to the real auction pipeline (commit_bid / reveal_bid /
-    close_auction), which remains the authority on state.
+    close_auction), which remains the authority on state — and inclusion
+    RE-VERIFIES the envelope first (admission record, MAC, freshness,
+    window policy; W-172), because the backend queue is outside the
+    trust boundary.
     """
 
     def __init__(
@@ -543,27 +579,58 @@ class MEVProtectedRouter:
     # -- inclusion --------------------------------------------------------
 
     def include_next(self) -> Optional[RoutingReceipt]:
-        """Apply the next queued envelope to the auction pipeline."""
-        envelope = self.backend.take_for_inclusion()
-        if envelope is None:
-            return None
-        receipt = self._receipt_for(envelope.envelope_id)
-        included_at = self._now_ms()
-        try:
-            self._apply(envelope)
-            status, error = "included", None
-        except Exception as err:  # pipeline is the authority; record, don't crash
-            status, error = "failed", f"{type(err).__name__}: {err}"
-            logger.warning("cnp9 envelope inclusion failed kind=%s task=%s: %s",
-                           envelope.kind, envelope.task_id, error)
-        with self._lock:
-            self._inclusion_seq += 1
-            if receipt is not None:
-                receipt.status = status
-                receipt.error = error
-                receipt.included_at_ms = included_at
-                receipt.inclusion_seq = self._inclusion_seq
-        return receipt
+        """Apply the next queued envelope to the auction pipeline.
+
+        Inclusion is authenticated (W-172): every envelope taken from
+        the backend is RE-VERIFIED before it is applied — it must carry
+        a live admission record with this router, its MAC must verify
+        over its current contents, it must still be inside the
+        freshness window, and it must still satisfy window policy.
+        The backend queue sits outside the trust boundary: an envelope
+        that was never admitted (injected straight into the backend),
+        was mutated after admission, or has gone stale while queued is
+        NEVER applied.
+        """
+        while True:
+            envelope = self.backend.take_for_inclusion()
+            if envelope is None:
+                return None
+            receipt = self._receipt_for(envelope.envelope_id)
+            try:
+                self._verify_for_inclusion(envelope)
+            except RoutingError as err:
+                error = f"{type(err).__name__}: {err}"
+                logger.warning(
+                    "cnp9 envelope rejected at inclusion kind=%s "
+                    "task=%s: %s", envelope.kind, envelope.task_id, error)
+                if receipt is None:
+                    # Never admitted through this router — no receipt
+                    # exists to annotate. Drop it and move on to the
+                    # next queued envelope instead of stalling the queue.
+                    continue
+                with self._lock:
+                    self._inclusion_seq += 1
+                    receipt.status = "failed"
+                    receipt.error = error
+                    receipt.included_at_ms = self._now_ms()
+                    receipt.inclusion_seq = self._inclusion_seq
+                return receipt
+            included_at = self._now_ms()
+            try:
+                self._apply(envelope)
+                status, error = "included", None
+            except Exception as err:  # pipeline is the authority; record, don't crash
+                status, error = "failed", f"{type(err).__name__}: {err}"
+                logger.warning("cnp9 envelope inclusion failed kind=%s task=%s: %s",
+                               envelope.kind, envelope.task_id, error)
+            with self._lock:
+                self._inclusion_seq += 1
+                if receipt is not None:
+                    receipt.status = status
+                    receipt.error = error
+                    receipt.included_at_ms = included_at
+                    receipt.inclusion_seq = self._inclusion_seq
+            return receipt
 
     def include_all(self) -> List[RoutingReceipt]:
         """Apply every queued envelope, in order. Returns the receipts."""
@@ -619,6 +686,40 @@ class MEVProtectedRouter:
                 raise ReplayedEnvelope(
                     f"envelope {envelope.envelope_id} already admitted")
             self._seen[envelope.envelope_id] = int(envelope.issued_at_ms)
+        self._check_window_policy(envelope, now)
+
+    def _verify_for_inclusion(self, envelope: RoutingEnvelope) -> None:
+        """Re-verify an envelope at inclusion time (W-172).
+
+        Admission is necessary but not sufficient: between admission
+        and inclusion the envelope sits in a backend queue that other
+        code can touch, so inclusion re-runs the checks that bind the
+        envelope to this router — a live admission record, MAC over the
+        envelope's CURRENT contents, the freshness window, and window
+        policy. Any failure raises and the envelope is never applied.
+        """
+        now = self._now_ms()
+        if envelope.protocol_version != PROTOCOL_VERSION:
+            raise InvalidEnvelope("protocol version mismatch")
+        if envelope.kind not in _KINDS:
+            raise InvalidEnvelope(f"unknown kind: {envelope.kind!r}")
+        with self._lock:
+            admitted = envelope.envelope_id in self._seen
+        if not admitted:
+            # Injected directly into the backend (or replayed into it)
+            # without ever passing admission — even a well-formed MAC
+            # does not help: this router never admitted it.
+            raise InvalidEnvelope(
+                "envelope was never admitted by this router")
+        if not envelope.verify_mac(self._secret):
+            # Contents changed after admission (queue tampering via a
+            # leaked reference) or the MAC was never valid.
+            raise InvalidEnvelope("envelope authentication failed")
+        age = now - int(envelope.issued_at_ms)
+        if age < 0 or age > self._max_age_ms:
+            raise StaleEnvelope(
+                f"envelope age {age}ms outside window (max "
+                f"{self._max_age_ms}ms)")
         self._check_window_policy(envelope, now)
 
     def _check_window_policy(self, envelope: RoutingEnvelope, now: int) -> None:
