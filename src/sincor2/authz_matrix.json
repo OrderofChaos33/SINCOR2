@@ -21,7 +21,8 @@
     "agent-key",
     "admin-key",
     "eip191-owner-sig",
-    "eip191-adjudicator"
+    "eip191-adjudicator",
+    "jwt+owner-or-admin"
   ],
   "notes": "guard = REQUIRED guard per the unified model (target state). current_guard = observed in code today. enforced=false means the required guard is not enforced today \u2014 see notes. mounted=false means not registered on the production mvp_app.",
   "endpoints": [
@@ -492,9 +493,9 @@
       "path_pattern": "/api/orders/<email>",
       "guard": "customer_owner",
       "tenant_scoped": true,
-      "notes": "CRITICAL GAP: unauthenticated; any email's orders enumerable. Must become customer_owner.",
-      "current_guard": "none",
-      "enforced": false,
+      "notes": "CLOSED (AUDIT P1 finding 2): JWT required; identity must equal the requested email (case-insensitive) or be admin. Was: CRITICAL GAP \u2014 unauthenticated; any email's orders enumerable.",
+      "current_guard": "jwt+owner-or-admin",
+      "enforced": true,
       "mounted": true,
       "source": "mvp_blueprints/billing.py"
     },
@@ -558,9 +559,9 @@
       "path_pattern": "/api/cancel-subscription",
       "guard": "customer_owner",
       "tenant_scoped": true,
-      "notes": "GAP: cancels by email/customer id with no auth.",
-      "current_guard": "none",
-      "enforced": false,
+      "notes": "CLOSED (AUDIT P1 finding 3): JWT required; identity must own the subscription (email match) or be admin; 403 on owner mismatch. Was: GAP \u2014 cancels by email/customer id with no auth.",
+      "current_guard": "jwt+owner-or-admin",
+      "enforced": true,
       "mounted": true,
       "source": "mvp_blueprints/billing.py"
     },
@@ -1612,11 +1613,11 @@
     {
       "method": "GET",
       "path_pattern": "/api/metrics/treasury",
-      "guard": "operator",
+      "guard": "authenticated",
       "tenant_scoped": false,
-      "notes": "GAP: treasury metrics unauthenticated (mounted from monitoring blueprint).",
-      "current_guard": "none",
-      "enforced": false,
+      "notes": "CLOSED: @jwt_required() on the monitoring-blueprint view (anonymous ledger-only variant lives at /api/metrics/treasury/public). Was: GAP \u2014 treasury metrics unauthenticated.",
+      "current_guard": "jwt",
+      "enforced": true,
       "mounted": true,
       "source": "mvp_app.py"
     },
@@ -3075,11 +3076,11 @@
     {
       "method": "GET",
       "path_pattern": "/api/tasks",
-      "guard": "operator",
-      "tenant_scoped": false,
-      "notes": "GAP: job queue listing unauthenticated.",
-      "current_guard": "none",
-      "enforced": false,
+      "guard": "customer_owner",
+      "tenant_scoped": true,
+      "notes": "CLOSED: @jwt_required() + tenant filter \u2014 a caller only ever sees jobs stamped with their own JWT identity; unowned jobs never served. Was: GAP \u2014 job queue listing unauthenticated.",
+      "current_guard": "jwt",
+      "enforced": true,
       "mounted": true,
       "source": "task_queue.py"
     },

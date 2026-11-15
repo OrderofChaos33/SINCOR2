@@ -196,8 +196,24 @@ def _signed_auth_params(caller_id: str, skill_id: str) -> dict:
     }
 
 
+def _quota_params(skill_id: str, input_text: str) -> dict:
+    """A genuine G2.6 quota signature from a fresh wallet.
+
+    Free quota is granted only to a verified quota identity: an EIP-191
+    signature over the canonical SINCOR-QUOTA send message, with the
+    wallet field naming the signer. A fresh key per send keeps quota
+    buckets isolated across tests.
+    """
+    acct = Account.create()
+    ts_ms = int(time.time() * 1000)
+    message = ai.identity_message_for_send(skill_id, input_text, ts_ms)
+    sig = "0x" + acct.sign_message(encode_defunct(text=message)).signature.hex()
+    return {"signature": sig, "quota_ts": ts_ms, "wallet": acct.address}
+
+
 def _send(client, monkeypatch, claimed_wei, chain_wei, tx_hash="0x" + "a1" * 32,
-          skill_id="compliance-sbom", caller_id="g25-amount-test"):
+          skill_id="compliance-sbom", caller_id="g25-amount-test",
+          extra_params=None):
     """POST message/send with a patched verifier; return (payload, task_id).
 
     Runs under FLASK_ENV=production so the real payment gate (and the
@@ -236,6 +252,7 @@ def _send(client, monkeypatch, claimed_wei, chain_wei, tx_hash="0x" + "a1" * 32,
                 "txHash": tx_hash,
                 "message": {"parts": [{"text": "Run compliance scan"}]},
                 **_signed_auth_params(caller_id, skill_id),
+                **(extra_params or {}),
             },
         },
     )
@@ -274,10 +291,17 @@ def test_amount_rpc_outage_rejects_send(client, monkeypatch):
 
 
 def test_free_call_records_zero_not_claim(client, monkeypatch):
-    """Free-quota calls carry no verified payment: the claim is not recorded."""
+    """Free-quota calls carry no verified payment: the claim is not recorded.
+
+    Since G2.6 the free quota belongs to a verified quota identity, so
+    the send carries a real quota signature (see _quota_params); the
+    caller_id alone no longer grants free calls.
+    """
     payload = _send(client, monkeypatch, claimed_wei=10 * 10**18,
                     chain_wei=5 * 10**17, skill_id="content-blog",
-                    caller_id="g25-free-claim-test")
+                    caller_id="g25-free-claim-test",
+                    extra_params=_quota_params("content-blog",
+                                               "Run compliance scan"))
     task_id = payload["result"]["id"]
     task = ai._get_task(task_id)
     assert task.axm_paid == 0

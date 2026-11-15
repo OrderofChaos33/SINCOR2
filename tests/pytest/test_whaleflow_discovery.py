@@ -152,7 +152,10 @@ def test_leaderboard_seed_parsing_rank_order(cache_env):
     with patch.object(whale_flow, "_get_json", return_value=fake) as m:
         seeds = whale_flow.discover_candidates_from_leaderboard(limit=10)
     assert seeds == ["0xaaa", "0xbbb"]
-    assert "v1/leaderboard" in m.call_args[0][0]
+    # Data-api v2: the leaderboard lives under /v2/leaderboard and the
+    # all-time board must be requested explicitly (v2 defaults to DAY).
+    assert "v2/leaderboard" in m.call_args[0][0]
+    assert "time_period=all" in m.call_args[0][0]
 
 
 def test_leaderboard_empty_on_api_failure(cache_env):
@@ -201,10 +204,24 @@ def test_market_pnl_skips_bad_rows():
 
 
 def test_wallet_trades_paginates_to_limit(cache_env):
-    pages = [[{"id": i}] * 500 for i in range(4)] + [[{"id": 9}] * 200]
-    with patch.object(whale_flow, "_get_json", side_effect=pages):
+    # Data-api v2 is cursor-paginated: each response is an envelope
+    # whose pagination.next_cursor must be echoed back to advance.
+    pages = [
+        {"data": [{"id": i}] * 500,
+         "pagination": {"next_cursor": f"cursor-{i}"}}
+        for i in range(4)
+    ] + [{"data": [{"id": 9}] * 200, "pagination": {}}]
+    urls = []
+
+    def fake_get(url, timeout=15):
+        urls.append(url)
+        return pages[len(urls) - 1]
+
+    with patch.object(whale_flow, "_get_json", side_effect=fake_get):
         ts = whale_flow._wallet_trades("0xw", limit=1200)
     assert len(ts) == 1200, "longer lookback must pull multiple pages"
+    assert "cursor=cursor-0" in urls[1]
+    assert "cursor=cursor-1" in urls[2]
 
 
 def test_score_wallet_default_lookback_is_2000(cache_env, monkeypatch):

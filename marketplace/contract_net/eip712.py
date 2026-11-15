@@ -121,6 +121,27 @@ def to_hex(data: bytes) -> str:
     return "0x" + data.hex()
 
 
+_BARE_BYTES32_RE = re.compile(r"[0-9a-fA-F]{64}")
+
+
+def canonical_epoch_root(value: str) -> str:
+    """Canonical 0x-prefixed bytes32 form for an epoch (Merkle) root.
+
+    Producers (the SINAX vector engine) emit bare 64-char hex, while the
+    signed Bid message format is 0x-prefixed (see ``_BYTES32_RE`` and
+    ``EMPTY_EPOCH_ROOT``). Normalize at this boundary so an honest root
+    is not refused at signing time. Anything that is not a bare or
+    prefixed 32-byte hex string passes through unchanged, so payload
+    validation still refuses genuinely malformed values.
+    """
+    v = str(value or "").strip()
+    if not v:
+        return EMPTY_EPOCH_ROOT
+    if _BARE_BYTES32_RE.fullmatch(v):
+        return "0x" + v
+    return v
+
+
 def encode_uint256(value: int) -> bytes:
     if value < 0 or value >= 1 << 256:
         raise ValueError("uint256 out of range")

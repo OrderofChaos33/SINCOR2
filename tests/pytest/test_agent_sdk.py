@@ -145,7 +145,10 @@ def test_sdk_full_settlement_releases_stake_and_earns_reputation(sdk):
     sdk.close_auction(task_id)
 
     proof = sdk.submit_proof(task_id, AGENT, "0xdeadbeef1234567890")
-    assert proof["status"] == "paid"
+    # Founder adjudication 2026-11-14: payout staged until actually
+    # paid — settlement presents "payout_staged"; "paid" requires a
+    # real broadcast tx_hash (contract_net.payout_broadcast_status).
+    assert proof["status"] == "payout_staged"
     task = sdk.get_task(task_id)
     assert task["state"] == "settled"
 

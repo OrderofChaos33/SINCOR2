@@ -48,10 +48,21 @@ def test_no_hardcoded_demo_secret():
     assert not hasattr(ext, "DEMO_SECRET")
 
 
-def test_sign_payload_requires_explicit_secret():
-    with pytest.raises(TypeError):
-        inbound.sign_payload({"a": 1})  # type: ignore[call-arg]  # no default allowed
+def test_sign_payload_requires_explicit_secret(monkeypatch):
+    # No hardcoded/demo fallback may ever sign: with neither an explicit
+    # secret nor SINCOR_A2A_SECRET in the environment, signing fails
+    # closed (RuntimeError) instead of using a guessable secret.
+    monkeypatch.delenv("SINCOR_A2A_SECRET", raising=False)
+    with pytest.raises(RuntimeError):
+        inbound.sign_payload({"a": 1})
     sig_a = inbound.sign_payload({"a": 1}, "s3cret")
     sig_b = inbound.sign_payload({"a": 1}, "s3cret")
     assert sig_a == sig_b and len(sig_a) == 64
     assert inbound.sign_payload({"a": 1}, "other") != sig_a
+    # The env-configured secret is the only implicit source, and an
+    # explicit argument still wins over it.
+    monkeypatch.setenv("SINCOR_A2A_SECRET", "env-secret")
+    assert inbound.sign_payload({"a": 1}) == inbound.sign_payload(
+        {"a": 1}, "env-secret"
+    )
+    assert inbound.sign_payload({"a": 1}) != sig_a

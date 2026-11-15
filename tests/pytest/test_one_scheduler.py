@@ -62,9 +62,12 @@ def test_scheduler_defaults_match_founder_decisions():
     expected_enabled = {
         "daily_ops": True,
         "sadas_scan": True,
-        "outreach_cycle": True,
-        "content_cycle": True,
-        "launch_cycle": True,
+        # P1 audit #9 (PR #442): the send/publish jobs default OFF and
+        # require explicit env opt-in (fail closed). The canonical_env
+        # fixture opts in for the registration tests below.
+        "outreach_cycle": False,
+        "content_cycle": False,
+        "launch_cycle": False,
         "recursive_optimizer": True,
         "subscription_reminders": True,
         "polyclaw_scan": True,

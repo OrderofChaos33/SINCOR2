@@ -38,8 +38,18 @@ POOL_RESERVE = 100.0
 
 @pytest.fixture
 def pool_env(tmp_path, monkeypatch):
+    from sincor2 import a2a_inbound_market
     from sincor2.a2a_inbound import reset_fabric
     from sincor2.onchain.stake_ledger import reset_stake_ledger
+
+    # The env vars at module top only take effect if this file imports
+    # a2a_inbound_market first; in a full-suite process another module
+    # has usually imported it already (freezing the 5-minute defaults),
+    # and the drive loops below then time out waiting for windows that
+    # cannot elapse. Pin the module constants directly — the same fix
+    # as PR #693's allocation-reconciliation fixture.
+    monkeypatch.setattr(a2a_inbound_market, "COMMIT_WINDOW_MS", 1000)
+    monkeypatch.setattr(a2a_inbound_market, "REVEAL_WINDOW_MS", 1000)
 
     reset_fabric()
     reset_stake_ledger(path=str(tmp_path / "stake.json"))
@@ -218,7 +228,10 @@ def test_double_submit_proof_spends_once(pool_env):
     bounty = float(_allocs_for(tsk_id)[0]["amount_axm"])
 
     proof = submit_proof(tsk_id, winner, "0x" + "ab" * 32)
-    assert proof["status"] == "paid"
+    # Founder adjudication 2026-11-14: payout staged until actually
+    # paid — settlement presents "payout_staged"; "paid" requires a
+    # real broadcast tx_hash (contract_net.payout_broadcast_status).
+    assert proof["status"] == "payout_staged"
 
     with pytest.raises(RuntimeError):
         submit_proof(tsk_id, winner, "0x" + "cd" * 32)  # not assigned anymore

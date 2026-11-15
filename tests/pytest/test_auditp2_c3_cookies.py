@@ -23,10 +23,26 @@ _ENV_KEYS = [
 
 
 @pytest.fixture(autouse=True)
-def clean_env(monkeypatch):
+def clean_env():
+    # Snapshot + restore, not just pre-test deletion: the test bodies
+    # below write os.environ[...] directly (not via monkeypatch), so a
+    # plain monkeypatch.delenv here never reverted them and the writes
+    # leaked into every later test file in the suite — e.g.
+    # RAILWAY_ENVIRONMENT=staging from
+    # test_provider_label_only_no_secure permanently
+    # disabled CHROMA demo mode (demo_mode() fails closed on any
+    # RAILWAY_ENVIRONMENT), breaking
+    # test_log_only_truth.py::test_blueprint_approve_never_flashes_sent_for_log_only
+    # in full-suite runs only.
+    saved = {key: os.environ.get(key) for key in _ENV_KEYS}
     for key in _ENV_KEYS:
-        monkeypatch.delenv(key, raising=False)
+        os.environ.pop(key, None)
     yield
+    for key, val in saved.items():
+        if val is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = val
 
 
 def _reload():

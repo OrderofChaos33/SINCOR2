@@ -470,7 +470,12 @@ def mock_onchain(monkeypatch, paid_amount):
         # transfer; in this hermetic world that is the wallet the
         # caller claims paid (BUYER on the billing loop, the rail
         # payer on the rail leg of the flagged-lead test).
-        return {"ok": True, "payer_wallet": supplied or BUYER}
+        # It also always reports confirmation depth (chain_ctx); the
+        # D2 high-value gate reads it, so the mock must carry it too.
+        # 13 matches rail_env's stubbed chain (receipt block 100, head
+        # 112) and clears the 12-confirmation finality threshold.
+        return {"ok": True, "payer_wallet": supplied or BUYER,
+                "confirmations": 13, "required_confirmations": 12}
 
     monkeypatch.setattr(x402, "verify_treasury_transfer", _verify)
     monkeypatch.setattr(
@@ -720,6 +725,14 @@ def rail_env(tmp_path, monkeypatch):
         raise AssertionError(f"unexpected RPC method {method}")
 
     monkeypatch.setattr(pp, "_rpc_call", _fake_rpc)
+    # Hermetic OFAC verdict (same pattern as test_d2_settle_integrity):
+    # the D2 high-value gate screens the payer through
+    # platform_payments.screen_payer_sanctions, whose vendored snapshot
+    # goes stale >48h after its fetch — its real wall-clock age must not
+    # leak into this purchase-loop test.
+    monkeypatch.setattr(
+        pp, "screen_payer_sanctions",
+        lambda w: {"verdict": "pass", "detail": "clean"})
     x402.init_x402_db()
     return {"tx_hash": RAIL_TX_HASH, "payer": RAIL_PAYER,
             "treasury": treasury, "tmp": tmp_path}

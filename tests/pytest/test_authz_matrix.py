@@ -445,7 +445,9 @@ class TestMatrixSchema:
         m = _matrix()
         e = m.guard_for("GET", "/api/orders/victim@example.com")
         assert e["guard"] == "customer_owner" and e["tenant_scoped"] is True
-        assert e["enforced"] is False and e["current_guard"] == "none"
+        # AUDIT P1 finding 2 closed this former CRITICAL gap: the route
+        # now enforces JWT identity == requested email (or admin).
+        assert e["enforced"] is True and e["current_guard"] == "jwt+owner-or-admin"
         e = m.guard_for("GET", "/api/orders")
         assert e["guard"] == "admin" and e["enforced"] is True
         e = m.guard_for("GET", "/health")
@@ -487,18 +489,18 @@ PROBES = [
     ("GET", "/admin/content/status", {}, 403, "admin", True, "session-admin"),
     ("GET", "/api/launch/partners", {}, 401, "admin", True, "session-admin"),
     ("GET", "/api/obs/vitals", {}, 401, "authenticated", True, "session-customer-or-admin"),
-    ("GET", "/api/orders/victim@example.com", {}, 200, "customer_owner", False, "none"),
+    ("GET", "/api/orders/victim@example.com", {}, 401, "customer_owner", True, "jwt+owner-or-admin"),
     ("GET", "/api/ops/schedulers", {}, 200, "operator", False, "none (admin-redacted section)"),
     ("GET", "/api/outreach/status", {}, 200, "operator", False, "none"),
-    ("GET", "/api/tasks", {}, 200, "operator", False, "none"),
-    ("GET", "/api/metrics/treasury", {}, 200, "operator", False, "none"),
+    ("GET", "/api/tasks", {}, 401, "customer_owner", True, "jwt"),
+    ("GET", "/api/metrics/treasury", {}, 401, "authenticated", True, "jwt"),
     ("GET", "/health", {}, 200, "public", True, "none"),
     ("GET", "/api/defi/catalog", {}, 200, "public", True, "none"),
     ("GET", "/api/a2a/agents", {}, 200, "public", True, "none"),
     ("POST", "/v1/a2a/tasks", {"json": {}}, 400, "authenticated", False, "sig-optional"),
     ("GET", "/v1/a2a/tasks/no-such-task", {}, 404, "customer_owner", False, "none"),
     ("GET", "/api/webbuilder/projects", {}, 401, "customer_owner", False, "session-admin"),
-    ("POST", "/api/cancel-subscription", {"json": {}}, 400, "customer_owner", False, "none"),
+    ("POST", "/api/cancel-subscription", {"json": {}}, 401, "customer_owner", True, "jwt+owner-or-admin"),
     ("GET", "/api/platform/subscription", {}, 400, "customer_owner", False, "none"),
     ("GET", "/launch/review", {}, 200, "operator", False, "none"),
 ]
@@ -530,5 +532,10 @@ class TestMatrixLiveProbes:
     def test_gap_entries_are_flagged(self):
         gaps = _matrix().gaps()
         assert len(gaps) > 0
-        critical = [g for g in gaps if "CRITICAL" in g.get("notes", "")]
-        assert any(g["path_pattern"] == "/api/orders/<email>" for g in critical)
+        gap_paths = {g["path_pattern"] for g in gaps}
+        # Still-open gaps stay flagged...
+        assert "/api/platform/subscription" in gap_paths
+        # ...and closed gaps leave the list: the former CRITICAL gap
+        # (GET /api/orders/<email>) was closed by AUDIT P1 finding 2 and
+        # must no longer be recorded as a gap.
+        assert "/api/orders/<email>" not in gap_paths

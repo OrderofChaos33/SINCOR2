@@ -103,7 +103,9 @@ class MerkleQuestTests(unittest.TestCase):
         self.assertEqual(order["H4_vault_before_conversion_pct"], 0)
         self.assertEqual(VAULT_CASH_FLOOR_USDC, 10_000)
         self.assertEqual(order["H1_platform_fee_bps"], 500)
-        self.assertFalse(order["H7_execute_live_default"])
+        # Founder authorized live execution (treasury_hold.py: "Founder
+        # authorized live. Railway still wins if EXECUTE_LIVE is set.").
+        self.assertTrue(order["H7_execute_live_default"])
 
 
 if __name__ == "__main__":

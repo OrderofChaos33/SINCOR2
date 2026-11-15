@@ -248,7 +248,10 @@ def test_end_to_end_sponsored_auction_recoups(client, monkeypatch):
     assert closed["assigned_to"] == AGENT
 
     proof = sdk.submit_proof(task_id, AGENT, "0xdeadbeef1234567890")
-    assert proof["status"] == "paid"
+    # Founder adjudication 2026-11-14: payout staged until actually
+    # paid — settlement presents "payout_staged"; "paid" requires a
+    # real broadcast tx_hash (contract_net.payout_broadcast_status).
+    assert proof["status"] == "payout_staged"
 
     # Earnings were 0.9 AXM < 2.0 fronted -> partial recoup.
     rec = sponsored_ledger().status_of(AGENT)

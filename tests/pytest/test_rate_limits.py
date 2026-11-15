@@ -27,9 +27,11 @@ pins, against the real production app (sincor2.mvp_app):
     Content-Type cannot switch buckets and dilute the cap.
   - The first GET /download/<unknown> is still the fail-closed 404,
     not a 429.
-  - Challenge minting is capped per source (wallet when known, else
-    IP): the 21st OPEN UNBOUND challenge from one source is refused
-    with 429 {"error": "rate_limited"}; another source can still mint.
+  - Challenge minting is capped per client address (WREN PR 7 —
+    keyed on remote_addr, never on a client-supplied wallet, so a
+    flood burns only the flooder's budget): the 21st OPEN UNBOUND
+    challenge from one address is refused with 429
+    {"error": "rate_limited"}; another address can still mint.
   - Expired, never-fulfilled x402_challenges rows are purged by
     purge_expired_challenges(), wired into the daily-ops scheduler job.
 
@@ -131,6 +133,14 @@ def chain(monkeypatch):
         raise AssertionError(f"unexpected RPC method {method}")
 
     monkeypatch.setattr(pp, "_rpc_call", _fake_rpc)
+    # Hermetic OFAC verdict (same pattern as test_d2_settle_integrity):
+    # the D2 high-value gate screens the settle payer through
+    # platform_payments.screen_payer_sanctions, whose vendored snapshot
+    # goes stale >48h after its fetch — its real wall-clock age must
+    # not leak into these limiter tests.
+    monkeypatch.setattr(
+        pp, "screen_payer_sanctions",
+        lambda w: {"verdict": "pass", "detail": "clean"})
 
     sent = []
 
@@ -170,6 +180,37 @@ def _wallet(i: int) -> str:
     return f"0x{i:040x}"
 
 
+def _checkout_and_bind_fresh_wallet(client, *, ip=None, headers=None):
+    """Checkout with a fresh wallet, then bind the challenge (the real
+    buyer flow the 402 response itself prescribes).
+
+    Since WREN PR 7 the open-unbound mint cap keys on the client
+    address (20/IP), so a loop that leaves every challenge unbound
+    trips that cap at 20 and never reaches the 30/hour route limiter
+    these tests pin. A bound challenge leaves the unbound pool, so
+    binding as we go keeps the mint cap out of the limiter's way —
+    without weakening either mechanism.
+    """
+    acct = Account.create()
+    res = _checkout(client, ip=ip, wallet=acct.address, headers=headers)
+    assert res.status_code == 402, res.get_json()
+    body = res.get_json()
+    sig = acct.sign_message(encode_defunct(
+        text=x402.challenge_bind_message(
+            body["challenge_id"], body["resource_id"],
+            acct.address))).signature.hex()
+    kwargs = {}
+    if ip:
+        kwargs["environ_base"] = {"REMOTE_ADDR": ip}
+    if headers:
+        kwargs["headers"] = headers
+    bound = client.post("/api/x402/challenge-bind", json={
+        "challenge_id": body["challenge_id"],
+        "payer_wallet": acct.address, "signature": sig}, **kwargs)
+    assert bound.get_json().get("ownership_proven") is True, bound.get_json()
+    return res
+
+
 # ---------------------------------------------------------------------------
 # per-route limiter: /rail/checkout 30/hour per IP
 # ---------------------------------------------------------------------------
@@ -177,8 +218,7 @@ def _wallet(i: int) -> str:
 def test_checkout_31st_from_one_ip_is_429_json_other_ip_unaffected(client):
     ip = "203.0.113.10"
     for i in range(30):
-        res = _checkout(client, ip=ip, wallet=_wallet(i + 1))
-        assert res.status_code == 402, (i, res.get_json())
+        _checkout_and_bind_fresh_wallet(client, ip=ip)
     res = _checkout(client, ip=ip, wallet=_wallet(10_001))
     assert res.status_code == 429, res.get_json()
     assert res.get_json()["error"] == "rate_limited"
@@ -208,10 +248,9 @@ def test_xff_spoof_prefix_does_not_reset_checkout_bucket(client,
         peer = "198.51.100.7"
         client_ip = "203.0.113.99"
         for i in range(30):
-            res = _checkout(
-                client, ip=peer, wallet=_wallet(20_000 + i),
+            _checkout_and_bind_fresh_wallet(
+                client, ip=peer,
                 headers={"X-Forwarded-For": f"10.1.0.{i}, {client_ip}"})
-            assert res.status_code == 402, (i, res.get_json())
         res = _checkout(
             client, ip=peer, wallet=_wallet(30_000),
             headers={"X-Forwarded-For": f"192.0.2.55, {client_ip}"})
@@ -488,17 +527,28 @@ def test_download_route_limited_at_30_per_hour(client):
 # ---------------------------------------------------------------------------
 
 def test_21st_open_unbound_challenge_from_one_wallet_is_429(client):
+    # WREN PR 7 re-keyed the mint cap on the CLIENT ADDRESS, never on a
+    # client-supplied wallet (under PR 4's wallet keying, naming a
+    # victim's wallet 20 times locked that wallet out of checkout).
+    # So the cap below is exercised from one IP: naming a different
+    # wallet does not mint a fresh budget, and only a different client
+    # address is a different source.
+    ip = "203.0.113.40"
     wallet = "0x" + "f0" * 20
     for i in range(20):
-        res = _checkout(client, wallet=wallet)
+        res = _checkout(client, ip=ip, wallet=wallet)
         assert res.status_code == 402, (i, res.get_json())
         assert res.get_json()["challenge_id"]
-    res = _checkout(client, wallet=wallet)
+    res = _checkout(client, ip=ip, wallet=wallet)
     assert res.status_code == 429, res.get_json()
     assert res.get_json()["error"] == "rate_limited"
     assert not res.get_json().get("challenge_id")
-    # Another source can still mint.
-    res = _checkout(client, wallet="0x" + "0f" * 20)
+    # A different wallet named from the SAME address is still capped —
+    # that is the PR 7 anti-lockout property.
+    res = _checkout(client, ip=ip, wallet="0x" + "0f" * 20)
+    assert res.status_code == 429, res.get_json()
+    # Another source (a different client address) can still mint.
+    res = _checkout(client, ip="203.0.113.41", wallet="0x" + "0f" * 20)
     assert res.status_code == 402, res.get_json()
     assert res.get_json()["challenge_id"]
 
