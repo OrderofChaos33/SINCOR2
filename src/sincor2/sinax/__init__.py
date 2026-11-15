@@ -208,6 +208,23 @@ from .self_healing import (
     SelfHealingReport,
 )
 from .dispute_resolution import ConsensusDisputeResolver, DisputeOutcome, ValidatorVote
+from .async_dispute_resolution import (
+    AdjudicatorOracleAdapter,
+    ArbitrationOracleAdapter,
+    AsyncDispute,
+    DisputeEvent,
+    DisputeRegistry,
+    DisputeState,
+    DuplicateDispute,
+    EvidenceItem,
+    InvalidDisputeInput,
+    InvalidRuling,
+    InvalidTransition,
+    OracleRuling,
+    DisputeError,
+    oracle_message,
+    recover_message_signer,
+)
 
 __all__ = [
     # Config
@@ -332,4 +349,20 @@ __all__ = [
     "ValidatorVote",
     "DisputeOutcome",
     "ConsensusDisputeResolver",
+    # Async dispute resolution (CNP-7)
+    "ArbitrationOracleAdapter",
+    "AdjudicatorOracleAdapter",
+    "AsyncDispute",
+    "DisputeEvent",
+    "DisputeRegistry",
+    "DisputeState",
+    "DisputeError",
+    "DuplicateDispute",
+    "EvidenceItem",
+    "InvalidDisputeInput",
+    "InvalidRuling",
+    "InvalidTransition",
+    "OracleRuling",
+    "oracle_message",
+    "recover_message_signer",
 ]
