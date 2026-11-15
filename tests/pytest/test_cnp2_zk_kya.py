@@ -144,6 +144,74 @@ def test_tampered_nullifier_rejected(issuer, agent):
 
 
 # ---------------------------------------------------------------------------
+# W-173: attestation_id is signed; commitment + anchor are verified
+# ---------------------------------------------------------------------------
+
+
+def test_relabeled_attestation_id_rejected(issuer, agent):
+    # PoC50-D: a valid attestation re-presented under a never-issued id.
+    att = issuer.issue_tier_attestation("agent-alpha", TIER_T3)
+    d = _mutate(att.to_dict(), "attestation_id", "cnp2a_forged_never_issued")
+    assert not issuer.anchored(d["attestation_id"])
+    res = verify_attestation(d, issuer.issuer_address, issuer.revocation_source())
+    assert not res.valid and res.reason == "bad-signature", res.reason
+
+
+def test_garbage_commitment_rejected_even_when_issuer_signed(issuer, agent):
+    # PoC50-D2 shape: a genuine issuer signature over the body does not
+    # save an attestation whose commitment the issuer never computed.
+    att = issuer.issue_tier_attestation("agent-alpha", TIER_T3)
+    fake = KYAAttestation(
+        attestation_id="cnp2a_x",
+        version=ATTESTATION_VERSION,
+        claim={"kind": "kya_tier", "tier": "T3"},
+        nullifier=att.nullifier,
+        issuer=issuer.issuer_address,
+        issued_at=att.issued_at,
+        expires_at=att.expires_at,
+        commitment="0x" + "22" * 32,
+        signature="",
+    )
+    fake.signature = issuer._sign(fake)
+    res = verify_attestation(fake.to_dict(), issuer.issuer_address, issuer.revocation_source())
+    assert not res.valid and res.reason == "commitment-mismatch", res.reason
+
+
+def test_anchor_check_accepts_issued_rejects_foreign_ledger(issuer, agent, registry):
+    att = issuer.issue_tier_attestation("agent-alpha", TIER_T3)
+    res = verify_attestation(
+        att.to_dict(), issuer.issuer_address, issuer.revocation_source(),
+        anchor_check=issuer.anchor_source(),
+    )
+    assert res.valid, res.reason
+    # A different issuer's ledger never anchored this (id, commitment).
+    other = ZKAttestationIssuer(registry, Account.create().key.hex())
+    res = verify_attestation(
+        att.to_dict(), issuer.issuer_address, issuer.revocation_source(),
+        anchor_check=other.anchor_source(),
+    )
+    assert not res.valid and res.reason == "unanchored", res.reason
+
+
+def test_anchor_check_fail_closed(issuer, agent):
+    att = issuer.issue_tier_attestation("agent-alpha", TIER_T3)
+    d = att.to_dict()
+
+    def boom(attestation_id, commitment):
+        raise ConnectionError("ledger unreachable")
+
+    r1 = verify_attestation(
+        d, issuer.issuer_address, issuer.revocation_source(), anchor_check=boom
+    )
+    assert not r1.valid and r1.reason == "anchor-unverifiable", r1.reason
+    r2 = verify_attestation(
+        d, issuer.issuer_address, issuer.revocation_source(),
+        anchor_check=lambda a, c: None,
+    )
+    assert not r2.valid and r2.reason == "anchor-unverifiable", r2.reason
+
+
+# ---------------------------------------------------------------------------
 # Revocation
 # ---------------------------------------------------------------------------
 

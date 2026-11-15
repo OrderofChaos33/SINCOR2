@@ -14,6 +14,10 @@ seal/delegation signing. Its rules:
   any request naming another algorithm is refused outright.
 - Nonces are tracked per key: a nonce may never be reused for the same
   key (replay protection at issuance).
+- A seal is issued only for the signing key's own address:
+  ``agent_address`` is bound to the key slot (W-175), exactly as the
+  delegator is bound in delegation certs. The enclave never mints a
+  seal naming an identity its key does not control.
 
 Policy constants:
 
@@ -178,8 +182,11 @@ class SealEnclave:
         """Sign a SigilSeal payload. Returns seal fields + signature metadata.
 
         Refuses: unknown key, unknown/extra fields, bad DID, bad address,
-        bad capability namespace, non-future or over-TTL expiry, bad or
-        reused nonce.
+        an ``agent_address`` other than the signing key's own address (the
+        enclave issues seals only for the identity its key controls — a
+        seal naming another address can never verify, since the signature
+        recovers to this key), bad capability namespace, non-future or
+        over-TTL expiry, bad or reused nonce.
         """
         ts = now if now is not None else time.time()
         slot = self._slot(key_id)
@@ -193,6 +200,14 @@ class SealEnclave:
         except ValueError as exc:
             raise EnclavePolicyError(str(exc)) from exc
         agent_address = self._check_address(fields["agent_address"], "agent_address")
+        # W-175: bind the seal to the slot, exactly as sign_delegation
+        # binds the delegator to the slot. Without this, the enclave
+        # would mint impersonation seals naming any victim address.
+        if agent_address.lower() != slot.address.lower():
+            raise EnclavePolicyError(
+                "agent_address must be the signing key's own address: "
+                "the enclave issues seals only for its own identity"
+            )
         capabilities = self._check_capabilities(fields["capabilities"], "capabilities")
         expiry = self._check_expiry(fields["expiry"], MAX_SEAL_TTL, now=ts)
         nonce = self._check_nonce(slot, fields["nonce"])
