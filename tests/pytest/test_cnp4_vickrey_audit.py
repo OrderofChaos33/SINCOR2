@@ -15,7 +15,7 @@ reality and must be deliberately updated if the founder ever approves a change.
 """
 from __future__ import annotations
 
-from conftest import hb_headers
+from conftest import hb_headers, signed_task_auth
 
 from flask import Flask
 
@@ -38,28 +38,29 @@ def _mk_client(tmp_path):
 
 
 def _register(client, agent_id):
+    from bid_testkit import register_wallet_agent
+
     from sincor2.onchain.stake_ledger import stake_ledger
 
-    r = client.post(
-        "/v1/a2a/register",
-        json={
-            "agent_id": agent_id,
-            "capability_tags": ["lead-enrichment"],
-            "rpc_callback": "https://agent.example/rpc",
-            "wallet": "0x" + "11" * 20,
-        },
-    )
-    assert r.status_code in (200, 201), r.get_json()
+    # First registration is fail-closed on wallet claims (C3) and sealed-bid
+    # commit/reveal requires an EIP-191 signature from the registered
+    # wallet (W-77): bid_testkit registers with a real proof and stashes
+    # the key so _commit/_reveal can sign.
+    register_wallet_agent(client, agent_id)
     r = client.post("/v1/a2a/heartbeat", json={"agent_id": agent_id}, headers=hb_headers())
     assert r.status_code == 200
     stake_ledger().deposit(agent_id, 10 * 10**18)
 
 
 def _sealed_task(client):
+    # The anti-gaming guard rejects bids on anonymous (unsigned) bounty
+    # tasks, so bind an identified poster via the caller signature
+    # (conftest.signed_task_auth — the signer is never a bidder here).
     r = client.post(
         "/v1/a2a/tasks",
         json={"skill": "lead-enrichment", "tags": ["lead-enrichment"],
-              "bounty_axm": 1.5, "sealed": True},
+              "bounty_axm": 1.5, "sealed": True,
+              **signed_task_auth("lead-enrichment")},
     )
     assert r.status_code == 201, r.get_json()
     return r.get_json()["task_id"]
@@ -72,18 +73,22 @@ def _commitment(bid_axm, nonce_hex, agent_id):
 
 
 def _commit(client, task_id, agent_id, bid_axm, nonce_hex):
+    from bid_testkit import key_for, signed_commit_body
+
     return client.post(
         "/v1/a2a/bids/commit",
-        json={"task_id": task_id, "agent_id": agent_id,
-              "commitment": _commitment(bid_axm, nonce_hex, agent_id)},
+        json=signed_commit_body(key_for(agent_id), task_id, agent_id,
+                                _commitment(bid_axm, nonce_hex, agent_id)),
     )
 
 
 def _reveal(client, task_id, agent_id, bid_axm, nonce_hex, est=300):
+    from bid_testkit import key_for, signed_reveal_body
+
     return client.post(
         "/v1/a2a/bids/reveal",
-        json={"task_id": task_id, "agent_id": agent_id, "bid_axm": bid_axm,
-              "nonce": nonce_hex, "estimated_seconds": est},
+        json=signed_reveal_body(key_for(agent_id), task_id, agent_id,
+                                bid_axm, nonce_hex, estimated_seconds=est),
     )
 
 
