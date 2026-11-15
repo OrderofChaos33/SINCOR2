@@ -58,9 +58,10 @@ def adjudicator():
 
 
 @pytest.fixture
-def adapter(adjudicator, clock):
-    return AdjudicatorOracleAdapter(
-        expected_adjudicator=adjudicator.address, now_ms=clock)
+def adapter(adjudicator, clock, registry):
+    # W-168: adapters are trusted only once registered with the registry.
+    return registry.register_oracle_adapter(AdjudicatorOracleAdapter(
+        expected_adjudicator=adjudicator.address, now_ms=clock))
 
 
 def _file(registry, task="task-1", agent="agent-1", filer="poster-1",
@@ -273,8 +274,8 @@ def test_evidence_after_resolution_rejected(registry, clock, adapter,
 # --------------------------------------------------------------------------
 
 def test_forged_ruling_rejected_state_unchanged(registry, clock, adjudicator):
-    adapter = AdjudicatorOracleAdapter(
-        expected_adjudicator=adjudicator.address, now_ms=clock)
+    adapter = registry.register_oracle_adapter(AdjudicatorOracleAdapter(
+        expected_adjudicator=adjudicator.address, now_ms=clock))
     d = _file(registry)
     registry.open_evidence_window(d.dispute_id)
     impostor = Account.create()
@@ -386,7 +387,7 @@ class QuorumOracleStub(ArbitrationOracleAdapter):
 
 
 def test_oracle_adapter_is_pluggable(registry, clock):
-    stub = QuorumOracleStub()
+    stub = registry.register_oracle_adapter(QuorumOracleStub())
     d = _file(registry)
     registry.open_evidence_window(d.dispute_id)
     ruling = OracleRuling(
@@ -414,7 +415,8 @@ def test_oracle_rejection_keeps_dispute_open(registry, clock):
         upheld=True, adjudicator_address="x",
         expires_at_ms=clock.now + 60_000, signature="0xabc")
     with pytest.raises(InvalidRuling):
-        registry.apply_oracle_ruling(ruling, DenyAll())
+        registry.apply_oracle_ruling(
+            ruling, registry.register_oracle_adapter(DenyAll()))
     assert d.state is DisputeState.EVIDENCE_OPEN
 
 
@@ -448,3 +450,113 @@ def test_snapshot_is_complete(registry, clock):
     assert snap["dispute_id"] == d.dispute_id
     assert isinstance(snap["events"], list) and len(snap["events"]) >= 2
     assert isinstance(snap["evidence"], list)
+
+
+# --------------------------------------------------------------------------
+# Adapter allowlist (W-168): the caller never picks the trust root
+# --------------------------------------------------------------------------
+
+class _AlwaysUpheldStub(ArbitrationOracleAdapter):
+    """Subclass whose canned verdict upholds everything (PoC shape)."""
+
+    name = "always-upheld"
+
+    def verify_ruling(self, ruling: OracleRuling) -> bool:
+        return True
+
+
+class _DuckTypedFake:
+    """The hunt-50 PoC adapter: right methods, no shared base class."""
+
+    name = "attacker-oracle"
+
+    def verify_ruling(self, ruling: OracleRuling) -> bool:
+        return True
+
+
+def _unsigned_ruling(dispute_id, clock):
+    return OracleRuling(
+        dispute_id=dispute_id, task_id="task-1", agent_id="agent-1",
+        upheld=True, adjudicator_address="0xattacker",
+        expires_at_ms=clock.now + 60_000, signature="0x" + "00" * 65)
+
+
+def test_w168_duck_typed_fake_adapter_rejected(registry, clock):
+    d = _file(registry)
+    registry.open_evidence_window(d.dispute_id)
+    with pytest.raises(InvalidRuling):
+        registry.apply_oracle_ruling(
+            _unsigned_ruling(d.dispute_id, clock), _DuckTypedFake())
+    assert d.state is DisputeState.EVIDENCE_OPEN
+    assert d.outcome_upheld is None
+
+
+def test_w168_unregistered_subclass_adapter_rejected(registry, clock):
+    # Subclassing the interface is not trust: never registered, never
+    # consulted — its canned "upheld" verdict moves nothing.
+    d = _file(registry)
+    registry.open_evidence_window(d.dispute_id)
+    with pytest.raises(InvalidRuling):
+        registry.apply_oracle_ruling(
+            _unsigned_ruling(d.dispute_id, clock), _AlwaysUpheldStub())
+    assert d.state is DisputeState.EVIDENCE_OPEN
+    assert d.outcome_upheld is None
+
+
+def test_w168_registered_adapter_resolves_normally(registry, clock):
+    stub = registry.register_oracle_adapter(_AlwaysUpheldStub())
+    assert registry.registered_oracle_adapters() == (stub,)
+    d = _file(registry)
+    registry.open_evidence_window(d.dispute_id)
+    registry.apply_oracle_ruling(
+        _unsigned_ruling(d.dispute_id, clock), stub)
+    assert d.state is DisputeState.RESOLVED
+    assert d.outcome_upheld is True
+
+
+def test_w168_constructor_registered_adapter_resolves(clock, adjudicator):
+    adapter = AdjudicatorOracleAdapter(
+        expected_adjudicator=adjudicator.address, now_ms=clock)
+    reg = DisputeRegistry(evidence_window_ms=60_000, now_ms=clock,
+                          oracle_adapters=[adapter])
+    d = _file(reg)
+    reg.open_evidence_window(d.dispute_id)
+    ruling = _signed_ruling(adjudicator, d.dispute_id, "task-1", "agent-1",
+                            True, clock)
+    reg.apply_oracle_ruling(ruling, adapter)
+    assert d.state is DisputeState.RESOLVED
+    assert d.outcome_upheld is True
+
+
+def test_w168_registration_is_per_registry(registry, clock):
+    # Registered with some other registry confers no trust here.
+    other = DisputeRegistry(evidence_window_ms=60_000, now_ms=clock)
+    stub = other.register_oracle_adapter(_AlwaysUpheldStub())
+    d = _file(registry)
+    registry.open_evidence_window(d.dispute_id)
+    with pytest.raises(InvalidRuling):
+        registry.apply_oracle_ruling(
+            _unsigned_ruling(d.dispute_id, clock), stub)
+    assert d.state is DisputeState.EVIDENCE_OPEN
+
+
+def test_w168_unregister_revokes_trust(registry, clock):
+    stub = registry.register_oracle_adapter(_AlwaysUpheldStub())
+    assert registry.unregister_oracle_adapter(stub) is True
+    assert registry.unregister_oracle_adapter(stub) is False
+    assert registry.registered_oracle_adapters() == ()
+    d = _file(registry)
+    registry.open_evidence_window(d.dispute_id)
+    with pytest.raises(InvalidRuling):
+        registry.apply_oracle_ruling(
+            _unsigned_ruling(d.dispute_id, clock), stub)
+    assert d.state is DisputeState.EVIDENCE_OPEN
+
+
+def test_w168_registration_rejects_non_adapters(registry):
+    with pytest.raises(InvalidDisputeInput):
+        registry.register_oracle_adapter(_DuckTypedFake())
+    with pytest.raises(InvalidDisputeInput):
+        registry.register_oracle_adapter(None)
+    with pytest.raises(InvalidDisputeInput):
+        DisputeRegistry(oracle_adapters=[_DuckTypedFake()])
