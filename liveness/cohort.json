@@ -25,7 +25,7 @@
           "name": "Monitoring"
         }
       ],
-      "wallet": "0x6672b91d64ee3680c030b8fb7d457738b9ca0db9",
+      "wallet": "0x90a1d519bf737118916a87d0295b96d76fa42e06",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     },
@@ -54,7 +54,7 @@
           "name": "Risk"
         }
       ],
-      "wallet": "0x6002cf82625eebe52149c14e03294fd116bb8a74",
+      "wallet": "0x122482a77a2ed0944fd3e584b11f8b848f14484a",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     },
@@ -83,7 +83,7 @@
           "name": "Defi"
         }
       ],
-      "wallet": "0xd5a6480dab03f87859fd17a3a6303f788e5ae3bb",
+      "wallet": "0x8de0289ede3b879586d8a9b86f4282962aae3e85",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     },
@@ -112,7 +112,7 @@
           "name": "Monitoring"
         }
       ],
-      "wallet": "0x4d55ea3eae95726be613948af85283a0afb5d1cc",
+      "wallet": "0xd98745e0cc3183896ff9fca9fc932cd91b6055fa",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     },
@@ -141,7 +141,7 @@
           "name": "Risk"
         }
       ],
-      "wallet": "0xbb7d37864fb78011d7a4196bf324bb54c0da975a",
+      "wallet": "0x418176e47ffd019cf9f38df36c9e6c2d6bab8ecc",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     },
@@ -170,7 +170,7 @@
           "name": "Compliance"
         }
       ],
-      "wallet": "0xa40bfdf6a2fd8acb0ebac7af2f6f945a297f0e18",
+      "wallet": "0x494543912e13af8746fc1cef54c28789019881e0",
       "chain_id": 8453,
       "origin_note": "genesis-liveness"
     }

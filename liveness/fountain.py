@@ -312,7 +312,7 @@ def load_state() -> dict:
 
 
 def save_state(st: dict) -> None:
-    tmp = STATE_PATH + ".tmp"
+    tmp = f"{STATE_PATH}.tmp.{os.getpid()}"
     with open(tmp, "w") as f:
         json.dump(st, f, indent=2)
     os.replace(tmp, STATE_PATH)
@@ -457,7 +457,10 @@ def post_lane_a(base_url: str, task_type: str, date=None):
         "description": spec["description"],
         "sealed": True,
         "seed_key": seed_key_for(task_type, date),
-        "auto_refresh": False,
+        # Standing listing: the board itself extends the TTL and revives
+        # zero-commit closes (refresh_stale_listings), so the heartbeat
+        # floor stays up without the fountain reposting the same seed key.
+        "auto_refresh": True,
         "poster_id": POSTER_ID,
     }
     return post_json(base_url, "/v1/a2a/tasks", body)
@@ -636,7 +639,11 @@ def ensure_supply(base_url: str, lane_a_min_open: int = 2,
         if open_a >= lane_a_min_open:
             break
         sk = seed_key_for(task_type)
-        if sk in seed_keys and states.get(sk) in ("open", "auction"):
+        # Skip when this seed key exists in ANY state: reposting a type
+        # whose task already closed today is what piled up duplicate
+        # seed keys (the server dedupe only matches open/auction rows).
+        # Yesterday's keys differ by date stamp, so a new day reposts.
+        if sk in seed_keys:
             continue
         try:
             task = post_lane_a(base_url, task_type)
