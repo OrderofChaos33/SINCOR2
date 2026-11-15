@@ -48,14 +48,20 @@ def test_compile_returns_triples_with_runtime_bytecode(compiled):
 def test_encode_constructor_args_roundtrip(script, compiled):
     from eth_abi import decode
     abi = compiled["escrow"][0]
-    args = ("0x" + "11" * 20, "0x" + "22" * 20, 5000, 20000000000000000)
+    # ExecutionEscrowManager's constructor takes 5 args (auctionCore,
+    # adjudicator, minStakeBps, challengerBond, guardian) — the same
+    # 5-tuple the deploy script itself passes in deploy_all().
+    args = ("0x" + "11" * 20, "0x" + "22" * 20, 5000, 20000000000000000,
+            "0x" + "33" * 20)
     encoded = script._encode_constructor_args(None, abi, args)
-    assert len(encoded) == 128  # 4 x 32-byte words
-    decoded = decode(["address", "address", "uint256", "uint256"], encoded)
+    assert len(encoded) == 160  # 5 x 32-byte words
+    decoded = decode(
+        ["address", "address", "uint256", "uint256", "address"], encoded)
     assert decoded[0].lower() == args[0].lower()
     assert decoded[1].lower() == args[1].lower()
     assert decoded[2] == 5000
     assert decoded[3] == 20000000000000000
+    assert decoded[4].lower() == args[4].lower()
 
 
 def test_write_artifacts(script, compiled, tmp_path):

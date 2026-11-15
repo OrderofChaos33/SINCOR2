@@ -314,19 +314,22 @@ def test_homepage_is_toa_centric_without_restore_copy() -> None:
         )
     lower = body.lower()
     assert "query toa" in lower
-    assert "register agent" in lower
-    assert "view raw card" in lower
+    assert "register your agent" in lower
+    assert "open raw card" in lower
     assert "temporal optimization agent" in lower
     assert "e-toa-44" in lower
-    assert 'property="og:title" content="SINCOR — TOA-native agent infrastructure on Base"' in body
-    assert 'property="og:description" content="Query TOA, inspect production-grade Agent Cards, and register agents on the live SINCOR A2A network. Autonomous work, live metrics, one-click machine endpoints."' in body
+    assert 'property="og:title" content="SINCOR — The control plane for autonomous agents"' in body
+    assert 'property="og:description" content="Named agents. Sealed-bid auctions. Settlement on Base. Genesis launches November 9, 2026."' in body
     assert "/api/a2a/quote?skill_id=toa-decision" in body
     assert "/docs/a2a" in body
     assert "/.well-known/agent-card.json" in body
     assert "/api/a2a" in body
-    assert "Agents online" in body
-    assert "price unavailable" in body
-    assert "health unavailable" in body
+    assert "Agents indexed" in body
+    # The 2026-11-03 site truth pass removed every token price display
+    # (and its "price unavailable" fallback copy) from the homepage; the
+    # live panel now reports unknown state via JS, never rendered copy.
+    assert "price unavailable" not in body
+    assert "health unavailable" not in body
     assert "starter " not in body
     assert "homepage restore in progress" not in lower
     assert "restore in progress" not in lower

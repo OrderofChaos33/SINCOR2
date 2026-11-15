@@ -226,6 +226,9 @@ class TestDefiPages:
             if re.search(r'Target yield</div><div class="v">[\d.]+%', text):
                 numeric += 1
                 assert suffix in text, os.path.basename(path)
-        # 24 pages publish a numeric target yield; p20/p26 list the slot as
-        # "Utility — infrastructure" with no figure to qualify.
-        assert numeric == 24
+        # The site truth pass for product pages (5e5d0f8a) removed every
+        # target-yield tile — no page publishes a numeric target yield
+        # today. The loop above stays as the guard: any page that brings
+        # a numeric yield back must carry the disclaimer suffix, and this
+        # count forces a deliberate review of that change.
+        assert numeric == 0

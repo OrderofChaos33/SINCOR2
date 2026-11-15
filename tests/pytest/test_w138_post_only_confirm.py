@@ -71,12 +71,30 @@ def mvp_client(monkeypatch):
     os.environ.setdefault("ADMIN_USERNAME", "admin")
     os.environ.setdefault("ADMIN_PASSWORD", "admin-password-32-char-minimum-ok")
     from sincor2.mvp_app import app, limiter
+    from sincor2.mvp_blueprints import pages
 
-    limiter.reset()
+    def _reset_limiters():
+        # The pages blueprint's @limiter.limit wrappers close over the
+        # limiter instance pages was first bound to. Mid-suite,
+        # test_obs_route_table reloads sincor2.mvp_app (its reimport
+        # test), replacing mvp_app.limiter with a fresh instance while
+        # the already-registered routes keep enforcing the ORIGINAL
+        # one — so resetting only mvp_app.limiter clears nothing, and
+        # the shared claim bucket (5/min, 30/hour per client address)
+        # arrives here still holding earlier files' traffic. Reset
+        # every distinct instance so each test starts from a clean
+        # bucket either way.
+        seen = set()
+        for lim in (limiter, getattr(pages, "limiter", None)):
+            if lim is not None and id(lim) not in seen:
+                seen.add(id(lim))
+                lim.reset()
+
+    _reset_limiters()
     app.config["TESTING"] = True
     app.config["SERVER_NAME"] = None
     yield app.test_client()
-    limiter.reset()
+    _reset_limiters()
 
 
 def _claim(mvp_client, email, wallet):

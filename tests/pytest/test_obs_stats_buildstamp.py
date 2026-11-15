@@ -225,14 +225,17 @@ def test_home_fetches_public_treasury_not_gated_route():
 
 def test_home_reads_reference_price_and_never_renders_unavailable():
     src = (REPO_ROOT / "templates" / "home.html").read_text(encoding="utf-8")
-    assert "reference_price_usd" in src
+    # The 2026-11-03 site truth pass removed every token price display
+    # from the homepage (reference-price ticker, live-spot tile, price
+    # JS): the reference price must NOT come back, and the strip must
+    # still never render an "unavailable" state.
+    assert "reference_price_usd" not in src
+    assert "live-spot-val" not in src
     assert "public snapshot unavailable" not in src
     assert "'unavailable'" not in src
+    assert "unavailable" not in src
     # static honest defaults are server-rendered, so the strip never
     # shows a bare dash even before (or without) the JS fetch completing.
-    # The SINC value itself always comes from the pricing payload — the
-    # claim scanner bans a hardcoded price figure in template copy.
-    assert 'id="live-spot-val">Reference<' in src
     assert 'id="live-treasury-val">20,000 AXM<' in src
 
 

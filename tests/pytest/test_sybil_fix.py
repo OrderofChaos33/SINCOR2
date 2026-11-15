@@ -350,7 +350,10 @@ def test_c_pair_cluster_is_flagged_not_blocked_and_noted_on_receipt():
 
     _assigned_task("task-pay-2", "sybil-p0", assigned_ago_ms=1_000)
     proof = submit_proof("task-pay-2", "sybil-p0", "0x" + "cd" * 16)
-    assert proof["status"] == "paid"
+    # Founder adjudication 2026-11-14: payout is staged until actually
+    # paid — settlement presents "payout_staged"; "paid" is earned only
+    # by a real broadcast tx_hash (contract_net.payout_broadcast_status).
+    assert proof["status"] == "payout_staged"
     sybil = proof["payout"].get("sybil") or {}
     assert sybil["flagged"] is True
     assert sybil["cluster_size"] == 2
@@ -367,7 +370,8 @@ def test_c_solo_agent_payout_clean():
 
     _assigned_task("task-pay-3", "sybil-solo", assigned_ago_ms=1_000)
     proof = submit_proof("task-pay-3", "sybil-solo", "0x" + "ef" * 16)
-    assert proof["status"] == "paid"
+    # Founder adjudication 2026-11-14: payout staged until actually paid.
+    assert proof["status"] == "payout_staged"
     assert "sybil" not in proof["payout"]
 
 

@@ -183,11 +183,27 @@ def test_home_locked_copy_present(client):
     assert LOCKED_POSITIONING in html
 
 
+def _live_skill_count() -> str:
+    """The fact strips advertise the live agent-card skill count.
+
+    Derived from the card builder (the source of truth the templates are
+    hand-synced to) so this suite tracks the catalogue instead of going
+    stale at a hardcoded number — it was pinned at 17 while the card
+    grew to 42 (Adopt-24, PR #630).
+    """
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT / "src"))
+    from sincor2.a2a_integration import build_agent_card
+
+    return str(len(build_agent_card().skills))
+
+
 def test_home_fact_strip_uses_only_safe_facts(client):
     hero = _hero(client.get("/?inner=1"))
     assert 'class="sp-facts"' in hero
     facts = hero.split('class="sp-facts"', 1)[1].split('class="sp-specs"', 1)[0]
-    for fact in ("17", "Sealed-bid", "x402", "Base", "Genesis pass"):
+    for fact in (_live_skill_count(), "Sealed-bid", "x402", "Base", "Genesis pass"):
         assert fact in facts, fact
 
 
@@ -196,12 +212,16 @@ def test_home_stats_strip_never_reads_broken(client):
     assert "public snapshot unavailable" not in html
     assert "connecting to Base snapshot" not in html
     specs = html.split('class="sp-specs"', 1)[1].split("</div>\n  </div>", 1)[0]
-    assert "17" in specs  # skills tile value, not a dynamic placeholder
-    # Founder ruling 2026-10-29: the strip carries exactly 3 live-fed values
-    # (the live-wired strip kept by the #562 conflict resolution).
-    assert specs.count('class="v live-v"') == 3
-    for tile_id in ("live-spot-val", "live-agent-count", "live-treasury-val"):
+    # The strip carries exactly the live-fed values that remain after the
+    # 2026-11-03 site truth pass removed every token price display (the
+    # live-spot-val tile pinned by the 2026-10-29 ruling went with it).
+    # What must never regress: honest server-rendered defaults, no bare
+    # placeholder, and the two surviving live-fed tiles.
+    assert specs.count('class="v live-v"') == 2
+    for tile_id in ("live-agent-count", "live-treasury-val"):
         assert f'id="{tile_id}"' in specs, tile_id
+    assert "live-spot-val" not in specs
+    assert "20,000 AXM" in specs  # treasury tile default, not a placeholder
 
 
 def test_home_hero_has_structured_visual_and_grid(client):
@@ -235,7 +255,7 @@ def test_gate_locked_copy_and_fact_strip(client):
     assert LOCKED_POSITIONING in client.get("/")
     assert 'class="fact-strip"' in copy
     facts = copy.split('class="fact-strip"', 1)[1].split("</ul>", 1)[0]
-    for fact in ("17", "Sealed-bid", "x402", "Base"):
+    for fact in (_live_skill_count(), "Sealed-bid", "x402", "Base"):
         assert fact in facts, fact
 
 

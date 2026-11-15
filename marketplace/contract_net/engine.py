@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 from .eip712 import (
     EMPTY_EPOCH_ROOT,
     BidSummaryMismatchError,
+    canonical_epoch_root,
     demo_signing_secret,
     sign_digest,
     to_hex,
@@ -81,7 +82,7 @@ class ContractNetEngine:
 
     def set_epoch_binding(self, *, epoch_id: str, merkle_root: str) -> None:
         self._epoch_id = str(epoch_id or "")
-        self._epoch_merkle_root = str(merkle_root or EMPTY_EPOCH_ROOT)
+        self._epoch_merkle_root = canonical_epoch_root(merkle_root)
 
     def next_nonce(self, agent_id: str) -> int:
         value = self._nonces.get(agent_id, 0) + 1
@@ -129,6 +130,7 @@ class ContractNetEngine:
         epoch_binding_hash: str = "",
     ) -> SealedBid:
         now = int(now if now is not None else time.time())
+        epoch_merkle_root = canonical_epoch_root(epoch_merkle_root)
         nonce = self.next_nonce(agent.agent_id)
         deadline = now + self.config.bid_ttl_seconds
         bid_price = int(price if price is not None else agent.true_min_price)
@@ -346,7 +348,9 @@ class ContractNetEngine:
                 )
                 if payload.get("epoch_id"):
                     epoch_id = payload["epoch_id"]
-                    epoch_merkle_root = payload["epoch_merkle_root"]
+                    epoch_merkle_root = canonical_epoch_root(
+                        payload["epoch_merkle_root"]
+                    )
                     epoch_binding_hash = payload["epoch_binding_hash"]
             bids.append(
                 self.draft_bid(
