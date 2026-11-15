@@ -56,6 +56,12 @@ Security posture
   (``require_winner_authorization``): only the winner of the parent task may
   mint the child seal. A forged child seal signed by anyone else is
   rejected even if its signature is cryptographically valid.
+- Seal nonces are single-use per signer (W-160): a
+  :class:`SealNonceRegistry` binds ``(signer, nonce)`` to exactly one seal
+  id. Chain verification, graph registration, and graph audit all consult
+  the registry, so two *different* seals sharing a signer and nonce are
+  rejected even when both signatures are valid. Re-verifying the *same*
+  seal is idempotent — it is not reuse.
 - Failed auctions (no winner) can never be sealed or subcontracted.
 - Task ids are unique across the graph: the hierarchy is a tree, and a
   task can never become its own ancestor.
@@ -63,6 +69,8 @@ Security posture
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import time
 import uuid
@@ -142,6 +150,10 @@ class SealError(HierarchicalCNPError):
 
 class SealChainError(SealError):
     """A seal chain fails to walk back to a valid genesis seal."""
+
+
+class NonceReuseError(SealError):
+    """A signer nonce is already bound to a different seal (W-160)."""
 
 
 class GraphError(HierarchicalCNPError):
@@ -510,6 +522,88 @@ def mint_nested_seal(
     )
 
 
+class SealNonceRegistry:
+    """Per-signer nonce ledger for nested seals (W-160).
+
+    Binds ``(signer_address, nonce)`` to the single seal id that first
+    claimed it. Presenting a *different* seal under an already-bound
+    ``(signer, nonce)`` pair is nonce reuse and raises
+    :class:`NonceReuseError`; re-presenting the *same* seal is idempotent
+    (re-verification of a known seal is not reuse).
+
+    The ledger is in-memory by default. Pass ``path`` to persist bindings
+    as JSON so they survive process restarts: the file is loaded at
+    construction (a malformed file fails closed) and rewritten atomically
+    on every new binding. One registry instance is one verification
+    context — a :class:`HierarchicalTaskGraph` owns one, and standalone
+    verifiers that need replay protection share one explicitly.
+    """
+
+    def __init__(self, path: Optional[str] = None) -> None:
+        self._path = path
+        self._bindings: Dict[str, Dict[int, str]] = {}
+        if path is not None and os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as fh:
+                    raw = json.load(fh)
+                bindings = raw["bindings"]
+                for signer, nonces in bindings.items():
+                    self._bindings[str(signer).lower()] = {
+                        int(nonce): str(seal_id).lower()
+                        for nonce, seal_id in nonces.items()
+                    }
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                raise HierarchicalCNPError(
+                    f"cannot load seal nonce registry from {path!r}: {exc}"
+                ) from exc
+
+    def __len__(self) -> int:
+        return sum(len(nonces) for nonces in self._bindings.values())
+
+    def lookup(self, agent_address: str, nonce: int) -> Optional[str]:
+        """The seal id bound to ``(agent_address, nonce)``, or None."""
+        return self._bindings.get(agent_address.lower(), {}).get(nonce)
+
+    def assert_available(self, seal: NestedSeal) -> None:
+        """Raise :class:`NonceReuseError` if the seal's (signer, nonce)
+        is already bound to a *different* seal. Records nothing."""
+        bound = self.lookup(seal.agent_address, seal.nonce)
+        if bound is not None and bound != seal.seal_id.lower():
+            raise NonceReuseError(
+                f"nonce {seal.nonce} for signer {seal.agent_address} is "
+                f"already bound to seal {bound}: nonce reuse rejected"
+            )
+
+    def check_and_record(self, seal: NestedSeal) -> None:
+        """Enforce single-use and bind ``(signer, nonce)`` to this seal.
+
+        Callers must only pass seals that have already fully verified:
+        recording an unverified seal would let an attacker poison the
+        ledger and deny a legitimate signer their nonce.
+        """
+        self.assert_available(seal)
+        signer = seal.agent_address.lower()
+        nonces = self._bindings.setdefault(signer, {})
+        if seal.nonce not in nonces:
+            nonces[seal.nonce] = seal.seal_id.lower()
+            self._persist()
+
+    def _persist(self) -> None:
+        if self._path is None:
+            return
+        payload = {
+            "version": 1,
+            "bindings": {
+                signer: {str(nonce): seal_id for nonce, seal_id in nonces.items()}
+                for signer, nonces in self._bindings.items()
+            },
+        }
+        tmp_path = f"{self._path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=1, sort_keys=True)
+        os.replace(tmp_path, self._path)
+
+
 def verify_nested_seal(
     seal: NestedSeal,
     net_config: ContractNetConfig,
@@ -518,12 +612,20 @@ def verify_nested_seal(
     allow_hmac: bool = False,
     max_depth: int = MAX_DEPTH_HARD_CAP,
     hmac_secret: str = "",
+    nonce_registry: Optional[SealNonceRegistry] = None,
 ) -> None:
     """Verify one seal. Raises :class:`SealError` with a reason on failure.
 
     Checks, in order: field validity → digest recomputation (tamper-evident)
     → seal-id derivation → signature (secp256k1 recovery must match
     ``agent_address``; HMAC is default-deny) → expiry → depth bounds.
+
+    When ``nonce_registry`` is given, the seal's ``(signer, nonce)`` pair
+    is additionally checked against the registry *after* every other check
+    passes and bound to this seal (W-160): a second, different seal reusing
+    the nonce is rejected with :class:`NonceReuseError`. Without a
+    registry this stays a pure per-seal check — a lone seal carries no
+    evidence of what other seals its signer has minted.
     """
     if not isinstance(seal, NestedSeal):
         raise SealError(f"expected NestedSeal, got {type(seal).__name__}")
@@ -572,6 +674,11 @@ def verify_nested_seal(
     if seal.expiry <= now:
         raise SealError("seal expired")
 
+    if nonce_registry is not None:
+        # Only fully verified seals reach this point, so recording here
+        # can never let an invalid seal poison the ledger.
+        nonce_registry.check_and_record(seal)
+
 
 def verify_seal_chain(
     leaf: NestedSeal,
@@ -583,6 +690,7 @@ def verify_seal_chain(
     allow_hmac: bool = False,
     authorized_signers: AbstractSet[str] = frozenset(),
     hmac_secret_resolver: Optional[Callable[[str], str]] = None,
+    nonce_registry: Optional[SealNonceRegistry] = None,
 ) -> List[NestedSeal]:
     """Walk a seal chain from ``leaf`` back to the genesis seal.
 
@@ -594,6 +702,11 @@ def verify_seal_chain(
     referenced hash; depth decreases by exactly 1 (defeats depth smuggling
     and reference cycles); the genesis seal sits at depth 0 with an empty
     parent hash. A repeated seal id is a cycle and is rejected.
+
+    Nonce single-use (W-160) is enforced two ways: two links of the
+    presented chain itself may never share a ``(signer, nonce)`` pair
+    under different seal ids, and when ``nonce_registry`` is given every
+    link is additionally checked/bound against that ledger.
     """
     allow = {addr.lower() for addr in authorized_signers}
     # Normalize registry keys once; lookups are case-insensitive.
@@ -602,6 +715,7 @@ def verify_seal_chain(
 
     chain: List[NestedSeal] = []
     visited: set[str] = set()
+    chain_nonces: Dict[Tuple[str, int], str] = {}
     current = leaf
     steps = 0
     while True:
@@ -622,6 +736,7 @@ def verify_seal_chain(
                 allow_hmac=allow_hmac,
                 max_depth=max_depth,
                 hmac_secret=secret,
+                nonce_registry=nonce_registry,
             )
         except SealError as exc:
             # A bad link breaks the chain: surface it as a chain error with
@@ -629,6 +744,14 @@ def verify_seal_chain(
             raise SealChainError(
                 f"chain link at depth {current.depth} is invalid: {exc}"
             ) from exc
+        nonce_key = (current.agent_address.lower(), current.nonce)
+        bound = chain_nonces.get(nonce_key)
+        if bound is not None and bound != _normalize_seal_id(current.seal_id):
+            raise SealChainError(
+                f"nonce {current.nonce} for signer {current.agent_address} "
+                "is used by two different seals in this chain: nonce reuse"
+            )
+        chain_nonces[nonce_key] = _normalize_seal_id(current.seal_id)
         if allow and current.agent_address.lower() not in allow:
             raise SealChainError(
                 f"signer {current.agent_address} is not an authorized sealer"
@@ -697,6 +820,7 @@ class HierarchicalTaskGraph:
         engine: ContractNetEngine,
         config: Optional[HierarchicalConfig] = None,
         key_resolver: Optional[SealKeyResolver] = None,
+        nonce_registry: Optional[SealNonceRegistry] = None,
     ) -> None:
         self.engine = engine
         self.config = config or HierarchicalConfig()
@@ -705,6 +829,11 @@ class HierarchicalTaskGraph:
         self._seals: Dict[str, NestedSeal] = {}  # normalized seal_id -> seal
         self._task_index: Dict[str, str] = {}  # task_id -> node_id
         self._seal_nonces: Dict[str, int] = {}
+        # W-160: every seal the graph verifies or registers is bound in
+        # this ledger; a (signer, nonce) pair can never name two seals.
+        # Pass a shared/persistent registry to extend the guarantee
+        # across graph instances.
+        self._nonce_registry = nonce_registry or SealNonceRegistry()
         # HMAC secrets used when the graph itself minted seals (demo/test
         # path). Production uses secp256k1, so this stays empty there.
         self._hmac_secrets: Dict[str, str] = {}
@@ -743,9 +872,20 @@ class HierarchicalTaskGraph:
 
     # -- seal bookkeeping -------------------------------------------------
 
+    @property
+    def nonce_registry(self) -> SealNonceRegistry:
+        """The graph's per-signer nonce ledger (W-160)."""
+        return self._nonce_registry
+
     def next_seal_nonce(self, agent_address: str) -> int:
         key = agent_address.lower()
-        value = self._seal_nonces.get(key, 0) + 1
+        value = self._seal_nonces.get(key, 0)
+        while True:
+            value += 1
+            # Never hand out a nonce the registry has already bound to a
+            # seal (e.g. an externally supplied seal registered earlier).
+            if self._nonce_registry.lookup(key, value) is None:
+                break
         self._seal_nonces[key] = value
         return value
 
@@ -753,6 +893,7 @@ class HierarchicalTaskGraph:
         seal_id = _normalize_seal_id(seal.seal_id)
         if seal_id in self._seals:
             raise DuplicateSeal(f"seal {seal.seal_id} is already registered")
+        self._nonce_registry.check_and_record(seal)
         self._seals[seal_id] = seal
 
     def _default_hmac_secret_resolver(self, address: str) -> str:
@@ -764,6 +905,7 @@ class HierarchicalTaskGraph:
             "authorized_signers": frozenset(self.config.authorized_signers),
             "hmac_secret_resolver": hmac_secret_resolver
             or self._default_hmac_secret_resolver,
+            "nonce_registry": self._nonce_registry,
         }
 
     def verify_node_chain(self, node: TaskNode, *, now: int,
@@ -828,6 +970,10 @@ class HierarchicalTaskGraph:
         # Fail fast on seal replay: a seal id may only ever be registered once.
         if _normalize_seal_id(seal.seal_id) in self._seals:
             raise DuplicateSeal(f"seal {seal.seal_id} is already registered")
+        # Fail fast on nonce reuse (W-160): the seal's (signer, nonce)
+        # must not already be bound to a different seal. Nothing is
+        # recorded here — binding happens in _register_seal on success.
+        self._nonce_registry.assert_available(seal)
         if not award.winner_id:
             raise GraphError("cannot seal an auction with no winner")
         if award.task_id != task.task_id:
