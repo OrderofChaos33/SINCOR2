@@ -22,20 +22,23 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+# Core runtime subset. The full production dependency set is pinned in
+# requirements.txt (resolved snapshot: requirements.lock); the versions
+# below are pinned to match requirements.txt exactly so `pip install .`
+# and `pip install -r requirements.txt` cannot drift apart.
 dependencies = [
-    "Flask>=3.0.0",
-    "Flask-JWT-Extended>=4.5.0",
-    "Flask-Limiter>=3.8.0",
-    "Pydantic>=2.4.0",
-    "python-dotenv>=1.0.0",
-    "gunicorn>=21.0.0",
+    "Flask==3.0.3",
+    "Flask-JWT-Extended==4.7.1",
+    "Flask-Limiter==3.8.0",
+    "Pydantic==2.9.2",
+    "python-dotenv==1.0.1",
+    "gunicorn==23.0.0",
 ]
 
 [project.optional-dependencies]

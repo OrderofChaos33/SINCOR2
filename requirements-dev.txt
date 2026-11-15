@@ -41,5 +41,5 @@ memory-profiler==0.61.0
 line-profiler==4.1.1
 
 # CLI Tools
-python-dotenv[cli]==1.0.0
+python-dotenv[cli]==1.0.1
 click-shell==2.1

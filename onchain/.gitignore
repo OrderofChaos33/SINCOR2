@@ -7,3 +7,8 @@ lib/
 .env
 deployments/*.json
 !deployments/.gitkeep
+
+# Vendored Foundry dependencies are committed (see lib/VENDORED.md);
+# negate this file's `lib/` rule above for them.
+!/lib/
+!/lib/**

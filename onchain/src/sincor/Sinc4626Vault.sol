@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -58,6 +59,10 @@ contract Sinc4626Vault is ERC4626, AccessControl, ReentrancyGuard, ISinc4626Vaul
 
     function router() external view returns (address) {
         return address(strategyRouter);
+    }
+
+    function asset() public view override(ERC4626, ISinc4626Vault) returns (address) {
+        return super.asset();
     }
 
     function totalAssets() public view override(ERC4626, ISinc4626Vault) returns (uint256) {

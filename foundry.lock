@@ -10,5 +10,26 @@
       "name": "v5.5.0",
       "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
     }
+  },
+  "lib/openzeppelin-contracts-v4": {
+    "tag": {
+      "name": "v4.9.6",
+      "rev": "dc44c9f1a4c3b10af99492eed84f83ed244203f6"
+    }
+  },
+  "lib/permit2": {
+    "rev": "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219"
+  },
+  "lib/solmate": {
+    "rev": "4b47a19038b798b4a33d9749d25e570443520647"
+  },
+  "lib/uniswap-hooks": {
+    "rev": "26dc8e53f812a1ca390d470342adb6cd8c3286ad"
+  },
+  "lib/v4-core": {
+    "rev": "d153b048868a60c2403a3ef5b2301bb247884d46"
+  },
+  "lib/v4-periphery": {
+    "rev": "7ebd04b161745b75ed0c24ba2df3bc7c25f65606"
   }
 }

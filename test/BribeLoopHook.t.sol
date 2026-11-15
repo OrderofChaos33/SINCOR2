@@ -3,7 +3,8 @@ pragma solidity ^0.8.27;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {BribeLoopHook, PoolKey, BalanceDelta, IPoolManager, Hooks} from "../contracts/hooks/BribeLoopHook.sol";
+import {BribeLoopHook, PoolKey, BalanceDelta, Hooks} from "../contracts/hooks/BribeLoopHook.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
 contract MockToken is ERC20 {
     constructor() ERC20("OUT", "OUT") {
@@ -84,8 +85,8 @@ contract BribeLoopHookTest is Test {
             tickSpacing: 60,
             hooks: address(hook)
         });
-        IPoolManager.SwapParams memory params =
-            IPoolManager.SwapParams({zeroForOne: true, amountSpecified: -1e18, sqrtPriceLimitX96: 0});
+        SwapParams memory params =
+            SwapParams({zeroForOne: true, amountSpecified: -1e18, sqrtPriceLimitX96: 0});
         BalanceDelta memory delta = BalanceDelta({amount0: 0, amount1: 1e18});
 
         vm.expectRevert("Caller not PoolManager");
@@ -103,7 +104,7 @@ contract BribeLoopHookTest is Test {
             tickSpacing: 60,
             hooks: address(hook)
         });
-        IPoolManager.SwapParams memory params = IPoolManager.SwapParams({
+        SwapParams memory params = SwapParams({
             zeroForOne: true,
             amountSpecified: -int256(outputAmount),
             sqrtPriceLimitX96: 0

@@ -1,0 +1,531 @@
+{
+  "registry_version": 1,
+  "generated": "2026-11-14",
+  "branch": "feat/sincor-a-plus-master-overhaul",
+  "base_commit": "4fd2c248",
+  "source_of_truth": "~/workspace/goals/make-money/files/52-PATH-STATUS-TABLE.md (verified 2026-11-14) + 52-PATH-REVENUE-MANIFEST.md (names/ids only; manifest claims are scope, not proof)",
+  "status_counts_note": "Verified table rollup: LIVE 3 / SEND-READY 3 / WIRED-NEEDS-TRIGGER 5 / NOT FOUND 5, remainder IN-QUEUE. Per-entry counts here: LIVE 2 (paths 1, 17), SEND-READY 2 (paths 10, 52), WIRED-NEEDS-TRIGGER 5, NOT FOUND 5, IN-QUEUE 38. The third LIVE (bounty sweeps) and third SEND-READY (audit packets) in the table's rollup are Pillar-4 motions spanning paths 21-46 rather than single numbered paths; they are documented in each P01-P26 entry's notes instead of inflating one entry.",
+  "outside_revenue_usd": 0,
+  "paths": [
+    {
+      "path_id": 1,
+      "name": "CNP Task Auction Take-Rate",
+      "category": "A2A JSON-RPC skill",
+      "entrypoint_file": "src/sincor2/a2a_integration.py",
+      "payment_rail": "AXM (Base)",
+      "status": "LIVE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 1",
+      "notes": "LIVE internal-only. 5% canon: A2A_PLATFORM_FEE_BPS default 500 at a2a_integration.py:104; treasury 0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac. Zero realized fees to date. NOTE (corrected post-integration, 2026-11-14): activity_engine.py cited by the status table IS present on this tree at src/sincor2/activity_engine.py — the earlier absence claim was measured on the pre-rebase side-branch tree (45f34309) and does not hold on main 4fd2c248."
+    },
+    {
+      "path_id": 2,
+      "name": "AXM Native Settlement Spread",
+      "category": "on-chain settlement",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 mechanism not built",
+      "status": "NOT FOUND",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 2",
+      "notes": "No distinct spread code exists anywhere in the repo (verified). Settlement is 1:1 at the 5% fee; no bid/ask or FX spread is taken."
+    },
+    {
+      "path_id": 3,
+      "name": "Vickrey Auction Surplus Routing",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "marketplace/contract_net/vickrey.py",
+      "payment_rail": "AXM (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 3",
+      "notes": "Sealed-bid Vickrey engine exists; surplus currently accrues to the poster, not the treasury. Routing the surplus to treasury is the unbuilt step."
+    },
+    {
+      "path_id": 4,
+      "name": "Dual-Pool Re-Auction Fees",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "contracts/ExecutionEscrowManager.sol",
+      "payment_rail": "AXM (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 4",
+      "notes": "posterReAuctionBalances at ExecutionEscrowManager.sol:69; no fee is taken on re-auction and the contract is not deployed."
+    },
+    {
+      "path_id": 5,
+      "name": "Hybrid Slashing & Bond Forfeiture Cut",
+      "category": "on-chain settlement",
+      "entrypoint_file": "contracts/escrow/SincorTaskEscrow.sol",
+      "payment_rail": "AXM (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 5",
+      "notes": "Slash/forfeiture logic at SincorTaskEscrow.sol:95-98, treasury constructor-set (:12, :33-36); also contracts/StakeSlashManager.sol and onchain/src/sincor/AgentStakeSlash.sol. None deployed."
+    },
+    {
+      "path_id": 6,
+      "name": "TimeLock Early-Exit Penalties",
+      "category": "on-chain settlement",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 mechanism not built",
+      "status": "NOT FOUND",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 6",
+      "notes": "No vesting/timelock contract exists in the repo (verified). The manifest's TimeLockRewardEscrow.sol does not exist."
+    },
+    {
+      "path_id": 7,
+      "name": "sincor-x402 Micro-Tariffs",
+      "category": "x402 API gate",
+      "entrypoint_file": "src/sincor2/x402_payments.py",
+      "payment_rail": "x402 (Base, USDC)",
+      "status": "WIRED-NEEDS-TRIGGER",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 7",
+      "notes": "PyPI sincor-x402 v0.1.1 published; /x402-live returns 200. Blocked on: Railway CDP facilitator vars + redeploy, W-155 settle-response-loss fix, Lane 3 fee-split decision. Lane 3 books no fee split today."
+    },
+    {
+      "path_id": 8,
+      "name": "ERC-7579 Session Key Validation Fees",
+      "category": "on-chain module",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 no toll implemented",
+      "status": "NOT FOUND",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 8",
+      "notes": "Fee NOT FOUND. Session-key validators exist (onchain/src/sincor/EpochSessionKeyValidator.sol) but charge no validation fee; no toll code exists."
+    },
+    {
+      "path_id": 9,
+      "name": "SEAL Underwriting Premiums",
+      "category": "on-chain module",
+      "entrypoint_file": "src/sincor2/underwriting/engine.py",
+      "payment_rail": "AXM (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 9",
+      "notes": "The SEAL module itself (marketplace/contract_net/sigil_seal.py) lives on unmerged branch xioix/cnp-01-sigil-seal and is absent on this branch; only the underwriting viewer/policy surface exists here. No premiums collected."
+    },
+    {
+      "path_id": 10,
+      "name": "SIGIL Attestation Tolls",
+      "category": "on-chain module",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 toll not implemented",
+      "status": "SEND-READY",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 10",
+      "notes": "Module SEND-READY: contracts/modules/SigilPolicyModule.sol IS present on this tree (main 4fd2c248), with its test suite at test/SigilPolicyModule.t.sol — the earlier 'absent on this branch' claim was measured on the pre-rebase side-branch tree (45f34309) and does not hold here (corrected post-integration, 2026-11-14). The attestation TOLL itself is NOT FOUND. ERC-8004 promotion merged via PR #654."
+    },
+    {
+      "path_id": 11,
+      "name": "TOA Priority Fees",
+      "category": "A2A JSON-RPC skill",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 no toll implemented",
+      "status": "NOT FOUND",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 11",
+      "notes": "Fee NOT FOUND. TOA forecasting infrastructure exists but charges no priority fee."
+    },
+    {
+      "path_id": 12,
+      "name": "KYA Identity & Reputation Staking",
+      "category": "on-chain module",
+      "entrypoint_file": "src/sincor2/kya/registry.py",
+      "payment_rail": "AXM (Base)",
+      "status": "WIRED-NEEDS-TRIGGER",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 12",
+      "notes": "KYA package + contracts/kya/KYARegistry.sol; genesis SBT live. Outside registrations: 0. Needs external trigger/adoption."
+    },
+    {
+      "path_id": 13,
+      "name": "Adjudicator Dispute Fees",
+      "category": "A2A JSON-RPC skill",
+      "entrypoint_file": "src/sincor2/a2a_inbound_market.py",
+      "payment_rail": "AXM (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 13",
+      "notes": "Dispute/adjudication flow exists in the inbound market; no dispute fee is charged today."
+    },
+    {
+      "path_id": 14,
+      "name": "SINAX Licensing",
+      "category": "licensing",
+      "entrypoint_file": "src/sincor2/sinax/axiom_solver.py",
+      "payment_rail": "none \u2014 no billing surface",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 14",
+      "notes": "SINAX is real code (src/sincor2/sinax/, 26 modules) but has no licensing or billing surface; licensing is unbuilt."
+    },
+    {
+      "path_id": 15,
+      "name": "BribeLoop Hook MEV",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "contracts/hooks/BribeLoopHook.sol",
+      "payment_rail": "ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 15",
+      "notes": "Hook code exists with mock addresses only; never deployed, capturing nothing. The backrun lane it fed was KILLED by measurement (median gaps 0.7-0.8 bps vs 3-94 bps fee floors)."
+    },
+    {
+      "path_id": 16,
+      "name": "Dynamic LP Fee-Switch Hook",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "onchain/src/SharedLiquidityHook.sol",
+      "payment_rail": "USDC/WETH (Base)",
+      "status": "WIRED-NEEDS-TRIGGER",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 16",
+      "notes": "SharedLiquidityVault LIVE @ 0xeA90a257e5Dae20a0472C4812775F28614459bb6; hook staging LIVE @ 0x5A20BfEc6Caa3A94246eCCCb36F27F4980152dC0. Production pool attachment pending."
+    },
+    {
+      "path_id": 17,
+      "name": "MoebiusX",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": null,
+      "payment_rail": "USDC/WETH (Base)",
+      "status": "LIVE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 17",
+      "notes": "LIVE but external to this repo: the v3.1 trader kit lives at ~/workspace/ops/moebiusx/v3.1-kit/ (deliberate isolation of session-key material). 107 all-time trades, all SUCCESS, through 2026-11-14; pool ~$54.90. In-repo surface is only the v4 hook (onchain/src/hooks/MoebiusMEVHook.sol) and notes."
+    },
+    {
+      "path_id": 18,
+      "name": "Agentic Liquidity Vault Management Fees",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "onchain/src/sincor/Sinc4626Vault.sol",
+      "payment_rail": "USDC (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 18",
+      "notes": "ERC-4626 vault code exists; no management/performance fee is charged and no external depositors exist."
+    },
+    {
+      "path_id": 19,
+      "name": "A2A Escrow Float Yield",
+      "category": "on-chain settlement",
+      "entrypoint_file": null,
+      "payment_rail": "none \u2014 mechanism not built",
+      "status": "NOT FOUND",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 19",
+      "notes": "No float-yield mechanism exists (verified). Escrowed funds earn nothing today."
+    },
+    {
+      "path_id": 20,
+      "name": "x402 Paymaster Gas Sponsorship Markup",
+      "category": "x402 API gate",
+      "entrypoint_file": "contracts/paymaster/SincorPaymaster.sol",
+      "payment_rail": "x402 (Base, USDC)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 20",
+      "notes": "Paymaster contract exists with no markup logic; not deployed."
+    },
+    {
+      "path_id": 21,
+      "name": "P01 Yield Aggregator Vault",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/yield_aggregator.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 21",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 22,
+      "name": "P02 Concentrated Liquidity Manager",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/clmm_manager.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 22",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 23,
+      "name": "P03 Intent Solver & Dark Pool",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/intent_dark_pool.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 23",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 24,
+      "name": "P04 MEV Protection & Capture",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/mev_capture.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 24",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 25,
+      "name": "P05 DeFi Risk Mutual",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/insurance_mutual.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 25",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 26,
+      "name": "P06 Perp DEX Hedging Swarm",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/perp_hedge_swarm.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 26",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 27,
+      "name": "P07 Cross-Chain Bridge Optimizer",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/bridge_optimizer.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 27",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 28,
+      "name": "P08 RWA Tokenization Vaults",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/rwa_vaults.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 28",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 29,
+      "name": "P09 DAO Governance Optimizer",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/dao_governance.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 29",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 30,
+      "name": "P10 Flash Loan Arbitrage Engine",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/flash_arbitrage.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 30",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 31,
+      "name": "P11 Delta-Neutral Yield",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/delta_neutral.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 31",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 32,
+      "name": "P12 TWAMM Large-Order Engine",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/twamm.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 32",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 33,
+      "name": "P13 AVS Tranching & Restaking",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/avs_tranching.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 33",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 34,
+      "name": "P14 Prediction Market Automation",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/prediction_markets.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 34",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 35,
+      "name": "P15 Lending Protocol Optimizer",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/lending_optimizer.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 35",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 36,
+      "name": "P16 Best-Execution DEX Aggregator",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/dex_aggregator.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 36",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 37,
+      "name": "P17 On-Chain Options Protocol",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/options_protocol.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 37",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 38,
+      "name": "P18 Structured Product Vaults",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/structured_products.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 38",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 39,
+      "name": "P19 Decentralized Credit Underwriting",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/credit_underwriting.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 39",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 40,
+      "name": "P20 DeFi Compliance Automation",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/compliance_automation.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 40",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 41,
+      "name": "P21 DAO Treasury Management",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/treasury_dao.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 41",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 42,
+      "name": "P22 Stablecoin Yield Maximizer",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/p22/__init__.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 42",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 43,
+      "name": "P23 NFT-Fi Liquidity Pools",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/p23/__init__.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 43",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 44,
+      "name": "P24 SocialFi Revenue Share",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/p24/__init__.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 44",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 45,
+      "name": "P25 Agent-Managed Portfolio",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/p25/__init__.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 45",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 46,
+      "name": "P26 Self-Improving DeFi OS",
+      "category": "DeFi/liquidity route",
+      "entrypoint_file": "src/sincor2/defi/p26/__init__.py",
+      "payment_rail": "USDC/ETH (Base)",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 46",
+      "notes": "One of the 26 in-platform DeFi product modules (src/sincor2/defi/catalog.py). Not a separately deployed or separately sold product today. Pillar-4 revenue motions span all 26: audit packets SEND-READY, bounty sweeps LIVE (internal scanning), direct integrations and micro-products IN-QUEUE (verified status table, 2026-11-14)."
+    },
+    {
+      "path_id": 47,
+      "name": "IFD Intelligence Feeds",
+      "category": "enterprise outbound",
+      "entrypoint_file": "src/sincor2/instant_business_intelligence.py",
+      "payment_rail": "Stripe fiat / USDC fallback",
+      "status": "WIRED-NEEDS-TRIGGER",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 47",
+      "notes": "Feed engine exists; priced in platform_payments.py PLATFORM_PLANS (BI Report $49, Monthly Intelligence $149/mo). Subscribers: 0."
+    },
+    {
+      "path_id": 48,
+      "name": "Governance & Treasury Risk Briefings",
+      "category": "enterprise outbound",
+      "entrypoint_file": "src/sincor2/defi/treasury_dao.py",
+      "payment_rail": "Stripe fiat / USDC fallback",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 48",
+      "notes": "Briefing capability rides on the P21 treasury module; no standalone briefing product or subscriber exists."
+    },
+    {
+      "path_id": 49,
+      "name": "Sybil & Campaign Verification-as-a-Service",
+      "category": "A2A JSON-RPC skill",
+      "entrypoint_file": "src/sincor2/axm_antigaming.py",
+      "payment_rail": "none \u2014 not productized",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 49",
+      "notes": "The anti-gaming guard code IS present on main (corrected post-integration, 2026-11-14): src/sincor2/axm_antigaming.py exists on this tree, check_self_bid at axm_antigaming.py:310, enforced via check_bid_eligibility in src/sincor2/a2a_inbound_market.py (close_auction :793, place_bid :1174, commit_bid :1249, reveal_bid :1336). The earlier 'exists only on unmerged branches / ABSENT on this branch' claim was measured on the pre-rebase side-branch tree (45f34309) and is false here. What remains IN-QUEUE is the VaaS product surface \u2014 packaging, pricing, and an external API for selling the verification as a service \u2014 which is not productized."
+    },
+    {
+      "path_id": 50,
+      "name": "B2B Agent Fleet Subscriptions",
+      "category": "$297 checkout lane",
+      "entrypoint_file": "src/sincor2/platform_payments.py",
+      "payment_rail": "Stripe fiat (off by default) / USDC fallback",
+      "status": "WIRED-NEEDS-TRIGGER",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 50",
+      "notes": "PLATFORM_PLANS: starter $297/mo, professional $997/mo, enterprise $2,997/mo, intel $149/mo; USDC 1:1 fallback when AXM unpriced. Live /pricing 200, /checkout 404 (no page), subscribers 0, no payment ever completed."
+    },
+    {
+      "path_id": 51,
+      "name": "Vertical Swarms",
+      "category": "vertical services",
+      "entrypoint_file": "verticals/loader.py",
+      "payment_rail": "varies by vertical",
+      "status": "IN-QUEUE",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 51",
+      "notes": "verticals/ packages exist (healthcare, dental, compliance, lead_gen, trading, auto_detailing). The only operating vertical is Clinton Auto Detailing \u2014 a separate local business, not SINCOR revenue."
+    },
+    {
+      "path_id": 52,
+      "name": "Enterprise MCP Server & SDK Licensing",
+      "category": "enterprise outbound",
+      "entrypoint_file": "src/sincor2/mcp_server.py",
+      "payment_rail": "Stripe fiat / licensing terms",
+      "status": "SEND-READY",
+      "healthcheck_cmd": "python3 scripts/verify_money_paths.py --only 52",
+      "notes": "MCP server exists; Glama + mcp.so listing kits paste-ready. Smithery needs a deployed public MCP URL; Official MCP Registry blocked on PyPI publish of the server package."
+    }
+  ]
+}
