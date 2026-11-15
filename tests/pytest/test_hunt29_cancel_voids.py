@@ -126,6 +126,14 @@ def _settle(client, challenge_id, tx_hash, wallet=PAYER):
 
 def test_variant_a_pre_cancel_challenge_cannot_settle_after_cancel(
         sub_app, sub_env):
+    # STALE update (founder-authorized 2026-11-08): the post-cancel
+    # assertions pinned the old immediate-revocation behavior (status
+    # "canceled", effective_plan "none", gate denied at once). Under
+    # the Terms §5 paid-through fix (9018cbb3) a mid-period cancel
+    # records "cancel_pending" and the paid plan runs to period_end.
+    # The W-106 invariant is unchanged and still asserted in full:
+    # the pre-cancel challenge is voided, its settle is refused with
+    # challenge_voided_by_cancel, and the period is NOT extended.
     client = sub_app.test_client()
     cid1 = _checkout(client, "starter")
     first = _settle(client, cid1, TX_STARTER)
@@ -137,7 +145,7 @@ def test_variant_a_pre_cancel_challenge_cannot_settle_after_cancel(
     cid2 = _checkout(client, "starter")
 
     out = rs.cancel_subscription(PAYER)
-    assert out["status"] == "canceled"
+    assert out["status"] == "cancel_pending"
     # the cancel voided the outstanding challenge (white-box)
     assert rs._get_issued(cid2)["voided_at"]
 
@@ -146,13 +154,15 @@ def test_variant_a_pre_cancel_challenge_cannot_settle_after_cancel(
     assert body["ok"] is False
     assert body["error"] == "challenge_voided_by_cancel"
 
-    # no resurrection: still canceled, no access, period NOT extended
+    # no resurrection: the voided settle did not reactivate the row or
+    # extend the period — the subscription stays in its paid-through
+    # cancel_pending state, with the originally paid access intact
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
-    assert status["effective_plan"] == "none"
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
     assert status["period_end"] == period_end_before
     assert status["period_index"] == 1
-    assert rs.gate(PAYER, "starter_agents").allowed is False
+    assert rs.gate(PAYER, "starter_agents").allowed is True
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +171,14 @@ def test_variant_a_pre_cancel_challenge_cannot_settle_after_cancel(
 
 def test_variant_b_refused_downgrade_cannot_complete_after_cancel(
         sub_app, sub_env):
+    # STALE update (founder-authorized 2026-11-08): the post-cancel
+    # assertions pinned the old immediate-revocation behavior (status
+    # "canceled", effective_plan "none"). Under the Terms §5
+    # paid-through fix (9018cbb3) a mid-period cancel records
+    # "cancel_pending" and the originally paid plan (enterprise) runs
+    # to period_end. The W-106 invariant is unchanged: re-settling the
+    # refused downgrade challenge is still refused with
+    # challenge_voided_by_cancel and no downgrade is applied.
     client = sub_app.test_client()
     cid_ent = _checkout(client, "enterprise")
     first = _settle(client, cid_ent, TX_ENT)
@@ -176,7 +194,7 @@ def test_variant_b_refused_downgrade_cannot_complete_after_cancel(
     assert rs.subscription_status(PAYER)["plan_id"] == "enterprise"
 
     rs.cancel_subscription(PAYER)
-    assert rs.subscription_status(PAYER)["status"] == "canceled"
+    assert rs.subscription_status(PAYER)["status"] == "cancel_pending"
 
     # re-settling the same challenge after the cancel must NOT complete
     # the downgrade and must NOT resurrect the subscription
@@ -186,9 +204,9 @@ def test_variant_b_refused_downgrade_cannot_complete_after_cancel(
     assert body["error"] == "challenge_voided_by_cancel"
 
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
+    assert status["status"] == "cancel_pending"
     assert status["plan_id"] == "enterprise"  # no downgrade applied
-    assert status["effective_plan"] == "none"
+    assert status["effective_plan"] == "enterprise"  # paid plan honored
     assert status["period_end"] == period_end_before
 
 
@@ -215,6 +233,13 @@ def test_normal_renewal_without_cancel_still_settles(sub_app, sub_env):
 
 def test_fresh_purchase_after_cancel_settles_and_activates(
         sub_app, sub_env):
+    # STALE update (founder-authorized 2026-11-08): the intermediate
+    # assertion pinned the old immediate-revocation status "canceled"
+    # after a mid-period cancel. Under the Terms §5 paid-through fix
+    # (9018cbb3) that intermediate state is "cancel_pending". The
+    # legitimate-flow invariant is unchanged: a genuinely fresh
+    # purchase (new challenge issued AFTER the cancel) still settles
+    # and reactivates the subscription, asserted in full below.
     client = sub_app.test_client()
     cid1 = _checkout(client, "starter")
     first = _settle(client, cid1, TX_STARTER)
@@ -222,7 +247,7 @@ def test_fresh_purchase_after_cancel_settles_and_activates(
     canceled_end = first.get_json()["subscription"]["period_end"]
 
     rs.cancel_subscription(PAYER)
-    assert rs.subscription_status(PAYER)["status"] == "canceled"
+    assert rs.subscription_status(PAYER)["status"] == "cancel_pending"
 
     # genuinely fresh purchase: NEW challenge issued AFTER the cancel,
     # settled with a NEW payment — must work and re-activate
@@ -247,9 +272,16 @@ def test_fresh_purchase_after_cancel_settles_and_activates(
 def test_module_level_settle_of_pre_cancel_challenge_refused(
         sub_app, sub_env):
     """Same W-106 path without HTTP: issue -> settle -> cancel -> settle."""
+    # STALE update (founder-authorized 2026-11-08): the final assertion
+    # pinned the old immediate-revocation status "canceled". Under the
+    # Terms §5 paid-through fix (9018cbb3) a mid-period cancel records
+    # "cancel_pending". The refusal invariant is unchanged: the
+    # pre-cancel challenge is still refused with
+    # challenge_voided_by_cancel, and the paid period is not extended.
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
+    period_end_before = r["subscription"]["period_end"]
 
     ch2 = rs.issue_renewal_challenge(PAYER, "starter")
     rs.cancel_subscription(PAYER)
@@ -257,7 +289,11 @@ def test_module_level_settle_of_pre_cancel_challenge_refused(
     r2 = rs.settle_renewal(ch2["challenge_id"], TX_STARTER2, PAYER)
     assert r2["ok"] is False
     assert r2["error"] == "challenge_voided_by_cancel"
-    assert rs.subscription_status(PAYER)["status"] == "canceled"
+    status = rs.subscription_status(PAYER)
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
+    assert status["period_end"] == period_end_before
+    assert status["period_index"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +313,14 @@ def test_module_level_settle_of_pre_cancel_challenge_refused(
 def test_race_r1_cancel_during_verify_blocks_settle(
         sub_app, sub_env, monkeypatch):
     """R1: settle blocked inside verify_challenge while cancel lands."""
+    # STALE update (founder-authorized 2026-11-08): the cancel-return
+    # and final assertions pinned the old immediate-revocation
+    # behavior ("canceled" / effective "none" / gate denied). Under
+    # the Terms §5 paid-through fix (9018cbb3) the mid-period cancel
+    # records "cancel_pending" and the paid plan runs to period_end.
+    # The TOCTOU invariant is unchanged: the in-flight settle is still
+    # blocked with challenge_voided_by_cancel and the period is NOT
+    # extended.
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
@@ -308,7 +352,7 @@ def test_race_r1_cancel_during_verify_blocks_settle(
         # The cancel lands while the settle is in flight (post top-check,
         # blocked at the on-chain verify seam).
         out = rs.cancel_subscription(PAYER)
-        assert out["status"] == "canceled"
+        assert out["status"] == "cancel_pending"
         assert rs._get_issued(ch2["challenge_id"])["voided_at"]
     finally:
         release.set()
@@ -319,10 +363,11 @@ def test_race_r1_cancel_during_verify_blocks_settle(
     assert result["ok"] is False, result
     assert result["error"] == "challenge_voided_by_cancel"
 
-    # no resurrection: still canceled, period NOT extended
+    # no resurrection: the blocked settle did not reactivate the row
+    # or extend the period — still paid-through cancel_pending
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
-    assert status["effective_plan"] == "none"
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
     assert status["period_end"] == period_end_before
     assert status["period_index"] == 1
 
@@ -330,6 +375,14 @@ def test_race_r1_cancel_during_verify_blocks_settle(
 def test_race_r2_cancel_at_money_gate_blocks_settle(
         sub_app, sub_env, monkeypatch):
     """R2: cancel lands at the money gate, immediately before apply."""
+    # STALE update (founder-authorized 2026-11-08): the embedded cancel
+    # assertion inside the money-gate callback and the final assertions
+    # pinned the old immediate-revocation behavior ("canceled" /
+    # effective "none"). Under the Terms §5 paid-through fix
+    # (9018cbb3) the mid-period cancel records "cancel_pending". The
+    # TOCTOU invariant is unchanged: the re-check before _apply_period
+    # still blocks the settle with challenge_voided_by_cancel and the
+    # period is NOT extended.
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
@@ -341,7 +394,7 @@ def test_race_r2_cancel_at_money_gate_blocks_settle(
         # The last step before _apply_period: a cancel arriving here
         # must still be honored by a re-check before the period applies.
         out = rs.cancel_subscription(PAYER)
-        assert out["status"] == "canceled"
+        assert out["status"] == "cancel_pending"
         return True
 
     monkeypatch.setattr(rs, "_sub_money_gate_allows", _cancel_at_gate)
@@ -350,10 +403,11 @@ def test_race_r2_cancel_at_money_gate_blocks_settle(
     assert result["ok"] is False, result
     assert result["error"] == "challenge_voided_by_cancel"
 
-    # no resurrection: still canceled, period NOT extended
+    # no resurrection: the blocked settle did not reactivate the row
+    # or extend the period — still paid-through cancel_pending
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
-    assert status["effective_plan"] == "none"
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
     assert status["period_end"] == period_end_before
     assert status["period_index"] == 1
 
@@ -363,13 +417,20 @@ def test_already_renewed_ack_survives_cancel_no_resurrection(
     """P11 preserved: re-settling an already-extended challenge after a
     cancel is an ack-only duplicate — ok/already_renewed, no period
     applied, no resurrection."""
+    # STALE update (founder-authorized 2026-11-08): the status
+    # assertions pinned the old immediate-revocation "canceled" after a
+    # mid-period cancel. Under the Terms §5 paid-through fix
+    # (9018cbb3) that state is "cancel_pending". The ack carve-out
+    # invariant is unchanged: the duplicate settle is still ack-only
+    # (ok / already_renewed / duplicate), applies no period, and does
+    # not reactivate the row.
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
     period_end_before = r["subscription"]["period_end"]
 
     rs.cancel_subscription(PAYER)
-    assert rs.subscription_status(PAYER)["status"] == "canceled"
+    assert rs.subscription_status(PAYER)["status"] == "cancel_pending"
 
     dup = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert dup["ok"] is True, dup
@@ -377,7 +438,8 @@ def test_already_renewed_ack_survives_cancel_no_resurrection(
     assert dup["duplicate"] is True
 
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
     assert status["period_index"] == 1
     assert status["period_end"] == period_end_before
 
@@ -435,10 +497,26 @@ def _platform_active_rows():
 def test_race_n1_cancel_during_platform_sync_reconciles_mirror(
         sub_app, sub_env, monkeypatch):
     """N1: settle blocked inside the platform sync while cancel lands."""
+    # STALE semantics rewrite (founder-authorized 2026-11-08): this
+    # test pinned the old immediate-revocation interleave — cancel
+    # during the sync cancelled the rail row AND the platform mirror,
+    # and the post-sync reconciliation had to re-cancel the mirror so
+    # NO active platform row survived. That is no longer the invariant
+    # for a mid-period cancel: under the Terms §5 paid-through fix
+    # (9018cbb3) the renewal period was already applied and paid when
+    # the cancel lands, so the cancel records "cancel_pending" and the
+    # invariant is rail/mirror AGREEMENT — both stores paid-through
+    # (active plan) to the NEW period end. The reconciliation duty is
+    # unchanged in kind: the released sync must finish mirroring the
+    # applied renewal exactly once, and the post-sync re-check must
+    # NOT cancel a mirror that agrees with a cancel_pending rail row
+    # (the terminal-"canceled" skip/re-cancel paths in _sync_platform
+    # key off the stored terminal status only).
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
     assert len(_platform_active_rows()) == 1
+    period_end_before = r["subscription"]["period_end"]
 
     ch2 = rs.issue_renewal_challenge(PAYER, "starter")
 
@@ -468,34 +546,58 @@ def test_race_n1_cancel_during_platform_sync_reconciles_mirror(
     thread.start()
     try:
         assert entered.wait(timeout=10), "settle never reached the sync"
-        # The cancel lands while the sync is in flight: rail row ->
-        # canceled, existing platform row -> cancelled.
+        # The cancel lands while the sync is in flight. The renewal
+        # period was already applied (_apply_period commits before the
+        # sync), so this is a mid-period cancel of the NEW period:
+        # rail row -> cancel_pending, and the platform mirror is NOT
+        # cancelled — the existing active row stays for the paid window.
         out = rs.cancel_subscription(PAYER)
-        assert out["status"] == "canceled"
-        assert _platform_active_rows() == []
+        assert out["status"] == "cancel_pending"
+        assert len(_platform_active_rows()) == 1
     finally:
         release.set()
     thread.join(timeout=10)
     assert not thread.is_alive(), "settle thread did not finish"
     assert holder["result"]["ok"] is True, holder["result"]
 
-    # The released sync activated the platform row, but the mirror must
-    # be reconciled: NO active platform row for a canceled rail sub.
-    assert _platform_active_rows() == []
+    # The released sync completed the mirror for the renewal payment,
+    # and the post-sync reconciliation left it in AGREEMENT with the
+    # rail row: exactly one active platform row, activated by the
+    # renewal challenge (not a stale row, not a cancelled one).
+    active = _platform_active_rows()
+    assert len(active) == 1
+    assert active[0]["last_payment_id"] == ch2["challenge_id"]
     for row in pp.list_subscriptions(PAYER):
-        assert row["status"] == "cancelled"
+        assert row["status"] == "active"
 
-    # Authoritative store unchanged by the reconciliation.
+    # Authoritative store: paid-through to the NEW (renewal) period
+    # end — the period the cancel honored — not the pre-renewal end.
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
-    assert status["effective_plan"] == "none"
-    assert rs.gate(PAYER, "starter_agents").allowed is False
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
+    assert status["period_index"] == 2
+    assert status["period_end"] > period_end_before
+    assert rs.gate(PAYER, "starter_agents").allowed is True
 
 
-def test_cancel_before_platform_sync_skips_activation(
+def test_cancel_before_platform_sync_still_mirrors_paid_through(
         sub_app, sub_env, monkeypatch):
-    """Simpler ordering: cancel completes BEFORE the sync step begins —
-    the sync must not call activate_subscription at all."""
+    """Simpler ordering: cancel completes BEFORE the sync step begins."""
+    # STALE semantics rewrite (founder-authorized 2026-11-08): this
+    # test pinned the old immediate-revocation interleave — the cancel
+    # cancelled both stores and the sync, seeing a canceled rail row,
+    # skipped activation entirely. Under the Terms §5 paid-through fix
+    # (9018cbb3) the renewal period was already applied and paid when
+    # the cancel completes, so the cancel records "cancel_pending" and
+    # the invariant is rail/mirror AGREEMENT: the sync must NOT skip —
+    # it mirrors the applied renewal so the platform row is active for
+    # exactly the paid-through window the rail row honors. (The
+    # terminal-"canceled" skip in _sync_platform keys off the stored
+    # terminal status only and does not fire for cancel_pending.)
+    # The activation spy is also re-pointed: the sync routes through
+    # activate_subscription_idempotent and never calls
+    # activate_subscription (see the N1 hook note above), so the old
+    # spy could not observe the sync at all.
     ch = rs.issue_renewal_challenge(PAYER, "starter")
     r = rs.settle_renewal(ch["challenge_id"], TX_STARTER, PAYER)
     assert r["ok"] is True, r
@@ -515,13 +617,14 @@ def test_cancel_before_platform_sync_skips_activation(
     monkeypatch.setattr(rs, "_sync_platform", _blocking_sync)
 
     activate_calls = []
-    orig_activate = pp.activate_subscription
+    orig_activate = pp.activate_subscription_idempotent
 
     def _spy_activate(**kwargs):
         activate_calls.append(kwargs)
         return orig_activate(**kwargs)
 
-    monkeypatch.setattr(pp, "activate_subscription", _spy_activate)
+    monkeypatch.setattr(pp, "activate_subscription_idempotent",
+                        _spy_activate)
 
     holder = {}
 
@@ -533,21 +636,28 @@ def test_cancel_before_platform_sync_skips_activation(
     thread.start()
     try:
         assert entered.wait(timeout=10), "settle never reached the sync"
-        # Cancel fully completes before the sync step runs.
+        # Cancel fully completes before the sync step runs: rail row
+        # -> cancel_pending; the platform mirror is NOT cancelled.
         out = rs.cancel_subscription(PAYER)
-        assert out["status"] == "canceled"
-        assert _platform_active_rows() == []
+        assert out["status"] == "cancel_pending"
+        assert len(_platform_active_rows()) == 1
     finally:
         release.set()
     thread.join(timeout=10)
     assert not thread.is_alive(), "settle thread did not finish"
     assert holder["result"]["ok"] is True, holder["result"]
 
-    # The sync step saw the canceled rail row and skipped activation.
-    assert activate_calls == []
-    assert _platform_active_rows() == []
+    # The sync step saw a cancel_pending (not terminal-canceled) rail
+    # row and mirrored the applied renewal exactly once, for the
+    # renewal payment — the mirror agrees with the rail store.
+    assert len(activate_calls) == 1
+    assert activate_calls[0]["payment_id"] == ch2["challenge_id"]
+    active = _platform_active_rows()
+    assert len(active) == 1
+    assert active[0]["last_payment_id"] == ch2["challenge_id"]
 
     status = rs.subscription_status(PAYER)
-    assert status["status"] == "canceled"
-    assert status["effective_plan"] == "none"
-    assert rs.gate(PAYER, "starter_agents").allowed is False
+    assert status["status"] == "cancel_pending"
+    assert status["effective_plan"] == "starter"
+    assert status["period_index"] == 2
+    assert rs.gate(PAYER, "starter_agents").allowed is True
