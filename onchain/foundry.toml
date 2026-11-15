@@ -18,7 +18,15 @@ via_ir = true
 # Global Remappings
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "forge-std/=lib/forge-std/src/"
+    "@uniswap/v4-core/=lib/v4-core/",
+    "@uniswap/v4-periphery/=lib/v4-periphery/",
+    "@openzeppelin/uniswap-hooks/=lib/uniswap-hooks/src/",
+    "forge-std/=lib/forge-std/src/",
+    "permit2/=lib/permit2/",
+    "solmate/=lib/solmate/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/",
+    "v4-core/=lib/v4-core/",
+    "v4-periphery/=lib/v4-periphery/",
 ]
 
 # Bytecode & Verification
@@ -59,6 +67,24 @@ runs = 128
 depth = 15
 
 # Network RPC Aliases
+# Deep campaign profile (pre-deploy / audit runs):
+#   FOUNDRY_PROFILE=ci-deep forge test
+# Inherits src/test/libs/solc from [profile.default]; only the campaign
+# knobs below are overridden.
+[profile.ci-deep]
+optimizer = true
+optimizer_runs = 200
+evm_version = "cancun"
+via_ir = true
+
+[profile.ci-deep.fuzz]
+runs = 10000
+
+[profile.ci-deep.invariant]
+runs = 256
+depth = 250
+fail_on_revert = true
+
 [rpc_endpoints]
 base = "${BASE_RPC_URL}"
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"

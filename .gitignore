@@ -51,11 +51,11 @@ dmypy.json
 # ============================================================================
 # Environment
 # ============================================================================
-.env
-.env.local
-.env.*.local
-.env.production.local
-.env.test
+# Every .env* file is ignored at any depth; only the placeholder templates
+# (.env.example) are tracked. Covers .env, .env.local, .env.production,
+# .env.staging, .env.test, and any future .env.<environment> variant.
+.env*
+!.env.example
 
 # ============================================================================
 # Secrets
@@ -93,7 +93,7 @@ Thumbs.db
 # ============================================================================
 # Project Specific
 # ============================================================================
-/node_modules/
+node_modules/
 /dist/
 /build/
 .next/
@@ -163,3 +163,13 @@ REVERT_COMMIT.txt
 # Liveness Phase 1 runtime state (never commit: salts, queue, cursor)
 liveness/state/
 liveness/fountain_state.json
+
+# ============================================================================
+# Foundry vendored dependencies (exception to the Python `lib/` rule above)
+# lib/ and onchain/lib/ hold pinned, committed Foundry dependencies
+# (see lib/VENDORED.md). Without these negations they would not be tracked.
+# ============================================================================
+!/lib/
+!/lib/**
+!/onchain/lib/
+!/onchain/lib/**
