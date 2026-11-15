@@ -16,9 +16,13 @@ signature scheme:
   (agent_id, salt, claim) private for dispute/audit reveal — the
   commitment+reveal protocol, mirroring ``sincor2.zk_privacy_layer``.
 * The verifier checks: schema + version, issuer identity, EIP-191 signature,
-  expiry, claim-kind allow-list, and revocation status of the nullifier.
-  EVERY failure mode rejects (fail-closed). An unverifiable attestation is
-  rejected, never "accepted with warnings".
+  expiry, claim-kind allow-list, revocation status of the nullifier, and
+  the commitment binding (the commitment is recomputed from the signed
+  body and must match exactly). Callers with access to the issuer's
+  commitment ledger may additionally supply an anchor check, which is
+  enforced fail-closed when supplied. EVERY failure mode rejects
+  (fail-closed). An unverifiable attestation is rejected, never
+  "accepted with warnings".
 
 Privacy boundaries (documented limits, not bugs):
 * The nullifier is deterministic per (agent, claim): two attestations for the
@@ -31,8 +35,12 @@ Privacy boundaries (documented limits, not bugs):
   trust when the founder approves the dependency.
 
 Security properties:
-* Tampering with any signed field (claim, nullifier, issuer, issued_at,
-  expires_at, commitment) invalidates the EIP-191 signature -> rejected.
+* Tampering with any signed field (attestation_id, claim, nullifier,
+  issuer, issued_at, expires_at, commitment) invalidates the EIP-191
+  signature -> rejected. Re-presenting a valid attestation under a
+  different (e.g. never-issued) attestation_id is tampering: the id is
+  signed, and the commitment recomputation binds the attestation to the
+  exact body the issuer committed at issuance.
 * Forgery requires the issuer's private key (secp256k1, eth_account).
 * Revocation: ``issuer.revoke_agent(kya_id)`` marks the registry record
   revoked AND publishes the agent's nullifiers to the revocation set.
@@ -139,8 +147,14 @@ def tier_satisfies(have: str, want: str) -> bool:
 
 
 def _canonical_body(att: "KYAAttestation") -> bytes:
-    """Canonical signed bytes. Single source of truth for sign and verify."""
+    """Canonical signed bytes. Single source of truth for sign and verify.
+
+    ``attestation_id`` is part of the signed body (W-173): an attestation
+    re-presented under a different id — e.g. a never-issued one — fails
+    signature verification instead of borrowing the original's validity.
+    """
     body = {
+        "attestation_id": att.attestation_id,
         "version": att.version,
         "claim": att.claim,
         "nullifier": att.nullifier,
@@ -150,6 +164,13 @@ def _canonical_body(att: "KYAAttestation") -> bytes:
         "commitment": att.commitment.lower(),
     }
     return json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _commitment_for(nullifier: str, digest: bytes, issued_at: int) -> str:
+    """Issuance commitment: keccak256(nullifier || digest || issued_at)."""
+    return _keccak_hex(
+        bytes.fromhex(nullifier[2:]) + digest + issued_at.to_bytes(8, "big")
+    )
 
 
 @dataclass
@@ -213,6 +234,7 @@ class VerificationResult:
 # ---------------------------------------------------------------------------
 
 RevocationCheck = Callable[[str], bool]
+AnchorCheck = Callable[[str, str], bool]
 
 
 class ZKAttestationIssuer:
@@ -274,9 +296,7 @@ class ZKAttestationIssuer:
         return "0x" + signed.signature.hex()
 
     def _commitment_for(self, nullifier: str, digest: bytes, issued_at: int) -> str:
-        return _keccak_hex(
-            bytes.fromhex(nullifier[2:]) + digest + issued_at.to_bytes(8, "big")
-        )
+        return _commitment_for(nullifier, digest, issued_at)
 
     def _issue(
         self,
@@ -405,6 +425,21 @@ class ZKAttestationIssuer:
         with self.lock:
             return attestation_id in self.commitment_ledger
 
+    def is_anchored(self, attestation_id: str, commitment: str) -> bool:
+        """True if the ledger anchors this id with exactly this commitment."""
+        with self.lock:
+            row = self.commitment_ledger.get(attestation_id)
+            if not row:
+                return False
+            return secrets.compare_digest(
+                str(row.get("commitment") or "").lower(),
+                str(commitment or "").lower(),
+            )
+
+    def anchor_source(self) -> AnchorCheck:
+        """Return the anchor callback verifiers with ledger access consult."""
+        return self.is_anchored
+
     def open(self, attestation_id: str) -> Optional[Dict[str, Any]]:
         """Reveal the opening for a dispute/audit. Issuer-only operation."""
         with self.lock:
@@ -461,12 +496,26 @@ def verify_attestation(
     revocation_check: Optional[RevocationCheck],
     now: Optional[int] = None,
     max_clock_skew_sec: int = MAX_CLOCK_SKEW_SEC,
+    anchor_check: Optional[AnchorCheck] = None,
 ) -> VerificationResult:
     """Verify an attestation. Returns valid=False for ANY failure (fail-closed).
 
     ``revocation_check`` must be a callable nullifier -> bool. If it is
     missing, raises, or returns a non-bool, the attestation is REJECTED:
     non-revocation must be positively established, never assumed.
+
+    The commitment is always recomputed and compared (W-173): the
+    commitment the issuer computed at issuance binds (attestation_id,
+    nullifier, claim, timestamps), so an attestation carrying a commitment
+    the issuer never computed is rejected even if its signature is genuine.
+
+    ``anchor_check`` is an optional callable (attestation_id, commitment)
+    -> bool for verifiers with access to the issuer's commitment ledger
+    (see ``ZKAttestationIssuer.anchor_source``). When supplied it is held
+    to the same fail-closed standard as ``revocation_check``: a missing
+    ledger entry, an exception, or a non-bool result REJECTS the
+    attestation. When omitted, the signed id + commitment binding above
+    is the anchor.
     """
     try:
         att = KYAAttestation.from_dict(data)
@@ -517,6 +566,43 @@ def verify_attestation(
     if recovered.lower() != att.issuer.lower():
         return VerificationResult(False, "bad-signature", att.attestation_id)
 
+    # Commitment binding (W-173): recompute the commitment exactly as
+    # issuance computed it — over the canonical body with the commitment
+    # field still empty (the commitment is bound by the signature
+    # afterwards) — and require an exact match.
+    try:
+        probe = KYAAttestation(
+            attestation_id=att.attestation_id,
+            version=att.version,
+            claim=dict(att.claim),
+            nullifier=att.nullifier,
+            issuer=att.issuer,
+            issued_at=att.issued_at,
+            expires_at=att.expires_at,
+            commitment="",
+            signature="",
+        )
+        probe_digest = _keccak(DOMAIN_SEPARATOR + _canonical_body(probe))
+        want_commitment = _commitment_for(att.nullifier, probe_digest, att.issued_at)
+    except Exception:
+        return VerificationResult(False, "commitment-mismatch", att.attestation_id)
+    if not secrets.compare_digest(want_commitment.lower(), att.commitment.lower()):
+        return VerificationResult(False, "commitment-mismatch", att.attestation_id)
+
+    # Anchor: when the caller supplies the issuer's ledger check, the
+    # (attestation_id, commitment) pair must be anchored in the ledger —
+    # an id the issuer never issued is rejected even with a valid
+    # signature and a self-consistent commitment.
+    if anchor_check is not None:
+        try:
+            anchored = anchor_check(att.attestation_id, att.commitment)
+        except Exception:
+            return VerificationResult(False, "anchor-unverifiable", att.attestation_id)
+        if not isinstance(anchored, bool):
+            return VerificationResult(False, "anchor-unverifiable", att.attestation_id)
+        if not anchored:
+            return VerificationResult(False, "unanchored", att.attestation_id)
+
     # Revocation: positively required. Any ambiguity -> reject.
     if revocation_check is None:
         return VerificationResult(False, "revocation-unverifiable", att.attestation_id)
@@ -537,8 +623,12 @@ def batch_verify(
     issuer_address: str,
     revocation_check: Optional[RevocationCheck],
     now: Optional[int] = None,
+    anchor_check: Optional[AnchorCheck] = None,
 ) -> List[VerificationResult]:
     """Verify many attestations; each result is independent (fail-closed each)."""
     return [
-        verify_attestation(d, issuer_address, revocation_check, now=now) for d in items
+        verify_attestation(
+            d, issuer_address, revocation_check, now=now, anchor_check=anchor_check
+        )
+        for d in items
     ]

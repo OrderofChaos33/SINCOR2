@@ -108,6 +108,61 @@ def test_seal_create_verify_roundtrip():
     assert ok, reason
 
 
+# ---------------------------------------------------------------------------
+# W-174: high-S malleated twins are rejected (low-S parity with eip712)
+# ---------------------------------------------------------------------------
+
+SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+
+
+def _malleated_twin(sig: str) -> str:
+    """The (r, n-s, v^1) twin of a 65-byte signature: same signer, high-s."""
+    raw = bytes.fromhex(sig[2:] if sig.startswith("0x") else sig)
+    r, s, v = raw[:32], int.from_bytes(raw[32:64], "big"), raw[64]
+    twin_s = SECP256K1_N - s
+    assert twin_s > SECP256K1_N // 2  # the twin really is the high-s form
+    return (
+        "0x" + r.hex() + twin_s.to_bytes(32, "big").hex()
+        + bytes([27 + ((v - 27) ^ 1)]).hex()
+    )
+
+
+def test_low_s_seal_signature_verifies():
+    fields, sig, sig_type = _signed_seal()
+    raw = bytes.fromhex(sig[2:])
+    assert int.from_bytes(raw[32:64], "big") <= SECP256K1_N // 2
+    ok, reason = verify_seal(
+        CONFIG, fields, sig, sig_type=sig_type,
+        expected_address=MASTER.address, now=NOW,
+    )
+    assert ok, reason
+
+
+def test_high_s_twin_seal_signature_rejected():
+    fields, sig, sig_type = _signed_seal()
+    twin = _malleated_twin(sig)
+    assert twin != sig
+    ok, reason = verify_seal(
+        CONFIG, fields, twin, sig_type=sig_type,
+        expected_address=MASTER.address, now=NOW,
+    )
+    assert not ok, reason
+
+
+def test_high_s_twin_delegation_cert_rejected():
+    reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg)
+    cert_fields, cert_sig = _signed_cert()
+    with pytest.raises(ValueError, match="signed by the delegator"):
+        reg.register_delegation(
+            cert_fields, _malleated_twin(cert_sig),
+            sig_type=SigType.SECP256K1.value,
+            seal_id=seal_id,
+            now=NOW,
+        )
+    assert not reg.session_key_live(SESSION.address, now=NOW)
+
+
 def test_seal_digest_byte_identical_to_eth_account():
     fields = _seal_fields()
     payload = seal_typed_data_payload(CONFIG, **fields)
@@ -222,17 +277,21 @@ def test_seal_typehash_distinct_from_delegation():
 # Delegation chain
 # ---------------------------------------------------------------------------
 
-def _registered_registry(*, cert_over=None, grants=None, with_seal=True):
+def _register_seal(reg, **over):
+    fields, sig, sig_type = _signed_seal(_seal_fields(**over))
+    return reg.register_seal(fields, sig, sig_type=sig_type, now=NOW)
+
+
+def _registered_registry(*, cert_over=None, seal_capabilities=None):
     reg = SealRegistry(CONFIG)
-    seal_id = None
-    if with_seal:
-        fields, sig, sig_type = _signed_seal()
-        seal_id = reg.register_seal(fields, sig, sig_type=sig_type, now=NOW)
+    seal_over = {}
+    if seal_capabilities is not None:
+        seal_over["capabilities"] = seal_capabilities
+    seal_id = _register_seal(reg, **seal_over)
     cert_fields, cert_sig = _signed_cert(_cert_fields(**(cert_over or {})))
     reg.register_delegation(
         cert_fields, cert_sig,
         sig_type=SigType.SECP256K1.value,
-        delegator_grants=grants or ["auction:bid", "auction:reveal", "market:read"],
         seal_id=seal_id,
         now=NOW,
     )
@@ -333,25 +392,27 @@ def test_seal_revocation_kills_seal():
 
 def test_cert_tampered_permissions_rejected_at_registration():
     reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg)
     cert_fields, cert_sig = _signed_cert()
     tampered = dict(cert_fields, permissions=["seal:admin"])
     with pytest.raises(ValueError, match="signed by the delegator"):
         reg.register_delegation(
             tampered, cert_sig,
             sig_type=SigType.SECP256K1.value,
-            delegator_grants=["auction:bid"],
+            seal_id=seal_id,
             now=NOW,
         )
 
 
 def test_cert_signed_by_wrong_key_rejected():
     reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg)
     cert_fields, cert_sig = _signed_cert(privkey=ATTACKER_PRIV)  # claims MASTER delegator
     with pytest.raises(ValueError, match="signed by the delegator"):
         reg.register_delegation(
             cert_fields, cert_sig,
             sig_type=SigType.SECP256K1.value,
-            delegator_grants=["auction:bid", "auction:reveal"],
+            seal_id=seal_id,
             now=NOW,
         )
 
@@ -368,13 +429,143 @@ def test_delegation_scope_enforced_on_action():
 
 def test_delegation_downscoping_enforced():
     reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg, capabilities=["auction:bid"])
     cert_fields, cert_sig = _signed_cert()
     with pytest.raises(ValueError, match="down-scoping"):
         reg.register_delegation(
             cert_fields, cert_sig,
             sig_type=SigType.SECP256K1.value,
-            delegator_grants=["auction:bid"],  # master cannot grant reveal
+            seal_id=seal_id,  # the seal cannot grant reveal
             now=NOW,
+        )
+
+
+def test_w169_inflated_permissions_cannot_use_caller_supplied_grants():
+    # PoC A: the master seal is capped at auction:bid. Neither a caller
+    # supplied grants argument nor an inflated cert permission can expand it.
+    reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg, capabilities=["auction:bid"])
+    cert_fields, cert_sig = _signed_cert(_cert_fields(permissions=["seal:admin"]))
+    with pytest.raises(TypeError, match="delegator_grants"):
+        reg.register_delegation(
+            cert_fields, cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            delegator_grants=["seal:admin"],
+            seal_id=seal_id,
+            now=NOW,
+        )
+    with pytest.raises(ValueError, match="down-scoping"):
+        reg.register_delegation(
+            cert_fields, cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            seal_id=seal_id,
+            now=NOW,
+        )
+    assert not reg.session_key_live(SESSION.address, now=NOW)
+
+
+def test_w169_revoked_delegator_seal_kills_delegation():
+    # PoC B: revocation of the referenced seal cascades to its delegation.
+    reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg)
+    cert_fields, cert_sig = _signed_cert()
+    reg.register_delegation(
+        cert_fields, cert_sig,
+        sig_type=SigType.SECP256K1.value,
+        seal_id=seal_id,
+        now=NOW,
+    )
+    payload, digest = _bid_payload()
+    action_sig = _raw_sign(digest, SESSION_PRIV)
+    assert reg.session_key_live(SESSION.address, now=NOW)
+    ok, reason = reg.verify_delegation_chain(
+        SESSION.address, payload, action_sig, "auction:bid", now=NOW
+    )
+    assert ok, reason
+
+    revoked_at, nonce = NOW + 10, 52
+    rev_digest = revocation_typed_data_digest(
+        CONFIG, revoker=MASTER.address, target=seal_id,
+        revoked_at=revoked_at, nonce=nonce,
+    )
+    reg.revoke_seal(
+        seal_id, _raw_sign(rev_digest, MASTER_PRIV),
+        revoked_at=revoked_at, nonce=nonce,
+    )
+
+    assert not reg.seal_valid(seal_id, now=NOW + 20)
+    assert not reg.session_key_live(SESSION.address, now=NOW + 20)
+    ok, reason = reg.verify_delegation_chain(
+        SESSION.address, payload, action_sig, "auction:bid", now=NOW + 20
+    )
+    assert not ok and "delegator seal revoked" in reason
+
+
+def test_w169_unrelated_seal_id_rejected():
+    # PoC D: a cert signed by SESSION cannot borrow MASTER's seal, even
+    # when the requested permission is within that seal's capabilities.
+    reg = SealRegistry(CONFIG)
+    victim_seal_id = _register_seal(reg, expiry=NOW + 30 * 24 * 3600)
+    cert_fields, cert_sig = _signed_cert(
+        _cert_fields(
+            delegator=SESSION.address,
+            session_key=ATTACKER.address,
+            permissions=["auction:bid"],
+            expiry=NOW + 20 * 24 * 3600,
+            nonce=9,
+        ),
+        privkey=SESSION_PRIV,
+    )
+    with pytest.raises(ValueError, match="does not match delegator seal"):
+        reg.register_delegation(
+            cert_fields, cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            seal_id=victim_seal_id,
+            now=NOW,
+        )
+    assert not reg.session_key_live(ATTACKER.address, now=NOW)
+
+
+def test_w169_registration_requires_existing_live_seal():
+    cert_fields, cert_sig = _signed_cert()
+
+    unknown_reg = SealRegistry(CONFIG)
+    with pytest.raises(ValueError, match="unknown delegator seal_id"):
+        unknown_reg.register_delegation(
+            cert_fields, cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            seal_id="0x" + "00" * 32,
+            now=NOW,
+        )
+
+    revoked_reg = SealRegistry(CONFIG)
+    revoked_seal_id = _register_seal(revoked_reg)
+    revoked_at, nonce = NOW + 10, 52
+    rev_digest = revocation_typed_data_digest(
+        CONFIG, revoker=MASTER.address, target=revoked_seal_id,
+        revoked_at=revoked_at, nonce=nonce,
+    )
+    revoked_reg.revoke_seal(
+        revoked_seal_id, _raw_sign(rev_digest, MASTER_PRIV),
+        revoked_at=revoked_at, nonce=nonce,
+    )
+    with pytest.raises(ValueError, match="delegator seal revoked"):
+        revoked_reg.register_delegation(
+            cert_fields, cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            seal_id=revoked_seal_id,
+            now=NOW + 20,
+        )
+
+    expired_reg = SealRegistry(CONFIG)
+    expired_seal_id = _register_seal(expired_reg, expiry=NOW + 60)
+    long_cert, long_cert_sig = _signed_cert(_cert_fields(expiry=NOW + 120))
+    with pytest.raises(ValueError, match="delegator seal expired"):
+        expired_reg.register_delegation(
+            long_cert, long_cert_sig,
+            sig_type=SigType.SECP256K1.value,
+            seal_id=expired_seal_id,
+            now=NOW + 61,
         )
 
 
@@ -389,7 +580,6 @@ def test_delegation_expiry_cannot_exceed_master_seal():
         reg.register_delegation(
             cert_fields, cert_sig,
             sig_type=SigType.SECP256K1.value,
-            delegator_grants=["auction:bid", "auction:reveal"],
             seal_id=seal_id,
             now=NOW,
         )
@@ -397,12 +587,13 @@ def test_delegation_expiry_cannot_exceed_master_seal():
 
 def test_delegation_requires_secp256k1_not_hmac():
     reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg)
     cert_fields, _cert_sig = _signed_cert()
     with pytest.raises(ValueError, match="secp256k1"):
         reg.register_delegation(
             cert_fields, "0x" + "00" * 32,
             sig_type=SigType.HMAC.value,
-            delegator_grants=["auction:bid", "auction:reveal"],
+            seal_id=seal_id,
             now=NOW,
         )
 
@@ -467,11 +658,12 @@ def test_enclave_sign_delegation_roundtrip():
     assert issued["session_key"] == SESSION.address
     # the issued cert verifies through the registry chain
     reg = SealRegistry(CONFIG)
+    seal_id = _register_seal(reg, capabilities=["auction:bid"])
     reg.register_delegation(
         {k: issued[k] for k in ("delegator", "session_key", "permissions", "expiry", "nonce")},
         issued["signature"],
         sig_type=SigType.SECP256K1.value,
-        delegator_grants=["auction:bid"],
+        seal_id=seal_id,
         now=NOW,
     )
     assert reg.session_key_live(SESSION.address, now=NOW)
@@ -578,3 +770,55 @@ def test_enclave_never_exposes_key_material():
     assert not enc.has_key(key_id)
     with pytest.raises(EnclaveKeyError):
         enc.sign_seal(key_id, _seal_fields(), now=NOW)
+
+
+# ---------------------------------------------------------------------------
+# W-175: the enclave issues seals only for its own key's identity
+# ---------------------------------------------------------------------------
+
+def test_enclave_refuses_seal_for_foreign_agent_address():
+    # sign_seal used to validate only the address FORMAT: the enclave
+    # would mint a seal naming a victim, signed with the attacker's key.
+    # (verify_seal rejected it downstream, but the enclave is the policy
+    # boundary — it must never issue the impersonation seal at all.)
+    enc = _enclave()
+    key_id = enc.import_key(ATTACKER_PRIV)
+    with pytest.raises(EnclavePolicyError, match="own address"):
+        enc.sign_seal(
+            key_id, _seal_fields(agent_address=MASTER.address), now=NOW
+        )
+
+
+def test_enclave_foreign_address_refusal_burns_no_nonce():
+    enc = _enclave()
+    key_id = enc.import_key(ATTACKER_PRIV)
+    with pytest.raises(EnclavePolicyError):
+        enc.sign_seal(
+            key_id,
+            _seal_fields(agent_address=MASTER.address, nonce=9),
+            now=NOW,
+        )
+    # The refusal happened before signing: nonce 9 is still usable for
+    # a legitimate seal under the key's own address.
+    sealed = enc.sign_seal(
+        key_id, _seal_fields(agent_address=ATTACKER.address, nonce=9), now=NOW
+    )
+    assert sealed["signer"] == ATTACKER.address
+    assert sealed["agent_address"] == ATTACKER.address
+
+
+def test_enclave_sign_seal_own_address_any_case():
+    enc = _enclave()
+    key_id = enc.import_key(MASTER_PRIV)
+    sealed = enc.sign_seal(
+        key_id, _seal_fields(agent_address=MASTER.address.lower()), now=NOW
+    )
+    ok, reason = verify_seal(
+        CONFIG,
+        {k: sealed[k] for k in ("agent_did", "agent_address", "capabilities", "expiry", "nonce")},
+        sealed["signature"],
+        sig_type=sealed["sig_type"],
+        expected_address=MASTER.address,
+        now=NOW,
+    )
+    assert ok, reason

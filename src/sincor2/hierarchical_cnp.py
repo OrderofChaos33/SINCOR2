@@ -56,6 +56,10 @@ Security posture
   (``require_winner_authorization``): only the winner of the parent task may
   mint the child seal. A forged child seal signed by anyone else is
   rejected even if its signature is cryptographically valid.
+- With a durable shared seal registry configured (``seal_registry_path``
+  or ``SINCOR_HIER_SEAL_REGISTRY_PATH``), a seal id registers exactly
+  once across graph instances and restarts (W-161); without one, the
+  duplicate protection is per-instance in-memory only.
 - Failed auctions (no winner) can never be sealed or subcontracted.
 - Task ids are unique across the graph: the hierarchy is a tree, and a
   task can never become its own ancestor.
@@ -63,9 +67,12 @@ Security posture
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import (
     AbstractSet,
@@ -126,6 +133,10 @@ MAX_TASK_ID_LEN = 128
 DEFAULT_SEAL_TTL_SECONDS = 24 * 3600
 MAX_SEAL_TTL_SECONDS = 30 * 24 * 3600
 
+#: Env fallback for the durable cross-instance seal registry path (W-161),
+#: mirroring the SINCOR_*_PATH idiom used by the other durable stores.
+SEAL_REGISTRY_PATH_ENV = "SINCOR_HIER_SEAL_REGISTRY_PATH"
+
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -168,6 +179,10 @@ class DuplicateSeal(GraphError):
     """A seal id is already registered in the graph."""
 
 
+class SealRegistryError(HierarchicalCNPError):
+    """The durable shared seal registry is corrupt or unusable. Fail closed."""
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -197,6 +212,13 @@ class HierarchicalConfig:
     authorized_signers: Tuple[str, ...] = ()
     #: Default seal lifetime for graph-minted seals.
     default_seal_ttl_seconds: int = DEFAULT_SEAL_TTL_SECONDS
+    #: Optional path to a durable cross-instance seal registry file
+    #: (W-161). When set — or when the ``SINCOR_HIER_SEAL_REGISTRY_PATH``
+    #: env var is set — a seal id can be registered exactly once across
+    #: every graph instance and restart sharing the file. Unset means
+    #: per-instance in-memory duplicate protection only (dev/test); a
+    #: production deployment MUST configure one.
+    seal_registry_path: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not 1 <= self.max_depth <= MAX_DEPTH_HARD_CAP:
@@ -207,6 +229,10 @@ class HierarchicalConfig:
             raise ValueError("default_seal_ttl_seconds out of range")
         for addr in self.authorized_signers:
             _validate_address(addr)
+        if self.seal_registry_path is not None and (
+            not isinstance(self.seal_registry_path, str) or not self.seal_registry_path
+        ):
+            raise ValueError("seal_registry_path must be a non-empty string or None")
 
 
 # ---------------------------------------------------------------------------
@@ -682,6 +708,132 @@ class TaskNode:
 SealKeyResolver = Callable[[str], Tuple[str, str]]
 
 
+class FileSealRegistry:
+    """Durable cross-instance registry of registered seal ids (W-161).
+
+    The graph's :class:`DuplicateSeal` protection used to live only in
+    each instance's in-memory dict, so the same seal could be registered
+    a second time in another process or after a restart. When a registry
+    file is configured, registration claims the seal id here first: the
+    claim is a locked read-modify-write of a JSON file (temp file +
+    fsync + ``os.replace`` + directory fsync — the same idiom as the
+    repo's other durable stores), so the id is durable before the
+    registration returns. Reads re-load the file under a shared lock, so
+    peer instances see each other's claims immediately. Fail closed
+    throughout: a corrupt, wrongly-shaped, or unwritable registry raises
+    :class:`SealRegistryError` — it never silently degrades to
+    per-instance behavior.
+    """
+
+    _VERSION = 1
+
+    def __init__(self, path: str) -> None:
+        if not isinstance(path, str) or not path:
+            raise SealRegistryError(
+                "seal registry path must be a non-empty string"
+            )
+        self._path = path
+        self._lock_path = path + ".lock"
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @contextmanager
+    def _locked(self, exclusive: bool):
+        try:
+            import fcntl
+        except ImportError as exc:  # pragma: no cover - non-POSIX platform
+            raise SealRegistryError(
+                "fcntl unavailable: cannot lock the seal registry"
+            ) from exc
+        try:
+            fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        except OSError as exc:
+            raise SealRegistryError(
+                f"cannot open seal registry lock {self._lock_path!r}: {exc}"
+            ) from exc
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            yield
+        finally:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+
+    def _load(self) -> set:
+        """Read the claimed-id set. Caller must hold the lock."""
+        try:
+            with open(self._path, "r", encoding="utf-8") as fh:
+                raw = fh.read()
+        except FileNotFoundError:
+            return set()
+        except OSError as exc:
+            raise SealRegistryError(
+                f"cannot read seal registry {self._path!r}: {exc}"
+            ) from exc
+        try:
+            data = json.loads(raw)
+        except ValueError as exc:
+            raise SealRegistryError(
+                f"seal registry {self._path!r} is corrupt (invalid JSON)"
+            ) from exc
+        if (
+            not isinstance(data, dict)
+            or data.get("version") != self._VERSION
+            or not isinstance(data.get("seal_ids"), list)
+            or not all(isinstance(s, str) for s in data["seal_ids"])
+        ):
+            raise SealRegistryError(
+                f"seal registry {self._path!r} has an unexpected shape"
+            )
+        return {s.lower() for s in data["seal_ids"]}
+
+    def _store(self, seal_ids: set) -> None:
+        """Atomically persist the claimed-id set. Caller holds the lock."""
+        payload = json.dumps(
+            {"version": self._VERSION, "seal_ids": sorted(seal_ids)},
+            indent=1,
+            sort_keys=True,
+        )
+        tmp_path = f"{self._path}.tmp-{os.getpid()}"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_path, self._path)
+            dir_fd = os.open(
+                os.path.dirname(os.path.abspath(self._path)), os.O_RDONLY
+            )
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError as exc:
+            raise SealRegistryError(
+                f"cannot persist seal registry {self._path!r}: {exc}"
+            ) from exc
+
+    def contains(self, seal_id: str) -> bool:
+        """True if ``seal_id`` was ever claimed in this registry."""
+        normalized = _normalize_seal_id(seal_id)
+        with self._locked(exclusive=False):
+            return normalized in self._load()
+
+    def claim(self, seal_id: str) -> bool:
+        """Durably claim ``seal_id``. False if it was already claimed."""
+        normalized = _normalize_seal_id(seal_id)
+        with self._locked(exclusive=True):
+            seal_ids = self._load()
+            if normalized in seal_ids:
+                return False
+            seal_ids.add(normalized)
+            self._store(seal_ids)
+            return True
+
+
 class HierarchicalTaskGraph:
     """A bounded tree of CNP tasks with nested seal chains.
 
@@ -701,6 +853,15 @@ class HierarchicalTaskGraph:
         self.engine = engine
         self.config = config or HierarchicalConfig()
         self._key_resolver = key_resolver
+        # W-161: optional durable cross-instance seal registry. Config
+        # wins; the env var is the deployment-level fallback. Unset =
+        # per-instance in-memory duplicate protection only.
+        registry_path = self.config.seal_registry_path or (
+            os.environ.get(SEAL_REGISTRY_PATH_ENV) or None
+        )
+        self._shared_seal_registry: Optional[FileSealRegistry] = (
+            FileSealRegistry(registry_path) if registry_path else None
+        )
         self._nodes: Dict[str, TaskNode] = {}
         self._seals: Dict[str, NestedSeal] = {}  # normalized seal_id -> seal
         self._task_index: Dict[str, str] = {}  # task_id -> node_id
@@ -753,6 +914,18 @@ class HierarchicalTaskGraph:
         seal_id = _normalize_seal_id(seal.seal_id)
         if seal_id in self._seals:
             raise DuplicateSeal(f"seal {seal.seal_id} is already registered")
+        # W-161: claim the id in the durable shared registry (when
+        # configured) BEFORE the local insert, so the id is durably
+        # claimed before registration returns and a second instance or a
+        # restarted process sees the claim. A failed claim leaves no
+        # local trace.
+        if self._shared_seal_registry is not None and not (
+            self._shared_seal_registry.claim(seal.seal_id)
+        ):
+            raise DuplicateSeal(
+                f"seal {seal.seal_id} is already registered "
+                "(shared seal registry)"
+            )
         self._seals[seal_id] = seal
 
     def _default_hmac_secret_resolver(self, address: str) -> str:
@@ -828,6 +1001,15 @@ class HierarchicalTaskGraph:
         # Fail fast on seal replay: a seal id may only ever be registered once.
         if _normalize_seal_id(seal.seal_id) in self._seals:
             raise DuplicateSeal(f"seal {seal.seal_id} is already registered")
+        # W-161: the same fail-fast against the durable shared registry,
+        # so a cross-instance replay dies before any auction/chain work.
+        if self._shared_seal_registry is not None and (
+            self._shared_seal_registry.contains(seal.seal_id)
+        ):
+            raise DuplicateSeal(
+                f"seal {seal.seal_id} is already registered "
+                "(shared seal registry)"
+            )
         if not award.winner_id:
             raise GraphError("cannot seal an auction with no winner")
         if award.task_id != task.task_id:
