@@ -53,6 +53,8 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
+from sincor2.onchain import toa_penalty
+
 try:  # POSIX advisory locks for cross-process deposit mutual exclusion
     import fcntl
 except ImportError:  # pragma: no cover - non-POSIX platforms
@@ -254,6 +256,34 @@ class StakeLedger:
         # Keep the event log bounded; the ledger is accounting, not a journal.
         if len(self._data["events"]) > 5000:
             self._data["events"] = self._data["events"][-5000:]
+
+    def _record_offense(self, agent_id: str, task_id: str, reason: str,
+                        slashed_wei: int) -> int:
+        """Record a capital-destroying slash in the agent's offense history.
+
+        Only slashed_wei > 0 counts: re-entrant slash() calls on an already
+        popped lock slash 0 and must NOT inflate the repeat-offender
+        counter (adversarial review item 3).  The history is bounded; the
+        curve saturates the exponent anyway (MAX_PRIOR_OFFENSES)."""
+        rec = self._agent(agent_id)
+        offenses = rec.setdefault("offenses", [])
+        count_before = len(offenses)
+        if int(slashed_wei) > 0:
+            offenses.append({"task_id": str(task_id), "reason": str(reason),
+                             "slashed_wei": str(int(slashed_wei)),
+                             "at": _now()})
+            if len(offenses) > 256:
+                offenses[:] = offenses[-256:]
+        return count_before
+
+    def offense_count(self, agent_id: str) -> int:
+        """Prior capital-destroying slashes for the repeat-offender curve.
+
+        Derived from this ledger's OWN history — slash_dynamic() never
+        trusts a caller-supplied count (adversarial review item 9)."""
+        rec = self._agent(agent_id)
+        offenses = rec.get("offenses")
+        return len(offenses) if isinstance(offenses, list) else 0
 
     # -- reputation-weighted collateral ------------------------------------
     def _rep(self, agent_id: str) -> Dict[str, Any]:
@@ -655,12 +685,19 @@ class StakeLedger:
 
     def slash(self, agent_id: str, task_id: str, slash_bps: int, reason: str,
               adjudicator: Optional[str] = None,
-              poster_id: Optional[str] = None) -> Dict[str, Any]:
+              poster_id: Optional[str] = None,
+              penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Slash ``slash_bps`` of the agent's locked stake for ``task_id``.
 
         Proceeds split by the subsidy-extraction invariant: the platform's
         unrecouped sponsored front is clawed back to the treasury first;
-        only the remainder becomes poster re-auction credit."""
+        only the remainder becomes poster re-auction credit.
+
+        ``penalty`` is an optional decision record (e.g. the dynamic-curve
+        inputs from slash_dynamic() or a TOA encoding digest) written
+        verbatim into the audit event.  Every slash decision lands in the
+        audit log with agent_id, task_id, slash_bps, reason, and the
+        penalty record."""
         if not 0 < int(slash_bps) <= BPS_DENOM:
             raise ValueError("slash_bps must be within (0, 10000]")
         caller = self._check_adjudicator(adjudicator)
@@ -670,6 +707,8 @@ class StakeLedger:
         remainder = locked - slashed
         rec["deposited_wei"] = str(int(rec["deposited_wei"]) - slashed)
         rec["slashed_wei"] = str(int(rec["slashed_wei"]) + slashed)
+        prior_offenses = self._record_offense(agent_id, task_id, reason,
+                                              slashed)
         if remainder:
             # Unslashed remainder is freed (not re-locked).
             pass
@@ -692,16 +731,23 @@ class StakeLedger:
                     reason=reason, adjudicator=caller,
                     clawback_wei=str(clawback_wei),
                     poster_credit_wei=str(poster_wei),
-                    credited_to=credit_to)
+                    credited_to=credit_to,
+                    prior_offenses=prior_offenses,
+                    penalty=penalty or {"dynamic": False})
         self._save()
-        return {"agent_id": agent_id, "task_id": task_id,
-                "slashed_wei": str(slashed), "reason": reason,
-                "clawback_wei": str(clawback_wei),
-                "poster_credit_wei": str(poster_wei),
-                "reauction_credited_to": credit_to}
+        out = {"agent_id": agent_id, "task_id": task_id,
+               "slashed_wei": str(slashed), "reason": reason,
+               "clawback_wei": str(clawback_wei),
+               "poster_credit_wei": str(poster_wei),
+               "reauction_credited_to": credit_to,
+               "prior_offenses": prior_offenses}
+        if penalty:
+            out["penalty"] = penalty
+        return out
 
     def slash_ghost(self, agent_id: str, task_id: str,
-                    poster_id: Optional[str] = None) -> Dict[str, Any]:
+                    poster_id: Optional[str] = None,
+                    penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Ghosting: committed but never revealed => 100 % slash.
         Called by close_auction (system path); the adjudicator gate is
         satisfied by the protocol rule itself.
@@ -713,15 +759,28 @@ class StakeLedger:
         Collateral regime change: ghosting clears the agent's execution
         record (R_i -> 0), so every concurrent and future bid immediately
         requires up to 5x the collateral.  The slash takes the stake; the
-        reset takes the capital efficiency."""
+        reset takes the capital efficiency.
+
+        ``penalty`` is an optional decision record written into the audit
+        event (see slash())."""
         self._reset_reputation_score(agent_id)
         rec = self._agent(agent_id)
         locked = int(rec["locks"].pop(task_id, "0"))
         if locked <= 0:
+            # No lock => no slash, no offense recorded (re-entry safe),
+            # but the attempt itself is audit-logged.
+            self._event("slash", agent_id=agent_id, task_id=task_id,
+                        slash_bps=GHOST_SLASH_BPS, slashed_wei="0",
+                        reason="ghosting_no_lock", adjudicator="protocol",
+                        prior_offenses=self.offense_count(agent_id),
+                        penalty=penalty or {"dynamic": False})
+            self._save()
             return {"agent_id": agent_id, "task_id": task_id,
                     "slashed_wei": "0", "reason": "ghosting_no_lock"}
         rec["deposited_wei"] = str(int(rec["deposited_wei"]) - locked)
         rec["slashed_wei"] = str(int(rec["slashed_wei"]) + locked)
+        prior_offenses = self._record_offense(agent_id, task_id, "ghosting",
+                                              locked)
         credit_to = poster_id or "__platform__"
         clawback_wei, poster_wei = self._split_slash(agent_id, locked,
                                                      task_id)
@@ -736,13 +795,77 @@ class StakeLedger:
                     reason="ghosting", adjudicator="protocol",
                     clawback_wei=str(clawback_wei),
                     poster_credit_wei=str(poster_wei),
-                    credited_to=credit_to)
+                    credited_to=credit_to,
+                    prior_offenses=prior_offenses,
+                    penalty=penalty or {"dynamic": False})
         self._save()
-        return {"agent_id": agent_id, "task_id": task_id,
-                "slashed_wei": str(locked), "reason": "ghosting",
-                "clawback_wei": str(clawback_wei),
-                "poster_credit_wei": str(poster_wei),
-                "reauction_credited_to": credit_to}
+        out = {"agent_id": agent_id, "task_id": task_id,
+               "slashed_wei": str(locked), "reason": "ghosting",
+               "clawback_wei": str(clawback_wei),
+               "poster_credit_wei": str(poster_wei),
+               "reauction_credited_to": credit_to,
+               "prior_offenses": prior_offenses}
+        if penalty:
+            out["penalty"] = penalty
+        return out
+
+    # -- dynamic slashing curve (CNP-3, explicitly gated) -----------------------
+    def slash_dynamic(self, agent_id: str, task_id: str, anchor_bps: int,
+                      severity: int, reason: str,
+                      adjudicator: Optional[str] = None,
+                      poster_id: Optional[str] = None,
+                      toa_decision: Optional[Dict[str, Any]] = None
+                      ) -> Dict[str, Any]:
+        """Slash with the dynamic escalation curve (gated).
+
+        Computes slash_bps = dynamic(anchor_bps, severity, prior_offenses)
+        where prior_offenses comes from THIS ledger's offense history —
+        never from caller input.  Fails closed (raises
+        DynamicSlashDisabled) unless SINCOR_DYNAMIC_SLASH_ENABLED is set.
+
+        ``reason`` must be "ghosting" (protocol path, no adjudicator key
+        needed) or "quality_failure_upheld" (adjudicator-only, enforced by
+        slash()).  ``toa_decision`` is an optional TOA penalty decision
+        dict: it is canonically encoded, its digest is bound into the
+        audit event, and the encoding is returned.
+
+        The subsidy-extraction split and the adjudicator gate are
+        unchanged; only the ratio is escalated."""
+        if not toa_penalty.dynamic_slash_enabled():
+            raise toa_penalty.DynamicSlashDisabled(
+                "dynamic slashing is not enabled: set "
+                f"{toa_penalty.DYNAMIC_SLASH_ENV}=1 to opt in")
+        prior_offenses = self.offense_count(agent_id)
+        computed_bps = toa_penalty.compute_dynamic_slash_bps(
+            anchor_bps, severity, prior_offenses)
+        penalty: Dict[str, Any] = {
+            "dynamic": True,
+            "curve": "severity_x_repeat",
+            "anchor_bps": anchor_bps,
+            "severity": severity,
+            "prior_offenses": prior_offenses,
+            "computed_slash_bps": computed_bps,
+            "hard_cap_bps": toa_penalty.HARD_CAP_BPS,
+            "gate": toa_penalty.DYNAMIC_SLASH_ENV,
+        }
+        if toa_decision is not None:
+            blob = toa_penalty.encode_toa_penalty(toa_decision)
+            penalty["toa_encoding_hex"] = blob.hex()
+            penalty["toa_digest"] = toa_penalty.toa_penalty_digest(
+                toa_decision)
+        if reason == "ghosting":
+            out = self.slash_ghost(agent_id, task_id, poster_id=poster_id,
+                                   penalty=penalty)
+        elif reason == "quality_failure_upheld":
+            out = self.slash(agent_id, task_id, computed_bps,
+                             "quality_failure_upheld",
+                             adjudicator=adjudicator, poster_id=poster_id,
+                             penalty=penalty)
+        else:
+            raise ValueError(
+                "reason must be 'ghosting' or 'quality_failure_upheld'")
+        out["computed_slash_bps"] = computed_bps
+        return out
 
     # -- challenger bonds -------------------------------------------------------
     def post_challenger_bond(self, agent_id: str, task_id: str) -> int:
