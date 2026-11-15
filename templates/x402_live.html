@@ -49,6 +49,33 @@
     </div>
 
     <div class="card">
+      <h2>Live activity — verified settled events</h2>
+      <p>Every event below carries an on-chain record and is labeled by
+         origin. SINCOR's own-agent activity is never blended into an
+         unlabeled total, and these event counts are never added into
+         the snapshot tallies above.</p>
+      {% if events %}
+      <p id="pw-totals"><strong>{{ event_totals.total }} verified events</strong> —
+         SINCOR agent: {{ event_totals.by_origin.sincor_agent }} ·
+         Marketplace tasks: {{ event_totals.by_origin.marketplace_task }} ·
+         External agents: {{ event_totals.by_origin.external_agent }}</p>
+      <div id="pw-events">
+        {% for e in events %}
+        <p class="pw-row"><strong>{{ e.origin_label }}</strong> — {{ e.label }}:
+           {{ e.detail }}
+           (<a href="https://basescan.org/tx/{{ e.tx_hash }}" rel="noopener" target="_blank">tx</a>,
+           <span class="stamp">{{ e.occurred_at }}</span>)</p>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p id="pw-totals"></p>
+      <div id="pw-events">
+        <p class="pw-empty">No verified settled activity yet — this wall only displays events with an on-chain record.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
       <h2>Agent card — {{ skill_count }} skills, live</h2>
       <p>Read directly from the published agent card
          (<a href="/.well-known/agent-card.json">/.well-known/agent-card.json</a>)
@@ -97,5 +124,48 @@
       </div>
     </div>
   </div>
+  <script>
+    // Live activity polling (~30s): refresh the event rows + split
+    // totals from the same feed the page was rendered from. Display
+    // only — a failed poll leaves the server-rendered content as-is.
+    (function () {
+      var box = document.getElementById("pw-events");
+      var totals = document.getElementById("pw-totals");
+      if (!box || !totals) return;
+      function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+          return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c];
+        });
+      }
+      function render(feed) {
+        var events = feed.events || [];
+        var t = feed.event_totals || {total: 0, by_origin: {}};
+        var bo = t.by_origin || {};
+        if (!events.length) {
+          totals.textContent = "";
+          box.innerHTML = "<p>No verified settled activity yet — this wall only displays events with an on-chain record.</p>";
+          return;
+        }
+        totals.innerHTML = "<strong>" + esc(t.total) + " verified events</strong> — " +
+          "SINCOR agent: " + esc(bo.sincor_agent || 0) + " · " +
+          "Marketplace tasks: " + esc(bo.marketplace_task || 0) + " · " +
+          "External agents: " + esc(bo.external_agent || 0);
+        box.innerHTML = events.map(function (e) {
+          return '<p class="pw-row"><strong>' + esc(e.origin_label) + "</strong> — " +
+            esc(e.label) + ": " + esc(e.detail) +
+            ' (<a href="https://basescan.org/tx/' + esc(e.tx_hash) +
+            '" rel="noopener" target="_blank">tx</a>, <span class="stamp">' +
+            esc(e.occurred_at) + "</span>)</p>";
+        }).join("");
+      }
+      function poll() {
+        fetch("/x402-live/events.json", {headers: {"Accept": "application/json"}})
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (feed) { if (feed) render(feed); })
+          .catch(function () { /* keep server-rendered content */ });
+      }
+      setInterval(poll, 30000);
+    })();
+  </script>
 </body>
 </html>
