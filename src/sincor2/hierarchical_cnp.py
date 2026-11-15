@@ -591,9 +591,11 @@ def verify_seal_chain(
 
     Each step requires: the seal verifies on its own; an optional
     fail-closed signer allowlist; the parent is registered under the exact
-    referenced hash; depth decreases by exactly 1 (defeats depth smuggling
-    and reference cycles); the genesis seal sits at depth 0 with an empty
-    parent hash. A repeated seal id is a cycle and is rejected.
+    referenced hash AND the registered entry's own seal_id equals that
+    hash (registry keys are never trusted as identity); depth decreases
+    by exactly 1 (defeats depth smuggling and reference cycles); the
+    genesis seal sits at depth 0 with an empty parent hash. A repeated
+    seal id is a cycle and is rejected.
     """
     allow = {addr.lower() for addr in authorized_signers}
     # Normalize registry keys once; lookups are case-insensitive.
@@ -651,6 +653,17 @@ def verify_seal_chain(
             raise SealChainError(
                 f"parent seal {current.parent_seal_hash} is not registered: "
                 "broken parent chain"
+            )
+        if _normalize_seal_id(parent.seal_id) != current.parent_seal_hash.lower():
+            # The registry key is not evidence: the entry stored under the
+            # referenced hash must BE the referenced seal. Without this
+            # binding, a hostile registry can substitute any fully valid
+            # seal (e.g. an attacker's genesis) under a victim's id and
+            # the walk would return a chain rooted at the wrong seal
+            # (W-159 genesis substitution).
+            raise SealChainError(
+                f"parent seal registered under {current.parent_seal_hash} "
+                f"has seal id {parent.seal_id}: registry substitution"
             )
         if parent.depth != current.depth - 1:
             raise SealChainError(
