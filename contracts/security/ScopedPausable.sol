@@ -24,8 +24,8 @@ abstract contract ScopedPausable {
     address public immutable guardianMultisig;
     uint256 public immutable SUNSET_BLOCK;
 
-    /// @dev Base L2: 2s per block -> 180 days = 7,776,000 blocks.
-    uint256 public constant SUNSET_DURATION_BLOCKS = 7_776_000;
+    /// @dev Base Denim: 200ms per block -> 180 days = 77,760,000 blocks.
+    uint256 public constant SUNSET_DURATION_BLOCKS = 77_760_000;
 
     event ProtocolPaused(address indexed caller);
     event ProtocolUnpaused(address indexed caller);
@@ -58,5 +58,56 @@ abstract contract ScopedPausable {
         paused = _state;
         if (_state) emit ProtocolPaused(msg.sender);
         else emit ProtocolUnpaused(msg.sender);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReentrancyGuard (vendored from OpenZeppelin Contracts v5, MIT-licensed).
+//
+// Co-located in this file deliberately: the Python solcx harnesses compile
+// ExecutionEscrowManager from a fixed source set (this file included) with
+// no remappings and no lib/ paths, so a separate guard file or an
+// `@openzeppelin/...` import is unresolvable there. Semantics are the
+// upstream design: a 1/2 status word, ReentrancyGuardReentrantCall on
+// reentry, and guard state shared across every guarded function of the
+// inheriting contract (cross-function reentry included).
+// ---------------------------------------------------------------------------
+
+/// @title ReentrancyGuard
+/// @notice Prevents reentrant calls to functions carrying `nonReentrant`.
+abstract contract ReentrancyGuard {
+    uint256 private constant NOT_ENTERED = 1;
+    uint256 private constant ENTERED = 2;
+
+    uint256 private _status;
+
+    error ReentrancyGuardReentrantCall();
+
+    constructor() {
+        _status = NOT_ENTERED;
+    }
+
+    /// @dev Prevents a contract from calling itself, directly or indirectly.
+    ///      Any `nonReentrant` function may not be called while another one
+    ///      is in progress, including indirectly via an external call out
+    ///      and back in.
+    modifier nonReentrant() {
+        _nonReentrantBefore();
+        _;
+        _nonReentrantAfter();
+    }
+
+    function _nonReentrantBefore() private {
+        if (_status == ENTERED) revert ReentrancyGuardReentrantCall();
+        _status = ENTERED;
+    }
+
+    function _nonReentrantAfter() private {
+        _status = NOT_ENTERED;
+    }
+
+    /// @dev Returns true if any guarded function is currently executing.
+    function _reentrancyGuardEntered() internal view returns (bool) {
+        return _status == ENTERED;
     }
 }
