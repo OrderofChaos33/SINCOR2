@@ -410,6 +410,49 @@ def test_tampered_parent_in_registry_rejected():
         )
 
 
+def test_genesis_substitution_via_registry_rejected():
+    # W-159: a hostile registry maps the victim root's id to a fully valid
+    # DIFFERENT genesis seal (different signer, different task). The walk
+    # must not return a chain rooted at the attacker's seal: the entry
+    # stored under the referenced hash must BE the referenced seal.
+    cfg, registry, seals = _chain_fixture(depth=1)
+    victim_root, leaf = seals
+    attacker_root, _a, _k = mint_secp256k1(
+        cfg, depth=0, task_id="t-ATTACKER-root", nonce=1
+    )
+    assert attacker_root.seal_id != victim_root.seal_id
+    hostile = dict(registry)
+    hostile[victim_root.seal_id.lower()] = attacker_root
+    with pytest.raises(SealChainError):
+        verify_seal_chain(
+            leaf, hostile, cfg, now=NOW, max_depth=MAX_DEPTH_HARD_CAP
+        )
+    # Control: the honest registry still verifies the same leaf.
+    chain = verify_seal_chain(
+        leaf, registry, cfg, now=NOW, max_depth=MAX_DEPTH_HARD_CAP
+    )
+    assert chain[0].seal_id == victim_root.seal_id
+
+
+def test_midchain_substitution_via_registry_rejected():
+    # W-159 at a non-genesis link: the middle seal's registry entry is
+    # swapped for a different valid depth-1 seal (same parent, different
+    # signer/task). The binding check must fire at that link too.
+    cfg, registry, seals = _chain_fixture(depth=2)
+    root, mid, leaf = seals
+    impostor, _a, _k = mint_secp256k1(
+        cfg, depth=1, parent_seal_hash=root.seal_id,
+        task_id="t-impostor", nonce=42,
+    )
+    assert impostor.seal_id != mid.seal_id
+    hostile = dict(registry)
+    hostile[mid.seal_id.lower()] = impostor
+    with pytest.raises(SealChainError):
+        verify_seal_chain(
+            leaf, hostile, cfg, now=NOW, max_depth=MAX_DEPTH_HARD_CAP
+        )
+
+
 def test_seal_reference_cycle_rejected():
     cfg = net_config()
     root, _, _ = mint_secp256k1(cfg, depth=0, task_id="t-r", nonce=1)
