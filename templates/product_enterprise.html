@@ -7,53 +7,54 @@
   <meta name="description" content="Deploy the full 45-agent SINCOR swarm. White-label, custom agents, SBT integration, dedicated support. $2,997/month.">
   <link rel="icon" href="/static/sincor_nav_icon.png">
   <meta property="og:image" content="/static/sincor_logo_new.jpg">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #050814;
-      --surface: #0a0e1a;
-      --card: #0f1420;
+      --bg: #0a0c10;
+      --surface: #141a23;
+      --card: #141a23;
       --border: rgba(255,255,255,0.07);
-      --border-gold: rgba(245,158,11,0.4);
-      --purple: #7c3aed;
-      --purple-light: #a78bfa;
-      --cyan: #22d3ee;
-      --green: #10b981;
-      --gold: #f59e0b;
+      --border-gold: rgba(212,169,78,0.4);
+      --gold: #d4a94e;
+      --gold-bright: #f0c664;
+      --gold-bright: #f0c664;
+      --green: #3ddc84;
+      --gold: #d4a94e;
       --gold-light: #fcd34d;
       --text: #e2e8f0;
       --muted: #64748b;
     }
-    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; line-height: 1.6; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; line-height: 1.6; }
+    h1, h2 { font-family:'Sora',sans-serif; }
 
-    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(5,8,20,0.96); backdrop-filter: blur(12px); z-index: 100; }
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 18px 48px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(10,12,16,0.96); backdrop-filter: blur(12px); z-index: 100; }
     .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
     .nav-logo img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(212,175,55,0.6); }
     .nav-logo span { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .nav-links { display: flex; align-items: center; gap: 28px; }
     .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
-    .nav-cta { background: linear-gradient(135deg, var(--gold), #d97706); color: #050814 !important; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+    .nav-cta { background: linear-gradient(135deg, var(--gold), #d97706); color: #0a0c10 !important; padding: 10px 24px; border-radius: 8px; font-weight: 700; font-size: 14px; }
 
     /* HERO — gold/enterprise feel */
     .hero { padding: 90px 48px 60px; text-align: center; max-width: 960px; margin: 0 auto; position: relative; }
-    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 450px; background: radial-gradient(ellipse at center, rgba(245,158,11,0.1) 0%, transparent 65%); pointer-events: none; }
-    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.35); color: var(--gold-light); padding: 6px 18px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 28px; }
+    .hero::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 800px; height: 450px; background: radial-gradient(ellipse at center, rgba(212,169,78,0.1) 0%, transparent 65%); pointer-events: none; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(212,169,78,0.1); border: 1px solid rgba(212,169,78,0.35); color: var(--gold-light); padding: 6px 18px; border-radius: 20px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 28px; }
     .badge-dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:0.3;} }
     h1 { font-size: clamp(40px, 6vw, 72px); font-weight: 700; line-height: 1.1; margin-bottom: 22px; }
     .grad { background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .grad2 { background: linear-gradient(135deg, var(--purple-light), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .grad2 { background: linear-gradient(135deg, var(--gold-bright), var(--gold-bright)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .hero-sub { font-size: 20px; color: var(--muted); max-width: 700px; margin: 0 auto 40px; }
     .hero-price { display: inline-flex; align-items: baseline; gap: 6px; margin-bottom: 36px; }
     .price-num { font-size: 72px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-family: 'JetBrains Mono', monospace; }
     .price-mo { font-size: 22px; color: var(--muted); }
     .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
-    .btn-primary { background: linear-gradient(135deg, var(--gold), #d97706); color: #050814; padding: 16px 44px; border-radius: 10px; font-size: 17px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(245,158,11,0.35); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(245,158,11,0.55); }
+    .btn-primary { background: linear-gradient(135deg, var(--gold), #d97706); color: #0a0c10; padding: 16px 44px; border-radius: 10px; font-size: 17px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 40px rgba(212,169,78,0.35); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(212,169,78,0.55); }
     .btn-ghost { border: 1px solid var(--border-gold); color: var(--gold-light); padding: 16px 32px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; transition: background 0.2s; }
-    .btn-ghost:hover { background: rgba(245,158,11,0.08); }
+    .btn-ghost:hover { background: rgba(212,169,78,0.08); }
     .trust-line { font-size: 13px; color: var(--muted); }
     .trust-line span { color: var(--green); }
 
@@ -64,23 +65,23 @@
 
     .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; margin: 48px 0; }
     .metric { background: var(--card); border: 1px solid var(--border-gold); border-radius: 14px; padding: 28px 20px; text-align: center; position: relative; overflow: hidden; }
-    .metric::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); }
+    .metric::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(212,169,78,0.04), transparent); }
     .metric-num { font-size: 42px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .metric-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
 
     /* 42 AGENT SHOWCASE */
     .agent-swarm { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .agent-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; transition: border-color 0.2s; }
-    .agent-tile:hover { border-color: rgba(245,158,11,0.3); }
-    .agent-tile.exclusive { border-color: rgba(245,158,11,0.2); background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); }
+    .agent-tile:hover { border-color: rgba(212,169,78,0.3); }
+    .agent-tile.exclusive { border-color: rgba(212,169,78,0.2); background: linear-gradient(135deg, rgba(212,169,78,0.04), transparent); }
     .agent-tile-icon { font-size: 24px; margin-bottom: 8px; }
     .agent-tile-name { font-size: 13px; font-weight: 700; color: var(--text); }
-    .agent-tile-badge { display: inline-block; background: rgba(245,158,11,0.15); color: var(--gold); padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 700; margin-top: 4px; }
+    .agent-tile-badge { display: inline-block; background: rgba(212,169,78,0.15); color: var(--gold); padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: 700; margin-top: 4px; }
 
     /* EXCLUSIVE FEATURES */
     .excl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 40px; }
     .excl-box { background: var(--card); border: 1px solid var(--border-gold); border-radius: 20px; padding: 36px 32px; position: relative; overflow: hidden; }
-    .excl-box::before { content: ''; position: absolute; top: -80px; right: -80px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(245,158,11,0.08), transparent 70%); }
+    .excl-box::before { content: ''; position: absolute; top: -80px; right: -80px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(212,169,78,0.08), transparent 70%); }
     .excl-icon { font-size: 44px; margin-bottom: 18px; }
     .excl-title { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
     .excl-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
@@ -88,8 +89,8 @@
 
     /* PRICING */
     .pricing-card { background: var(--card); border: 2px solid var(--border-gold); border-radius: 28px; padding: 52px 44px; max-width: 600px; margin: 0 auto; position: relative; overflow: hidden; }
-    .pricing-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(245,158,11,0.04), transparent); pointer-events: none; }
-    .pricing-card::after { content: 'ENTERPRISE'; position: absolute; top: 28px; right: -30px; background: linear-gradient(135deg, var(--gold), #d97706); color: #050814; padding: 6px 48px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; transform: rotate(35deg); }
+    .pricing-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(212,169,78,0.04), transparent); pointer-events: none; }
+    .pricing-card::after { content: 'ENTERPRISE'; position: absolute; top: 28px; right: -30px; background: linear-gradient(135deg, var(--gold), #d97706); color: #0a0c10; padding: 6px 48px; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; transform: rotate(35deg); }
     .plan-name { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .plan-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
     .pricing-amount { font-size: 64px; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: linear-gradient(135deg, var(--gold-light), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -101,7 +102,7 @@
     .check-gold { color: var(--gold); flex-shrink: 0; margin-top: 2px; }
 
     .compare { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin-top: 48px; }
-    .compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 18px 28px; background: rgba(245,158,11,0.05); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; color: var(--muted); }
+    .compare-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 18px 28px; background: rgba(212,169,78,0.05); border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; color: var(--muted); }
     .compare-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; padding: 14px 28px; border-bottom: 1px solid var(--border); font-size: 14px; }
     .compare-row:last-child { border-bottom: none; }
     .feat { color: var(--text); }
@@ -114,7 +115,7 @@
     .faq-q { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
     .faq-a { font-size: 14px; color: var(--muted); line-height: 1.6; }
 
-    .cta-banner { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(124,58,237,0.06)); border: 1px solid var(--border-gold); border-radius: 28px; padding: 70px 48px; text-align: center; margin: 60px 48px; }
+    .cta-banner { background: linear-gradient(135deg, rgba(212,169,78,0.12), rgba(212,169,78,0.06)); border: 1px solid var(--border-gold); border-radius: 28px; padding: 70px 48px; text-align: center; margin: 60px 48px; }
     .cta-banner h2 { font-size: clamp(32px, 5vw, 52px); font-weight: 700; margin-bottom: 18px; }
     .cta-banner p { color: var(--muted); font-size: 17px; margin-bottom: 40px; max-width: 600px; margin-left: auto; margin-right: auto; }
 

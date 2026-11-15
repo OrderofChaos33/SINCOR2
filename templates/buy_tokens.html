@@ -5,29 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pay on Base — SINCOR</title>
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0a0e27;--panel:#0f1629;--cyan:#06b6d4;--purple:#8b5cf6;--text:#f1f5f9;--muted:#94a3b8;--green:#34d399;--red:#f87171}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;line-height:1.55}
+    :root{--bg:#0a0c10;--panel:#10141b;--gold-bright:#f0c664;--gold:#d4a94e;--text:#f1f5f9;--muted:#94a3b8;--green:#34d399;--red:#f87171}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.55}
     .wrap{max-width:720px;margin:0 auto;padding:32px 20px 60px}
     h1{font-size:1.75rem;margin:0 0 8px}
     .sub{color:var(--muted);margin-bottom:24px}
-    .card{background:var(--panel);border:1px solid rgba(139,92,246,.25);border-radius:14px;padding:22px;margin:16px 0}
+    .card{background:var(--panel);border:1px solid rgba(212,169,78,.25);border-radius:14px;padding:22px;margin:16px 0}
     label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
-    select,input{width:100%;background:#050814;color:var(--text);border:1px solid rgba(139,92,246,.3);border-radius:10px;padding:12px;font-family:inherit;font-size:15px}
+    select,input{width:100%;background:#0a0c10;color:var(--text);border:1px solid rgba(212,169,78,.3);border-radius:10px;padding:12px;font-family:inherit;font-size:15px}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     @media(max-width:560px){.row{grid-template-columns:1fr}}
-    .stat{font-size:1.5rem;font-weight:700;color:var(--cyan)}
+    .stat{font-size:1.5rem;font-weight:700;color:var(--gold-bright)}
     .pill{display:inline-block;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.35)}
     button,a.btn{cursor:pointer;border:none;border-radius:10px;padding:13px 18px;font-weight:700;font-family:inherit;text-decoration:none;display:inline-block;text-align:center}
-    .btn-primary{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff;width:100%}
-    .btn-ghost{background:#1a202c;color:#c4b5fd;border:1px solid rgba(139,92,246,.35)}
-    .btn-cyan{background:linear-gradient(135deg,var(--cyan),#0891b2);color:#051018;width:100%}
+    .btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-bright));color:#14100a;width:100%}
+    .btn-ghost{background:#1a202c;color:#f0c664;border:1px solid rgba(212,169,78,.35)}
+    .btn-cyan{background:linear-gradient(135deg,var(--gold-bright),#d4a94e);color:#051018;width:100%}
     .muted{color:var(--muted);font-size:13px}
-    .mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--cyan)}
+    .mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;color:var(--gold-bright)}
     .err{color:var(--red);font-size:14px;margin-top:10px;display:none}
     .ok{color:var(--green);font-size:14px;margin-top:10px;display:none}
-    .token-badge{font-weight:700;color:var(--purple)}
+    .token-badge{font-weight:700;color:var(--gold)}
     nav{margin-bottom:20px}
     nav a{color:var(--muted);text-decoration:none;font-size:14px}
     nav a:hover{color:var(--text)}

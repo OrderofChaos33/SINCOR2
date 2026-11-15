@@ -5,29 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Buy — SINCOR</title>
     <link rel="icon" type="image/svg+xml" href="/static/sincor_favicon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --bg: #050508;
-            --surface: #0d0d15;
-            --surface2: #12121f;
+            --bg: #0a0c10;
+            --surface: #141a23;
+            --surface2: #1a2230;
             --border: rgba(255,255,255,0.08);
-            --purple: #7c3aed;
-            --purple-light: #a78bfa;
-            --blue: #2563eb;
-            --green: #10b981;
+            --gold: #d4a94e;
+            --gold-bright: #f0c664;
+            --blue: #d4a94e;
+            --green: #3ddc84;
             --text: #e2e8f0;
             --muted: #64748b;
         }
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
         }
+        h1, h2 { font-family: 'Sora', sans-serif; }
         nav {
-            background: rgba(5,5,8,0.95);
+            background: rgba(10,12,16,0.95);
             border-bottom: 1px solid var(--border);
             padding: 16px 32px;
             display: flex;
@@ -35,7 +36,7 @@
             justify-content: space-between;
         }
         .nav-logo { font-size: 20px; font-weight: 700; color: #fff; text-decoration: none; font-family: monospace; }
-        .nav-logo span { color: var(--purple-light); }
+        .nav-logo span { color: var(--gold-bright); }
         .nav-back { color: var(--muted); text-decoration: none; font-size: 14px; }
         .nav-back:hover { color: var(--text); }
 
@@ -45,9 +46,9 @@
         }
         .badge {
             display: inline-block;
-            background: rgba(16,185,129,0.15);
+            background: rgba(61,220,132,0.15);
             color: var(--green);
-            border: 1px solid rgba(16,185,129,0.3);
+            border: 1px solid rgba(61,220,132,0.3);
             padding: 6px 16px;
             border-radius: 20px;
             font-size: 13px;
@@ -60,7 +61,7 @@
             line-height: 1.2;
             margin-bottom: 16px;
         }
-        .hero h1 span { color: var(--purple-light); }
+        .hero h1 span { color: var(--gold-bright); }
         .hero p {
             font-size: 18px;
             color: var(--muted);
@@ -76,8 +77,8 @@
             padding: 0 24px;
         }
         .status-ok {
-            background: rgba(16,185,129,0.1);
-            border: 1px solid rgba(16,185,129,0.3);
+            background: rgba(61,220,132,0.1);
+            border: 1px solid rgba(61,220,132,0.3);
             color: var(--green);
             padding: 16px;
             border-radius: 10px;
@@ -101,7 +102,7 @@
             color: var(--muted);
         }
         .rail-note strong { color: var(--text); }
-        .rail-note code { color: var(--purple-light); }
+        .rail-note code { color: var(--gold-bright); }
         .b2b-grid {
             margin-top: 16px;
             display: grid;
@@ -116,7 +117,7 @@
         }
         .b2b-pack h4 { font-size: 14px; margin-bottom: 4px; color: var(--text); }
         .b2b-pack p { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-        .b2b-pack a { font-size: 12px; color: var(--purple-light); text-decoration: none; }
+        .b2b-pack a { font-size: 12px; color: var(--gold-bright); text-decoration: none; }
         .b2b-pack a:hover { color: #fff; }
 
         .plans-wrap {
@@ -142,17 +143,17 @@
             position: relative;
             transition: border-color 0.2s;
         }
-        .plan:hover { border-color: rgba(124,58,237,0.4); }
+        .plan:hover { border-color: rgba(212,169,78,0.4); }
         .plan.featured {
-            border-color: var(--purple);
-            background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(37,99,235,0.06));
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(212,169,78,0.1), rgba(240,198,100,0.06));
         }
         .plan-badge-top {
             position: absolute;
             top: -14px;
             left: 50%;
             transform: translateX(-50%);
-            background: var(--purple);
+            background: var(--gold);
             color: #fff;
             padding: 4px 16px;
             border-radius: 20px;
@@ -209,7 +210,7 @@
             width: 100%;
             padding: 15px 24px;
             border-radius: 10px;
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: 'Sora', sans-serif;
             font-size: 15px;
             font-weight: 700;
             text-align: center;
@@ -218,10 +219,10 @@
             transition: all 0.2s;
             text-decoration: none;
         }
-        .btn-buy-primary { background: var(--purple); color: #fff; }
-        .btn-buy-primary:hover { background: #6d28d9; transform: translateY(-1px); }
-        .btn-buy-outline { background: transparent; color: var(--purple-light); border: 1px solid rgba(124,58,237,0.5); }
-        .btn-buy-outline:hover { border-color: var(--purple); color: #fff; }
+        .btn-buy-primary { background: var(--gold); color: #14100a; }
+        .btn-buy-primary:hover { background: #d4a94e; transform: translateY(-1px); }
+        .btn-buy-outline { background: transparent; color: var(--gold-bright); border: 1px solid rgba(212,169,78,0.5); }
+        .btn-buy-outline:hover { border-color: var(--gold); color: #fff; }
 
         /* Digital downloads */
         .what-box {
@@ -247,19 +248,19 @@
         .what-item .icon { font-size: 22px; margin-bottom: 8px; }
         .what-item h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
         .what-item p { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
-        .what-item a { font-size: 12px; color: var(--purple-light); text-decoration: none; }
+        .what-item a { font-size: 12px; color: var(--gold-bright); text-decoration: none; }
         .what-item a:hover { color: #fff; }
 
         .contact-note {
-            background: rgba(16,185,129,0.07);
-            border: 1px solid rgba(16,185,129,0.2);
+            background: rgba(61,220,132,0.07);
+            border: 1px solid rgba(61,220,132,0.2);
             border-radius: 12px;
             padding: 24px;
             text-align: center;
         }
         .contact-note h4 { color: var(--green); font-size: 17px; font-weight: 700; margin-bottom: 6px; }
         .contact-note p { color: var(--muted); font-size: 14px; }
-        .contact-note a { color: var(--purple-light); text-decoration: none; }
+        .contact-note a { color: var(--gold-bright); text-decoration: none; }
     </style>
 </head>
 <body>

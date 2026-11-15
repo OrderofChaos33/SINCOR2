@@ -17,16 +17,16 @@
                     <p class="text-gray-600">Select and configure your AI business automation agents</p>
                 </div>
                 <div class="text-right flex items-center gap-3">
-                    <p class="text-sm text-blue-600">🤖 <span class="fleet-count">—</span> Agents Available</p>
+                    <p class="text-sm text-yellow-600">🤖 <span class="fleet-count">—</span> Agents Available</p>
                     <!-- SINC live cost badge -->
-                    <div id="sinc-cost-badge" style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#4338ca">
+                    <div id="sinc-cost-badge" style="background:#fbf3dd;border:1px solid #ecd28f;border-radius:999px;padding:4px 12px;font-size:.78rem;font-weight:600;color:#7a5c14">
                         🪙 Est. Cost: <span id="sinc-cost-value">1 SINC/call</span>
                     </div>
                     <button onclick="sincSelectorWidget.connect()" id="sinc-sel-connect"
-                            style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer">
+                            style="background:linear-gradient(135deg,#d4a94e,#f0c664);color:#14100a;border:none;border-radius:6px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer">
                         Connect Wallet
                     </button>
-                    <span id="sinc-sel-pill" style="display:none;font-size:.78rem;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:4px 10px;color:#4338ca;font-weight:700;cursor:pointer" onclick="sincSelectorWidget.showDetails()">
+                    <span id="sinc-sel-pill" style="display:none;font-size:.78rem;background:#fbf3dd;border:1px solid #ecd28f;border-radius:999px;padding:4px 10px;color:#7a5c14;font-weight:700;cursor:pointer" onclick="sincSelectorWidget.showDetails()">
                         🪙 <span id="sinc-sel-balance">—</span>
                     </span>
                 </div>
@@ -38,16 +38,16 @@
 
         <!-- Recommendations -->
         <div class="mb-8">
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h2 class="text-lg font-semibold text-blue-800 mb-4">🎯 Recommended for Your Business</h2>
-                <p class="text-sm text-blue-700 mb-4">Based on your auto detailing business profile, we recommend starting with these agents:</p>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-yellow-800 mb-4">🎯 Recommended for Your Business</h2>
+                <p class="text-sm text-yellow-700 mb-4">Based on your auto detailing business profile, we recommend starting with these agents:</p>
                 
                 <div id="recommendations" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Recommendations will be loaded here -->
                 </div>
                 
                 <div class="mt-4">
-                    <button onclick="acceptRecommendations()" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold hover:bg-blue-700">
+                    <button onclick="acceptRecommendations()" class="bg-yellow-600 text-white px-6 py-2 rounded font-semibold hover:bg-yellow-700">
                         ✅ Accept Recommendations & Start Setup
                     </button>
                     <button onclick="showAllAgents()" class="ml-4 bg-gray-200 text-gray-700 px-6 py-2 rounded font-semibold hover:bg-gray-300">
@@ -64,7 +64,7 @@
             <!-- Agent Categories -->
             <div class="mb-6">
                 <div class="flex flex-wrap gap-2">
-                    <button onclick="filterCategory('all')" class="category-filter bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium">All Agents</button>
+                    <button onclick="filterCategory('all')" class="category-filter bg-yellow-600 text-white px-4 py-2 rounded text-sm font-medium">All Agents</button>
                     <button onclick="filterCategory('Marketing & Sales')" class="category-filter bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium">Marketing & Sales</button>
                     <button onclick="filterCategory('Operations')" class="category-filter bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium">Operations</button>
                     <button onclick="filterCategory('Customer Relations')" class="category-filter bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-medium">Customer Relations</button>
@@ -104,7 +104,7 @@
                         <span id="progress-text">0/3 Phases Complete</span>
                     </div>
                     <div class="bg-gray-200 rounded-full h-2">
-                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        <div id="progress-bar" class="bg-yellow-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                 </div>
                 
@@ -118,7 +118,7 @@
                     <button id="prev-btn" onclick="previousStep()" class="bg-gray-200 text-gray-700 px-6 py-2 rounded font-semibold hover:bg-gray-300" disabled>
                         ← Previous
                     </button>
-                    <button id="next-btn" onclick="nextStep()" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold hover:bg-blue-700">
+                    <button id="next-btn" onclick="nextStep()" class="bg-yellow-600 text-white px-6 py-2 rounded font-semibold hover:bg-yellow-700">
                         Next →
                     </button>
                 </div>
@@ -150,7 +150,7 @@
                     </div>
                 </div>
                 
-                <a href="/admin" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-bold inline-block hover:bg-blue-700">
+                <a href="/admin" class="bg-yellow-600 text-white px-8 py-3 rounded-lg font-bold inline-block hover:bg-yellow-700">
                     → Go to Dashboard
                 </a>
             </div>
@@ -193,7 +193,7 @@
 
         function createAgentCard(agent, recommendation = null, isRecommended = false) {
             const div = document.createElement('div');
-            div.className = `bg-white p-4 rounded-lg border ${selectedAgents.has(agent.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200'} cursor-pointer hover:border-blue-300`;
+            div.className = `bg-white p-4 rounded-lg border ${selectedAgents.has(agent.id) ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'} cursor-pointer hover:border-yellow-300`;
             div.onclick = () => toggleAgent(agent.id, div);
             
             const priorityBadge = recommendation ? 
@@ -211,15 +211,15 @@
                     ${priorityBadge}
                 </div>
                 <p class="text-sm text-gray-700 mb-3">${agent.description}</p>
-                ${recommendation ? `<p class="text-xs text-blue-700 font-medium">${recommendation.reason}</p>` : ''}
+                ${recommendation ? `<p class="text-xs text-yellow-700 font-medium">${recommendation.reason}</p>` : ''}
                 ${recommendation ? `<p class="text-xs text-green-700 mt-1">${recommendation.estimated_roi}</p>` : ''}
                 
                 <div class="mt-3">
                     <label class="text-xs text-gray-600">Capability Level:</label>
                     <div class="flex gap-1 mt-1">
-                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 1)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}">Basic</button>
-                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 2)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 2 ? 'bg-blue-600 text-white' : 'bg-gray-200'}">Advanced</button>
-                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 3)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 3 ? 'bg-blue-600 text-white' : 'bg-gray-200'}">Expert</button>
+                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 1)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 1 ? 'bg-yellow-600 text-white' : 'bg-gray-200'}">Basic</button>
+                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 2)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 2 ? 'bg-yellow-600 text-white' : 'bg-gray-200'}">Advanced</button>
+                        <button onclick="event.stopPropagation(); setAgentLevel('${agent.id}', 3)" class="level-btn text-xs px-2 py-1 rounded ${getAgentLevel(agent.id) === 3 ? 'bg-yellow-600 text-white' : 'bg-gray-200'}">Expert</button>
                     </div>
                 </div>
             `;
@@ -254,10 +254,10 @@
         function toggleAgent(agentId, cardElement) {
             if (selectedAgents.has(agentId)) {
                 selectedAgents.delete(agentId);
-                cardElement.className = cardElement.className.replace('border-blue-500 bg-blue-50', 'border-gray-200');
+                cardElement.className = cardElement.className.replace('border-yellow-500 bg-yellow-50', 'border-gray-200');
             } else {
                 selectedAgents.add(agentId);
-                cardElement.className = cardElement.className.replace('border-gray-200', 'border-blue-500 bg-blue-50');
+                cardElement.className = cardElement.className.replace('border-gray-200', 'border-yellow-500 bg-yellow-50');
             }
             
             updateSelectedDisplay();
@@ -277,7 +277,7 @@
                     const levelNames = ['', 'Basic', 'Advanced', 'Expert'];
                     
                     const div = document.createElement('div');
-                    div.className = 'bg-white p-4 rounded-lg border border-blue-200';
+                    div.className = 'bg-white p-4 rounded-lg border border-yellow-200';
                     div.innerHTML = `
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
@@ -407,8 +407,8 @@
                     }).join('')}
                 </div>
                 
-                <div class="mt-6 p-4 bg-blue-50 rounded">
-                    <p class="text-sm text-blue-800">
+                <div class="mt-6 p-4 bg-yellow-50 rounded">
+                    <p class="text-sm text-yellow-800">
                         <strong>Next Steps:</strong> Complete the setup tasks above, then click Next to continue.
                     </p>
                 </div>

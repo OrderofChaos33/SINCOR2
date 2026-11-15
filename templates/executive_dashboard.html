@@ -9,7 +9,7 @@
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <style>
         .executive-gradient {
-            background: linear-gradient(135deg, #0c1426 0%, #1a237e 25%, #283593 50%, #3949ab 75%, #3f51b5 100%);
+            background: linear-gradient(135deg, #0a0c10 0%, #d4a94e 25%, #d4a94e 50%, #d4a94e 75%, #d4a94e 100%);
         }
         
         .premium-card {
@@ -20,7 +20,7 @@
         }
         
         .metric-glow {
-            text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            text-shadow: 0 0 20px rgba(240, 198, 100, 0.5);
         }
         
         .status-indicator {
@@ -28,15 +28,15 @@
         }
         
         .executive-btn {
-            background: linear-gradient(135deg, #3b82f6, #1e40af);
+            background: linear-gradient(135deg, #f0c664, #d4a94e);
             transition: all 0.3s ease;
             transform-origin: center;
         }
         
         .executive-btn:hover {
-            background: linear-gradient(135deg, #1e40af, #1e3a8a);
+            background: linear-gradient(135deg, #d4a94e, #1e3a8a);
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 10px 25px rgba(240, 198, 100, 0.4);
         }
         
         .data-card {
@@ -48,29 +48,29 @@
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
         }
         
-        .brand-blue { color: #3b82f6; }
-        .brand-cyan { color: #06b6d4; }
-        .brand-emerald { color: #10b981; }
-        .brand-amber { color: #f59e0b; }
+        .brand-blue { color: #f0c664; }
+        .brand-cyan { color: #f0c664; }
+        .brand-emerald { color: #3ddc84; }
+        .brand-amber { color: #d4a94e; }
     </style>
 </head>
 
 <body class="executive-gradient min-h-screen text-white">
     <!-- Executive Header -->
-    <header class="bg-black bg-opacity-40 backdrop-blur-sm border-b border-blue-500 border-opacity-30">
+    <header class="bg-black bg-opacity-40 backdrop-blur-sm border-b border-yellow-500 border-opacity-30">
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <img src="/static/sincor_hornet_logo.jpg" alt="SINCOR" class="h-12 w-auto">
                     <div>
                         <h1 class="text-2xl font-bold brand-blue">SINCOR Executive Center</h1>
-                        <p class="text-sm text-blue-300">Real-Time Business Intelligence & Command</p>
+                        <p class="text-sm text-yellow-300">Real-Time Business Intelligence & Command</p>
                     </div>
                 </div>
                 
                 <div class="flex items-center space-x-6">
                     <div class="text-right">
-                        <div class="text-sm text-blue-300">System Status</div>
+                        <div class="text-sm text-yellow-300">System Status</div>
                         <div class="flex items-center">
                             <div class="w-3 h-3 bg-green-400 rounded-full status-indicator mr-2"></div>
                             <span class="text-green-400 font-semibold">ONLINE</span>
@@ -78,12 +78,12 @@
                     </div>
                     
                     <div class="text-right">
-                        <div class="text-sm text-blue-300">Last Updated</div>
+                        <div class="text-sm text-yellow-300">Last Updated</div>
                         <div class="text-white font-mono text-sm" x-text="lastUpdated">--:--</div>
                     </div>
                     
                     <div class="flex items-center space-x-3">
-                        <a href="/" class="text-blue-300 hover:text-blue-100 text-sm">Home</a>
+                        <a href="/" class="text-yellow-300 hover:text-yellow-100 text-sm">Home</a>
                         <a href="/logout" class="text-gray-400 hover:text-gray-200 text-sm border border-gray-600 hover:border-gray-400 px-3 py-1 rounded">Logout</a>
                     </div>
                 </div>
@@ -106,18 +106,18 @@
                 <div class="premium-card rounded-xl p-6 data-card">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-blue-300 text-sm font-medium">Total Leads Captured</p>
+                            <p class="text-yellow-300 text-sm font-medium">Total Leads Captured</p>
                             <p class="text-3xl font-bold metric-glow brand-blue" x-text="metrics.leads?.total_leads || 0">0</p>
-                            <p class="text-xs text-blue-400 mt-1">Real system data</p>
+                            <p class="text-xs text-yellow-400 mt-1">Real system data</p>
                         </div>
                         <div class="text-4xl opacity-80">🎯</div>
                     </div>
                     <div class="mt-4 flex items-center">
-                        <div class="flex-1 bg-blue-900 bg-opacity-30 rounded-full h-2">
-                            <div class="bg-blue-500 h-2 rounded-full transition-all duration-1000" 
+                        <div class="flex-1 bg-yellow-900 bg-opacity-30 rounded-full h-2">
+                            <div class="bg-yellow-500 h-2 rounded-full transition-all duration-1000" 
                                  :style="`width: ${Math.min(100, (metrics.leads?.total_leads || 0) * 10)}%`"></div>
                         </div>
-                        <span class="ml-3 text-xs text-blue-400">Active</span>
+                        <span class="ml-3 text-xs text-yellow-400">Active</span>
                     </div>
                 </div>
 
@@ -144,18 +144,18 @@
                 <div class="premium-card rounded-xl p-6 data-card">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-cyan-300 text-sm font-medium">Agent Network</p>
+                            <p class="text-yellow-300 text-sm font-medium">Agent Network</p>
                             <p class="text-3xl font-bold metric-glow brand-cyan" x-text="metrics.agents?.coordination_score || 0">0</p>
-                            <p class="text-xs text-cyan-400 mt-1">Coordination Score</p>
+                            <p class="text-xs text-yellow-400 mt-1">Coordination Score</p>
                         </div>
                         <div class="text-4xl opacity-80">🤖</div>
                     </div>
                     <div class="mt-4 flex items-center">
-                        <div class="flex-1 bg-cyan-900 bg-opacity-30 rounded-full h-2">
-                            <div class="bg-cyan-500 h-2 rounded-full transition-all duration-1000" 
+                        <div class="flex-1 bg-yellow-900 bg-opacity-30 rounded-full h-2">
+                            <div class="bg-yellow-500 h-2 rounded-full transition-all duration-1000" 
                                  :style="`width: ${metrics.agents?.coordination_score || 0}%`"></div>
                         </div>
-                        <span class="ml-3 text-xs text-cyan-400" x-text="`${metrics.agents?.total_agents_available || 0} agents`">0 agents</span>
+                        <span class="ml-3 text-xs text-yellow-400" x-text="`${metrics.agents?.total_agents_available || 0} agents`">0 agents</span>
                     </div>
                 </div>
 
@@ -204,7 +204,7 @@
                         </button>
                         
                         <button onclick="viewBusinessIntel()" 
-                                class="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-4 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg flex items-center justify-center">
+                                class="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white px-6 py-4 rounded-lg font-semibold transition-all duration-300 hover:shadow-lg flex items-center justify-center">
                             <span class="mr-3">🎯</span>
                             Business Intelligence
                         </button>
@@ -228,10 +228,10 @@
                             <div class="flex items-start space-x-3 p-3 rounded-lg"
                                  :class="activity.category === 'success' ? 'bg-emerald-900 bg-opacity-20' : 
                                         activity.category === 'error' ? 'bg-red-900 bg-opacity-20' : 
-                                        'bg-blue-900 bg-opacity-20'">
+                                        'bg-yellow-900 bg-opacity-20'">
                                 <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
                                      :class="activity.category === 'success' ? 'bg-emerald-600' : 
-                                            activity.category === 'error' ? 'bg-red-600' : 'bg-blue-600'">
+                                            activity.category === 'error' ? 'bg-red-600' : 'bg-yellow-600'">
                                     <span class="text-xs">
                                         <span x-show="activity.category === 'success'">✓</span>
                                         <span x-show="activity.category === 'error'">✗</span>
@@ -241,7 +241,7 @@
                                 <div class="flex-1 min-w-0">
                                     <p class="font-semibold text-sm" 
                                        :class="activity.category === 'success' ? 'text-emerald-300' : 
-                                              activity.category === 'error' ? 'text-red-300' : 'text-blue-300'"
+                                              activity.category === 'error' ? 'text-red-300' : 'text-yellow-300'"
                                        x-text="activity.title">Activity</p>
                                     <p class="text-xs text-gray-300 mt-1" x-text="activity.description">Description</p>
                                     <p class="text-xs text-gray-500 mt-1" x-text="formatTimestamp(activity.timestamp)">Time</p>
@@ -278,10 +278,10 @@
                         <!-- Agent Network -->
                         <div class="flex items-center justify-between p-3 bg-black bg-opacity-20 rounded-lg">
                             <div class="flex items-center">
-                                <div class="w-3 h-3 bg-blue-400 rounded-full mr-3"></div>
+                                <div class="w-3 h-3 bg-yellow-400 rounded-full mr-3"></div>
                                 <span class="text-gray-200">Agent Network</span>
                             </div>
-                            <span class="text-blue-400 font-semibold" x-text="metrics.agents?.status || 'Unknown'">Unknown</span>
+                            <span class="text-yellow-400 font-semibold" x-text="metrics.agents?.status || 'Unknown'">Unknown</span>
                         </div>
 
                         <!-- Lead System -->
@@ -303,8 +303,8 @@
                         </div>
 
                         <!-- Data Insights -->
-                        <div class="mt-6 p-4 bg-gradient-to-r from-blue-900 to-purple-900 bg-opacity-30 rounded-lg">
-                            <h4 class="font-semibold text-blue-300 mb-2">📋 Executive Summary</h4>
+                        <div class="mt-6 p-4 bg-gradient-to-r from-yellow-900 to-yellow-900 bg-opacity-30 rounded-lg">
+                            <h4 class="font-semibold text-yellow-300 mb-2">📋 Executive Summary</h4>
                             <div class="text-sm text-gray-300 space-y-1">
                                 <p x-text="`• ${metrics.leads?.total_leads || 0} total leads in system`">• 0 total leads in system</p>
                                 <p x-text="`• ${metrics.database?.total_size_mb || 0}MB data stored`">• 0MB data stored</p>
@@ -325,7 +325,7 @@
             
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div class="premium-card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4 text-blue-300">Lead Generation Trend</h3>
+                    <h3 class="text-lg font-semibold mb-4 text-yellow-300">Lead Generation Trend</h3>
                     <canvas id="leadsChart" width="400" height="200"></canvas>
                 </div>
                 
@@ -415,8 +415,8 @@
                                 datasets: [{
                                     label: 'Leads Generated',
                                     data: [0, 0, 0, this.metrics.leads?.total_leads || 1],
-                                    borderColor: '#3b82f6',
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderColor: '#f0c664',
+                                    backgroundColor: 'rgba(240, 198, 100, 0.1)',
                                     tension: 0.4,
                                     fill: true
                                 }]
@@ -450,7 +450,7 @@
                                 labels: ['Database', 'Agents', 'Performance', 'Uptime'],
                                 datasets: [{
                                     data: [100, 85, 95, 99],
-                                    backgroundColor: ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b'],
+                                    backgroundColor: ['#f0c664', '#f0c664', '#3ddc84', '#d4a94e'],
                                     borderWidth: 0
                                 }]
                             },

@@ -6,28 +6,28 @@
   <title>SINCOR Autonomous Swarm Deck</title>
   <meta name="description" content="SINCOR2 Autonomous Swarm — 15-slide technical deck. 42 agents, multi-agent OS, Base chain economy.">
   <link rel="icon" type="image/png" href="/static/sincor_favicon.png">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#0a0e27; --purple:#8b5cf6; --cyan:#06b6d4; --text:#f1f5f9; --muted:#94a3b8; }
+    :root { --bg:#0a0c10; --gold:#d4a94e; --gold-bright:#f0c664; --text:#f1f5f9; --muted:#94a3b8; }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; overflow:hidden; }
-    .top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:rgba(10,14,39,.92); border-bottom:1px solid rgba(139,92,246,.25); backdrop-filter:blur(12px); gap:12px; }
-    .top a { color:var(--cyan); text-decoration:none; font-weight:600; font-size:14px; white-space:nowrap; }
+    body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow:hidden; }
+    .top { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:rgba(10,14,39,.92); border-bottom:1px solid rgba(212,169,78,.25); backdrop-filter:blur(12px); gap:12px; }
+    .top a { color:var(--gold-bright); text-decoration:none; font-weight:600; font-size:14px; white-space:nowrap; }
     .top-title { font-size:13px; color:var(--muted); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
     .progress { flex:1; max-width:360px; height:4px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden; }
-    .progress > div { height:100%; background:linear-gradient(90deg,var(--purple),var(--cyan)); width:0%; transition:width .35s ease; }
+    .progress > div { height:100%; background:linear-gradient(90deg,var(--gold),var(--gold-bright)); width:0%; transition:width .35s ease; }
     .stage { height:100vh; display:flex; align-items:center; justify-content:center; padding:72px 20px 140px; }
     .frame { width:min(1100px, 96vw); aspect-ratio:16/9; border-radius:12px; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); background:#f4f4f5; }
     .frame img { width:100%; height:100%; object-fit:contain; display:block; background:#f4f4f5; }
-    .thumbs { position:fixed; bottom:0; left:0; right:0; z-index:20; background:rgba(10,14,39,.95); border-top:1px solid rgba(139,92,246,.2); padding:10px 16px 14px; display:flex; gap:8px; overflow-x:auto; scrollbar-width:thin; }
+    .thumbs { position:fixed; bottom:0; left:0; right:0; z-index:20; background:rgba(10,14,39,.95); border-top:1px solid rgba(212,169,78,.2); padding:10px 16px 14px; display:flex; gap:8px; overflow-x:auto; scrollbar-width:thin; }
     .thumbs button { flex:0 0 auto; border:2px solid transparent; border-radius:6px; padding:0; background:none; cursor:pointer; opacity:.55; transition:opacity .2s, border-color .2s, transform .2s; }
     .thumbs button:hover { opacity:.85; }
-    .thumbs button.active { opacity:1; border-color:var(--cyan); transform:translateY(-2px); }
+    .thumbs button.active { opacity:1; border-color:var(--gold-bright); transform:translateY(-2px); }
     .thumbs img { width:88px; height:50px; object-fit:cover; display:block; border-radius:4px; }
     .nav-hint { position:fixed; bottom:78px; left:50%; transform:translateX(-50%); color:var(--muted); font-size:12px; pointer-events:none; }
     .btns { position:fixed; bottom:78px; right:20px; display:flex; gap:8px; z-index:21; }
-    .btns button { background:rgba(139,92,246,.25); border:1px solid var(--purple); color:var(--text); padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; }
-    .btns button:hover { background:var(--purple); }
+    .btns button { background:rgba(212,169,78,.25); border:1px solid var(--gold); color:var(--text); padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; }
+    .btns button:hover { background:var(--gold); }
     #counter { font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace; white-space:nowrap; }
   </style>
 </head>
