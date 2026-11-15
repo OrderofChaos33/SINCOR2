@@ -289,17 +289,33 @@ def test_caller_cannot_lie_about_prior_offenses(ledger, gate_on):
     ledger.lock_for_commit("agent-a", "tsk-1", 4 * ONE_AXM)
     ledger.slash_dynamic("agent-a", "tsk-1", QUALITY_SLASH_BPS, 0,
                          "quality_failure_upheld", adjudicator="judge-1")
-    # A TOA decision claiming prior_offenses=0 does not lower the curve:
-    # the ledger's own history (1 prior) governs.
+    # W-166: a TOA decision claiming prior_offenses=0 (and pricing the
+    # slash at the un-escalated 5000) no longer merely gets its lie
+    # ignored — the decision does not describe THIS slash, so the slash
+    # is rejected outright.  The caller's protection is unchanged and
+    # stronger: the lie cannot lower (or launder) the curve.
     lying = tp.make_toa_decision(
         agent_id="agent-a", task_id="tsk-2", offense="quality_failure",
         severity=0, prior_offenses=0, anchor_bps=QUALITY_SLASH_BPS,
         recommended_slash_bps=5000, adjudicator_id="judge-1", nonce=1)
     ledger.lock_for_commit("agent-a", "tsk-2", 4 * ONE_AXM)
+    with pytest.raises(tp.InvalidToaDecision):
+        ledger.slash_dynamic("agent-a", "tsk-2", QUALITY_SLASH_BPS, 0,
+                             "quality_failure_upheld",
+                             adjudicator="judge-1", toa_decision=lying)
+    # Nothing was slashed and the offense count did not move.
+    assert ledger.balance_of("agent-a")["locked_wei"] == str(2 * ONE_AXM)
+    assert ledger.offense_count("agent-a") == 1
+    # A truthful decision (ledger count 1, curve price 6250) is accepted
+    # and the ledger-derived escalation governs the amount.
+    honest = tp.make_toa_decision(
+        agent_id="agent-a", task_id="tsk-2", offense="quality_failure",
+        severity=0, prior_offenses=1, anchor_bps=QUALITY_SLASH_BPS,
+        recommended_slash_bps=6250, adjudicator_id="judge-1", nonce=2)
     out = ledger.slash_dynamic("agent-a", "tsk-2", QUALITY_SLASH_BPS, 0,
                                "quality_failure_upheld",
-                               adjudicator="judge-1", toa_decision=lying)
-    assert out["computed_slash_bps"] == 6250  # ledger count, not the lie
+                               adjudicator="judge-1", toa_decision=honest)
+    assert out["computed_slash_bps"] == 6250  # ledger count governs
     assert out["penalty"]["prior_offenses"] == 1
 
 
@@ -327,9 +343,13 @@ def test_toa_decision_bound_into_audit_event(ledger, gate_on):
 def test_slash_dynamic_ghosting(ledger, gate_on):
     ledger.deposit("ghost", 10 * ONE_AXM)
     ledger.lock_for_commit("ghost", "tsk-1", 4 * ONE_AXM)  # 2 locked
+    # W-165: the dynamic entry point is adjudicator-gated for ghosting
+    # too; the ungated protocol path is slash_ghost() itself.
     out = ledger.slash_dynamic("ghost", "tsk-1", GHOST_SLASH_BPS, 100,
-                               "ghosting", poster_id="poster-p")
+                               "ghosting", adjudicator="judge-1",
+                               poster_id="poster-p")
     assert out["computed_slash_bps"] == 10000  # ghosting anchor is the cap
+    assert out["applied_slash_bps"] == 10000
     assert out["slashed_wei"] == str(2 * ONE_AXM)
     # Ghosting still clears the execution record.
     assert ledger.reputation_score("ghost") == 0.0

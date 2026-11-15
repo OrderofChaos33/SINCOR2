@@ -260,22 +260,108 @@ def encode_toa_penalty(decision: Mapping[str, Any]) -> bytes:
     return _TOA_PENALTY_TAG + payload
 
 
+def _strict_object(pairs: Any) -> Dict[str, Any]:
+    """object_pairs_hook for strict decoding: a repeated key is fatal.
+
+    Stdlib json keeps the LAST value for a duplicate key, so one blob
+    could show a signer/strict reader one value and execute another.
+    W-167: reject the blob instead."""
+    obj: Dict[str, Any] = {}
+    for key, value in pairs:
+        if key in obj:
+            raise InvalidToaDecision(f"duplicate key in payload: {key!r}")
+        obj[key] = value
+    return obj
+
+
+def _reject_json_constant(name: str) -> Any:
+    """parse_constant hook: NaN/Infinity are not strict JSON and never
+    appear in a canonical encoding — reject them outright."""
+    raise InvalidToaDecision(f"non-strict JSON constant in payload: {name}")
+
+
 def decode_toa_penalty(blob: bytes) -> Dict[str, Any]:
-    """Decode and re-validate a TOA penalty encoding."""
+    """Decode and re-validate a TOA penalty encoding.
+
+    STRICT inverse of encode_toa_penalty (W-167): the payload must be
+    exactly one JSON object — duplicate keys rejected (the signed bytes
+    and the executed decision can never carry different values for the
+    same field), no trailing data after the object, no NaN/Infinity
+    constants, and the field set must match the schema exactly (extras
+    rejected, missing fields raise InvalidToaDecision, never a bare
+    KeyError).  One blob -> one decision, exactly as one decision ->
+    one encoding."""
     if type(blob) is not bytes or not blob.startswith(_TOA_PENALTY_TAG):
         raise InvalidToaDecision("bad version tag")
     try:
-        parsed = json.loads(blob[len(_TOA_PENALTY_TAG):].decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        text = blob[len(_TOA_PENALTY_TAG):].decode("utf-8")
+    except UnicodeDecodeError as exc:
         raise InvalidToaDecision(f"undecodable payload: {exc}") from exc
+    decoder = json.JSONDecoder(object_pairs_hook=_strict_object,
+                               parse_constant=_reject_json_constant)
+    try:
+        parsed, end = decoder.raw_decode(text)
+    except InvalidToaDecision:
+        raise
+    except json.JSONDecodeError as exc:
+        raise InvalidToaDecision(f"undecodable payload: {exc}") from exc
+    if end != len(text):
+        raise InvalidToaDecision("trailing data after payload")
     if not isinstance(parsed, dict):
         raise InvalidToaDecision("payload must be an object")
-    return {k: _canonicalize(parsed[k], k) for k in sorted(_SCHEMA.keys())}
+    keys = set(parsed.keys())
+    expected = set(_SCHEMA.keys())
+    if keys != expected:
+        missing = expected - keys
+        extra = keys - expected
+        raise InvalidToaDecision(
+            f"decision fields must be exactly {sorted(expected)}; "
+            f"missing={sorted(missing)} extra={sorted(extra)}")
+    return {k: _canonicalize(parsed[k], k) for k in sorted(expected)}
 
 
 def toa_penalty_digest(decision: Mapping[str, Any]) -> str:
     """sha256 hex of the canonical encoding: the audit-log binding."""
     return hashlib.sha256(encode_toa_penalty(decision)).hexdigest()
+
+
+def validate_toa_decision_binding(decision: Mapping[str, Any], *,
+                                  agent_id: str, task_id: str,
+                                  offense: str, severity: int,
+                                  prior_offenses: int, anchor_bps: int,
+                                  computed_slash_bps: int,
+                                  adjudicator_id: str) -> Dict[str, Any]:
+    """Validate a TOA decision against the slash it claims to govern.
+
+    W-166: a decision is evidence FOR ONE slash, not a bearer token.
+    Every field must match the slash it is bound to — agent, task,
+    offense, severity, the ledger-derived prior-offense count, the
+    anchor, the computed slash bps, and the adjudicator who authorized
+    the slash.  Any mismatch raises InvalidToaDecision; the caller must
+    reject the slash rather than digest-bind a decision that describes
+    a different (or differently-priced) punishment.
+
+    Pure: returns the canonical (schema-validated, NFC-normalized)
+    decision dict.  Nonce single-use is stateful and is enforced by
+    the ledger, not here."""
+    canonical = decode_toa_penalty(encode_toa_penalty(decision))
+    expected = {
+        "agent_id": agent_id,
+        "task_id": task_id,
+        "offense": offense,
+        "severity": severity,
+        "prior_offenses": prior_offenses,
+        "anchor_bps": anchor_bps,
+        "recommended_slash_bps": computed_slash_bps,
+        "adjudicator_id": adjudicator_id,
+    }
+    for field, want in expected.items():
+        got = canonical[field]
+        if got != want:
+            raise InvalidToaDecision(
+                f"TOA decision {field}={got!r} does not match the slash "
+                f"it is bound to ({want!r})")
+    return canonical
 
 
 def make_toa_decision(*, agent_id: str, task_id: str, offense: str,

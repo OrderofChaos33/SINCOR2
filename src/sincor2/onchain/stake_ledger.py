@@ -203,6 +203,10 @@ class StakeLedger:
         # tx_hash (normalized lowercase) -> {agent_id, amount_wei, at}.
         # Durable: persisted in the ledger file, survives restarts.
         self._data.setdefault("tx_hashes", {})
+        # Consumed TOA penalty-decision nonces (W-166): "<adjudicator>:<nonce>"
+        # -> decision digest.  Durable for the same reason: a decision nonce
+        # must stay burned across restarts, or replay protection is fiction.
+        self._data.setdefault("toa_nonces", {})
 
     # -- persistence ------------------------------------------------------
     def _load(self) -> None:
@@ -823,21 +827,53 @@ class StakeLedger:
         never from caller input.  Fails closed (raises
         DynamicSlashDisabled) unless SINCOR_DYNAMIC_SLASH_ENABLED is set.
 
-        ``reason`` must be "ghosting" (protocol path, no adjudicator key
-        needed) or "quality_failure_upheld" (adjudicator-only, enforced by
-        slash()).  ``toa_decision`` is an optional TOA penalty decision
-        dict: it is canonically encoded, its digest is bound into the
-        audit event, and the encoding is returned.
+        ``reason`` must be "ghosting" or "quality_failure_upheld".  BOTH
+        branches are adjudicator-gated at THIS entry point (W-165):
+        slash_dynamic() is caller-facing, so a caller-supplied reason
+        string alone never moves stake.  The ungated ghost path is
+        slash_ghost() itself, invoked directly by the trusted protocol
+        caller (close_auction) once IT has established the ghost from
+        market state — the ledger cannot verify ghosting on its own, so
+        it does not pretend a reason label is proof.
 
-        The subsidy-extraction split and the adjudicator gate are
-        unchanged; only the ratio is escalated."""
+        ``toa_decision`` is an optional TOA penalty decision dict.  It
+        is validated field-by-field against THIS slash (W-166) and its
+        nonce is consumed (single-use, durable) BEFORE its digest is
+        bound into the audit event; a decision describing another
+        agent/task/adjudicator, a different severity or price, or a
+        replayed nonce is rejected with InvalidToaDecision.
+
+        The penalty record (and the return value) carries both the
+        curve's ``computed_slash_bps`` and the ``applied_slash_bps``
+        actually taken — for ghosting the applied ratio is always the
+        GHOST_SLASH_BPS anchor (100 %), whatever the curve computed
+        (W-165: the audit trail never reports the computed value as the
+        penalty when a different amount was taken).
+
+        The subsidy-extraction split is unchanged; the slash AMOUNT
+        derivation is unchanged (ledger-derived priors); only the
+        ratio is escalated."""
         if not toa_penalty.dynamic_slash_enabled():
             raise toa_penalty.DynamicSlashDisabled(
                 "dynamic slashing is not enabled: set "
                 f"{toa_penalty.DYNAMIC_SLASH_ENV}=1 to opt in")
+        if reason == "ghosting":
+            expected_offense = "ghosting"
+        elif reason == "quality_failure_upheld":
+            expected_offense = "quality_failure"
+        else:
+            raise ValueError(
+                "reason must be 'ghosting' or 'quality_failure_upheld'")
+        # W-165: same adjudication the quality path requires, enforced
+        # for the ghosting branch too at this caller-facing entry point.
+        caller = self._check_adjudicator(adjudicator)
         prior_offenses = self.offense_count(agent_id)
         computed_bps = toa_penalty.compute_dynamic_slash_bps(
             anchor_bps, severity, prior_offenses)
+        # slash_ghost() always takes GHOST_SLASH_BPS; slash() takes the
+        # computed ratio.  Record what will ACTUALLY be applied.
+        applied_bps = (GHOST_SLASH_BPS if reason == "ghosting"
+                       else computed_bps)
         penalty: Dict[str, Any] = {
             "dynamic": True,
             "curve": "severity_x_repeat",
@@ -845,26 +881,40 @@ class StakeLedger:
             "severity": severity,
             "prior_offenses": prior_offenses,
             "computed_slash_bps": computed_bps,
+            "applied_slash_bps": applied_bps,
             "hard_cap_bps": toa_penalty.HARD_CAP_BPS,
             "gate": toa_penalty.DYNAMIC_SLASH_ENV,
         }
         if toa_decision is not None:
-            blob = toa_penalty.encode_toa_penalty(toa_decision)
-            penalty["toa_encoding_hex"] = blob.hex()
-            penalty["toa_digest"] = toa_penalty.toa_penalty_digest(
-                toa_decision)
+            # W-166: field-by-field binding first, nonce consumption
+            # second, digest-binding (inside slash/slash_ghost via the
+            # penalty record) last.
+            canonical = toa_penalty.validate_toa_decision_binding(
+                toa_decision, agent_id=agent_id, task_id=task_id,
+                offense=expected_offense, severity=severity,
+                prior_offenses=prior_offenses, anchor_bps=anchor_bps,
+                computed_slash_bps=computed_bps, adjudicator_id=caller)
+            digest = toa_penalty.toa_penalty_digest(canonical)
+            nonce_key = f"{caller}:{canonical['nonce']}"
+            consumed = self._data.setdefault("toa_nonces", {})
+            if nonce_key in consumed:
+                raise toa_penalty.InvalidToaDecision(
+                    f"TOA decision nonce {canonical['nonce']} already "
+                    f"consumed for adjudicator {caller!r}")
+            consumed[nonce_key] = digest
+            penalty["toa_encoding_hex"] = toa_penalty.encode_toa_penalty(
+                canonical).hex()
+            penalty["toa_digest"] = digest
         if reason == "ghosting":
             out = self.slash_ghost(agent_id, task_id, poster_id=poster_id,
                                    penalty=penalty)
-        elif reason == "quality_failure_upheld":
+        else:
             out = self.slash(agent_id, task_id, computed_bps,
                              "quality_failure_upheld",
                              adjudicator=adjudicator, poster_id=poster_id,
                              penalty=penalty)
-        else:
-            raise ValueError(
-                "reason must be 'ghosting' or 'quality_failure_upheld'")
         out["computed_slash_bps"] = computed_bps
+        out["applied_slash_bps"] = applied_bps
         return out
 
     # -- challenger bonds -------------------------------------------------------
