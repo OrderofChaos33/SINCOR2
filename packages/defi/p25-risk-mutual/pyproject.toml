@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sincor-p25-risk-mutual"
+version = "0.1.0"
+description = "SINCOR P25 (suite P05) DeFi Risk Mutual — reference coverage-pool module, standalone extraction. State: EXTERNAL; no mutual is capitalized or open."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary — engagement use only" }
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
