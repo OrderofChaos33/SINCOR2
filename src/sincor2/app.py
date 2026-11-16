@@ -448,6 +448,13 @@ app.register_blueprint(_defi_catalog_bp)
 if limiter:
     limiter.exempt(_defi_catalog_bp)
 
+# Path 48: Governance & Treasury Risk Briefings (/api/briefings/*).
+from sincor2.blueprints.briefings import briefings_bp as _briefings_bp
+
+app.register_blueprint(_briefings_bp)
+if limiter:
+    limiter.exempt(_briefings_bp)
+
 # Human payment rail: GET /rail/pay/<sku> + GET /rail/onramp (read-only page;
 # the money movement happens client-side via the x402 challenge endpoints).
 from sincor2.blueprints.rail_pay import rail_pay_bp as _rail_pay_bp

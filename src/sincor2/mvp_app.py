@@ -1269,6 +1269,13 @@ from sincor2.blueprints.defi_catalog import defi_catalog_bp as _defi_catalog_bp
 
 app.register_blueprint(_defi_catalog_bp)
 
+# Path 48: Governance & Treasury Risk Briefings (/api/briefings/*).
+# Subscriber-token auth lives in the blueprint; generate+store+retrieve
+# only, no outbound sending.
+from sincor2.blueprints.briefings import briefings_bp as _briefings_bp
+
+app.register_blueprint(_briefings_bp)
+
 # OBS-01 Agent Vitals (BETA): /obs/vitals + GET /api/obs/vitals. Read-only,
 # customer-session gated, deliberately unlinked from all public nav/pricing/
 # sitemaps (direct URL only) until the beta walkthrough passes. No money
