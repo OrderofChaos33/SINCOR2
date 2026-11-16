@@ -154,6 +154,27 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
     bytes4 internal constant ERC20_DECREASE_ALLOWANCE = 0xa457c2d7; // decreaseAllowance(address,uint256)
     bytes4 internal constant ERC2612_PERMIT = 0xd505accf; // permit(address,address,uint256,uint256,uint8,bytes32,bytes32)
 
+    // W-191 (hunt 53): wrapper / batch selectors. The payload of one of
+    // these calls is a LIST of further calls, which the single-call
+    // decoder cannot see through — a transfer nested inside a multicall
+    // passed preCheck completely ungated (the outermost selector is not
+    // a transfer selector, and the wrapper target need not be an
+    // allowance holder). preCheck therefore decodes these wrappers and
+    // gates EVERY nested call with the same rules as a direct call (see
+    // _preCheckWrappedCall). Once a known wrapper selector is seen, a
+    // malformed payload fails closed (MalformedExecution) — it is never
+    // waved through unexamined.
+    bytes4 internal constant MULTICALL_CALLS = 0xac9650d8; // multicall(bytes[])
+    bytes4 internal constant MULTICALL_DEADLINE_CALLS = 0x5ae401dc; // multicall(uint256,bytes[])
+    bytes4 internal constant AGGREGATE_CALLS = 0x252dba42; // aggregate((address,bytes)[])
+    bytes4 internal constant TRY_AGGREGATE_CALLS = 0xbce38bd7; // tryAggregate(bool,(address,bytes)[])
+    bytes4 internal constant AGGREGATE3_CALLS = 0x82ad56cb; // aggregate3((address,bool,bytes)[])
+    bytes4 internal constant AGGREGATE3_VALUE_CALLS = 0x174dea71; // aggregate3Value((address,bool,uint256,bytes)[])
+
+    /// @dev Maximum wrapper nesting depth preCheck will decode. A wrapper
+    ///      nested deeper than this fails closed (MalformedExecution).
+    uint256 internal constant MAX_WRAPPER_DEPTH = 4;
+
     /// @notice A SIGIL verification commitment, signed by the account's
     ///         configured verifier key via EIP-712 (SEAL-style typed data).
     struct SigilAttestation {
@@ -488,6 +509,15 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
     ///         safe direction (never double-release) and matches how
     ///         Kernel-style hooks behave when execution reverts after the
     ///         hook has run in a separate executeUserOp phase.
+    ///
+    ///         W-191 (hunt 53): (a)–(c) describe ONE call. A call whose
+    ///         payload is a known wrapper (multicall / aggregate family)
+    ///         carries a list of nested calls; every nested call is gated
+    ///         through the same _preCheckCall path, recursively, so a
+    ///         release hidden inside a wrapper faces exactly the checks a
+    ///         direct call faces. Before this fix the decoder inspected
+    ///         only the outermost selector and a multicall-nested transfer
+    ///         passed with no attestation at all.
     function preCheck(address, uint256, bytes calldata msgData) external override returns (bytes memory hookData) {
         address account = msg.sender;
         AccountConfig memory cfg = configOf[account];
@@ -496,11 +526,44 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
         address target = address(bytes20(msgData[0:20]));
         uint256 value = uint256(bytes32(msgData[20:52]));
         bytes calldata inner = msgData[52:];
+        return _preCheckCall(account, cfg, target, value, inner, 0);
+    }
 
-        // W-148 (b): allowance-granting calls are gated as releases and the
-        // grant is recorded for holder-call gating and uninstall wipe.
+    /// @dev Gate ONE call (target, value, innerCallData) for `account`.
+    ///      Direct executions enter at depth 0; W-191 wrapper payloads
+    ///      recurse into this function for every nested call, so grant
+    ///      gating, release gating, and holder gating apply identically
+    ///      at any nesting level.
+    function _preCheckCall(
+        address account,
+        AccountConfig memory cfg,
+        address target,
+        uint256 value,
+        bytes calldata inner,
+        uint256 depth
+    ) internal returns (bytes memory hookData) {
         if (value == 0 && inner.length >= 4) {
             bytes4 selector = bytes4(inner[0:4]);
+
+            // W-191: a known wrapper selector means the payload is a list
+            // of nested calls. Gate every one of them; the outermost
+            // selector alone says nothing about what the payload moves.
+            if (_isWrapperSelector(selector)) {
+                if (depth >= MAX_WRAPPER_DEPTH) revert MalformedExecution();
+                hookData = _preCheckWrappedCall(account, cfg, target, selector, inner, depth);
+                // W-148 (c) still applies to the wrapper call itself: the
+                // target may hold a tracked allowance and pull inside any
+                // of the nested calls.
+                if (isAllowanceHolder[account][target]) {
+                    bytes memory holderData = _gateAllowanceHolderCall(account, cfg, target);
+                    if (holderData.length != 0) hookData = holderData;
+                }
+                return hookData;
+            }
+
+            // W-148 (b): allowance-granting calls are gated as releases and
+            // the grant is recorded for holder-call gating and uninstall
+            // wipe.
             if (
                 selector == ERC20_APPROVE || selector == ERC20_INCREASE_ALLOWANCE
                     || selector == ERC20_DECREASE_ALLOWANCE || selector == ERC2612_PERMIT
@@ -509,7 +572,8 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
             }
         }
 
-        (address token, address payee, uint256 amount, bool isRelease) = _decodeRelease(account, msgData);
+        (address token, address payee, uint256 amount, bool isRelease) =
+            _decodeRelease(account, target, value, inner);
         if (!isRelease) {
             // W-148 (c): a call into an allowance holder can pull funds via
             // transferFrom without showing this hook a transfer selector.
@@ -529,6 +593,136 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
 
         bytes32 digest = _consumeAttestation(account, cfg, token, payee, amount);
         return abi.encode(digest);
+    }
+
+    /// @dev W-191: the known wrapper / batch selectors whose payloads
+    ///      preCheck must decode instead of trusting the outer selector.
+    function _isWrapperSelector(bytes4 selector) internal pure returns (bool) {
+        return selector == MULTICALL_CALLS || selector == MULTICALL_DEADLINE_CALLS
+            || selector == AGGREGATE_CALLS || selector == TRY_AGGREGATE_CALLS || selector == AGGREGATE3_CALLS
+            || selector == AGGREGATE3_VALUE_CALLS;
+    }
+
+    /// @dev W-191: decode a known wrapper payload and gate every nested
+    ///      call through _preCheckCall.
+    ///
+    ///      multicall(bytes[]) / multicall(uint256,bytes[]) payloads are
+    ///      SELF-calls: each element is executed by the wrapper target
+    ///      against itself, so every element is gated as a call to the
+    ///      wrapper target with value 0. (The wrapper branch is only
+    ///      reached when the outer value is 0; a payable outer call is
+    ///      already gated as a native release of its full value, which
+    ///      bounds what its nested calls can spend of the account's
+    ///      funds.) The Multicall3 aggregate family carries an explicit
+    ///      target — and aggregate3Value an explicit value — per nested
+    ///      call; those are gated exactly as given.
+    ///
+    ///      Any malformed offset or length fails closed
+    ///      (MalformedExecution): once a wrapper selector is seen, its
+    ///      payload is never waved through unexamined. The hookData
+    ///      convention mirrors _gateAllowanceHolderCall: the last
+    ///      consumed attestation digest, or empty if none was consumed.
+    function _preCheckWrappedCall(
+        address account,
+        AccountConfig memory cfg,
+        address target,
+        bytes4 selector,
+        bytes calldata inner,
+        uint256 depth
+    ) internal returns (bytes memory hookData) {
+        bytes calldata args = inner[4:];
+        if (selector == MULTICALL_CALLS || selector == MULTICALL_DEADLINE_CALLS) {
+            // args: [uint256 deadline (deadline form only)] ++ [offset to bytes[]]
+            uint256 arrayAt = _arrayHead(args, selector == MULTICALL_DEADLINE_CALLS ? 32 : 0);
+            return _preCheckBytesArray(account, cfg, target, args, arrayAt, depth);
+        }
+        // Aggregate family: args are [bool (tryAggregate only)] ++
+        // [offset to tuple array]. Tuple head layouts:
+        //   aggregate:        (target, callData)                 — 2 words
+        //   tryAggregate:     (target, callData)                 — 2 words
+        //   aggregate3:       (target, allowFailure, callData)   — 3 words
+        //   aggregate3Value:  (target, allowFailure, value, callData)
+        //                                                        — 4 words
+        // In every layout the callData offset is the LAST head word and
+        // the value (aggregate3Value only) is the word before it.
+        uint256 arrayAt = _arrayHead(args, selector == TRY_AGGREGATE_CALLS ? 32 : 0);
+        bool withValue = selector == AGGREGATE3_VALUE_CALLS;
+        uint256 headWords =
+            (selector == AGGREGATE_CALLS || selector == TRY_AGGREGATE_CALLS) ? 2 : (withValue ? 4 : 3);
+        return _preCheckTupleArray(account, cfg, args, arrayAt, headWords, withValue, depth);
+    }
+
+    /// @dev Read the array offset word at `offsetWordPos` in an arguments
+    ///      blob and return the position of the array's length word. The
+    ///      offset value is relative to the start of the arguments blob.
+    function _arrayHead(bytes calldata args, uint256 offsetWordPos) internal pure returns (uint256 arrayAt) {
+        arrayAt = _calldataWord(args, offsetWordPos);
+        if (arrayAt > args.length || args.length - arrayAt < 32) revert MalformedExecution();
+    }
+
+    /// @dev Bounds-checked 32-byte word read from calldata. Any read past
+    ///      the end of the payload is a malformed execution — fail closed.
+    function _calldataWord(bytes calldata data, uint256 at) internal pure returns (uint256) {
+        if (at > data.length || data.length - at < 32) revert MalformedExecution();
+        return uint256(bytes32(data[at:at + 32]));
+    }
+
+    /// @dev W-191: gate every element of a bytes[] payload (multicall
+    ///      forms). Element offsets are relative to the position right
+    ///      after the array length word; each element is a length word
+    ///      followed by the call payload. Elements are self-calls on the
+    ///      wrapper target with value 0 (see _preCheckWrappedCall).
+    function _preCheckBytesArray(
+        address account,
+        AccountConfig memory cfg,
+        address target,
+        bytes calldata args,
+        uint256 arrayAt,
+        uint256 depth
+    ) internal returns (bytes memory hookData) {
+        uint256 count = _calldataWord(args, arrayAt);
+        uint256 headsAt = arrayAt + 32;
+        for (uint256 i = 0; i < count; i++) {
+            uint256 elemAt = headsAt + _calldataWord(args, headsAt + i * 32);
+            uint256 elemLen = _calldataWord(args, elemAt);
+            uint256 dataAt = elemAt + 32;
+            if (dataAt > args.length || args.length - dataAt < elemLen) revert MalformedExecution();
+            bytes memory sub =
+                _preCheckCall(account, cfg, target, 0, args[dataAt:dataAt + elemLen], depth + 1);
+            if (sub.length != 0) hookData = sub;
+        }
+        return hookData;
+    }
+
+    /// @dev W-191: gate every element of an aggregate-family tuple array.
+    ///      Element offsets are relative to the position right after the
+    ///      array length word; each tuple's callData offset is relative
+    ///      to the tuple's own start.
+    function _preCheckTupleArray(
+        address account,
+        AccountConfig memory cfg,
+        bytes calldata args,
+        uint256 arrayAt,
+        uint256 headWords,
+        bool withValue,
+        uint256 depth
+    ) internal returns (bytes memory hookData) {
+        uint256 count = _calldataWord(args, arrayAt);
+        uint256 headsAt = arrayAt + 32;
+        for (uint256 i = 0; i < count; i++) {
+            uint256 tupleAt = headsAt + _calldataWord(args, headsAt + i * 32);
+            address subTarget = address(uint160(_calldataWord(args, tupleAt)));
+            uint256 subValue = withValue ? _calldataWord(args, tupleAt + 64) : 0;
+            uint256 dataAt = tupleAt + _calldataWord(args, tupleAt + (headWords - 1) * 32);
+            uint256 dataLen = _calldataWord(args, dataAt);
+            uint256 payloadAt = dataAt + 32;
+            if (payloadAt > args.length || args.length - payloadAt < dataLen) revert MalformedExecution();
+            bytes memory sub = _preCheckCall(
+                account, cfg, subTarget, subValue, args[payloadAt:payloadAt + dataLen], depth + 1
+            );
+            if (sub.length != 0) hookData = sub;
+        }
+        return hookData;
     }
 
     /// @dev Gate one release of `amount` of `token` to `payee` against the
@@ -748,18 +942,14 @@ contract SigilPolicyModule is IERC7579Hook, EIP712 {
     ///         the settlement gate. Kept as a no-op per the IHook interface.
     function postCheck(bytes calldata) external override {}
 
-    /// @dev Decode an ERC-7579 packed single call into a fund-release tuple.
-    function _decodeRelease(address account, bytes calldata msgData)
+    /// @dev Decode ONE call (target, value, innerCallData) — unpacked from
+    ///      an ERC-7579 packed single call, or from a W-191 wrapper
+    ///      payload — into a fund-release tuple.
+    function _decodeRelease(address account, address target, uint256 value, bytes calldata inner)
         internal
         pure
         returns (address token, address payee, uint256 amount, bool isRelease)
     {
-        // Packed single call: target(20) ++ value(32) ++ innerCallData(rest)
-        if (msgData.length < 52) revert MalformedExecution();
-        address target = address(bytes20(msgData[0:20]));
-        uint256 value = uint256(bytes32(msgData[20:52]));
-        bytes calldata inner = msgData[52:];
-
         if (value > 0) {
             return (address(0), target, value, true);
         }
