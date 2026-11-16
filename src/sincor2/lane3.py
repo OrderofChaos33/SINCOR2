@@ -159,6 +159,7 @@ def proof_wall_data() -> Dict[str, Any]:
 
 INTRO_BOUNTY_SLOTS = 20
 INTRO_BOUNTY_DEFAULT_AXM = 1.0
+_INTRO_BOUNTY_TASK_PREFIX = "intro-bounty:"
 _ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 
 
@@ -192,6 +193,30 @@ def _external_ordinal(agents: Dict[str, Any], agent_id: str,
     return None
 
 
+def _live_intro_bounty_allocation_count(pool: Any) -> Optional[int]:
+    """Count LIVE (state == "allocated") intro-bounty reservations in
+    the pool ledger, across every agent — the W-182 cap basis.
+
+    Returns None when the pool does not expose an allocation listing
+    (the minimal stub pools used in some tests): the caller then falls
+    back to attempting the allocation itself, preserving the existing
+    flagged_unfunded behaviour for pools that cannot reserve."""
+    status = getattr(pool, "status", None)
+    if not callable(status):
+        return None
+    try:
+        allocations = status().get("allocations") or []
+    except Exception:
+        return None
+    return sum(
+        1 for alloc in allocations
+        if isinstance(alloc, dict)
+        and str(alloc.get("task_id") or "").startswith(
+            _INTRO_BOUNTY_TASK_PREFIX)
+        and alloc.get("state") == "allocated"
+    )
+
+
 def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
     """Flag ``agent_id`` for the introductory micro-bounty if it is among
     the first ``INTRO_BOUNTY_SLOTS`` VERIFIED external registrations, and
@@ -215,6 +240,15 @@ def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
     the existing a2a settle flow on the agent's first verified handshake.
     If the pool cannot reserve (unfunded / degraded), the flag still
     lands, marked ``flagged_unfunded`` — an allocation is never faked.
+
+    W-182: the ordinal check alone is NOT the cap. ``registered_at`` is
+    preserved across a provisional claim, so a squat placed before the
+    honest registrations still recomputes a low ordinal when claimed
+    after every slot is taken. The binding cap is therefore enforced
+    at allocation time on the count of LIVE ``intro-bounty:*``
+    allocations in the ledger: once that count reaches
+    ``INTRO_BOUNTY_SLOTS``, no further reservation is made and the
+    record is marked ``cap_reached`` instead.
     """
     from sincor2.a2a_inbound import _save_agents, get_fabric
 
@@ -277,7 +311,7 @@ def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
         from sincor2.a2a_bounty_pool import bounty_pool
 
         pool = bounty_pool()
-        task_id = f"intro-bounty:{agent_id}"
+        task_id = f"{_INTRO_BOUNTY_TASK_PREFIX}{agent_id}"
         live_allocations: Any = []
         allocations_for_task = getattr(pool, "allocations_for_task", None)
         if callable(allocations_for_task):
@@ -287,6 +321,23 @@ def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
                 live_allocations[0].get("allocation_id")
                 or live_allocations[0].get("id"))
             flag["status"] = "reserved"
+        elif (_live_intro_bounty_allocation_count(pool) or 0) \
+                >= INTRO_BOUNTY_SLOTS:
+            # W-182: the live-allocation count IS the cap (see the
+            # docstring) — an ordinal inside the slots no longer
+            # suffices once every slot already holds a reservation.
+            # No allocation is made; the record keeps the refusal so
+            # the state stays visible instead of silently flagged.
+            flag = {
+                "eligible": False,
+                "reason": "intro_bounty_cap_reached",
+                "ordinal": ordinal,
+                "slots": INTRO_BOUNTY_SLOTS,
+                "amount_axm": amount,
+                "status": "cap_reached",
+                "payable_on": "first_verified_handshake",
+                "allocation_id": None,
+            }
         else:
             alloc = pool.allocate(
                 task_id=task_id,

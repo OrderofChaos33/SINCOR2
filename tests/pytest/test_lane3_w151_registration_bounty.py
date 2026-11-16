@@ -275,6 +275,62 @@ def test_claim_via_ap2_register_with_proof_fields(
     assert record["owner_wallet"] == owner.address.lower()
 
 
+# ── (C) W-182: the cap is the live-allocation count, not the ordinal ──────
+
+def test_preserved_registered_at_claim_cannot_exceed_allocation_cap(
+        mvp_client, fabric_isolated, tmp_pool):
+    """Hunt 52 PoC poc52c_bounty_overflow: an anonymous squat placed
+    FIRST preserves its registered_at across a later wallet-proof
+    claim, so the claim recomputes ordinal 1 — but by then 20 honest
+    verified registrations already hold 20 live reservations. The
+    allocation-time count cap must refuse the 21st reservation."""
+    _clear_externals(fabric_isolated)
+
+    # 1. Anonymous squat first (earliest registered_at, no slot yet).
+    resp = mvp_client.post("/ap2/register", json=_payload("aaa-squat"))
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    data = resp.get_json()
+    assert data["intro_bounty"]["eligible"] is False
+    squat_id = data["agent"]["agent_id"]
+    assert _allocations(tmp_pool, squat_id) == []
+
+    # 2. Twenty honest verified agents fill all 20 slots.
+    honest_ids = []
+    for i in range(20):
+        name = f"honest-agent-{i:02d}"
+        payload = _payload(name)
+        payload.update(_proof_fields(name, Account.create()))
+        resp = mvp_client.post("/ap2/register", json=payload)
+        assert resp.status_code == 201, (name, resp.get_data(as_text=True))
+        data = resp.get_json()
+        assert data["intro_bounty"]["eligible"] is True, (name, data)
+        assert data["intro_bounty"]["status"] == "reserved"
+        honest_ids.append(data["agent"]["agent_id"])
+    for agent_id in honest_ids:
+        assert len(_allocations(tmp_pool, agent_id)) == 1
+
+    # 3. The late claim of the early squat recomputes ordinal 1, but
+    #    the live-allocation count is already at the cap: refused.
+    payload = _payload("aaa-squat")
+    payload.update(_proof_fields("aaa-squat", Account.create()))
+    resp = mvp_client.post("/ap2/register", json=payload)
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    data = resp.get_json()
+    assert data["agent"]["identity"] == "verified"
+    flag = data["intro_bounty"]
+    assert flag["eligible"] is False, flag
+    assert flag["status"] == "cap_reached"
+    assert flag["allocation_id"] is None
+    assert _allocations(tmp_pool, squat_id) == []
+
+    # Total live intro-bounty reservations stay at the cap; ledger ok.
+    total = sum(len(_allocations(tmp_pool, agent_id))
+                for agent_id in honest_ids + [squat_id])
+    assert total == 20
+    verdict = tmp_pool.verify_ledger()
+    assert verdict["ok"], verdict
+
+
 def test_proof_with_mismatched_wallet_does_not_claim(
         mvp_client, fabric_isolated, tmp_pool):
     """A valid signature from key A presented with key B's wallet
