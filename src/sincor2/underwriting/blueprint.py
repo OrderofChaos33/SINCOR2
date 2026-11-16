@@ -113,6 +113,33 @@ def revoke_agent(agent_id: str):
     return jsonify(rec)
 
 
+@uw_bp.post("/v1/underwriting/quote")
+def premium_quote():
+    """Read-only premium quote (Path 9). Prices cover; collects nothing."""
+    from sincor2.underwriting.premiums import quote_premium
+
+    body = request.get_json(silent=True) or {}
+    try:
+        quote = quote_premium(
+            coverage_usd=str(body.get("coverage_usd") or body.get("requested_usd") or "0"),
+            duration_seconds=int(body.get("duration_seconds") or 2700),
+            risk_score=float(body.get("risk_score") or 0.0),
+        )
+    except (TypeError, ValueError) as exc:
+        return _err(str(exc), 400)
+    return jsonify(quote.to_dict())
+
+
+@uw_bp.get("/v1/premiums/<envelope_id>")
+def get_premium(envelope_id: str):
+    from sincor2.underwriting.premiums import PremiumLedger
+
+    rec = PremiumLedger(_engine.store).get(envelope_id)
+    if not rec:
+        return _err("premium not found", 404)
+    return jsonify(rec)
+
+
 @uw_bp.get("/v1/receipts/<receipt_id>")
 def get_receipt(receipt_id: str):
     rec = _engine.receipt(receipt_id)

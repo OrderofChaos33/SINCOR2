@@ -5,6 +5,7 @@ Additive: deterministic score engine + Flask /v1 surface (`engine`, `blueprint`)
 """
 
 from sincor2.underwriting.engine import UnderwritingEngine, score_mandate
+from sincor2.underwriting.premiums import PremiumLedger, PremiumQuote, quote_premium
 from sincor2.underwriting.store import UnderwriteStore
 
 try:
@@ -19,4 +20,7 @@ __all__ = [
     "score_mandate",
     "UnderwriteRuntime",
     "boot",
+    "PremiumLedger",
+    "PremiumQuote",
+    "quote_premium",
 ]

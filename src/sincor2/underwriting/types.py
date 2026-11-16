@@ -118,6 +118,9 @@ class SpendEnvelope:
     toa_risk: float | None = None
     toa_rationale: str = ""
     denied: bool = False
+    premium_usd: str = "0.000000"
+    premium_id: str | None = None
+    premium_status: str = "not_charged"
     schema: str = SCHEMA_ENVELOPE
 
     def to_dict(self) -> dict[str, Any]:

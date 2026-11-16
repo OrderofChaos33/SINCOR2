@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .policy import Policy
+from .premiums import PremiumLedger, quote_premium
 from .store import UnderwriteStore
 from .toa_adapter import SpendUnderwriter
 from .types import IntentMandate, SpendEnvelope, money, money_str
@@ -42,6 +43,26 @@ class EnvelopeService:
             payee=payee,
             extra_context=extra_context,
         )
+        # Path 9: price + collect the underwriting premium at issuance.
+        # Additive only — this runs after every existing gate (mandate
+        # liveness, kill switch, TOA) has already produced the envelope,
+        # and no premium state is ever read back by Policy/Facilitator.
+        # Denied envelopes are not underwriting: explicitly not charged.
+        if not env.denied:
+            quote = quote_premium(
+                coverage_usd=env.amount_usd,
+                duration_seconds=env.ttl_seconds,
+                risk_score=env.toa_risk if env.toa_risk is not None else 0.0,
+            )
+            record = PremiumLedger(self.store).collect(
+                quote,
+                envelope_id=env.envelope_id,
+                agent_id=env.agent_id,
+                mandate_id=env.mandate_id,
+            )
+            env.premium_usd = record.get("premium_usd", "0.000000")
+            env.premium_id = record.get("premium_id")
+            env.premium_status = record.get("status", "not_charged")
         self.store.write_envelope(env)
         kind = "envelope.denied" if env.denied else "envelope.issued"
         self.store.audit(
@@ -86,4 +107,8 @@ class EnvelopeService:
         env.status = "revoked"
         self.store.write_envelope(env)
         self.store.audit("envelope.revoked", env.agent_id, {"by": by}, env.mandate_id, env.envelope_id)
+        # Premium refund: an envelope that was never drawn on returns its
+        # premium exactly once; once spent, the premium is earned.
+        if money(env.remaining_usd) >= money(env.amount_usd) and money(env.amount_usd) > 0:
+            PremiumLedger(self.store).refund(env.envelope_id, reason="revoked_unused")
         return env

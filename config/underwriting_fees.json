@@ -6,6 +6,9 @@
   "erc8004_identity": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
   "verify_fee_axm": 2,
   "underwrite_bps": 50,
+  "premium_base_bps": 100,
+  "premium_reference_ttl_seconds": 2700,
+  "premium_min_usd": "0.01",
   "burn_share": 0.5,
   "free_quota_is_not_settlement": true
 }

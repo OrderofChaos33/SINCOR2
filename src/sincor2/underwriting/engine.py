@@ -176,6 +176,40 @@ class UnderwritingEngine:
             "created_at": iso(utcnow()),
         }
         self.store.append("underwrites", record)
+        # Path 9: price + collect the underwriting premium at issuance.
+        # Additive only — scoring/gating above is unchanged, and no
+        # premium state feeds back into score, settle, or revoke.
+        # Denied mandates are not underwriting: explicitly not charged.
+        from .premiums import (
+            PREMIUM_REFERENCE_TTL_SECONDS,
+            PremiumLedger,
+            quote_premium,
+        )
+
+        if scored["decision"] == "allow":
+            starts_at = _parse_time(body.get("starts_at"))
+            expires_at = _parse_time(body.get("expires_at"))
+            duration = PREMIUM_REFERENCE_TTL_SECONDS
+            if starts_at and expires_at and expires_at > starts_at:
+                duration = int((expires_at - starts_at).total_seconds())
+            quote = quote_premium(
+                coverage_usd=record["requested_usd"],
+                duration_seconds=duration,
+                risk_score=1.0 - float(scored["score"]),
+            )
+            premium = PremiumLedger(self.store).collect(
+                quote,
+                envelope_id=envelope_id,
+                agent_id=body.get("agent_id"),
+                payer=body.get("principal_wallet"),
+            )
+        else:
+            premium = {
+                "envelope_id": envelope_id,
+                "status": "not_charged",
+                "premium_usd": "0.000000",
+            }
+        record = {**record, "premium": premium}
         return record
 
     def settle(self, envelope_id: str, body: Dict[str, Any]) -> Dict[str, Any]:
