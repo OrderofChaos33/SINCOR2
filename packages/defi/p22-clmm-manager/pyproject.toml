@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "p22-clmm-manager"
+version = "0.1.0"
+description = "Concentrated Liquidity Manager (suite P02) — concentrated-liquidity position management for v3/v4-style pools. Platform module extraction; not separately deployed."
+readme = "README.md"
+requires-python = ">=3.11"
+# PACK-1 dependency inventory: the extracted core uses ONLY the Python
+# standard library. There are no third-party runtime dependencies and
+# no platform-internal dependencies (the single platform reach-in, the
+# shared price oracle, is vendored as a stub — see PACKAGING.md).
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
