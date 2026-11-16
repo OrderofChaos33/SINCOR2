@@ -1,12 +1,14 @@
-"""A2A quote response builder — explicit Treasury / burn fee split.
+"""A2A quote response builder — explicit Treasury fee split (no burn).
 
 Helper for wiring the existing POST /api/a2a/quote route.
 
-Fee rules (canonical, do not diverge):
-  • Platform fee on settlement: 5 % (500 bps) → Treasury
+Fee rules (canonical, do not diverge — founder CONFORM verdict 2026-11-16):
+  • Platform fee on settlement: 5 % (500 bps) → Treasury, 0 % burned
     (see marketplace/settlement.py PLATFORM_FEE_BPS)
-  • AXM receipt burn mechanics: 50 % burned to 0x…dEaD, 50 % → Treasury
-    (see a2a_integration.record_axm_receipt)
+  • AXM receipts: no burn — the full platform fee routes to Treasury
+    (see a2a_integration.record_axm_receipt, locked fee policy 2026-09-26).
+    The legacy 50 % burn split is retired everywhere; the burn fields
+    below remain in the payload shape, always zero.
   • SINC is primary task payment token; AXM retained for legacy
 """
 
@@ -33,8 +35,11 @@ SINC_PRICE_PER_TASK = int(os.getenv("SINC_PRICE_PER_TASK", "1"))
 AXM_PRICE_PER_TASK = int(os.getenv("AXM_PRICE_PER_TASK", str(1 * 10**18)))
 
 PLATFORM_FEE_BPS = 500
-AXM_BURN_BPS = 5_000
-AXM_TREASURY_BPS = 5_000
+# Founder CONFORM canon (2026-11-16): no burn, ever. AXM_BURN_BPS is a
+# hard-coded 0 — not config-readable — so no config edit can silently
+# reactivate a burn. The full platform fee routes to Treasury.
+AXM_BURN_BPS = 0
+AXM_TREASURY_BPS = 10_000
 
 
 def build_quote_response(skill_id: str, skill_name: Optional[str] = None) -> Dict[str, Any]:
@@ -55,15 +60,16 @@ def build_quote_response(skill_id: str, skill_name: Optional[str] = None) -> Dic
             "platform_fee_bps": PLATFORM_FEE_BPS,
             "platform_fee_pct": f"{PLATFORM_FEE_BPS / 100:.2f}%",
             "treasury_share_on_axm_receipt_bps": AXM_TREASURY_BPS,
-            "treasury_share_on_axm_receipt_pct": "50%",
+            "treasury_share_on_axm_receipt_pct": "100%",
             "burn_share_on_axm_receipt_bps": AXM_BURN_BPS,
-            "burn_share_on_axm_receipt_pct": "50%",
+            "burn_share_on_axm_receipt_pct": "0%",
             "treasury": TREASURY_WALLET,
             "burn_to": DEAD_ADDRESS,
             "note": (
                 "Platform fee (5%) is deducted from every confirmed settlement "
-                "and routed to treasury. On AXM receipts, 50% is burned to "
-                "0x…dEaD and 50% is routed to treasury (independent of platform fee)."
+                "and routed to treasury. No burn: on AXM receipts the full "
+                "platform fee is routed to treasury and 0% is burned "
+                "(founder CONFORM canon, 2026-11-16)."
             ),
         },
         "note": (
