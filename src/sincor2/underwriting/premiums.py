@@ -30,6 +30,51 @@ Defaults (overridable via ``config/underwriting_fees.json``):
 TTL), ``premium_min_usd = 0.01`` (floor so any positive coverage prices
 above zero — no silent free underwriting).
 
+Dynamic adjustment clause (founder-ratified 2026-11-16): the 100 bps base
+is a launch *floor*, not a constant. ``resolve_effective_base_bps`` runs
+on every quote and may raise the effective base toward the researched
+market-median *cap* of 222.5 bps — never below the floor, never above
+the cap — under two triggers, both computed from records already in the
+underwrite store plus one operator-maintained config figure:
+
+- **GTV trigger** — trailing-30-day settled volume (``amount_usd`` summed
+  over the store's ``receipts`` collection, i.e. settlements recorded by
+  ``engine.settle``) reaches ``premium_gtv_threshold_usd`` (default
+  $1,000,000): the founder's launch discount expires and the effective
+  base is the cap.
+- **Runway trigger** — the underwriting reserve's runway,
+  ``underwriting_reserve_usd / trailing-30-day burn rate``, falls below
+  ``premium_runway_min_months`` (default 6): the base steps up in
+  ``premium_step_bps`` increments (default +50) until the *projected*
+  runway at the stepped rate reaches the minimum or the cap is hit.
+  The trailing burn rate is the burn the store's records actually
+  carry: settlement burn fees (``receipts.burn_fee_usd``) plus the
+  premium records' burn share (``premiums.burn_usd`` — structurally
+  zero today, since premiums are never burned; it is summed anyway so
+  the rate tracks the field if that ever changes). The projection
+  credits only the *incremental* premium income a stepped rate would
+  have collected on the window's actual issuance (each collected
+  premium rescaled by ``candidate_bps / base_bps`` recorded on it,
+  refunds held constant): projected drain = burn rate − incremental
+  income, and projected runway = reserve / projected drain (infinite
+  when the drain is not positive). A zero trailing burn rate means an
+  infinite runway — no step-up, and no division by zero.
+
+Input sources are explicit — nothing is invented: settled volume and
+burn come only from ``receipts``/``premiums`` records inside the
+trailing 30 days (records without a parseable ``created_at`` are
+excluded — their age cannot be proven), and the reserve balance comes
+only from ``underwriting_reserve_usd`` in
+``config/underwriting_fees.json`` (default ``"0"`` — an operator
+maintains it; no live balance feeds it yet). With no history and the
+default reserve, the zero-burn rule yields an infinite runway and every
+quote resolves to the 100 bps floor: the not-yet-live default state.
+
+Every quote whose effective base differs from the floor appends one
+record to the store's ``premium_adjustments`` collection (append-only
+JSONL alongside ``premiums``): timestamp, effective bps, which trigger
+fired, and the exact inputs used. Quotes at the floor append nothing.
+
 Properties: the quote is a pure function of its inputs (deterministic),
 and non-decreasing in coverage, duration, and risk. Zero/negative
 coverage or duration is *explicitly* unpriced: premium 0 with status
@@ -58,15 +103,19 @@ verification outcome.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from .types import iso, money, money_str, new_id, utcnow
+from .types import iso, money, money_str, new_id, parse_iso, utcnow
 
 PREMIUM_FORMULA_VERSION = "seal-premium.v1"
 PREMIUMS_COLLECTION = "premiums"
+ADJUSTMENTS_COLLECTION = "premium_adjustments"
+RECEIPTS_COLLECTION = "receipts"
+TRAILING_WINDOW_DAYS = 30
 
 
 def _config_path() -> Path:
@@ -79,6 +128,14 @@ def _load_config() -> dict[str, Any]:
         "premium_base_bps": 100,
         "premium_reference_ttl_seconds": 2700,
         "premium_min_usd": "0.01",
+        # Dynamic adjustment clause knobs (see module docstring).
+        "premium_base_bps_cap": "222.5",
+        "premium_step_bps": 50,
+        "premium_gtv_threshold_usd": "1000000",
+        "premium_runway_min_months": 6,
+        # Operator-maintained underwriting reserve balance (USD). No live
+        # balance feeds this yet; "0" is the honest not-yet-live default.
+        "underwriting_reserve_usd": "0",
     }
     try:
         with _config_path().open("r", encoding="utf-8") as fh:
@@ -95,6 +152,13 @@ TREASURY = str(_CFG["treasury"])
 PREMIUM_BASE_BPS = int(_CFG["premium_base_bps"])
 PREMIUM_REFERENCE_TTL_SECONDS = int(_CFG["premium_reference_ttl_seconds"])
 PREMIUM_MIN_USD = Decimal(str(_CFG["premium_min_usd"]))
+# Dynamic adjustment clause constants. The floor is PREMIUM_BASE_BPS (the
+# ratified launch base); the cap is the researched market median.
+PREMIUM_BASE_BPS_CAP = Decimal(str(_CFG["premium_base_bps_cap"]))
+PREMIUM_STEP_BPS = Decimal(str(_CFG["premium_step_bps"]))
+PREMIUM_GTV_THRESHOLD_USD = money(_CFG["premium_gtv_threshold_usd"])
+PREMIUM_RUNWAY_MIN_MONTHS = Decimal(str(_CFG["premium_runway_min_months"]))
+UNDERWRITING_RESERVE_USD = money(_CFG["underwriting_reserve_usd"])
 
 
 def risk_class_for(risk_score: float) -> str:
@@ -105,6 +169,212 @@ def risk_class_for(risk_score: float) -> str:
     return "high"
 
 
+# ---------------------------------------------------------------------------
+# Dynamic adjustment clause — effective base-rate resolver
+#
+# Input sources (explicit; nothing is read from anywhere else):
+#   * settled volume / burn — the underwrite store's own ``receipts`` and
+#     ``premiums`` collections, restricted to the trailing 30 days by each
+#     record's ``created_at`` (records whose timestamp does not parse are
+#     excluded: their age cannot be proven);
+#   * reserve balance — ``underwriting_reserve_usd`` from
+#     config/underwriting_fees.json (UNDERWRITING_RESERVE_USD), an
+#     operator-maintained figure, default "0".
+# With no store (or an empty one) every history total is zero, the
+# zero-burn rule makes the runway infinite, and the resolver returns the
+# floor — the not-yet-live default state.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BaseRateResolution:
+    effective_bps: Decimal
+    trigger: str | None  # None | "gtv" | "runway" | "both"
+    inputs: dict[str, Any] = field(default_factory=dict)
+
+
+def _bps_json(value: Decimal) -> int | float:
+    """JSON-friendly bps: integral rates stay ints (100), the cap is 222.5."""
+    if value == value.to_integral_value():
+        return int(value)
+    return float(value)
+
+
+def _in_window(record: dict[str, Any], since: datetime) -> bool:
+    raw = record.get("created_at")
+    if not isinstance(raw, str) or not raw:
+        return False
+    try:
+        return parse_iso(raw) >= since
+    except Exception:
+        return False
+
+
+def _window_totals(store: Any, since: datetime) -> dict[str, Any]:
+    """Trailing-window totals from the store's own records.
+
+    - ``settled_volume``: ``amount_usd`` over ``receipts`` (settlements
+      recorded by ``engine.settle``) — the GTV measure.
+    - ``burn_rate``: ``burn_fee_usd`` over ``receipts`` (the settlement
+      fee's burn share) plus ``burn_usd`` over ``premiums`` (structurally
+      zero today — premiums are never burned — summed so the rate tracks
+      the field if that changes).
+    - ``collected``: (premium_usd, base_bps) per collected premium record,
+      the actual issuance the runway projection rescales.
+    - ``refunded``: premium_usd over refunded premium records (held
+      constant by the projection — a future rate does not un-refund).
+    """
+    settled_volume = Decimal(0)
+    burn_rate = Decimal(0)
+    collected: list[tuple[Decimal, Decimal]] = []
+    refunded = Decimal(0)
+    for rec in store.list(RECEIPTS_COLLECTION):
+        if not _in_window(rec, since):
+            continue
+        settled_volume += money(rec.get("amount_usd") or 0)
+        burn_rate += money(rec.get("burn_fee_usd") or 0)
+    for rec in store.list(PREMIUMS_COLLECTION):
+        if not _in_window(rec, since):
+            continue
+        burn_rate += money(rec.get("burn_usd") or 0)
+        status = rec.get("status")
+        if status == "collected":
+            base = money(rec.get("base_bps") or PREMIUM_BASE_BPS)
+            if base <= 0:
+                base = Decimal(PREMIUM_BASE_BPS)
+            collected.append((money(rec.get("premium_usd") or 0), base))
+        elif status == "refunded":
+            refunded += money(rec.get("premium_usd") or 0)
+    return {
+        "settled_volume": settled_volume,
+        "burn_rate": burn_rate,
+        "collected": collected,
+        "refunded": refunded,
+    }
+
+
+def resolve_effective_base_bps(
+    store: Any | None = None,
+    *,
+    now: datetime | None = None,
+    reserve_usd: Decimal | str | None = None,
+) -> BaseRateResolution:
+    """Resolve the effective premium base rate under the adjustment clause.
+
+    Pure with respect to its inputs: it reads (never writes) the store.
+    The caller (``quote_premium``) owns the adjustments-log write.
+    """
+    floor = Decimal(PREMIUM_BASE_BPS)
+    cap = PREMIUM_BASE_BPS_CAP
+    reserve = (
+        money(reserve_usd) if reserve_usd is not None else UNDERWRITING_RESERVE_USD
+    )
+    moment = now or utcnow()
+    since = moment - timedelta(days=TRAILING_WINDOW_DAYS)
+    if store is not None:
+        totals = _window_totals(store, since)
+    else:
+        totals = {
+            "settled_volume": Decimal(0),
+            "burn_rate": Decimal(0),
+            "collected": [],
+            "refunded": Decimal(0),
+        }
+    settled_volume: Decimal = totals["settled_volume"]
+    burn_rate: Decimal = totals["burn_rate"]
+    collected: list[tuple[Decimal, Decimal]] = totals["collected"]
+    collected_total = sum((p for p, _ in collected), Decimal(0))
+    net_income = collected_total - totals["refunded"]
+
+    # Trigger 1 — GTV: trailing settled volume at/over the threshold
+    # expires the launch discount outright (effective base = cap).
+    gtv_fired = settled_volume >= PREMIUM_GTV_THRESHOLD_USD
+
+    # Trigger 2 — runway: reserve / trailing burn rate. A zero burn rate
+    # is an infinite runway (no step-up, no division by zero).
+    runway_months: Decimal | None = None
+    runway_fired = False
+    if burn_rate > 0:
+        runway_months = reserve / burn_rate
+        runway_fired = runway_months < PREMIUM_RUNWAY_MIN_MONTHS
+
+    def projected_runway(candidate: Decimal) -> Decimal | None:
+        """Runway if the base had been ``candidate`` over the window.
+
+        Only the *incremental* premium income is credited: each collected
+        premium is rescaled by candidate / (base it was recorded at), and
+        the drain is the burn rate minus that increment. A non-positive
+        drain is an infinite runway (returned as None).
+        """
+        projected = sum(
+            (premium * candidate / base for premium, base in collected),
+            Decimal(0),
+        )
+        drain = burn_rate - (projected - collected_total)
+        if drain <= 0:
+            return None
+        return reserve / drain
+
+    stepped = floor
+    if runway_fired:
+        candidate = floor
+        while candidate < cap:
+            projected = projected_runway(candidate)
+            if projected is None or projected >= PREMIUM_RUNWAY_MIN_MONTHS:
+                break
+            candidate = min(candidate + PREMIUM_STEP_BPS, cap)
+        stepped = candidate
+
+    if gtv_fired:
+        effective = cap
+    elif runway_fired:
+        effective = stepped
+    else:
+        effective = floor
+    if gtv_fired and runway_fired:
+        trigger: str | None = "both"
+    elif gtv_fired:
+        trigger = "gtv"
+    elif runway_fired:
+        trigger = "runway"
+    else:
+        trigger = None
+
+    inputs = {
+        "settled_volume_30d_usd": money_str(settled_volume),
+        "gtv_threshold_usd": money_str(PREMIUM_GTV_THRESHOLD_USD),
+        "burn_rate_30d_usd": money_str(burn_rate),
+        "reserve_usd": money_str(reserve),
+        "runway_months": (
+            None
+            if runway_months is None
+            else str(runway_months.quantize(Decimal("0.0001")))
+        ),
+        "runway_min_months": _bps_json(PREMIUM_RUNWAY_MIN_MONTHS),
+        "premium_income_30d_usd": money_str(net_income),
+        "window_days": TRAILING_WINDOW_DAYS,
+    }
+    return BaseRateResolution(effective_bps=effective, trigger=trigger, inputs=inputs)
+
+
+def _log_adjustment(store: Any, resolution: BaseRateResolution, now: datetime) -> None:
+    """Append one adjustments-log record for an adjusted quote.
+
+    Called by ``quote_premium`` exactly when the resolved base differs
+    from the floor (equivalently, when a trigger fired). Quotes at the
+    floor write nothing.
+    """
+    store.append(
+        ADJUSTMENTS_COLLECTION,
+        {
+            "timestamp": iso(now),
+            "effective_bps": _bps_json(resolution.effective_bps),
+            "trigger": resolution.trigger,
+            "inputs": resolution.inputs,
+        },
+    )
+
+
 @dataclass
 class PremiumQuote:
     premium_id: str
@@ -112,10 +382,15 @@ class PremiumQuote:
     duration_seconds: int
     risk_score: float
     risk_class: str
-    base_bps: int
+    base_bps: int | float  # the effective base actually applied
     premium_usd: str
     status: str  # "quoted" | "not_charged"
     formula_version: str = PREMIUM_FORMULA_VERSION
+    # Dynamic adjustment clause (additive; see resolver above).
+    base_bps_effective: int | float = PREMIUM_BASE_BPS
+    base_bps_floor: int = PREMIUM_BASE_BPS
+    base_bps_cap: int | float = 222.5
+    adjustment_trigger: str | None = None  # None | "gtv" | "runway" | "both"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -126,39 +401,62 @@ def quote_premium(
     coverage_usd: str | Decimal,
     duration_seconds: int,
     risk_score: float | None,
+    store: Any | None = None,
+    now: datetime | None = None,
 ) -> PremiumQuote:
-    """Pure, deterministic premium quote. See module docstring for formula."""
+    """Premium quote at the effective base rate. See module docstring.
+
+    With no ``store`` there is no history to resolve against, so the
+    quote lands on the 100 bps floor and nothing is logged — identical
+    to the pre-clause behaviour. With a store, the adjustment clause
+    resolves the effective base from the store's records, and an
+    adjusted quote appends one record to the adjustments log.
+    """
+    moment = now or utcnow()
+    resolution = resolve_effective_base_bps(store, now=moment)
+    effective = resolution.effective_bps
+    rate_fields = {
+        "base_bps": _bps_json(effective),
+        "base_bps_effective": _bps_json(effective),
+        "base_bps_floor": PREMIUM_BASE_BPS,
+        "base_bps_cap": _bps_json(PREMIUM_BASE_BPS_CAP),
+        "adjustment_trigger": resolution.trigger,
+    }
     coverage = money(coverage_usd)
     risk = min(1.0, max(0.0, float(risk_score or 0.0)))
     duration = int(duration_seconds or 0)
     if coverage <= 0 or duration <= 0:
-        return PremiumQuote(
+        quote = PremiumQuote(
             premium_id=new_id(),
             coverage_usd=money_str(coverage),
             duration_seconds=duration,
             risk_score=risk,
             risk_class=risk_class_for(risk),
-            base_bps=PREMIUM_BASE_BPS,
             premium_usd="0.000000",
             status="not_charged",
+            **rate_fields,
         )
-    raw = (
-        coverage
-        * (Decimal(PREMIUM_BASE_BPS) / Decimal(10_000))
-        * (Decimal(duration) / Decimal(PREMIUM_REFERENCE_TTL_SECONDS))
-        * (Decimal(1) + Decimal(str(risk)))
-    )
-    premium = max(raw, PREMIUM_MIN_USD)
-    return PremiumQuote(
-        premium_id=new_id(),
-        coverage_usd=money_str(coverage),
-        duration_seconds=duration,
-        risk_score=risk,
-        risk_class=risk_class_for(risk),
-        base_bps=PREMIUM_BASE_BPS,
-        premium_usd=money_str(premium),
-        status="quoted",
-    )
+    else:
+        raw = (
+            coverage
+            * (effective / Decimal(10_000))
+            * (Decimal(duration) / Decimal(PREMIUM_REFERENCE_TTL_SECONDS))
+            * (Decimal(1) + Decimal(str(risk)))
+        )
+        premium = max(raw, PREMIUM_MIN_USD)
+        quote = PremiumQuote(
+            premium_id=new_id(),
+            coverage_usd=money_str(coverage),
+            duration_seconds=duration,
+            risk_score=risk,
+            risk_class=risk_class_for(risk),
+            premium_usd=money_str(premium),
+            status="quoted",
+            **rate_fields,
+        )
+    if store is not None and resolution.trigger is not None:
+        _log_adjustment(store, resolution, moment)
+    return quote
 
 
 class PremiumLedger:
@@ -220,6 +518,8 @@ class PremiumLedger:
             "risk_score": quote.risk_score,
             "risk_class": quote.risk_class,
             "base_bps": quote.base_bps,
+            "base_bps_effective": quote.base_bps_effective,
+            "adjustment_trigger": quote.adjustment_trigger,
             "premium_usd": quote.premium_usd,
             "treasury_usd": quote.premium_usd,
             "burn_usd": "0.000000",

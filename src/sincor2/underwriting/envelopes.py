@@ -53,6 +53,7 @@ class EnvelopeService:
                 coverage_usd=env.amount_usd,
                 duration_seconds=env.ttl_seconds,
                 risk_score=env.toa_risk if env.toa_risk is not None else 0.0,
+                store=self.store,
             )
             record = PremiumLedger(self.store).collect(
                 quote,

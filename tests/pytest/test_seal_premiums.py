@@ -17,8 +17,10 @@ mechanism — the envelope debit *is* the covered spend.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
+from sincor2.underwriting import premiums as premiums_mod
 from sincor2.underwriting.envelopes import EnvelopeService
 from sincor2.underwriting.engine import TREASURY, UnderwritingEngine
 from sincor2.underwriting.facilitator import Facilitator
@@ -26,11 +28,12 @@ from sincor2.underwriting.mandates import MandateService
 from sincor2.underwriting.premiums import (
     PremiumLedger,
     quote_premium,
+    resolve_effective_base_bps,
 )
 from sincor2.underwriting.store import UnderwriteStore
 from sincor2.underwriting.taps.ledger_sim import LedgerSimTap
 from sincor2.underwriting.toa_adapter import SpendUnderwriter
-from sincor2.underwriting.types import AuthorizeRequest, REASON
+from sincor2.underwriting.types import AuthorizeRequest, REASON, iso, utcnow
 
 
 # --------------------------------------------------------------------------
@@ -323,3 +326,240 @@ def test_engine_settle_unchanged_after_premium(tmp_path):
     # Pre-existing settlement-fee behaviour is untouched by the premium build.
     assert receipt["underwrite_fee_usd"] == round(10 * 0.005, 6)
     assert receipt["envelope_id"] == rec["envelope_id"]
+
+
+# --------------------------------------------------------------------------
+# Dynamic adjustment clause (founder-ratified 2026-11-16)
+#
+# Floor 100 bps, cap 222.5 bps. Trigger 1 (GTV): trailing-30d settled
+# volume (receipts.amount_usd) >= $1M -> cap. Trigger 2 (runway):
+# reserve / trailing-30d burn < 6 months -> +50 bps steps until the
+# projected runway recovers or the cap is reached. Zero burn = infinite
+# runway = no step-up. Adjusted quotes append one premium_adjustments
+# record; floor quotes append nothing.
+# --------------------------------------------------------------------------
+
+def _seed_receipt(store, amount_usd, burn_fee_usd=0.0, *, days_ago=0):
+    store.append(
+        "receipts",
+        {
+            "receipt_id": f"seed-{amount_usd}-{burn_fee_usd}-{days_ago}",
+            "amount_usd": amount_usd,
+            "burn_fee_usd": burn_fee_usd,
+            "created_at": iso(utcnow() - timedelta(days=days_ago)),
+        },
+    )
+
+
+def _seed_collected_premium(store, premium_usd, base_bps=100):
+    store.append(
+        "premiums",
+        {
+            "status": "collected",
+            "premium_usd": premium_usd,
+            "burn_usd": "0.000000",
+            "base_bps": base_bps,
+            "created_at": iso(utcnow()),
+        },
+    )
+
+
+def _adjustments(store):
+    return store.list("premium_adjustments")
+
+
+def test_adjustment_floor_default_with_no_history(tmp_path):
+    # Not-yet-live default state: no records, default reserve "0", zero
+    # burn -> infinite runway -> the 100 bps floor, nothing logged.
+    store = UnderwriteStore(tmp_path)
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.base_bps == 100
+    assert q.base_bps_effective == 100
+    assert q.base_bps_floor == 100
+    assert q.base_bps_cap == 222.5
+    assert q.adjustment_trigger is None
+    assert q.premium_usd == "1.000000"
+    assert _adjustments(store) == []
+
+
+def test_adjustment_quote_without_store_matches_pre_clause():
+    q = quote_premium(coverage_usd="100.00", duration_seconds=2700, risk_score=0.0)
+    assert q.base_bps == 100
+    assert q.base_bps_effective == 100
+    assert q.base_bps_floor == 100
+    assert q.base_bps_cap == 222.5
+    assert q.adjustment_trigger is None
+    # Canonical case is byte-identical to the pre-change formula output.
+    assert q.premium_usd == "1.000000"
+
+
+def test_adjustment_floor_premium_byte_identical_with_zero_burn_history(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 5000.0, 0.0)  # history exists, but no burn, no GTV
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.base_bps_effective == 100
+    assert q.adjustment_trigger is None
+    assert q.premium_usd == "1.000000"
+    assert _adjustments(store) == []
+
+
+def test_adjustment_gtv_trigger_fires_at_threshold(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 600_000.0)
+    _seed_receipt(store, 400_000.0)  # trailing settled volume = exactly $1M
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.base_bps_effective == 222.5
+    assert q.base_bps == 222.5
+    assert q.adjustment_trigger == "gtv"
+    # 100.00 * 2.225% * (2700/2700) * (1+0) = 2.225 exactly.
+    assert q.premium_usd == "2.225000"
+    rows = _adjustments(store)
+    assert len(rows) == 1
+    assert rows[0]["effective_bps"] == 222.5
+    assert rows[0]["trigger"] == "gtv"
+    assert rows[0]["inputs"]["settled_volume_30d_usd"] == "1000000.000000"
+    assert rows[0]["timestamp"]
+
+
+def test_adjustment_gtv_trigger_silent_below_threshold(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 999_999.0)  # one dollar under the GTV threshold
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.base_bps_effective == 100
+    assert q.adjustment_trigger is None
+    assert q.premium_usd == "1.000000"
+    assert _adjustments(store) == []
+
+
+def test_adjustment_gtv_ignores_receipts_outside_window(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 2_000_000.0, days_ago=31)  # outside trailing 30d
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.base_bps_effective == 100
+    assert q.adjustment_trigger is None
+    assert _adjustments(store) == []
+
+
+def test_adjustment_runway_steps_up_in_increments(tmp_path):
+    # Reserve $5,000, trailing burn $1,000 -> runway 5.0 months (< 6).
+    # Collected premiums of $900 at 100 bps: at 150 bps the projected
+    # income is $1,350, the drain drops to $550, and the projected
+    # runway is ~9.09 months — one +50 step suffices.
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 1_000.0)
+    _seed_collected_premium(store, "900.000000", base_bps=100)
+    res = resolve_effective_base_bps(store, reserve_usd="5000")
+    assert res.trigger == "runway"
+    assert res.effective_bps == Decimal("150")
+    assert res.inputs["runway_months"] == "5.0000"
+    assert res.inputs["burn_rate_30d_usd"] == "1000.000000"
+
+
+def test_adjustment_runway_caps_at_market_median(tmp_path):
+    # No premium income to project: the drain never improves, so the
+    # step-up walks the whole way to the 222.5 bps cap and stops there.
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 1_000.0)
+    res = resolve_effective_base_bps(store, reserve_usd="5000")
+    assert res.trigger == "runway"
+    assert res.effective_bps == Decimal("222.5")
+
+
+def test_adjustment_runway_zero_reserve_positive_burn_caps(tmp_path):
+    # Reserve 0 with any positive burn is a 0-month runway: full step-up.
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 100.0)
+    res = resolve_effective_base_bps(store, reserve_usd="0")
+    assert res.trigger == "runway"
+    assert res.effective_bps == Decimal("222.5")
+
+
+def test_adjustment_runway_healthy_no_trigger(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 100.0)  # runway = 1000 / 100 = 10 months
+    res = resolve_effective_base_bps(store, reserve_usd="1000")
+    assert res.trigger is None
+    assert res.effective_bps == Decimal("100")
+
+
+def test_adjustment_zero_burn_never_steps_up(tmp_path):
+    # Zero trailing burn -> infinite runway, even with a zero reserve:
+    # no step-up and no division by zero.
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 0.0)
+    res = resolve_effective_base_bps(store, reserve_usd="0")
+    assert res.trigger is None
+    assert res.effective_bps == Decimal("100")
+    assert res.inputs["runway_months"] is None
+
+
+def test_adjustment_both_triggers(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 1_500_000.0, 1_000.0)  # GTV over threshold + burn
+    res = resolve_effective_base_bps(store, reserve_usd="5000")
+    assert res.trigger == "both"
+    assert res.effective_bps == Decimal("222.5")
+
+
+def test_adjustment_runway_quote_logs_exactly_once(tmp_path, monkeypatch):
+    monkeypatch.setattr(premiums_mod, "UNDERWRITING_RESERVE_USD", Decimal("5000"))
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 10_000.0, 1_000.0)  # runway 5 months, no income
+    q = quote_premium(
+        coverage_usd="100.00", duration_seconds=2700, risk_score=0.0, store=store
+    )
+    assert q.adjustment_trigger == "runway"
+    assert q.base_bps_effective == 222.5
+    rows = _adjustments(store)
+    assert len(rows) == 1
+    assert rows[0]["trigger"] == "runway"
+    assert rows[0]["inputs"]["reserve_usd"] == "5000.000000"
+
+
+def test_adjustment_log_written_exactly_on_adjusted_quotes(tmp_path):
+    store = UnderwriteStore(tmp_path)
+    _seed_receipt(store, 1_000_000.0)  # GTV at threshold, zero burn
+    quote_premium(coverage_usd="10.00", duration_seconds=2700, risk_score=0.0, store=store)
+    quote_premium(coverage_usd="10.00", duration_seconds=2700, risk_score=0.0, store=store)
+    assert len(_adjustments(store)) == 2  # one record per adjusted quote
+
+    empty = UnderwriteStore(tmp_path / "empty")
+    quote_premium(coverage_usd="10.00", duration_seconds=2700, risk_score=0.0, store=empty)
+    assert _adjustments(empty) == []  # floor quotes write nothing
+
+
+def test_engine_issuance_applies_adjusted_rate(tmp_path):
+    engine = UnderwritingEngine(UnderwriteStore(tmp_path))
+    _seed_receipt(engine.store, 1_000_000.0)  # GTV trigger armed
+    rec = engine.underwrite(_engine_body())
+    assert rec["decision"] == "allow"
+    premium = rec["premium"]
+    assert premium["status"] == "collected"
+    assert premium["base_bps"] == 222.5
+    assert premium["base_bps_effective"] == 222.5
+    assert premium["adjustment_trigger"] == "gtv"
+    # Score 1.0 -> risk 0.0; 100 * 2.225% * (2700/2700) * 1 = 2.225.
+    assert premium["premium_usd"] == "2.225000"
+    assert len(_adjustments(engine.store)) == 1
+
+
+def test_envelope_issuance_applies_adjusted_rate(tmp_path):
+    store, _, envelopes, _, m = _stack(tmp_path)
+    _seed_receipt(store, 1_000_000.0)  # GTV trigger armed
+    env = _issue(envelopes, m)
+    assert env.premium_status == "collected"
+    rows = [r for r in _premiums(store) if r["envelope_id"] == env.envelope_id]
+    assert len(rows) == 1
+    assert rows[0]["base_bps_effective"] == 222.5
+    assert rows[0]["adjustment_trigger"] == "gtv"
+    assert len(_adjustments(store)) == 1

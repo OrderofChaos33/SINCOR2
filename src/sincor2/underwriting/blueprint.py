@@ -124,6 +124,7 @@ def premium_quote():
             coverage_usd=str(body.get("coverage_usd") or body.get("requested_usd") or "0"),
             duration_seconds=int(body.get("duration_seconds") or 2700),
             risk_score=float(body.get("risk_score") or 0.0),
+            store=_engine.store,
         )
     except (TypeError, ValueError) as exc:
         return _err(str(exc), 400)

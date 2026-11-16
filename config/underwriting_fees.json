@@ -9,6 +9,7 @@
   "premium_base_bps": 100,
   "premium_reference_ttl_seconds": 2700,
   "premium_min_usd": "0.01",
+  "underwriting_reserve_usd": "0",
   "burn_share": 0.5,
   "free_quota_is_not_settlement": true
 }

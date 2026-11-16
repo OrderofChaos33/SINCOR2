@@ -196,6 +196,7 @@ class UnderwritingEngine:
                 coverage_usd=record["requested_usd"],
                 duration_seconds=duration,
                 risk_score=1.0 - float(scored["score"]),
+                store=self.store,
             )
             premium = PremiumLedger(self.store).collect(
                 quote,
