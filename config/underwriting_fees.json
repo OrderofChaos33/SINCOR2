@@ -5,11 +5,11 @@
   "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
   "erc8004_identity": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
   "verify_fee_axm": 2,
-  "underwrite_bps": 50,
+  "underwrite_bps": 500,
   "premium_base_bps": 100,
   "premium_reference_ttl_seconds": 2700,
   "premium_min_usd": "0.01",
   "underwriting_reserve_usd": "0",
-  "burn_share": 0.5,
+  "burn_share": 0.0,
   "free_quota_is_not_settlement": true
 }

@@ -323,9 +323,31 @@ def test_engine_settle_unchanged_after_premium(tmp_path):
     engine = UnderwritingEngine(UnderwriteStore(tmp_path))
     rec = engine.underwrite(_engine_body())
     receipt = engine.settle(rec["envelope_id"], {"amount_usd": 10})
-    # Pre-existing settlement-fee behaviour is untouched by the premium build.
-    assert receipt["underwrite_fee_usd"] == round(10 * 0.005, 6)
+    # Premium collection does not alter settlement: the settle runs under
+    # the CONFORM canon (founder verdict, 2026-11-16) — 5% fee, all of it
+    # to treasury, zero burn.
+    assert receipt["underwrite_fee_usd"] == round(10 * 0.05, 6)
+    assert receipt["treasury_fee_usd"] == receipt["underwrite_fee_usd"]
+    assert receipt["burn_fee_usd"] == 0.0
     assert receipt["envelope_id"] == rec["envelope_id"]
+
+
+def test_engine_settle_conform_canon(tmp_path):
+    """CONFORM verdict (founder, 2026-11-16): settlement fee is exactly
+    5% of the settled amount, the treasury receives the full fee, and the
+    burn is exactly zero. The legacy model (50 bps, 50% burn split) is
+    retired."""
+    engine = UnderwritingEngine(UnderwriteStore(tmp_path))
+    rec = engine.underwrite(_engine_body())
+    receipt = engine.settle(rec["envelope_id"], {"amount_usd": 100})
+    assert receipt["underwrite_fee_usd"] == 5.0  # exactly 5% of 100
+    assert receipt["treasury_fee_usd"] == 5.0  # full fee to treasury
+    assert receipt["burn_fee_usd"] == 0.0  # no burn, ever
+    # The persisted receipt carries the same conform figures.
+    stored = engine.receipt(receipt["receipt_id"])
+    assert stored["underwrite_fee_usd"] == 5.0
+    assert stored["treasury_fee_usd"] == 5.0
+    assert stored["burn_fee_usd"] == 0.0
 
 
 # --------------------------------------------------------------------------

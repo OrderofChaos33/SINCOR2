@@ -28,8 +28,14 @@ def _load_fee_config() -> Dict[str, Any]:
         "treasury": "0x09E2891432827D8835d2E9b83B25e2a5ba9612Ac",
         "erc8004_identity": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
         "verify_fee_axm": 2,
-        "underwrite_bps": 50,
-        "burn_share": 0.5,
+        # CONFORM canon (founder verdict, 2026-11-16): the settlement fee
+        # is 5% of the settled amount, routed 100% to treasury, NO burn.
+        # The legacy model (50 bps with a 50% burn split) is retired.
+        "underwrite_bps": 500,
+        # Founder-locked at 0.0 by the same verdict. Kept as a key only so
+        # existing config files still load; engine code does NOT honour a
+        # non-zero value here (see BURN_SHARE below).
+        "burn_share": 0.0,
     }
     try:
         with _fee_config_path().open("r", encoding="utf-8") as fh:
@@ -48,7 +54,12 @@ TREASURY = str(_FEES["treasury"])
 ERC8004_IDENTITY = str(_FEES["erc8004_identity"])
 VERIFY_FEE_AXM = int(_FEES["verify_fee_axm"])
 UNDERWRITE_BPS = int(_FEES["underwrite_bps"])
-BURN_SHARE = float(_FEES["burn_share"])
+# Founder-locked (CONFORM verdict, 2026-11-16): the burn share is zero and
+# is deliberately NOT read from config, so no config edit can silently
+# reactivate a burn path. Legacy burn may be re-evaluated only by a future
+# founder decision after trailing-30-day volume crosses $1M AND the P09
+# premium base has ratcheted to 222.5 bps.
+BURN_SHARE = 0.0
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -243,9 +254,14 @@ class UnderwritingEngine:
         if cap_usd > 0 and amount_usd > cap_usd:
             raise PermissionError("settlement exceeds underwritten cap")
 
+        # CONFORM canon (founder verdict, 2026-11-16): fee = 5% of the
+        # settled amount, 100% to treasury, burn exactly zero. The
+        # burn_fee_usd field stays in the receipt shape (the P09 premium
+        # rate resolver sums it over receipts) and is always 0.0 on new
+        # settlements by design.
         underwrite_fee = amount_usd * (UNDERWRITE_BPS / 10_000.0)
-        burn_fee = underwrite_fee * BURN_SHARE
-        treasury_fee = underwrite_fee - burn_fee
+        burn_fee = 0.0
+        treasury_fee = underwrite_fee
 
         receipt = {
             "receipt_id": str(uuid4()),

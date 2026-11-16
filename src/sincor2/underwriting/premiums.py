@@ -59,6 +59,12 @@ underwrite store plus one operator-maintained config figure:
   income, and projected runway = reserve / projected drain (infinite
   when the drain is not positive). A zero trailing burn rate means an
   infinite runway — no step-up, and no division by zero.
+  CONFORM note (founder verdict, 2026-11-16): ``engine.settle`` now
+  writes ``burn_fee_usd = 0`` on every new settlement (5% fee, 100% to
+  treasury, no burn), so the receipts side of the trailing burn rate is
+  zero by design going forward; only pre-verdict historical receipts can
+  carry a nonzero burn, and they age out of the 30-day window. The GTV
+  trigger is therefore the operative ratchet under conform canon.
 
 Input sources are explicit — nothing is invented: settled volume and
 burn come only from ``receipts``/``premiums`` records inside the
@@ -215,10 +221,13 @@ def _window_totals(store: Any, since: datetime) -> dict[str, Any]:
 
     - ``settled_volume``: ``amount_usd`` over ``receipts`` (settlements
       recorded by ``engine.settle``) — the GTV measure.
-    - ``burn_rate``: ``burn_fee_usd`` over ``receipts`` (the settlement
-      fee's burn share) plus ``burn_usd`` over ``premiums`` (structurally
-      zero today — premiums are never burned — summed so the rate tracks
-      the field if that changes).
+    - ``burn_rate``: ``burn_fee_usd`` over ``receipts`` plus ``burn_usd``
+      over ``premiums`` (structurally zero — premiums are never burned —
+      summed so the rate tracks the field if that changes). Since the
+      CONFORM verdict (2026-11-16), ``engine.settle`` records
+      ``burn_fee_usd = 0`` on every new settlement, so this reads zero on
+      conform settlements by design; any nonzero value comes from
+      pre-verdict historical receipts still inside the window.
     - ``collected``: (premium_usd, base_bps) per collected premium record,
       the actual issuance the runway projection rescales.
     - ``refunded``: premium_usd over refunded premium records (held
