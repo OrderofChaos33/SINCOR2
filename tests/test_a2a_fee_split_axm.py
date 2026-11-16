@@ -57,7 +57,13 @@ def test_maybe_record_fee_one_realized_call():
             task_id="task-1",
             metadata=meta,
         )
-        assert out == {"ok": True}
+        # P02: the returned AXM settlement record carries the spread
+        # fields (1.0 % of 1 AXM = 10**16 wei) alongside the fee event.
+        assert out == {
+            "ok": True,
+            "spread_bps_applied": 100,
+            "spread_amount": 10**16,
+        }
         rec.assert_called_once()
         kwargs = rec.call_args.kwargs
         assert kwargs["projected"] is False if "projected" in kwargs else True

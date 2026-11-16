@@ -77,6 +77,11 @@ from sincor2.onchain.constants import (
 from sincor2.schema_gate import compile_skill_schemas, validate_skill_input
 from sincor2 import treasury_inflow as _treasury_inflow
 from sincor2.treasury_settlement import record_platform_fee_inflow
+from sincor2.axm_settlement_spread import (
+    AXM_SETTLEMENT_SPREAD_BPS,
+    compute_spread_wei as _compute_axm_settlement_spread_wei,
+    spread_fields as _axm_spread_fields,
+)
 from sincor2.a2a_idempotency import idempotent
 from sincor2.defi.p24 import skill as _p24_issuance_skill
 from sincor2.free_ration import (
@@ -3247,6 +3252,15 @@ def maybe_record_a2a_platform_fee(
         tx_hash=tx_hash,
         task_id=task_id,
     )
+    if recorded is not None:
+        # P02: annotate the settlement's fee record with the AXM
+        # settlement spread owed to treasury — a separate component
+        # from the platform fee recorded above (see
+        # sincor2.axm_settlement_spread).  This call site is AXM-only
+        # by construction, so the fields always apply here.
+        recorded.update(
+            _axm_spread_fields(asset="AXM", settled_amount_wei=axm_paid_wei)
+        )
     if recorded is not None and metadata is not None:
         metadata["fee_recorded"] = True
     return recorded
@@ -4135,6 +4149,11 @@ class A2ARouter:
                 "axm_paid_display": f"{task.axm_paid / 10**18:.4f} AXM",
                 "platform_fee_bps": A2A_PLATFORM_FEE_BPS,
                 "platform_fee_wei":  str(platform_fee_wei),
+                # P02 AXM settlement spread (default 1.0 %, ratification
+                # pending) — separate from the platform fee above; owed
+                # to the same treasury.
+                "spread_bps_applied": AXM_SETTLEMENT_SPREAD_BPS,
+                "spread_amount_wei":  str(_compute_axm_settlement_spread_wei(task.axm_paid)),
                 "burn_amount_wei":  "0",
                 "treasury_amount_wei": str(platform_fee_wei),
                 "treasury":       TREASURY_WALLET,
