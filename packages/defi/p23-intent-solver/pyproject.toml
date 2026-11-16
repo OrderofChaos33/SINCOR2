@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sincor-p23-intent-solver"
+version = "0.1.0"
+description = "Intent Solver & Dark Pool (SINCOR DeFi P23 / suite P03) — standalone reference package. State: EXTERNAL; no solver deployed or bonded for outside flow; deployment only inside a signed engagement."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "SINCOR Business Solutions" }]
+keywords = ["intent", "dark-pool", "solver", "defi", "settlement"]
+# Runtime dependencies: none. The module uses only the Python standard
+# library (see PACKAGING.md dependency inventory).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
