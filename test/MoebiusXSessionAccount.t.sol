@@ -211,4 +211,140 @@ contract MoebiusXSessionAccountTest is Test {
         vm.expectRevert(MoebiusXSessionAccount.NotOwner.selector);
         account.revokeSession(sessionId);
     }
+
+    // ── Fuzz: cage enforcement under fuzzed amounts/targets/calldata ──
+
+    function _swapData(uint256 amount) internal view returns (bytes memory) {
+        return abi.encodeWithSelector(MockDexRouter.swap.selector, address(usdc), amount);
+    }
+
+    function _spent(bytes32 id) internal view returns (uint256 spent) {
+        (, , , , spent, , , ) = account.sessions(id);
+    }
+
+    function testFuzz_PerCallCapBoundary(uint256 amount) public {
+        amount = bound(amount, 0, 100e6);
+        if (amount > PER_CALL) {
+            vm.prank(sessionKey);
+            vm.expectRevert(MoebiusXSessionAccount.PerCallCapExceeded.selector);
+            account.executeAsSession(sessionId, address(router), _swapData(amount));
+            assertEq(_spent(sessionId), 0);
+            assertEq(usdc.balanceOf(address(account)), 100e6);
+        } else {
+            vm.prank(sessionKey);
+            account.executeAsSession(sessionId, address(router), _swapData(amount));
+            assertEq(_spent(sessionId), amount);
+            assertEq(usdc.balanceOf(address(account)), 100e6 - amount);
+        }
+    }
+
+    function testFuzz_CumulativeCapNeverExceeded(uint256 a1, uint256 a2, uint256 a3) public {
+        uint256[3] memory amounts = [bound(a1, 0, 20e6), bound(a2, 0, 20e6), bound(a3, 0, 20e6)];
+        uint256 expectedSpent;
+        for (uint256 i = 0; i < 3; i++) {
+            uint256 amt = amounts[i];
+            bool ok;
+            vm.prank(sessionKey);
+            try account.executeAsSession(sessionId, address(router), _swapData(amt)) {
+                ok = true;
+            } catch {
+                ok = false;
+            }
+            if (ok) {
+                // A success is only legitimate inside both caps.
+                assertLe(amt, PER_CALL, "over-per-call swap succeeded");
+                expectedSpent += amt;
+                assertLe(expectedSpent, CAP, "cumulative cap exceeded");
+            } else {
+                // A revert is only legitimate outside a cap: the router call
+                // itself cannot fail for an in-cage amount (funded + approved).
+                assertTrue(amt > PER_CALL || expectedSpent + amt > CAP, "in-cage swap reverted");
+            }
+            assertEq(_spent(sessionId), expectedSpent);
+            assertEq(usdc.balanceOf(address(account)), 100e6 - expectedSpent);
+        }
+    }
+
+    function testFuzz_ProductionCageShape(uint256 amount) public {
+        // The production session cage: $5 per trade, $25 total (6dp USDC).
+        bytes32 id = keccak256("moebiusx-prod-cage");
+        vm.startPrank(OWNER);
+        account.grantSession(id, sessionKey, 0, uint48(block.timestamp + 7 days), 25e6, 5e6);
+        account.allowCall(id, address(router), MockDexRouter.swap.selector);
+        vm.stopPrank();
+
+        amount = bound(amount, 0, 30e6);
+        if (amount > 5e6) {
+            vm.prank(sessionKey);
+            vm.expectRevert(MoebiusXSessionAccount.PerCallCapExceeded.selector);
+            account.executeAsSession(id, address(router), _swapData(amount));
+            assertEq(_spent(id), 0);
+        } else {
+            vm.prank(sessionKey);
+            account.executeAsSession(id, address(router), _swapData(amount));
+            assertEq(_spent(id), amount);
+        }
+    }
+
+    function testFuzz_NonAllowlistedTargetAlwaysReverts(address fuzzTarget) public {
+        vm.assume(fuzzTarget != address(router));
+        vm.prank(sessionKey);
+        vm.expectRevert(MoebiusXSessionAccount.CallNotAllowlisted.selector);
+        account.executeAsSession(sessionId, fuzzTarget, _swapData(1e6));
+    }
+
+    function testFuzz_WrongSelectorOnRouterAlwaysReverts(bytes4 fuzzSelector) public {
+        vm.assume(fuzzSelector != MockDexRouter.swap.selector);
+        bytes memory data = abi.encodePacked(fuzzSelector, bytes32(uint256(1)), bytes32(uint256(1)));
+        vm.prank(sessionKey);
+        vm.expectRevert(MoebiusXSessionAccount.CallNotAllowlisted.selector);
+        account.executeAsSession(sessionId, address(router), data);
+    }
+
+    function testFuzz_ArbitraryCalldataAccountingInvariant(bytes calldata data) public {
+        // Any calldata at all — valid swap encodings, wrong selectors, short
+        // or garbage payloads: the call may succeed or revert, but the spend
+        // accounting may never break. Every unit of outflow must be charged.
+        vm.prank(sessionKey);
+        try account.executeAsSession(sessionId, address(router), data) {} catch {}
+
+        uint256 spent = _spent(sessionId);
+        assertLe(spent, PER_CALL);
+        assertLe(spent, CAP);
+        assertEq(usdc.balanceOf(address(account)), 100e6 - spent);
+        assertEq(usdc.balanceOf(address(router)), spent);
+    }
+
+    function testFuzz_ImpostorAlwaysReverts(address caller, uint256 amount) public {
+        vm.assume(caller != sessionKey);
+        amount = bound(amount, 0, 25e6);
+        vm.prank(caller);
+        vm.expectRevert(MoebiusXSessionAccount.NotSessionKey.selector);
+        account.executeAsSession(sessionId, address(router), _swapData(amount));
+    }
+
+    function testFuzz_TimeWindowBoundary(uint256 warpBy) public {
+        warpBy = bound(warpBy, 0, 14 days);
+        vm.warp(block.timestamp + warpBy);
+        if (warpBy > 7 days) {
+            vm.prank(sessionKey);
+            vm.expectRevert(MoebiusXSessionAccount.SessionExpired.selector);
+            account.executeAsSession(sessionId, address(router), _swapData(1e6));
+        } else {
+            vm.prank(sessionKey);
+            account.executeAsSession(sessionId, address(router), _swapData(1e6));
+            assertEq(_spent(sessionId), 1e6);
+        }
+    }
+
+    function testFuzz_NonOwnerCannotGrantOrRevoke(address caller) public {
+        vm.assume(caller != OWNER);
+        vm.prank(caller);
+        vm.expectRevert(MoebiusXSessionAccount.NotOwner.selector);
+        account.grantSession(keccak256("fuzz-grant"), sessionKey, 0, uint48(block.timestamp + 1 days), CAP, PER_CALL);
+
+        vm.prank(caller);
+        vm.expectRevert(MoebiusXSessionAccount.NotOwner.selector);
+        account.revokeSession(sessionId);
+    }
 }

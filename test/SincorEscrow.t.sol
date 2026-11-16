@@ -176,4 +176,124 @@ contract SincorTaskEscrowTest is Test {
         escrow.completeTask(taskId);
         assertEq(token.balanceOf(agent), agentBefore + REWARD);
     }
+
+    // ── Fuzz: amounts / authority / double-release ────────────────────
+
+    function testFuzz_CreateClaimCompletePaysExactly(uint256 reward, uint256 bond, uint256 duration) public {
+        reward = bound(reward, 1, 9_000 * 1e18);
+        bond = bound(bond, 0, 9_000 * 1e18);
+        duration = bound(duration, 1, 365 days);
+
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(reward, bond, duration);
+        assertEq(token.balanceOf(address(escrow)), reward);
+
+        vm.prank(agent);
+        escrow.claimTask(taskId);
+        assertEq(token.balanceOf(address(escrow)), reward + bond);
+
+        uint256 agentBefore = token.balanceOf(agent);
+        vm.prank(creator);
+        escrow.completeTask(taskId);
+
+        // Release pays the agent exactly reward + bond, escrow drains to 0.
+        assertEq(token.balanceOf(agent), agentBefore + reward + bond);
+        assertEq(token.balanceOf(address(escrow)), 0);
+        (,,,,, SincorTaskEscrow.TaskStatus status) = escrow.tasks(taskId);
+        assertEq(uint256(status), uint256(SincorTaskEscrow.TaskStatus.Verified));
+    }
+
+    function testFuzz_CreateClaimSlashSplitsExactly(uint256 reward, uint256 bond, uint256 duration) public {
+        reward = bound(reward, 1, 9_000 * 1e18);
+        bond = bound(bond, 0, 9_000 * 1e18);
+        duration = bound(duration, 1, 30 days);
+
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(reward, bond, duration);
+        vm.prank(agent);
+        escrow.claimTask(taskId);
+
+        uint256 creatorBefore = token.balanceOf(creator);
+        vm.warp(block.timestamp + duration + 1);
+        escrow.slashTask(taskId, reporter); // anyone may slash after expiry
+
+        // Refund path conserves exactly: creator + reporter + treasury
+        // receive reward + bond between them, escrow drains to 0.
+        assertEq(token.balanceOf(creator), creatorBefore + reward);
+        assertEq(token.balanceOf(reporter), bond / 2);
+        assertEq(token.balanceOf(treasury), bond - bond / 2);
+        assertEq(token.balanceOf(address(escrow)), 0);
+        (,,,,, SincorTaskEscrow.TaskStatus status) = escrow.tasks(taskId);
+        assertEq(uint256(status), uint256(SincorTaskEscrow.TaskStatus.Slashed));
+    }
+
+    function testFuzz_CompleteRevertsForAnyNonCreator(uint256 reward, uint256 bond, address caller) public {
+        vm.assume(caller != creator);
+        reward = bound(reward, 1, 9_000 * 1e18);
+        bond = bound(bond, 0, 9_000 * 1e18);
+
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(reward, bond, 1 days);
+        vm.prank(agent);
+        escrow.claimTask(taskId);
+
+        vm.prank(caller);
+        vm.expectRevert("Unauthorized verification");
+        escrow.completeTask(taskId);
+    }
+
+    function testFuzz_NoDoubleRelease(uint256 reward, uint256 bond, bool completeFirst) public {
+        reward = bound(reward, 1, 9_000 * 1e18);
+        bond = bound(bond, 0, 9_000 * 1e18);
+
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(reward, bond, 1 days);
+        vm.prank(agent);
+        escrow.claimTask(taskId);
+
+        if (completeFirst) {
+            vm.prank(creator);
+            escrow.completeTask(taskId);
+        } else {
+            vm.prank(creator);
+            escrow.slashTask(taskId, reporter);
+        }
+        assertEq(token.balanceOf(address(escrow)), 0);
+
+        // A second release of either kind must revert and move nothing.
+        vm.prank(creator);
+        vm.expectRevert("Task not active");
+        escrow.completeTask(taskId);
+
+        vm.prank(creator);
+        vm.expectRevert("Task not active");
+        escrow.slashTask(taskId, reporter);
+        assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function testFuzz_ZeroRewardCreateAlwaysReverts(uint256 bond, uint256 duration) public {
+        bond = bound(bond, 0, 9_000 * 1e18);
+        vm.prank(creator);
+        vm.expectRevert("Reward must be > 0");
+        escrow.createTask(0, bond, duration);
+    }
+
+    function testFuzz_ClaimAfterExpiryAlwaysReverts(uint256 reward, uint256 extraWarp) public {
+        reward = bound(reward, 1, 9_000 * 1e18);
+        extraWarp = bound(extraWarp, 0, 30 days);
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(reward, 0, 1 days);
+        vm.warp(block.timestamp + 1 days + extraWarp);
+        vm.prank(agent);
+        vm.expectRevert("Task expired");
+        escrow.claimTask(taskId);
+    }
+
+    function testFuzz_NonCreatorCannotSlashBeforeExpiry(address caller) public {
+        vm.assume(caller != creator);
+        uint256 taskId = _createAndClaim();
+        vm.prank(caller);
+        vm.expectRevert("Slash condition not met");
+        escrow.slashTask(taskId, reporter);
+    }
 }

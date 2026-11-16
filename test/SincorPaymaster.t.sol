@@ -296,4 +296,112 @@ contract SincorPaymasterTest is Test {
         vm.expectRevert("only EntryPoint");
         pm.postOp(PostOpMode.opSucceeded, ctx, 0.5 ether, 1 gwei);
     }
+
+    // ── Fuzz: sponsorship limits / unauthorized ops / accounting ──────
+
+    function testFuzz_ValidateRespectsSpendCeiling(uint256 ceiling, uint256 maxCost) public {
+        ceiling = bound(ceiling, 0, 20 ether);
+        maxCost = bound(maxCost, 0, 20 ether);
+        pm.setProbation(agent, true);
+        pm.setMaxSponsoredWei(ceiling);
+
+        if (maxCost <= ceiling) {
+            (bytes memory ctx, uint256 vd) = _asEntryPointValidate(agent, maxCost);
+            assertEq(vd, 0);
+            assertEq(ctx.length, 64);
+            assertEq(pm.reservedWei(), maxCost);
+            assertEq(pm.inFlight(agent), 1);
+        } else {
+            vm.prank(address(ep));
+            vm.expectRevert("spend ceiling");
+            pm.validatePaymasterUserOp(_userOp(agent), bytes32(0), maxCost);
+            assertEq(pm.reservedWei(), 0);
+        }
+    }
+
+    function testFuzz_OpCapEnforcedAtFuzzedCap(uint256 capOps) public {
+        capOps = bound(capOps, 1, 20);
+        pm.setProbation(agent, true);
+        pm.setMaxSponsoredWei(100 ether);
+        pm.setMaxSponsoredOps(capOps);
+
+        for (uint256 i = 0; i < capOps; i++) {
+            _asEntryPointValidate(agent, 0.001 ether);
+        }
+        assertEq(pm.inFlight(agent), capOps);
+
+        vm.prank(address(ep));
+        vm.expectRevert("op cap reached");
+        pm.validatePaymasterUserOp(_userOp(agent), bytes32(0), 0.001 ether);
+    }
+
+    function testFuzz_NonAllowlistedSenderAlwaysRejected(address sender) public {
+        vm.assume(sender != agent);
+        pm.setMaxSponsoredWei(10 ether);
+        vm.prank(address(ep));
+        vm.expectRevert("not allowlisted");
+        pm.validatePaymasterUserOp(_userOp(sender), bytes32(0), 0.1 ether);
+        assertEq(pm.reservedWei(), 0);
+    }
+
+    function testFuzz_UnauthorizedCallerAlwaysReverts(address caller) public {
+        vm.assume(caller != address(this) && caller != address(ep) && caller != withdrawer);
+        _openSponsorship();
+        pm.setWithdrawer(withdrawer);
+        pm.deposit{value: 5 ether}();
+
+        vm.prank(caller);
+        vm.expectRevert("only EntryPoint");
+        pm.validatePaymasterUserOp(_userOp(agent), bytes32(0), 0.1 ether);
+
+        vm.prank(caller);
+        vm.expectRevert("only EntryPoint");
+        pm.postOp(PostOpMode.opSucceeded, abi.encode(agent, uint256(0.1 ether)), 0.1 ether, 1 gwei);
+
+        vm.prank(caller);
+        vm.expectRevert("not authorized");
+        pm.withdrawTo(payable(caller), 1 ether);
+
+        vm.prank(caller);
+        vm.expectRevert("not owner");
+        pm.setProbation(caller, true);
+
+        vm.prank(caller);
+        vm.expectRevert("not owner");
+        pm.setMaxSponsoredWei(100 ether);
+
+        assertEq(ep.balanceOf(address(pm)), 5 ether);
+        assertEq(pm.reservedWei(), 0);
+    }
+
+    function testFuzz_ValidatePostOpAccountingExact(uint256 maxCost, uint256 actualCost) public {
+        maxCost = bound(maxCost, 0.01 ether, 5 ether);
+        actualCost = bound(actualCost, 0, maxCost); // conformant EntryPoint: actual <= max
+        _openSponsorship(); // ceiling 10 ether
+
+        (bytes memory ctx, ) = _asEntryPointValidate(agent, maxCost);
+        _asEntryPointPostOp(ctx, actualCost, 1 gwei);
+
+        assertEq(pm.reservedWei(), 0);
+        assertEq(pm.inFlight(agent), 0);
+        assertEq(pm.sponsoredWei(), actualCost);
+        assertEq(pm.sponsoredCount(agent), 1);
+        assertLe(pm.sponsoredWei() + pm.reservedWei(), pm.maxSponsoredWei());
+    }
+
+    function testFuzz_OwnerWithdrawMovesExactAmount(uint256 amount) public {
+        amount = bound(amount, 0, 5 ether);
+        pm.deposit{value: 5 ether}();
+        uint256 before = recipient.balance;
+        pm.withdrawTo(payable(recipient), amount);
+        assertEq(recipient.balance, before + amount);
+        assertEq(ep.balanceOf(address(pm)), 5 ether - amount);
+    }
+
+    function testFuzz_WithdrawAboveDepositAlwaysReverts(uint256 amount) public {
+        amount = bound(amount, 5 ether + 1, 1_000 ether);
+        pm.deposit{value: 5 ether}();
+        vm.expectRevert("insufficient deposit");
+        pm.withdrawTo(payable(recipient), amount);
+    }
 }
