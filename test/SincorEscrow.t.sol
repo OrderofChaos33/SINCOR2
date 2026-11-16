@@ -163,6 +163,98 @@ contract SincorTaskEscrowTest is Test {
         escrow.slashTask(taskId, address(0));
     }
 
+    // --- W-189: expired unclaimed task must not strand its reward ---
+
+    function test_CancelExpiredUnclaimedRefundsCreator() public {
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
+
+        // Past expiry, the task can no longer be claimed (PoC A1 strand).
+        vm.warp(block.timestamp + 2 days);
+        vm.prank(agent);
+        vm.expectRevert("Task expired");
+        escrow.claimTask(taskId);
+
+        uint256 creatorBefore = token.balanceOf(creator);
+        vm.expectEmit(true, true, false, true);
+        emit SincorTaskEscrow.TaskCancelled(taskId, creator, REWARD);
+        vm.prank(creator);
+        escrow.cancelTask(taskId);
+
+        assertEq(token.balanceOf(creator), creatorBefore + REWARD);
+        assertEq(token.balanceOf(address(escrow)), 0);
+        (,, uint256 reward,,, SincorTaskEscrow.TaskStatus status) = escrow.tasks(taskId);
+        assertEq(reward, 0);
+        assertEq(uint256(status), uint256(SincorTaskEscrow.TaskStatus.Cancelled));
+    }
+
+    function test_CancelUnassignedBeforeExpiryRefundsCreator() public {
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
+
+        uint256 creatorBefore = token.balanceOf(creator);
+        vm.prank(creator);
+        escrow.cancelTask(taskId);
+
+        assertEq(token.balanceOf(creator), creatorBefore + REWARD);
+        assertEq(token.balanceOf(address(escrow)), 0);
+        (,,,,, SincorTaskEscrow.TaskStatus status) = escrow.tasks(taskId);
+        assertEq(uint256(status), uint256(SincorTaskEscrow.TaskStatus.Cancelled));
+    }
+
+    function test_CancelZeroDurationTaskRefundsCreator() public {
+        // duration == 0 is unclaimable from the moment it is created.
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 0);
+
+        uint256 creatorBefore = token.balanceOf(creator);
+        vm.prank(creator);
+        escrow.cancelTask(taskId);
+
+        assertEq(token.balanceOf(creator), creatorBefore + REWARD);
+        assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_CancelRevertsForNonCreator() public {
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
+        vm.warp(block.timestamp + 2 days);
+
+        // A third party cannot cancel — and therefore cannot take the reward.
+        vm.prank(agent);
+        vm.expectRevert("Unauthorized cancellation");
+        escrow.cancelTask(taskId);
+
+        vm.prank(address(0x99));
+        vm.expectRevert("Unauthorized cancellation");
+        escrow.cancelTask(taskId);
+
+        // Funds untouched and still recoverable by the creator afterwards.
+        assertEq(token.balanceOf(address(escrow)), REWARD);
+        vm.prank(creator);
+        escrow.cancelTask(taskId);
+        assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_CancelRevertsAfterClaim() public {
+        uint256 taskId = _createAndClaim();
+        vm.prank(creator);
+        vm.expectRevert("Task not cancellable");
+        escrow.cancelTask(taskId);
+    }
+
+    function test_CancelRevertsTwice() public {
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
+
+        vm.prank(creator);
+        escrow.cancelTask(taskId);
+
+        vm.prank(creator);
+        vm.expectRevert("Task not cancellable");
+        escrow.cancelTask(taskId);
+    }
+
     function test_ZeroBondClaimAndComplete() public {
         vm.prank(creator);
         uint256 taskId = escrow.createTask(REWARD, 0, 1 days);

@@ -11,7 +11,7 @@ contract SincorTaskEscrow is ReentrancyGuard {
     IERC20 public immutable sincorToken;
     address public treasury;
 
-    enum TaskStatus { Unassigned, Claimed, Verified, Slashed }
+    enum TaskStatus { Unassigned, Claimed, Verified, Slashed, Cancelled }
 
     struct Task {
         address creator;
@@ -29,6 +29,7 @@ contract SincorTaskEscrow is ReentrancyGuard {
     event TaskClaimed(uint256 indexed taskId, address indexed agent, uint256 bondStaked);
     event TaskCompleted(uint256 indexed taskId, address indexed agent, uint256 totalPayout);
     event TaskSlashed(uint256 indexed taskId, address indexed agent, address indexed reporter, uint256 slashedBond);
+    event TaskCancelled(uint256 indexed taskId, address indexed creator, uint256 refundAmount);
 
     constructor(address _sincorToken, address _treasury) {
         require(_sincorToken != address(0) && _treasury != address(0), "Invalid addresses");
@@ -51,6 +52,25 @@ contract SincorTaskEscrow is ReentrancyGuard {
 
         sincorToken.safeTransferFrom(msg.sender, address(this), rewardAmount);
         emit TaskCreated(taskId, msg.sender, rewardAmount, bondRequired, block.timestamp + duration);
+    }
+
+    /// @notice Cancel an unclaimed task and refund its full reward to the creator.
+    /// @dev Only the task's creator may cancel, and only while the task is
+    ///      Unassigned (no agent has staked a bond yet, so the creator is the
+    ///      only party with funds at stake). This is the recovery path for
+    ///      tasks that expire unclaimed — without it their rewards would be
+    ///      locked in this contract permanently (W-189).
+    function cancelTask(uint256 taskId) external nonReentrant {
+        Task storage task = tasks[taskId];
+        require(task.status == TaskStatus.Unassigned, "Task not cancellable");
+        require(msg.sender == task.creator, "Unauthorized cancellation");
+
+        task.status = TaskStatus.Cancelled;
+        uint256 refundAmount = task.rewardAmount;
+        task.rewardAmount = 0;
+
+        sincorToken.safeTransfer(task.creator, refundAmount);
+        emit TaskCancelled(taskId, task.creator, refundAmount);
     }
 
     function claimTask(uint256 taskId) external nonReentrant {
