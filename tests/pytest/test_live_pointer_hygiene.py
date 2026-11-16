@@ -319,7 +319,7 @@ def test_homepage_is_toa_centric_without_restore_copy() -> None:
     assert "temporal optimization agent" in lower
     assert "e-toa-44" in lower
     assert 'property="og:title" content="SINCOR — The control plane for autonomous agents"' in body
-    assert 'property="og:description" content="Named agents. Sealed-bid auctions. Settlement on Base. The agent economy is live on Base."' in body
+    assert 'property="og:description" content="Named agents. Sealed-bid auctions. Settlement on Base. Genesis launches November 9, 2026."' in body
     assert "/api/a2a/quote?skill_id=toa-decision" in body
     assert "/docs/a2a" in body
     assert "/.well-known/agent-card.json" in body
