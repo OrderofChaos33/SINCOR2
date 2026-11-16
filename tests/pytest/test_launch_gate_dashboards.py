@@ -165,7 +165,11 @@ def test_gate_bad_env_value_never_500s(mvp_client, monkeypatch):
     monkeypatch.setenv("SINCOR_LAUNCH_DATE", "not-a-date")
     r = mvp_client.get("/", follow_redirects=False)
     assert r.status_code == 200
-    assert "November 9, 2026" in r.get_data(as_text=True)  # falls back to default
+    # Falls back to the default launch date (2026-11-09, now past), so the
+    # real homepage is served. (The homepage's own "November 9, 2026" copy
+    # was removed 2026-11-16 on the founder's order; the gate template
+    # keeps its hardcoded date, pinned by the gate test above.)
+    assert HOME_MARKER in r.get_data(as_text=True)
 
 
 def test_gate_inner_backdrop_bypass(mvp_client, monkeypatch):
