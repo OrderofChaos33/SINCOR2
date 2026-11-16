@@ -68,6 +68,12 @@ Security posture
   in the engine's history, matched on auction id / task / winner /
   prices) *and* its seal is signed by that award's winner. Hand-built
   awards with attacker-chosen clearing prices are rejected.
+- **Child registration binding (W-178):** a subcontract node is accepted
+  only if its award is likewise a real award produced by this graph's
+  engine (the same engine-history match as W-158) *and* its seal is
+  signed by the parent award's winner (the winner authorization above).
+  Hand-built child awards that never ran in the engine are rejected, so
+  payable child awards cannot be minted without an auction.
 - **Capability attenuation (W-164):** a child seal's capabilities must
   be a subset of its parent seal's capabilities. Authority can only
   narrow down the tree — a winner cannot self-grant capabilities the
@@ -193,7 +199,7 @@ class BudgetExceeded(GraphError):
 
 
 class UnrecordedAward(GraphError):
-    """An award presented for registration was never produced by the engine (W-158)."""
+    """An award presented for registration was never produced by the engine (W-158 / W-178)."""
 
 
 class CapabilityEscalation(GraphError):
@@ -858,13 +864,16 @@ class HierarchicalTaskGraph:
 
         Used by adversarial tests and by external award pipelines; the
         high-level :meth:`subcontract` runs the engine and delegates here.
+
+        The award must be a real award produced by this graph's engine
+        (W-178) and the seal must be signed by the parent award's winner.
         """
         return self._register_node(
             task, award, seal, parent_node_id=parent_node_id,
             now=now, hmac_secret_resolver=hmac_secret_resolver,
         )
 
-    # -- budget conservation + award provenance (W-157 / W-158) -----------
+    # -- budget conservation + award provenance (W-157 / W-158 / W-178) ---
 
     def _committed_child_totals(self, parent: TaskNode) -> Tuple[int, int]:
         """(sum of child task caps, sum of child clearing prices) for a parent."""
@@ -1031,6 +1040,19 @@ class HierarchicalTaskGraph:
                 child_cap=task.max_price,
                 child_clearing=award.clearing_price,
             )
+            # Child binding (W-178): the subcontract award must be a real
+            # award this engine produced, never a hand-built object with
+            # an attacker-chosen clearing price — the same engine-history
+            # provenance check the root branch enforces (W-158). The
+            # winner binding for a child is the seal-signer check above:
+            # the seal must be signed by the parent award's winner. This
+            # runs after the budget check so an over-budget fabricated
+            # award still reports BudgetExceeded.
+            if not self._award_in_engine_history(award):
+                raise UnrecordedAward(
+                    f"subcontract award for task {task.task_id!r} is not "
+                    "in the engine's history: fabricated awards are rejected"
+                )
         else:
             if duplicate_task:
                 raise GraphError(f"task {task.task_id!r} is already in the graph")
