@@ -25,6 +25,8 @@ contract OptimisticBatchSettlementTest is Test {
     event RootSubmitted(uint256 indexed batchId, bytes32 root, uint256 eventCount);
     event Challenged(uint256 indexed batchId, address challenger, uint256 leafIndex);
     event Finalized(uint256 indexed batchId, bytes32 root);
+    event ChallengeResolved(uint256 indexed batchId, address challenger, bool fraudProven);
+    event ChallengeExpired(uint256 indexed batchId, address challenger);
 
     OptimisticBatchSettlement public obs;
     address public treasury = address(0x7EA5);
@@ -303,7 +305,8 @@ contract OptimisticBatchSettlementTest is Test {
         obs.challenge(id, 0, leafA, fraudLeaf, proof, sides);
         vm.roll(START_BLOCK + 10_000);
         vm.expectRevert(OptimisticBatchSettlement.NotPending.selector);
-        obs.finalize(id); // a challenged batch can never finalize
+        obs.finalize(id); // finalize cannot bypass a live challenge;
+        // resolveChallenge / expireChallenge (W-190) is the only path out
     }
 
     function testFuzz_FinalizeWindow_Boundary(uint256 delta) public {
@@ -318,6 +321,153 @@ contract OptimisticBatchSettlementTest is Test {
             (, , , uint8 status, ) = _batch(id);
             assertEq(status, 2);
         }
+    }
+
+    // --- W-190 regression: vacuous challenge must not freeze a batch --------
+    // Hunt 53 PoC (poc53_escrow_obs_sigil.py §B1-B3): an unrelated attacker
+    // challenged an honest 2-event batch with leafIndex = 999 and a
+    // claimedLeaf invented on the spot; the challenge was accepted and the
+    // batch could NEVER finalize (no resolution path existed).
+
+    function test_W190_VacuousChallenge_OutOfRangeIndex_Reverts() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        bytes32 invented = keccak256("attacker-invented-leaf-never-committed-anywhere");
+        vm.prank(anyone);
+        vm.expectRevert(OptimisticBatchSettlement.LeafIndexOutOfRange.selector);
+        obs.challenge(id, 999, leafA, invented, proof, sides);
+
+        // The batch was never frozen: it finalizes normally after the window.
+        (, , , uint8 status, ) = _batch(id);
+        assertEq(status, 0, "batch still pending after vacuous challenge attempt");
+        vm.roll(START_BLOCK + 3001);
+        obs.finalize(id);
+        (, , , status, ) = _batch(id);
+        assertEq(status, 2, "batch finalized - vacuous challenge cannot freeze it");
+    }
+
+    function test_W190_Challenge_ProofPositionMismatch_Reverts() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA(); // proof for leafA at index 0
+        vm.prank(anyone);
+        vm.expectRevert(OptimisticBatchSettlement.ProofIndexMismatch.selector);
+        obs.challenge(id, 1, leafA, fraudLeaf, proof, sides); // claims index 1
+        (, , , uint8 status, ) = _batch(id);
+        assertEq(status, 0, "batch still pending after mismatched challenge attempt");
+    }
+
+    function test_W190_RepeatedVacuousChallenges_CannotFreeze() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        // Griefing loop: every vacuous form reverts, none sticks.
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(anyone);
+            vm.expectRevert(OptimisticBatchSettlement.LeafIndexOutOfRange.selector);
+            obs.challenge(id, 999 + i, leafA, fraudLeaf, proof, sides);
+            vm.prank(anyone);
+            vm.expectRevert(OptimisticBatchSettlement.ProofIndexMismatch.selector);
+            obs.challenge(id, 1, leafA, fraudLeaf, proof, sides);
+        }
+        vm.roll(START_BLOCK + 3001);
+        obs.finalize(id);
+        (, , , uint8 status, ) = _batch(id);
+        assertEq(status, 2, "batch finalized despite repeated vacuous challenges");
+    }
+
+    function test_W190_SubstantiveChallenge_BlocksFinalize_UntilDismissed() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        vm.prank(anyone);
+        obs.challenge(id, 0, leafA, fraudLeaf, proof, sides); // real leaf, real index
+
+        // A live substantive challenge blocks finalization past the window.
+        vm.roll(START_BLOCK + 3001);
+        vm.expectRevert(OptimisticBatchSettlement.NotPending.selector);
+        obs.finalize(id);
+
+        // Treasury adjudicates: fraud not shown -> dismissed, batch pending.
+        vm.expectEmit(true, false, false, true);
+        emit ChallengeResolved(id, anyone, false);
+        vm.prank(treasury);
+        obs.resolveChallenge(id, false);
+        (, , , uint8 status, address challenger) = _batch(id);
+        assertEq(status, 0, "dismissed challenge returns batch to pending");
+        assertEq(challenger, address(0), "challenger cleared");
+
+        obs.finalize(id);
+        (, , , status, ) = _batch(id);
+        assertEq(status, 2, "batch finalizes after dismissal");
+    }
+
+    function test_W190_UpheldChallenge_RejectsBatch() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        vm.prank(anyone);
+        obs.challenge(id, 0, leafA, fraudLeaf, proof, sides);
+
+        vm.expectEmit(true, false, false, true);
+        emit ChallengeResolved(id, anyone, true);
+        vm.prank(treasury);
+        obs.resolveChallenge(id, true);
+        (, , , uint8 status, ) = _batch(id);
+        assertEq(status, 3, "upheld challenge rejects the batch");
+
+        vm.roll(START_BLOCK + 10_000);
+        vm.expectRevert(OptimisticBatchSettlement.NotPending.selector);
+        obs.finalize(id); // a rejected batch can never finalize
+        vm.expectRevert(OptimisticBatchSettlement.NotPending.selector);
+        obs.challenge(id, 0, leafA, fraudLeaf, proof, sides);
+    }
+
+    function test_W190_ResolveChallenge_NonTreasuryReverts() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        obs.challenge(id, 0, leafA, fraudLeaf, proof, sides);
+        vm.prank(operator);
+        vm.expectRevert(OptimisticBatchSettlement.NotTreasury.selector);
+        obs.resolveChallenge(id, false); // the operator cannot judge its own batch
+        vm.prank(anyone);
+        vm.expectRevert(OptimisticBatchSettlement.NotTreasury.selector);
+        obs.resolveChallenge(id, true);
+    }
+
+    function test_W190_ResolveChallenge_NotChallengedReverts() public {
+        (uint256 id, ) = _submit2();
+        vm.prank(treasury);
+        vm.expectRevert(OptimisticBatchSettlement.NotChallenged.selector);
+        obs.resolveChallenge(id, false);
+    }
+
+    function test_W190_UnadjudicatedChallenge_Expires_BatchFinalizes() public {
+        (uint256 id, ) = _submit2();
+        (bytes32[] memory proof, uint8[] memory sides) = _proofA();
+        vm.prank(anyone);
+        obs.challenge(id, 0, leafA, fraudLeaf, proof, sides);
+
+        // Too early: window + resolution grace not yet fully passed.
+        vm.roll(START_BLOCK + 3000 + 3000);
+        vm.expectRevert(OptimisticBatchSettlement.ResolutionOpen.selector);
+        obs.expireChallenge(id);
+
+        // One block later the backstop opens, callable by anyone.
+        vm.roll(START_BLOCK + 3000 + 3000 + 1);
+        vm.expectEmit(true, false, false, true);
+        emit ChallengeExpired(id, anyone);
+        obs.expireChallenge(id);
+        (, , , uint8 status, address challenger) = _batch(id);
+        assertEq(status, 0, "expired challenge returns batch to pending");
+        assertEq(challenger, address(0), "challenger cleared");
+
+        obs.finalize(id);
+        (, , , status, ) = _batch(id);
+        assertEq(status, 2, "batch finalizes after challenge expiry");
+    }
+
+    function test_W190_ExpireChallenge_NotChallengedReverts() public {
+        (uint256 id, ) = _submit2();
+        vm.roll(START_BLOCK + 10_000);
+        vm.expectRevert(OptimisticBatchSettlement.NotChallenged.selector);
+        obs.expireChallenge(id);
     }
 
     function testFuzz_RaceAtBoundary_FirstTransitionWins(bool challengeFirst) public {
