@@ -14,7 +14,7 @@ from .types import (
     SealedBid,
     TaskSpec,
 )
-from .vickrey import clear_vickrey
+from .vickrey import PLATFORM_FEE_BPS, clear_vickrey, platform_fee_for, split_clearing_proceeds
 from .vectors import cosine_similarity, embed_tokens
 
 try:
@@ -35,7 +35,10 @@ __all__ = [
     "Invite",
     "SealedBid",
     "TaskSpec",
+    "PLATFORM_FEE_BPS",
     "clear_vickrey",
+    "platform_fee_for",
+    "split_clearing_proceeds",
     "cosine_similarity",
     "demo_roster",
     "demo_tasks",

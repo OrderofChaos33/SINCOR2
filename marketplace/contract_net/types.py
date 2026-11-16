@@ -210,6 +210,15 @@ class Award:
     epoch_merkle_root: str = ""
     phase: str = AuctionPhase.CLEARED.value
     error: str = ""
+    # Platform-fee routing (Path 3, fee canon locked 2026-09-26): the 5 %
+    # platform fee is taken out of the clearing-price proceeds and routed
+    # 100 % to the treasury (no burn); the winner is paid the remainder.
+    # The clearing price itself — what the poster pays — is unchanged.
+    # Defaults keep failed awards and hand-built Awards at zero fee.
+    platform_fee_bps: int = 500
+    platform_fee: int = 0  # micro-AXM routed to treasury_address
+    winner_net_amount: int = 0  # micro-AXM paid to the winner (clearing - fee)
+    treasury_address: str = DEFAULT_VERIFYING_CONTRACT  # canonical treasury
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)

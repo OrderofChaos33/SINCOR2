@@ -3,6 +3,16 @@
 Lowest valid price wins. The winner is paid the second-lowest valid price
 (or their own price if they were the only valid bid). No iterative
 counter-bids: one signed envelope per agent.
+
+Fee routing (Path 3): on a cleared award, the platform fee — 5 %
+(``PLATFORM_FEE_BPS`` = 500, the locked fee canon) — is taken out of the
+clearing-price proceeds and routed 100 % to the treasury, with NO burn,
+mirroring ``marketplace/settlement.py`` (``PLATFORM_FEE_BPS`` /
+``SettlementCoordinator.confirm_payment``) and
+``sincor2.a2a_integration.A2A_PLATFORM_FEE_BPS``. The winner (payee)
+receives the remainder. The fee does not alter the clearing price, the
+winning bid, or winner selection, so bid truthfulness is preserved:
+every winner's payoff is scaled by the same constant factor.
 """
 
 from __future__ import annotations
@@ -10,6 +20,30 @@ from __future__ import annotations
 from typing import Iterable, List, Optional, Sequence, Tuple
 
 from .types import Award, AuctionPhase, Invite, SealedBid
+
+# Platform fee in basis points (500 = 5 %). Locked fee canon 2026-09-26:
+# 100 % to treasury, no burn. Kept local (mirroring
+# sincor2.activity_engine.PLATFORM_FEE_BPS) so this module stays
+# dependency-free pure clearing logic.
+PLATFORM_FEE_BPS = 500
+_BPS_DENOM = 10_000
+
+
+def platform_fee_for(amount: int) -> int:
+    """Return the 5 % platform fee for a settlement amount (micro-AXM).
+
+    Integer floor, matching ``a2a_integration._compute_platform_fee_wei``:
+    the fee never rounds up and never exceeds the amount.
+    """
+    if amount < 0:
+        raise ValueError("Settlement amount cannot be negative")
+    return (amount * PLATFORM_FEE_BPS) // _BPS_DENOM
+
+
+def split_clearing_proceeds(clearing_price: int) -> Tuple[int, int]:
+    """Split clearing proceeds into (platform_fee, winner_net_amount)."""
+    fee = platform_fee_for(clearing_price)
+    return fee, clearing_price - fee
 
 
 def sort_valid_bids(bids: Sequence[SealedBid]) -> List[SealedBid]:
@@ -70,6 +104,7 @@ def clear_vickrey(
     winner = valid[0]
     clearing = valid[1].price if len(valid) > 1 else winner.price
     rent = clearing - winner.price
+    platform_fee, winner_net = split_clearing_proceeds(clearing)
     junior_ids = {row.agent_id for row in invites if row.junior}
 
     return Award(
@@ -80,6 +115,9 @@ def clear_vickrey(
         winner_bid_price=winner.price,
         clearing_price=clearing,
         savings_vs_first_price=rent,
+        platform_fee_bps=PLATFORM_FEE_BPS,
+        platform_fee=platform_fee,
+        winner_net_amount=winner_net,
         mechanism="vickrey-second-price",
         junior_reserved=junior_reserved,
         junior_winner=winner.agent_id in junior_ids,
