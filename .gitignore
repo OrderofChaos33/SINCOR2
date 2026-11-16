@@ -162,6 +162,8 @@ REVERT_COMMIT.txt
 
 # Liveness Phase 1 runtime state (never commit: salts, queue, cursor)
 liveness/state/
+# Contract-Net Vickrey clearing-volume ledger (runtime state for the fee step-up)
+marketplace/contract_net/state/
 liveness/fountain_state.json
 # Liveness cohort signing keys (NEVER commit: private key material)
 liveness/cohort_keys.json

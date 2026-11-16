@@ -15,6 +15,14 @@ from .types import (
     TaskSpec,
 )
 from .vickrey import PLATFORM_FEE_BPS, clear_vickrey, platform_fee_for, split_clearing_proceeds
+from .volume_ledger import (
+    BASE_FEE_BPS,
+    STEP_UP_FEE_BPS,
+    fee_bps_for_volumes,
+    monthly_volumes_usd,
+    record_clearing,
+    resolve_fee_bps,
+)
 from .vectors import cosine_similarity, embed_tokens
 
 try:
@@ -36,8 +44,14 @@ __all__ = [
     "SealedBid",
     "TaskSpec",
     "PLATFORM_FEE_BPS",
+    "BASE_FEE_BPS",
+    "STEP_UP_FEE_BPS",
     "clear_vickrey",
+    "fee_bps_for_volumes",
+    "monthly_volumes_usd",
     "platform_fee_for",
+    "record_clearing",
+    "resolve_fee_bps",
     "split_clearing_proceeds",
     "cosine_similarity",
     "demo_roster",
