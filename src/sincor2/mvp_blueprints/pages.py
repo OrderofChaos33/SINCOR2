@@ -536,6 +536,11 @@ def security_page():
     return render_template("security.html")
 
 
+@bp.route("/venom")
+def venom_page():
+    return render_template("venom.html")
+
+
 @bp.route("/axiom")
 def axiom_page():
     return render_template("axiom.html")
