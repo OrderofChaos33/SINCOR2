@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "p24-mev-protection"
+version = "0.1.0"
+description = "SINCOR P24 MEV Protection & Capture (suite P04) — MEV protection module extracted from the SINCOR2 platform for counterparty engagement packaging. Protection/integration scope only; the package makes no MEV capture revenue claims. Platform module; not a standalone product."
+requires-python = ">=3.11"
+# Runtime dependencies: none. The module is Python standard library only
+# (see PACKAGING.md dependency inventory).
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
