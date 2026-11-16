@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "p21-yield-aggregator"
+version = "0.1.0"
+description = "SINCOR P21 Yield Aggregator Vault (suite P01) — risk-aware allocator across yield sources. Platform module extracted for counterparty engagement packaging; not a standalone product."
+requires-python = ">=3.11"
+# Runtime dependencies: none. The module is Python standard library only
+# (see PACKAGING.md dependency inventory).
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
