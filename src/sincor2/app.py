@@ -1629,6 +1629,11 @@ def create_app():
         init_rail_delivery_routes(app)
     except Exception as e:
         print(f"Rail delivery routes not available: {e}")
+    try:
+        from sincor2.vaas_blueprint import register_vaas
+        register_vaas(app)
+    except Exception as e:
+        print(f"VaaS blueprint not available: {e}")
     return app
 
 
