@@ -107,7 +107,7 @@ contract BribeLoopHook {
         address,
         PoolKey calldata key,
         SwapParams calldata params,
-        BalanceDelta delta,
+        BalanceDelta calldata delta,
         bytes calldata
     ) external onlyPoolManager returns (bytes4, int128) {
         // Identify output token based on swap direction

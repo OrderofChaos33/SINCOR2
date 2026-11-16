@@ -38,7 +38,7 @@ contract OLTWAMMIHook is BaseHook, ReentrancyGuardTransient {
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
 
-    IPoolManager public immutable poolManager;
+    // poolManager is inherited from BaseHook/ImmutableState (set via BaseHook(_poolManager)).
     address public immutable treasury;
 
     address public owner;
@@ -89,7 +89,6 @@ contract OLTWAMMIHook is BaseHook, ReentrancyGuardTransient {
     constructor(IPoolManager _poolManager, address _treasury, uint256 _feeBps) BaseHook(_poolManager) {
         if (_treasury == address(0)) revert InvalidTreasury();
         if (_feeBps > MAX_FEE_BPS) revert FeeTooHigh();
-        poolManager = _poolManager;
         treasury = _treasury;
         owner = msg.sender;
         protocolFeeBps = _feeBps;
