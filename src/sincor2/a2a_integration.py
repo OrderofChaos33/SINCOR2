@@ -50,6 +50,7 @@ Quick start
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -2332,7 +2333,7 @@ def build_ap2_discovery_document() -> Dict[str, Any]:
         },
         "status": "LIVE — AP2 discovery document served at https://getsincor.com/.well-known/ap2.json (founder-approved deploy, 2026-11-11); the settlement hub's deployment state is stated in settlement.hub_deployed_on_mainnet.",
         "verification_enforced_offchain": True,
-        "verification_note": "The Hub records any sigilCommitment it is handed and never checks expectedSchemaHash on-chain; verification is enforced by the settling engine before submission, as in sincor-x402.",
+        "verification_note": "Since the W-150 fix, the Hub records only the sigilCommitment bound into the buyer-signed SEAL and rejects zero-amount seals on-chain; it still never checks expectedSchemaHash on-chain, so output verification is additionally enforced by the settling engine before submission, as in sincor-x402.",
     }
 
 
@@ -3540,6 +3541,59 @@ class PaymentVerifier:
 
 
 # ---------------------------------------------------------------------------
+# Proof-wall ingest (POST /api/proof-wall/ingest)
+# ---------------------------------------------------------------------------
+
+PROOF_WALL_INGEST_SECRET_ENV = "SINCOR_PROOF_WALL_INGEST_SECRET"
+PROOF_WALL_INGEST_SIGNATURE_HEADER = "X-Sincor-Signature"
+
+
+def _proof_wall_fetch_receipt(tx_hash: str) -> Optional[Dict[str, Any]]:
+    """Fetch a Base transaction receipt via ``BASE_RPC_URL``.
+
+    Same server-side verification pattern as PaymentVerifier: the
+    caller only names the tx; the receipt comes from the chain, never
+    from caller claims. Returns the receipt dict, or None when the RPC
+    is unconfigured, the call fails, or no receipt exists yet — every
+    None is a fail-closed "cannot verify" for the ingest handler.
+    (Module-level seam: tests stub this function, never the network.)
+    """
+    rpc_url = os.getenv("BASE_RPC_URL")
+    if not rpc_url:
+        logger.error("BASE_RPC_URL not set — cannot verify proof-wall ingest")
+        return None
+    try:
+        payload = json.dumps({
+            "jsonrpc": "2.0", "id": 1,
+            "method":  "eth_getTransactionReceipt",
+            "params":  [tx_hash],
+        }).encode()
+        with _urllib_request.urlopen(_urllib_request.Request(
+            rpc_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        ), timeout=BASE_RPC_TIMEOUT) as resp:
+            data = json.loads(resp.read())
+        receipt = data.get("result")
+        return receipt if isinstance(receipt, dict) else None
+    except Exception as exc:  # noqa: BLE001 - RPC failure = unverifiable
+        logger.error("proof-wall ingest receipt fetch failed: %s", exc)
+        return None
+
+
+def _proof_wall_verify_ingest_signature(raw_body: bytes,
+                                        signature: str) -> bool:
+    """HMAC-SHA256 over the raw request body, keyed by the ingest
+    secret (env-provisioned via the secure flow; never in repo/chat).
+    No secret configured → the route is disabled (fail closed)."""
+    secret = os.getenv(PROOF_WALL_INGEST_SECRET_ENV, "")
+    if not secret or not signature:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature.strip().lower())
+
+
+# ---------------------------------------------------------------------------
 # A2A Router  (returns a Flask Blueprint)
 # ---------------------------------------------------------------------------
 
@@ -4138,6 +4192,90 @@ class A2ARouter:
             return jsonify(proof)
 
         # ── Reputation leaderboard ────────────────────────────────────────────
+        @bp.route("/api/proof-wall/ingest", methods=["POST"])
+        def proof_wall_ingest():
+            """Record one externally-produced verified settlement event
+            (MoebiusX trades) on the proof wall.
+
+            Trust model — the caller's claim is never trusted:
+              * The body must be HMAC-SHA256 signed with the ingest
+                secret (``SINCOR_PROOF_WALL_INGEST_SECRET``, provisioned
+                via the secure flow; unset → route disabled, 503).
+              * The event must claim a CONFIRMED + SUCCESS trade with a
+                full tx hash, from the moebiusx_v3.1 source only —
+                marketplace events are emitted in-app and are never
+                accepted over this route.
+              * The handler re-verifies the tx on Base server-side via
+                ``BASE_RPC_URL``: the receipt must exist and be
+                successful. Failed/missing/unverifiable → 400, no event.
+              * Dedupe is by event_id; a replay is a 200 no-op.
+            """
+            from flask import jsonify, request
+            from sincor2 import proof_events
+
+            if not os.getenv(PROOF_WALL_INGEST_SECRET_ENV, ""):
+                return jsonify(_err(
+                    "proof-wall ingest is not configured", code=-32003)), 503
+            raw_body = request.get_data(cache=True) or b""
+            signature = request.headers.get(
+                PROOF_WALL_INGEST_SIGNATURE_HEADER, "")
+            if not _proof_wall_verify_ingest_signature(raw_body, signature):
+                return jsonify(_err(
+                    "invalid ingest signature", code=-32602)), 401
+            try:
+                body = json.loads(raw_body.decode("utf-8")) \
+                    if raw_body else {}
+            except (ValueError, UnicodeDecodeError):
+                return jsonify(_err("body must be a JSON object",
+                                    code=-32602)), 400
+            if not isinstance(body, dict):
+                return jsonify(_err("body must be a JSON object",
+                                    code=-32602)), 400
+
+            # Claim checks: only a confirmed, successful trade with a
+            # full tx hash may proceed to on-chain re-verification.
+            if str(body.get("status") or "") != "CONFIRMED" \
+                    or str(body.get("outcome") or "") != "SUCCESS":
+                return jsonify(_err(
+                    "only CONFIRMED + SUCCESS trades are ingestible",
+                    code=-32003)), 400
+            event = {k: body.get(k) for k in (
+                "event_id", "source", "origin", "label", "detail",
+                "amount", "asset", "tx_hash", "occurred_at")}
+            if event.get("source") != "moebiusx_v3.1" \
+                    or event.get("origin") != "sincor_agent":
+                return jsonify(_err(
+                    "ingest accepts moebiusx_v3.1 / sincor_agent events only",
+                    code=-32003)), 400
+            try:
+                event = proof_events.validate_event(event)
+            except ValueError as exc:
+                return jsonify(_err(str(exc), code=-32602)), 400
+
+            # On-chain re-verification — the claim alone records nothing.
+            receipt = _proof_wall_fetch_receipt(event["tx_hash"])
+            if receipt is None or receipt.get("status") != "0x1":
+                return jsonify(_err(
+                    "tx not verified on-chain", code=-32003)), 400
+            receipt_hash = str(receipt.get("transactionHash") or "")
+            if receipt_hash and receipt_hash.lower() \
+                    != event["tx_hash"].lower():
+                return jsonify(_err(
+                    "receipt does not match the claimed tx_hash",
+                    code=-32003)), 400
+
+            try:
+                recorded = proof_events.record_event(event)
+            except proof_events.ProofStoreError as exc:
+                logger.error("proof-wall ingest: store failure: %s", exc)
+                return jsonify(_err(
+                    "event store unavailable", code=-32003)), 503
+            return jsonify({
+                "recorded": recorded,
+                "duplicate": not recorded,
+                "event_id": event["event_id"],
+            }), (201 if recorded else 200)
+
         @bp.route("/api/a2a/leaderboard", methods=["GET"])
         def leaderboard():
             """Return top external A2A callers by volume and settlement count."""
@@ -5123,6 +5261,7 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
 
     if (axm_paid > 0 and tx_hash) or free_call:
         _record_a2a_settlement(task, axm_paid, tx_hash or "")
+        _record_task_settled_proof_event(task, axm_paid, tx_hash or "")
         # Reputation identity was fixed at send time in task.metadata
         # (wallet: namespace); the caller_id fallback is UNTRUSTED-INPUT
         # KEYED in a separate trust domain (see _reputation_key).
@@ -5143,6 +5282,43 @@ def _finalize_a2a_task(task: "A2ATask", output: Optional[str], error: Optional[s
         "output": output,
         "proof_of_settlement": proof,
     }
+
+
+def _record_task_settled_proof_event(task: "A2ATask", axm_paid: int,
+                                     tx_hash: str) -> None:
+    """Emit the proof-wall event for a settle-final, actually-paid task.
+
+    Mirrors the /api/a2a/settle proof path's refusals exactly: no event
+    for simulated, free, or unpaid tasks. This runs at the transition
+    where the task becomes terminal (COMPLETED) with its payment
+    recorded — never on payout staging. Best-effort by design: the
+    wall is a read-model, so an emission failure is logged and never
+    bricks the settlement itself. Dedupe is by event_id, so a replayed
+    finalization cannot double-count."""
+    try:
+        if int(axm_paid or 0) <= 0 or not tx_hash:
+            return
+        if bool((task.metadata or {}).get("free_call")):
+            return
+        if str(tx_hash).startswith("0xSIMULATED"):
+            return
+        from sincor2 import proof_events
+
+        amount_display = f"{int(axm_paid) / 10**18:.4f}"
+        proof_events.record_event({
+            "event_id": f"task:{task.id}",
+            "source": "marketplace",
+            "origin": "marketplace_task",
+            "label": f"Task {task.id}",
+            "detail": f"Settled on Base — {amount_display} AXM",
+            "amount": amount_display,
+            "asset": "AXM",
+            "tx_hash": str(tx_hash),
+            "occurred_at": task.updated_at or _now(),
+        })
+    except Exception as exc:  # noqa: BLE001 - read-model must not brick settle
+        logger.warning("proof wall event emission failed for %s: %s",
+                       getattr(task, "id", "?"), exc)
 
 
 def _record_a2a_settlement(task: "A2ATask", axm_paid: int, tx_hash: str) -> None:

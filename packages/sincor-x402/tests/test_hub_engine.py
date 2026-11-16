@@ -132,12 +132,17 @@ def hub_env():
 
 
 def _header(env, *, task, signer=None, buyer=None, amount=AMOUNT,
-            schema_hash=SPEC_HASH, deadline=None):
+            schema_hash=SPEC_HASH, deadline=None, sigil=None, result=RESULT):
+    # W-150: the sigil commitment is inside the signed seal. By default the
+    # buyer signs the commitment of the result the settler will deliver.
+    if sigil is None:
+        sigil = compute_sigil_commitment(task, result)
     return env.engine.create_buyer_seal_header(
         buyer_signer=_typed_data_signer(signer or env.buyer),
         buyer_address=(buyer or env.buyer).address,
         task_id=task, provider_address=env.provider,
         amount_atomic=amount, expected_schema_hash=schema_hash,
+        sigil_commitment=sigil,
         deadline=deadline)
 
 
@@ -193,6 +198,9 @@ def test_seal_header_structure(hub_env):
     assert payload["provider"] == env.provider
     assert payload["amount"] == AMOUNT
     assert payload["expectedSchemaHash"] == "0x" + SPEC_HASH
+    # W-150: the commitment the buyer signed is carried inside the envelope.
+    assert payload["sigilCommitment"] == compute_sigil_commitment(
+        "hub-struct-1", RESULT)
     assert payload["nonce"] == nonce_before
     assert payload["deadline"] > int(time.time())
     assert payload["v"] in (27, 28)
@@ -200,6 +208,8 @@ def test_seal_header_structure(hub_env):
     parsed = SealEnvelope.parse(header)
     assert parsed.task_id == to_bytes32("hub-struct-1")
     assert parsed.amount == AMOUNT and parsed.nonce == nonce_before
+    assert parsed.sigil_commitment == to_bytes32(
+        compute_sigil_commitment("hub-struct-1", RESULT))
 
 
 def test_sigil_commitment_keccak_canon():
@@ -256,7 +266,9 @@ def test_replayed_nonce_rejected(hub_env):
 
 def test_engine_refuses_when_verification_fails(hub_env):
     env = hub_env
-    header = _header(env, task="hub-verify-fail-1")
+    # The seal signs the commitment of the (wrong-shaped) result itself, so
+    # the signed-sigil check passes and it is the Verifier seam that refuses.
+    header = _header(env, task="hub-verify-fail-1", result={"wrong": "shape"})
     calls_before = env.relayer_signer.calls
     nonce_before = env.engine.current_nonce(env.buyer.address)
     before = _balances(env)
@@ -282,6 +294,48 @@ def test_seal_spec_mismatch_refused(hub_env):
     with pytest.raises(VerificationFailed):
         _settle(env, header)
     assert env.relayer_signer.calls == calls_before
+
+
+# --- W-150: the sigil is bound into the buyer-signed seal ---------------------
+
+def test_engine_refuses_result_that_differs_from_signed_sigil(hub_env):
+    env = hub_env
+    # Buyer signed the seal for RESULT's commitment. A different (still
+    # spec-valid) result computes a different commitment: the engine must
+    # refuse BEFORE the Hub is called — under the pre-fix Hub, the settler
+    # could simply have recorded the new commitment instead.
+    header = _header(env, task="hub-w150-sigil-mismatch")
+    calls_before = env.relayer_signer.calls
+    nonce_before = env.engine.current_nonce(env.buyer.address)
+    before = _balances(env)
+    with pytest.raises(VerificationFailed) as excinfo:
+        _settle(env, header, result={"answer": 43})
+    assert "buyer-signed seal" in str(excinfo.value)
+    assert env.relayer_signer.calls == calls_before
+    assert env.engine.current_nonce(env.buyer.address) == nonce_before
+    assert _balances(env) == before
+    assert env.engine.is_task_verified(
+        "hub-w150-sigil-mismatch",
+        compute_sigil_commitment("hub-w150-sigil-mismatch",
+                                 {"answer": 43})) is False
+
+
+def test_zero_amount_seal_rejected_onchain(hub_env):
+    env = hub_env
+    # W-150: a buyer-signed $0 seal used to settle and record "verified"
+    # with zero USDC moved (red-team hunt 47). The Hub now reverts
+    # SealAmountZero, surfaced by the engine's pre-submission simulation.
+    header = _header(env, task="hub-w150-zero-amount", amount=0)
+    calls_before = env.relayer_signer.calls
+    before = _balances(env)
+    with pytest.raises(SettlementReverted) as excinfo:
+        _settle(env, header)
+    assert "SealAmountZero" in str(excinfo.value)
+    assert env.relayer_signer.calls == calls_before  # simulation caught it
+    assert _balances(env) == before
+    assert env.engine.is_task_verified(
+        "hub-w150-zero-amount",
+        compute_sigil_commitment("hub-w150-zero-amount", RESULT)) is False
 
 
 def test_missing_allowance_preflight(hub_env):

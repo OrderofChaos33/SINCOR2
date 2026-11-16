@@ -53,6 +53,19 @@ Threats considered (adversarial self-review, 2026-10-02):
   6. Unauthenticated updates — production wiring MUST pass
      ``auth_verifier``; constructing the manager without one in a
      production environment raises (fail-closed, mirroring BiddingEngine).
+  7. Unauthenticated stream lifecycle (W-162) — ``open_stream`` and
+     ``close_stream`` authenticate through the same ``auth_verifier``
+     whenever one is set: the caller must present an ``auth_proof`` for
+     the agent identity it claims.  Without this, anyone could squat a
+     victim's stream, close it irreversibly, or exhaust the per-auction
+     stream cap with sybil identities.
+  8. Opener-declared stream terms (W-163) — an auction's commit deadline
+     and minimum increment live in the auction record
+     (``register_auction``), never in the opener's request.  When an
+     ``auth_verifier`` is set (production), ``open_stream`` sources both
+     values from the record and rejects unregistered auctions; the
+     opener-supplied arguments are honoured only in no-verifier dev/test
+     mode, for backward compatibility with existing callers.
 """
 
 from __future__ import annotations
@@ -69,6 +82,15 @@ from sincor2.onchain.bidder_client import commitment as _commitment
 logger = logging.getLogger("sincor.streaming_bids")
 
 COMMITMENT_LEN = 32
+
+#: Domain-separation prefix the manager puts in front of a lifecycle
+#: ``auth_proof`` before handing it to ``auth_verifier`` (W-162).  A
+#: submitted update's proof is its raw 32-byte commitment; a lifecycle
+#: proof arrives tagged with this prefix, so one verifier can apply
+#: lifecycle-grade credential validation (e.g. a signature check) to
+#: open/close without confusing it with a commitment, and a streamed
+#: commitment can never be replayed as a lifecycle credential.
+LIFECYCLE_PROOF_PREFIX = b"sincor2.streaming_bids.lifecycle:"
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +117,19 @@ class StreamConfig:
             raise ValueError("min_update_interval_seconds must be >= 0")
         if self.max_streams_per_auction < 1:
             raise ValueError("max_streams_per_auction must be >= 1")
+
+
+@dataclass(frozen=True)
+class AuctionTerms:
+    """Auction-level source of truth for stream terms (W-163).
+
+    Set once by the auction operator via ``register_auction``; every
+    stream opened for the auction inherits these values.  Openers never
+    declare them.
+    """
+
+    commit_deadline_ts: float
+    min_increment_wei: int = 0
 
 
 @dataclass(frozen=True)
@@ -171,10 +206,16 @@ class StreamingBidManager:
     config:
         Anti-spam tuning.  Defaults are conservative.
     auth_verifier:
-        Optional ``callable(agent_id, auction_id_hex, commitment) -> bool``.
-        When set, every submitted update must pass it.  When None, no
-        authentication is performed — permitted in dev/test only; in a
-        production environment the constructor raises (fail-closed).
+        Optional ``callable(agent_id, auction_id_hex, proof) -> bool``.
+        When set, every submitted update must pass it (the update's
+        commitment is the proof), and ``open_stream``/``close_stream``
+        must pass it too (the caller supplies an opaque ``auth_proof`` —
+        in production wiring, a credential only the agent's key holder
+        can produce for that agent identity; lifecycle proofs reach the
+        verifier domain-tagged with ``LIFECYCLE_PROOF_PREFIX``).  When
+        None, no authentication is performed — permitted in dev/test
+        only; in a production environment the constructor raises
+        (fail-closed).
     clock:
         Optional ``callable() -> float`` timestamp source (default
         ``time.time``).  Injectable for deterministic tests.
@@ -208,6 +249,8 @@ class StreamingBidManager:
         self._lock = threading.RLock()
         # auction_id_hex -> {agent_id -> _StreamRecord}
         self._streams: Dict[str, Dict[str, _StreamRecord]] = {}
+        # auction_id_hex -> AuctionTerms (auction record, W-163)
+        self._auctions: Dict[str, AuctionTerms] = {}
 
     # -- helpers ----------------------------------------------------------
 
@@ -220,6 +263,98 @@ class StreamingBidManager:
     ) -> Optional[_StreamRecord]:
         return self._streams.get(self._auction_hex(auction_id), {}).get(agent_id)
 
+    def _check_auth(
+        self, agent_id: str, auction_id: bytes, proof: Optional[bytes],
+        *, lifecycle: bool = False,
+    ) -> Optional[StreamResult]:
+        """
+        Authenticate one operation through ``auth_verifier``.
+
+        Returns None when the operation is authorized (or no verifier is
+        configured — dev/test mode), otherwise the rejection result.
+        ``proof`` is the commitment bytes for ``submit_update`` and the
+        caller-supplied ``auth_proof`` for lifecycle operations; a
+        missing proof fails closed whenever a verifier is set (W-162).
+        Lifecycle proofs are domain-tagged with
+        ``LIFECYCLE_PROOF_PREFIX`` before reaching the verifier, so a
+        commitment can never double as a lifecycle credential.
+        """
+        if self._auth is None:
+            return None
+        if proof is None:
+            return StreamResult(ok=False, reason="auth_failed",
+                                detail="auth proof required")
+        presented = bytes(proof)
+        if lifecycle:
+            presented = LIFECYCLE_PROOF_PREFIX + presented
+        try:
+            authed = self._auth(
+                agent_id, self._auction_hex(auction_id), presented)
+        except Exception:
+            logger.exception(
+                "[STREAM-BIDS] auth_verifier crashed agent=%s", agent_id)
+            return StreamResult(ok=False, reason="auth_failed",
+                                detail="auth verifier error")
+        if not authed:
+            return StreamResult(ok=False, reason="auth_failed",
+                                detail="operation not authenticated")
+        return None
+
+    # -- auction record (terms source of truth, W-163) ----------------------
+
+    def register_auction(
+        self,
+        auction_id: bytes,
+        *,
+        commit_deadline_ts: float,
+        min_increment_wei: int = 0,
+    ) -> StreamResult:
+        """
+        Register an auction's terms — the source of truth every stream
+        for this auction inherits (W-163).
+
+        This is the auction operator's act, performed when the auction
+        is created; openers never declare terms.  Registration is
+        first-write-wins: re-registering with identical terms is an
+        idempotent no-op, re-registering with different terms is
+        rejected (``auction_terms_conflict``) and the original record
+        stands, so terms can never be rewritten mid-window.
+        """
+        try:
+            auction_id = bytes(auction_id)
+        except (TypeError, ValueError):
+            return StreamResult(ok=False, reason="bad_auction_id",
+                                detail="auction_id must be bytes-like")
+        if len(auction_id) != COMMITMENT_LEN:
+            return StreamResult(ok=False, reason="bad_auction_id",
+                                detail="auction_id must be 32 bytes")
+        if int(min_increment_wei) < 0:
+            return StreamResult(ok=False, reason="bad_increment",
+                                detail="min_increment_wei must be >= 0")
+        if not commit_deadline_ts > self._clock():
+            return StreamResult(ok=False, reason="window_closed",
+                                detail="commit deadline is not in the future")
+        terms = AuctionTerms(commit_deadline_ts=float(commit_deadline_ts),
+                             min_increment_wei=int(min_increment_wei))
+        with self._lock:
+            existing = self._auctions.get(self._auction_hex(auction_id))
+            if existing is not None:
+                if existing == terms:
+                    return StreamResult(ok=True, reason="registered",
+                                        detail="terms already registered")
+                return StreamResult(
+                    ok=False, reason="auction_terms_conflict",
+                    detail="auction already registered with different terms")
+            self._auctions[self._auction_hex(auction_id)] = terms
+        logger.info("[STREAM-BIDS] auction registered auction=%s",
+                    self._auction_hex(auction_id)[:16])
+        return StreamResult(ok=True, reason="registered")
+
+    def auction_terms(self, auction_id: bytes) -> Optional[AuctionTerms]:
+        """The registered terms for an auction, or None if unregistered."""
+        with self._lock:
+            return self._auctions.get(self._auction_hex(bytes(auction_id)))
+
     # -- stream lifecycle ---------------------------------------------------
 
     def open_stream(
@@ -227,15 +362,25 @@ class StreamingBidManager:
         auction_id: bytes,
         agent_id: str,
         *,
-        commit_deadline_ts: float,
-        min_increment_wei: int = 0,
+        commit_deadline_ts: Optional[float] = None,
+        min_increment_wei: Optional[int] = None,
+        auth_proof: Optional[bytes] = None,
     ) -> StreamResult:
         """
         Register an agent's update stream for one auction.
 
-        ``commit_deadline_ts`` is the auction's commit-window close (same
-        clock domain as ``clock``).  ``min_increment_wei`` is the minimum
-        absolute price move between consecutive updates, enforced at reveal.
+        Terms (commit deadline, minimum increment) are sourced from the
+        auction record registered via ``register_auction`` — never from
+        the opener (W-163).  The ``commit_deadline_ts`` /
+        ``min_increment_wei`` arguments are honoured only when no
+        ``auth_verifier`` is configured (dev/test mode, where there is
+        no production auction wiring); whenever a verifier is set, the
+        auction must be registered and these arguments are ignored.
+
+        Whenever an ``auth_verifier`` is configured, the opener must
+        also authenticate as ``agent_id`` by presenting ``auth_proof``
+        (W-162): an unauthenticated caller cannot squat another agent's
+        stream or burn the per-auction stream cap with sybil identities.
         """
         try:
             auction_id = bytes(auction_id)
@@ -249,15 +394,46 @@ class StreamingBidManager:
         if not agent_id:
             return StreamResult(ok=False, reason="bad_agent_id",
                                 detail="agent_id must be non-empty")
-        if int(min_increment_wei) < 0:
+        if min_increment_wei is not None and int(min_increment_wei) < 0:
             return StreamResult(ok=False, reason="bad_increment",
                                 detail="min_increment_wei must be >= 0")
         now = self._clock()
-        if not commit_deadline_ts > now:
-            return StreamResult(ok=False, reason="window_closed",
-                                detail="commit deadline is not in the future")
 
         with self._lock:
+            # Authenticate before revealing anything about stream state:
+            # an unauthenticated caller learns neither whether the
+            # stream exists nor whether the cap is exhausted.
+            rejection = self._check_auth(agent_id, auction_id, auth_proof,
+                                         lifecycle=True)
+            if rejection is not None:
+                return rejection
+
+            terms = self._auctions.get(self._auction_hex(auction_id))
+            if terms is not None:
+                deadline = terms.commit_deadline_ts
+                increment = terms.min_increment_wei
+            elif self._auth is not None:
+                # Production mode: terms come from the auction record,
+                # full stop — an unregistered auction has no streams.
+                return StreamResult(
+                    ok=False, reason="unknown_auction",
+                    detail="auction not registered; stream terms must "
+                           "come from the auction record")
+            else:
+                # Dev/test mode (no verifier): legacy opener-declared
+                # terms, kept so existing callers/tests are unaffected.
+                if commit_deadline_ts is None:
+                    return StreamResult(
+                        ok=False, reason="missing_terms",
+                        detail="commit_deadline_ts is required when the "
+                               "auction is not registered")
+                deadline = float(commit_deadline_ts)
+                increment = int(min_increment_wei or 0)
+            if not deadline > now:
+                return StreamResult(ok=False, reason="window_closed",
+                                    detail="commit deadline is not in "
+                                           "the future")
+
             per_auction = self._streams.setdefault(
                 self._auction_hex(auction_id), {})
             if agent_id in per_auction:
@@ -269,8 +445,8 @@ class StreamingBidManager:
             per_auction[agent_id] = _StreamRecord(
                 auction_id=auction_id,
                 agent_id=agent_id,
-                commit_deadline_ts=float(commit_deadline_ts),
-                min_increment_wei=int(min_increment_wei),
+                commit_deadline_ts=deadline,
+                min_increment_wei=increment,
             )
         logger.info("[STREAM-BIDS] stream opened auction=%s agent=%s",
                     self._auction_hex(auction_id)[:16], agent_id)
@@ -317,20 +493,10 @@ class StreamingBidManager:
                 # information, treated as spam.
                 return StreamResult(ok=False, reason="duplicate_commitment",
                                     detail="commitment already streamed")
-            if self._auth is not None:
-                try:
-                    authed = self._auth(
-                        agent_id, self._auction_hex(auction_id),
-                        commitment_bytes)
-                except Exception:
-                    logger.exception(
-                        "[STREAM-BIDS] auth_verifier crashed agent=%s",
-                        agent_id)
-                    return StreamResult(ok=False, reason="auth_failed",
-                                        detail="auth verifier error")
-                if not authed:
-                    return StreamResult(ok=False, reason="auth_failed",
-                                        detail="update not authenticated")
+            rejection = self._check_auth(agent_id, auction_id,
+                                         commitment_bytes)
+            if rejection is not None:
+                return rejection
             if (rec.last_update_at is not None
                     and now - rec.last_update_at
                     < self._config.min_update_interval_seconds):
@@ -355,10 +521,34 @@ class StreamingBidManager:
                      self._auction_hex(auction_id)[:16], agent_id, seq)
         return StreamResult(ok=True, reason="accepted", seq=seq)
 
-    def close_stream(self, auction_id: bytes, agent_id: str) -> StreamResult:
-        """Close a stream; further updates are rejected.  Idempotent-safe."""
+    def close_stream(
+        self,
+        auction_id: bytes,
+        agent_id: str,
+        *,
+        auth_proof: Optional[bytes] = None,
+    ) -> StreamResult:
+        """
+        Close a stream; further updates are rejected.  Idempotent-safe.
+
+        Whenever an ``auth_verifier`` is configured, the caller must
+        authenticate as the stream's agent via ``auth_proof`` (W-162):
+        closing is irreversible (the record persists and blocks
+        re-opening), so an unauthenticated close would be a permanent
+        per-auction DoS of the victim bidder.
+        """
+        try:
+            auction_id = bytes(auction_id)
+        except (TypeError, ValueError):
+            return StreamResult(ok=False, reason="bad_auction_id",
+                                detail="auction_id must be bytes-like")
+        agent_id = str(agent_id or "")
         with self._lock:
-            rec = self._get_record(bytes(auction_id), str(agent_id or ""))
+            rejection = self._check_auth(agent_id, auction_id, auth_proof,
+                                         lifecycle=True)
+            if rejection is not None:
+                return rejection
+            rec = self._get_record(auction_id, agent_id)
             if rec is None:
                 return StreamResult(ok=False, reason="unknown_stream")
             rec.open = False

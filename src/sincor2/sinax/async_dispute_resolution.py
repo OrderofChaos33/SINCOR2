@@ -17,6 +17,12 @@ Security posture (fail-closed, no fiction):
   signatures before they can move a dispute. A ruling binds the dispute_id
   it was issued for; consumed rulings are single-use, so replays are
   rejected.
+* The caller of ``apply_oracle_ruling`` never picks the trust root: an
+  adapter can verify rulings only after the operator registers that exact
+  instance with the registry (constructor ``oracle_adapters`` or
+  ``register_oracle_adapter``). Unregistered adapters — including
+  duck-typed lookalikes and unregistered subclasses — are rejected
+  (W-168).
 * Timeout auto-resolution defaults to "not upheld": without an
   adjudicator-signed ruling there is no slashing. Slashing is on the money
   path and must never be inferred from silence.
@@ -39,7 +45,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +166,9 @@ class ArbitrationOracleAdapter(ABC):
     Implementations translate an external arbitration decision into a
     verified :class:`OracleRuling`. The registry calls ``verify_ruling``
     before a ruling can resolve anything; a ``False`` return keeps the
-    dispute exactly where it was (fail-closed).
+    dispute exactly where it was (fail-closed). An adapter instance is
+    consulted only after the operator registers it with the registry —
+    subclassing this interface alone confers no trust.
     """
 
     name: str = "base"
@@ -346,7 +354,9 @@ class DisputeRegistry:
     def __init__(self, *,
                  evidence_window_ms: int = DEFAULT_EVIDENCE_WINDOW_MS,
                  auto_resolve_upheld: bool = False,
-                 now_ms: Optional[Callable[[], int]] = None) -> None:
+                 now_ms: Optional[Callable[[], int]] = None,
+                 oracle_adapters: Optional[
+                     Iterable[ArbitrationOracleAdapter]] = None) -> None:
         if int(evidence_window_ms) <= 0:
             raise InvalidDisputeInput("evidence_window_ms must be positive")
         self.evidence_window_ms = int(evidence_window_ms)
@@ -358,6 +368,47 @@ class DisputeRegistry:
         self._disputes: Dict[str, AsyncDispute] = {}
         self._open_by_pair: Dict[tuple, str] = {}
         self._consumed_rulings: set = set()  # EIP-191 signature digests
+        # Adapter allowlist (W-168): identity-keyed map of the exact
+        # adapter instances the operator has pinned to this registry.
+        # Strong references are held so an id() can never be recycled
+        # onto a different object while it is trusted.
+        self._oracle_adapters: Dict[int, ArbitrationOracleAdapter] = {}
+        for adapter in oracle_adapters or ():
+            self.register_oracle_adapter(adapter)
+
+    # -- oracle adapter allowlist -------------------------------------------
+    def register_oracle_adapter(
+            self, adapter: ArbitrationOracleAdapter) -> ArbitrationOracleAdapter:
+        """Pin an adapter instance as trusted for this registry.
+
+        This is the operator-side wiring step: only adapters registered
+        here (or via the constructor) may verify rulings in
+        :meth:`apply_oracle_ruling`. Registration is by identity — the
+        exact instance registered is the exact instance trusted.
+        Returns the adapter for convenient assignment/chaining.
+        """
+        if not isinstance(adapter, ArbitrationOracleAdapter):
+            raise InvalidDisputeInput(
+                "oracle adapter must be an ArbitrationOracleAdapter "
+                "instance")
+        with self._lock:
+            self._oracle_adapters[id(adapter)] = adapter
+        return adapter
+
+    def unregister_oracle_adapter(
+            self, adapter: ArbitrationOracleAdapter) -> bool:
+        """Revoke an adapter's trust; True if it had been registered."""
+        with self._lock:
+            return self._oracle_adapters.pop(id(adapter), None) is not None
+
+    def registered_oracle_adapters(self) -> tuple:
+        """Snapshot of the adapter instances currently trusted."""
+        with self._lock:
+            return tuple(self._oracle_adapters.values())
+
+    def _is_trusted_adapter(self, adapter: Any) -> bool:
+        return (isinstance(adapter, ArbitrationOracleAdapter)
+                and self._oracle_adapters.get(id(adapter)) is adapter)
 
     # -- filing -----------------------------------------------------------
     def file_dispute(self, *, task_id: str, agent_id: str, filer_id: str,
@@ -428,8 +479,11 @@ class DisputeRegistry:
                             adapter: ArbitrationOracleAdapter) -> AsyncDispute:
         """Verify the ruling via the adapter, then EVIDENCE_OPEN -> RESOLVED.
 
-        Fail-closed: any verification failure raises InvalidRuling and the
-        dispute state is untouched.
+        The adapter must be registered with this registry (see
+        :meth:`register_oracle_adapter`): the caller submitting a ruling
+        never chooses which oracle is trusted. Fail-closed: any trust or
+        verification failure raises InvalidRuling and the dispute state
+        is untouched.
         """
         with self._lock:
             dispute = self._get(ruling.dispute_id)
@@ -445,6 +499,12 @@ class DisputeRegistry:
             digest = str(ruling.signature or "").strip().lower()
             if digest in self._consumed_rulings:
                 raise InvalidRuling("ruling already consumed (replay)")
+            if not self._is_trusted_adapter(adapter):
+                dispute._log("note", dispute.state, dispute.state,
+                             "ruling rejected: oracle adapter is not "
+                             "registered with this registry", now)
+                raise InvalidRuling(
+                    "oracle adapter is not registered with this registry")
             if not adapter.verify_ruling(ruling):
                 dispute._log("note", dispute.state, dispute.state,
                              f"ruling rejected by oracle {adapter.name}", now)

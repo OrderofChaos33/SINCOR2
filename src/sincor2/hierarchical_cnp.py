@@ -62,6 +62,26 @@ Security posture
   the registry, so two *different* seals sharing a signer and nonce are
   rejected even when both signatures are valid. Re-verifying the *same*
   seal is idempotent — it is not reuse.
+- **Budget conservation (W-157):** a parent task's ``max_price`` is the
+  total envelope for its subtree level. The sum of child task caps — and
+  the sum of child clearing prices actually committed — may never exceed
+  the parent's remaining budget, so a winner cannot re-spend the same
+  budget across N subcontracts. Enforced in ``_register_node`` (the single
+  registration choke point) and pre-checked in ``subcontract`` before an
+  auction is spent.
+- **Root registration binding (W-158):** a genesis node is accepted only
+  if its award is a real award produced by this graph's engine (present
+  in the engine's history, matched on auction id / task / winner /
+  prices) *and* its seal is signed by that award's winner. Hand-built
+  awards with attacker-chosen clearing prices are rejected.
+- **Capability attenuation (W-164):** a child seal's capabilities must
+  be a subset of its parent seal's capabilities. Authority can only
+  narrow down the tree — a winner cannot self-grant capabilities the
+  parent never held (e.g. ``treasury:release`` under a ``research:read``
+  parent) by subcontracting. Enforced in ``_register_node`` (the single
+  registration choke point) and pre-checked in ``subcontract`` before
+  an auction is spent. Root seals are unaffected: a genesis seal takes
+  its capabilities from its own award/seal.
 - Failed auctions (no winner) can never be sealed or subcontracted.
 - Task ids are unique across the graph: the hierarchy is a tree, and a
   task can never become its own ancestor.
@@ -178,6 +198,18 @@ class AuthorizationError(GraphError):
 
 class DuplicateSeal(GraphError):
     """A seal id is already registered in the graph."""
+
+
+class BudgetExceeded(GraphError):
+    """A subcontract would exceed the parent task's remaining budget (W-157)."""
+
+
+class UnrecordedAward(GraphError):
+    """An award presented for registration was never produced by the engine (W-158)."""
+
+
+class CapabilityEscalation(GraphError):
+    """A child seal claims capabilities its parent seal does not hold (W-164)."""
 
 
 # ---------------------------------------------------------------------------
@@ -699,9 +731,11 @@ def verify_seal_chain(
 
     Each step requires: the seal verifies on its own; an optional
     fail-closed signer allowlist; the parent is registered under the exact
-    referenced hash; depth decreases by exactly 1 (defeats depth smuggling
-    and reference cycles); the genesis seal sits at depth 0 with an empty
-    parent hash. A repeated seal id is a cycle and is rejected.
+    referenced hash AND the registered entry's own seal_id equals that
+    hash (registry keys are never trusted as identity); depth decreases
+    by exactly 1 (defeats depth smuggling and reference cycles); the
+    genesis seal sits at depth 0 with an empty parent hash. A repeated
+    seal id is a cycle and is rejected.
 
     Nonce single-use (W-160) is enforced two ways: two links of the
     presented chain itself may never share a ``(signer, nonce)`` pair
@@ -774,6 +808,17 @@ def verify_seal_chain(
             raise SealChainError(
                 f"parent seal {current.parent_seal_hash} is not registered: "
                 "broken parent chain"
+            )
+        if _normalize_seal_id(parent.seal_id) != current.parent_seal_hash.lower():
+            # The registry key is not evidence: the entry stored under the
+            # referenced hash must BE the referenced seal. Without this
+            # binding, a hostile registry can substitute any fully valid
+            # seal (e.g. an attacker's genesis) under a victim's id and
+            # the walk would return a chain rooted at the wrong seal
+            # (W-159 genesis substitution).
+            raise SealChainError(
+                f"parent seal registered under {current.parent_seal_hash} "
+                f"has seal id {parent.seal_id}: registry substitution"
             )
         if parent.depth != current.depth - 1:
             raise SealChainError(
@@ -931,7 +976,11 @@ class HierarchicalTaskGraph:
         now: int,
         hmac_secret_resolver: Optional[Callable[[str], str]] = None,
     ) -> TaskNode:
-        """Register a genesis task with its depth-0 seal. No auction is run."""
+        """Register a genesis task with its depth-0 seal. No auction is run.
+
+        The award must be a real award produced by this graph's engine
+        (W-158) and the seal must be signed by that award's winner.
+        """
         return self._register_node(
             task, award, seal, parent_node_id="",
             now=now, hmac_secret_resolver=hmac_secret_resolver,
@@ -956,6 +1005,97 @@ class HierarchicalTaskGraph:
             task, award, seal, parent_node_id=parent_node_id,
             now=now, hmac_secret_resolver=hmac_secret_resolver,
         )
+
+    # -- budget conservation + award provenance (W-157 / W-158) -----------
+
+    def _committed_child_totals(self, parent: TaskNode) -> Tuple[int, int]:
+        """(sum of child task caps, sum of child clearing prices) for a parent."""
+        caps = 0
+        clearing = 0
+        for child_id in parent.child_node_ids:
+            child = self._nodes[child_id]
+            caps += child.task.max_price
+            clearing += child.award.clearing_price
+        return caps, clearing
+
+    def _check_child_budget(
+        self,
+        parent: TaskNode,
+        *,
+        child_cap: int,
+        child_clearing: Optional[int] = None,
+    ) -> None:
+        """Enforce budget conservation for one more child of ``parent``.
+
+        The parent task's ``max_price`` is the budget envelope. Both the
+        worst-case commitment (sum of child caps) and the realized
+        commitment (sum of child clearing prices) must fit inside the
+        parent's remaining budget — a winner may not re-spend the same
+        budget across multiple subcontracts (W-157).
+        """
+        budget = parent.task.max_price
+        committed_caps, committed_clearing = self._committed_child_totals(parent)
+        if committed_caps + child_cap > budget:
+            raise BudgetExceeded(
+                f"subcontract cap {child_cap} exceeds parent task "
+                f"{parent.task.task_id!r} remaining budget: child caps already "
+                f"commit {committed_caps} of {budget}"
+            )
+        if child_clearing is not None and committed_clearing + child_clearing > budget:
+            raise BudgetExceeded(
+                f"subcontract clearing {child_clearing} exceeds parent task "
+                f"{parent.task.task_id!r} remaining budget: child awards already "
+                f"commit {committed_clearing} of {budget}"
+            )
+
+    def _check_child_capabilities(
+        self,
+        parent: TaskNode,
+        child_capabilities: Sequence[str],
+    ) -> None:
+        """Enforce capability attenuation for one child of ``parent``.
+
+        A subcontract may only *narrow* authority: the child seal's
+        capabilities must be a subset of the parent seal's capabilities.
+        A winner cannot mint themselves capabilities the parent never
+        held by subcontracting (W-164). Because every level is checked
+        against its own parent, attenuation is transitive — a capability
+        dropped at one level can never reappear deeper in the tree.
+        """
+        parent_caps = set(parent.seal.capabilities)
+        escalated = sorted({cap for cap in child_capabilities
+                            if cap not in parent_caps})
+        if escalated:
+            raise CapabilityEscalation(
+                f"child seal capabilities {escalated} are not held by the "
+                f"parent seal for task {parent.task.task_id!r} (parent "
+                f"holds {sorted(parent_caps)}): capabilities may only "
+                "narrow down the tree"
+            )
+
+    def _award_in_engine_history(self, award: Award) -> bool:
+        """True iff this graph's engine actually produced ``award``.
+
+        Matches on the money-relevant identity of the award (auction id,
+        task, winner, winner wallet, bid and clearing prices), so a
+        hand-built award with an attacker-chosen clearing price never
+        matches, while a faithful copy of a real engine award does.
+        """
+        for record in self.engine.history():
+            rec = record.award
+            if rec is award:
+                return True
+            if (
+                rec.auction_id == award.auction_id
+                and rec.task_id == award.task_id
+                and rec.winner_id == award.winner_id
+                and (rec.winner_wallet or "").lower()
+                == (award.winner_wallet or "").lower()
+                and rec.winner_bid_price == award.winner_bid_price
+                and rec.clearing_price == award.clearing_price
+            ):
+                return True
+        return False
 
     def _register_node(
         self,
@@ -1027,6 +1167,16 @@ class HierarchicalTaskGraph:
                 raise AuthorizationError(
                     "child seal must be signed by the parent task's award winner"
                 )
+            # Capability attenuation (W-164): the child seal may claim
+            # only capabilities the parent seal actually holds.
+            self._check_child_capabilities(parent, seal.capabilities)
+            # Budget conservation (W-157): this child's cap and its actual
+            # clearing price must fit the parent's remaining budget.
+            self._check_child_budget(
+                parent,
+                child_cap=task.max_price,
+                child_clearing=award.clearing_price,
+            )
         else:
             if duplicate_task:
                 raise GraphError(f"task {task.task_id!r} is already in the graph")
@@ -1035,6 +1185,20 @@ class HierarchicalTaskGraph:
                 raise SealChainError("genesis seal must sit at depth 0")
             if seal.parent_seal_hash.lower() != EMPTY_SEAL_HASH.lower():
                 raise SealChainError("genesis seal must reference the empty parent hash")
+            # Root binding (W-158): the genesis seal must be signed by the
+            # root award's winner — the same binding the subcontract branch
+            # enforces — and the award must be a real award this engine
+            # produced, never a hand-built object with an attacker-chosen
+            # clearing price.
+            if seal.agent_address.lower() != (award.winner_wallet or "").lower():
+                raise AuthorizationError(
+                    "root seal must be signed by the root award's winner"
+                )
+            if not self._award_in_engine_history(award):
+                raise UnrecordedAward(
+                    f"root award for task {task.task_id!r} is not in the "
+                    "engine's history: fabricated awards are rejected"
+                )
 
         # The full chain (leaf → genesis) must verify against the registry.
         # For a root this is a 1-link chain; the registry gains the new seal
@@ -1166,6 +1330,16 @@ class HierarchicalTaskGraph:
             raise DepthLimitExceeded(
                 f"subcontract depth {depth} exceeds max_depth {self.config.max_depth}"
             )
+        # Budget conservation (W-157), fail fast: the child task's cap
+        # alone must fit the parent's remaining budget before an auction
+        # is spent on it. The full check (caps + committed clearing) runs
+        # again in _register_node once the award exists.
+        self._check_child_budget(parent, child_cap=task.max_price)
+        # Capability attenuation (W-164), fail fast: the requested child
+        # capabilities must fit inside the parent seal's capabilities
+        # before an auction is spent on them. The authoritative check
+        # runs again in _register_node against the minted seal.
+        self._check_child_capabilities(parent, capabilities)
         award = self.engine.run(task, agents, seed=seed, now=now, **run_kwargs)
         if not award.winner_id:
             raise GraphError(f"subcontract auction for {task.task_id!r} failed: no winner")

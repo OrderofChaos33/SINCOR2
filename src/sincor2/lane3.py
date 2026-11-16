@@ -8,7 +8,10 @@ no new money-movement code, no on-chain transfers:
    repo/site state. The MoebiusX tallies are a build-time snapshot (the
    deployed site cannot read the trading kits) and the page is stamped
    "as of" the snapshot date; the skill count/list is read live from the
-   agent card builder.
+   agent card builder. The "Live activity" section is fed separately by
+   :func:`proof_wall_live_feed` from the append-only verified-event
+   store (``sincor2.proof_events``) — events are never blended into
+   the snapshot tallies.
 
 2. Zero-friction external agent registration (GET /register page +
    POST /ap2/register): validates name / endpoint URL / contact, then
@@ -96,6 +99,38 @@ MODULE_SUMMARIES = [
 ]
 
 
+def proof_wall_live_feed() -> Dict[str, Any]:
+    """Live-activity feed for the proof wall: verified settlement
+    events from the append-only store (sincor2.proof_events), newest
+    first, with totals split by origin.
+
+    The snapshot constants above remain the historical record until
+    the event store covers the same history; event totals are reported
+    as their own labeled counts and are NEVER added into the snapshot
+    tallies (no double-counting). When the store is empty the feed is
+    empty and the page renders the spec's empty-state sentence; when
+    the store is unreadable the feed degrades the same way with
+    ``events_available`` False — the page never errors and never
+    invents data."""
+    from sincor2 import proof_events
+
+    try:
+        return {
+            "events": proof_events.list_events(limit=25),
+            "event_totals": proof_events.totals(),
+            "events_available": True,
+        }
+    except Exception:  # noqa: BLE001 - corrupt store degrades, never 500s
+        return {
+            "events": [],
+            "event_totals": {
+                "total": 0,
+                "by_origin": {o: 0 for o in sorted(proof_events.ORIGINS)},
+            },
+            "events_available": False,
+        }
+
+
 def proof_wall_data() -> Dict[str, Any]:
     """Data for the /x402-live proof wall. Skill data is read live from
     the agent card builder so the count can never drift from the card."""
@@ -103,7 +138,7 @@ def proof_wall_data() -> Dict[str, Any]:
 
     card = build_agent_card()
     skills = [{"id": s.id, "name": s.name} for s in card.skills]
-    return {
+    data = {
         "as_of": PROOF_WALL_AS_OF,
         "moebiusx_v2": MOEBIUSX_V2,
         "moebiusx_v3": MOEBIUSX_V3,
@@ -116,6 +151,8 @@ def proof_wall_data() -> Dict[str, Any]:
         "endorsement_url": ENDORSEMENT_URL,
         "endorsement_handle": ENDORSEMENT_HANDLE,
     }
+    data.update(proof_wall_live_feed())
+    return data
 
 
 # ── External agent registration + introductory bounty flag ──────────────────
@@ -134,12 +171,18 @@ def _intro_bounty_amount() -> float:
     return amount if amount > 0 else INTRO_BOUNTY_DEFAULT_AXM
 
 
-def _external_ordinal(agents: Dict[str, Any], agent_id: str) -> Optional[int]:
+def _external_ordinal(agents: Dict[str, Any], agent_id: str,
+                      *, verified_only: bool = False) -> Optional[int]:
     """1-based position of ``agent_id`` among origin=="external" records,
-    ordered by (registered_at, agent_id). None if not present/external."""
+    ordered by (registered_at, agent_id). None if not present/external.
+
+    With ``verified_only=True`` the ranking runs over verified external
+    records only — the ranking the intro bounty uses (W-151), so
+    anonymous registrations never consume bounty ordering."""
     externals = [
         r for r in agents.values()
         if isinstance(r, dict) and r.get("origin") == "external"
+        and (not verified_only or r.get("identity") == "verified")
     ]
     externals.sort(key=lambda r: (int(r.get("registered_at") or 0),
                                   str(r.get("agent_id") or "")))
@@ -151,9 +194,22 @@ def _external_ordinal(agents: Dict[str, Any], agent_id: str) -> Optional[int]:
 
 def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
     """Flag ``agent_id`` for the introductory micro-bounty if it is among
-    the first ``INTRO_BOUNTY_SLOTS`` external registrations, and note the
-    flag in the bounty pool ledger via the pool's existing allocate()
-    path. Idempotent: an already-flagged record returns its flag.
+    the first ``INTRO_BOUNTY_SLOTS`` VERIFIED external registrations, and
+    note the flag in the bounty pool ledger via the pool's existing
+    allocate() path. Idempotent: an already-flagged record returns its
+    flag, and a live ledger reservation for the agent is reused, never
+    duplicated.
+
+    W-151: only a record whose identity is ``"verified"`` (a wallet
+    bound by a valid EIP-191 registration proof) can be flagged or
+    allocated. An anonymous (``identity="unverified"``) record receives
+    a non-allocating ``pending_verification`` marker instead — no slot
+    is consumed and no pool reservation is made — and slots/ordinals
+    are counted among verified external records only, so zero-cost
+    anonymous registration spam cannot exhaust the budget. The flag is
+    applied by this module's registration route, and by
+    ``a2a_inbound_ext.register_agent_record`` when a provisional record
+    is claimed with a valid wallet proof.
 
     The allocation is a ledger reservation only — payout happens through
     the existing a2a settle flow on the agent's first verified handshake.
@@ -171,42 +227,79 @@ def apply_intro_bounty_flag(agent_id: str) -> Dict[str, Any]:
         existing = record.get("intro_bounty")
         if isinstance(existing, dict) and existing.get("eligible"):
             return dict(existing)
-        ordinal = _external_ordinal(fabric.agents, agent_id)
-        if ordinal is None:
+        if record.get("origin") != "external":
             return {"eligible": False, "reason": "not_external"}
-        if ordinal > INTRO_BOUNTY_SLOTS:
-            return {"eligible": False, "ordinal": ordinal,
-                    "slots": INTRO_BOUNTY_SLOTS}
-        flag: Dict[str, Any] = {
-            "eligible": True,
-            "ordinal": ordinal,
-            "slots": INTRO_BOUNTY_SLOTS,
-            "amount_axm": amount,
-            "status": "flagged",
-            "payable_on": "first_verified_handshake",
-            "allocation_id": None,
-        }
-        record["intro_bounty"] = flag
+        if record.get("identity") != "verified":
+            # W-151: gate the money — an unverified identity must not
+            # allocate the bounty or consume a slot. The marker keeps
+            # the pending state visible without reserving anything.
+            pending: Dict[str, Any] = {
+                "eligible": False,
+                "reason": "identity_unverified",
+                "status": "pending_verification",
+                "slots": INTRO_BOUNTY_SLOTS,
+                "amount_axm": amount,
+                "payable_on": "first_verified_handshake",
+                "allocation_id": None,
+            }
+            record["intro_bounty"] = pending
+            flag = dict(pending)
+            ordinal = None
+        else:
+            ordinal = _external_ordinal(
+                fabric.agents, agent_id, verified_only=True)
+            if ordinal is None:
+                return {"eligible": False, "reason": "not_external"}
+            if ordinal > INTRO_BOUNTY_SLOTS:
+                return {"eligible": False, "ordinal": ordinal,
+                        "slots": INTRO_BOUNTY_SLOTS}
+            flag = {
+                "eligible": True,
+                "ordinal": ordinal,
+                "slots": INTRO_BOUNTY_SLOTS,
+                "amount_axm": amount,
+                "status": "flagged",
+                "payable_on": "first_verified_handshake",
+                "allocation_id": None,
+            }
+            record["intro_bounty"] = flag
     _save_agents(fabric)
+    if not flag.get("eligible"):
+        return dict(flag)
 
     # Ledger note through the pool's existing code path. A custom journal
     # action would make verify_ledger() inconclusive, so this is a plain
-    # allocate() against a per-agent task id.
+    # allocate() against a per-agent task id. Exactly-once is enforced at
+    # the ledger level too: a live reservation for this agent (e.g. left
+    # behind by a record rebuild on re-registration) is reused, never
+    # reserved twice.
     try:
         from sincor2.a2a_bounty_pool import bounty_pool
 
-        alloc = bounty_pool().allocate(
-            task_id=f"intro-bounty:{agent_id}",
-            amount_axm=amount,
-            reason=(
-                "Lane-3 introductory micro-bounty for external agent "
-                f"{agent_id} (registration #{ordinal} of "
-                f"{INTRO_BOUNTY_SLOTS}); payable on its first verified "
-                "handshake via the existing a2a settle flow."
-            ),
-        )
-        flag["allocation_id"] = alloc.get("allocation_id") or alloc.get("id")
-        flag["status"] = "reserved"
+        pool = bounty_pool()
+        task_id = f"intro-bounty:{agent_id}"
+        live_allocations: Any = []
+        allocations_for_task = getattr(pool, "allocations_for_task", None)
+        if callable(allocations_for_task):
+            live_allocations = allocations_for_task(task_id) or []
+        if live_allocations:
+            flag["allocation_id"] = (
+                live_allocations[0].get("allocation_id")
+                or live_allocations[0].get("id"))
+            flag["status"] = "reserved"
+        else:
+            alloc = pool.allocate(
+                task_id=task_id,
+                amount_axm=amount,
+                reason=(
+                    "Lane-3 introductory micro-bounty for external agent "
+                    f"{agent_id} (registration #{ordinal} of "
+                    f"{INTRO_BOUNTY_SLOTS}); payable on its first verified "
+                    "handshake via the existing a2a settle flow."
+                ),
+            )
+            flag["allocation_id"] = alloc.get("allocation_id") or alloc.get("id")
+            flag["status"] = "reserved"
     except Exception as exc:  # pool unfunded/degraded — flag stands alone
         flag["status"] = "flagged_unfunded"
         flag["note"] = f"{type(exc).__name__}: {exc}"
@@ -224,6 +317,16 @@ def register_external_agent(body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
 
     Returns (http_status, payload). Validation failures are 400s; the
     storage itself is the platform's existing registration path.
+
+    W-151: registration stays zero-friction, but the record it creates
+    is PROVISIONAL until a wallet-identity proof is completed — an
+    anonymous registration allocates no intro bounty and does not make
+    the slug permanent. Callers may complete the proof in the same call
+    by including the standard registration proof fields (``wallet`` /
+    ``registration_wallet``, ``registration_signature``,
+    ``registration_ts``); a provisional record can also be claimed
+    later by presenting that proof (see
+    ``a2a_inbound_ext.register_agent_record``).
     """
     from sincor2.a2a_inbound import RegistrationAuthError
     from sincor2.a2a_inbound_ext import register_agent_record
@@ -256,6 +359,16 @@ def register_external_agent(body: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
             f"Contact: {contact}"
         ),
     }
+    # Optional wallet-identity proof pass-through (W-151): when present,
+    # the registration path verifies it exactly as it does for
+    # POST /v1/a2a/register — a valid proof binds the wallet, verifies
+    # the identity, and makes the slug permanent; an invalid one fails
+    # closed there. Absent fields keep the anonymous provisional path.
+    for field in ("wallet", "registration_wallet", "registration_signature",
+                  "signature", "registration_ts", "reg_ts", "timestamp"):
+        value = body.get(field)
+        if value not in (None, ""):
+            record_body[field] = value
     try:
         record = register_agent_record(record_body)
     except (PermissionError, RegistrationAuthError) as exc:
@@ -354,6 +467,134 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
         return None
 
 
+# --- W-155: settle-response-loss recovery ---------------------------------
+#
+# /settle executes the transferWithAuthorization on-chain and only
+# THEN answers. If that answer is lost in transit (timeout, reset,
+# proxy failure), the buyer's authorization is consumed and the
+# treasury is paid, yet the client sees only a transport error — and
+# on retry the facilitator rejects the settle because the nonce is
+# already used. Without a recovery path that is a permanent failure
+# for a buyer who HAS paid (the M1 timeout double-charge pattern on
+# the seller side). The recovery below resolves the authorization's
+# on-chain state before any failure is declared. It is proof-based,
+# never facilitator-word-based: success requires ALL of
+#
+#   1. USDC ``authorizationState(authorizer, nonce)`` == true (the
+#      nonce is consumed — necessary, but NOT sufficient: a buyer
+#      can also consume their own nonce via cancelAuthorization
+#      without paying anyone);
+#   2. an ``AuthorizationUsed`` event for exactly this authorizer +
+#      nonce on the asset contract (emitted only by an executed
+#      transferWithAuthorization / receiveWithAuthorization — a
+#      cancellation emits AuthorizationCanceled instead); and
+#   3. in that same transaction, a USDC ``Transfer`` of exactly the
+#      authorized value from the authorized sender to the authorized
+#      recipient.
+#
+# Anything less — RPC error, missing log, mismatched transfer —
+# fails closed and the original settle failure stands. A recovered
+# success carries the SAME deterministic payment_ref derived from
+# the authorization, so the platform's W-146 consumption opens
+# exactly one escrow no matter how many times the buyer retries.
+
+# authorizationState(address,bytes32) on the EIP-3009 asset contract.
+_AUTHORIZATION_STATE_SELECTOR = "0xe94a0102"
+# AuthorizationUsed(address,bytes32) event topic.
+_AUTHORIZATION_USED_TOPIC = \
+    "0x98de503528ee59b575ef0c0a2576a82497bfc029a5685b209e9ec333479b10a5"
+# Transfer(address,address,uint256) event topic.
+_TRANSFER_TOPIC = \
+    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+# Log search for the AuthorizationUsed event: walk back from the
+# chain head in bounded chunks (public RPCs cap eth_getLogs ranges),
+# far enough to cover any realistic retry delay (~46 hours of Base
+# blocks at 2s/block) without an unbounded scan.
+_SETTLE_LOG_CHUNK_BLOCKS = 10_000
+_SETTLE_LOG_MAX_BLOCKS = 200_000
+# Settle rejection wording that indicates the authorization may
+# already be consumed (as opposed to a definitive verdict like an
+# invalid signature or insufficient funds, where no chain state
+# could change the answer). A hint only OPENS the recovery check;
+# the on-chain proof above is what can turn it into a success.
+_SETTLED_REJECTION_HINTS = (
+    "already", "nonce", "used", "consumed",
+    "authorization_state", "authorization state",
+)
+
+
+def _settle_rejection_suggests_consumed(reason: str) -> bool:
+    text = (reason or "").lower()
+    return any(hint in text for hint in _SETTLED_REJECTION_HINTS)
+
+
+def _topic_address(address: str) -> str:
+    """An address as a 32-byte log topic / ABI word (lowercase)."""
+    return "0x" + "0" * 24 + address[2:].lower()
+
+
+def _settlement_proof_onchain(asset: str, auth: Dict[str, Any]) -> bool:
+    """True only if the EIP-3009 authorization `auth` (normalized)
+    was consumed by an executed transfer of exactly the authorized
+    amount from the authorized sender to the authorized recipient
+    on the asset contract at `asset`. Fails closed on any error or
+    missing evidence. Reads go through the module's ``_base_rpc``
+    seam, like every other Lane 3 chain read."""
+    try:
+        authorizer = auth["from"]
+        nonce = auth["nonce"]
+        call_data = (
+            _AUTHORIZATION_STATE_SELECTOR
+            + _topic_address(authorizer)[2:]
+            + nonce[2:])
+        state = _base_rpc(
+            "eth_call", [{"to": asset, "data": call_data}, "latest"])
+        if not state or int(state, 16) != 1:
+            return False
+        latest = int(_base_rpc("eth_blockNumber", []), 16)
+        tx_hash = None
+        searched = 0
+        to_block = latest
+        while searched < _SETTLE_LOG_MAX_BLOCKS and to_block >= 0:
+            from_block = max(
+                0, to_block - _SETTLE_LOG_CHUNK_BLOCKS + 1)
+            logs = _base_rpc("eth_getLogs", [{
+                "address": asset,
+                "topics": [
+                    _AUTHORIZATION_USED_TOPIC,
+                    _topic_address(authorizer),
+                    nonce,
+                ],
+                "fromBlock": hex(from_block),
+                "toBlock": hex(to_block),
+            }]) or []
+            if logs:
+                tx_hash = logs[0].get("transactionHash")
+                break
+            searched += to_block - from_block + 1
+            to_block = from_block - 1
+        if not tx_hash:
+            return False
+        receipt = _base_rpc(
+            "eth_getTransactionReceipt", [tx_hash]) or {}
+        for log in receipt.get("logs") or []:
+            topics = log.get("topics") or []
+            if (
+                str(log.get("address") or "").lower() == asset.lower()
+                and len(topics) >= 3
+                and str(topics[0]).lower() == _TRANSFER_TOPIC
+                and str(topics[1]).lower()
+                    == _topic_address(auth["from"])
+                and str(topics[2]).lower() == _topic_address(auth["to"])
+                and int(log.get("data") or "0x0", 16)
+                    == int(auth["value"])
+            ):
+                return True
+        return False
+    except Exception:
+        return False
+
+
 class _HttpFacilitator:
     """Facilitator client for a configured x402 facilitator.
 
@@ -397,6 +638,17 @@ class _HttpFacilitator:
     re-send the Authorization header to the redirect target, so a
     compromised or redirecting facilitator could otherwise harvest
     the operator's long-lived CDP key (CWE-522).
+
+    Settle-response-loss recovery (W-155): a /settle that executes
+    on-chain but whose response is lost leaves the buyer paid and
+    the authorization consumed; a retry is then rejected as
+    already-settled. On a settle transport error, or on a settle
+    rejection indicating the authorization is already consumed,
+    verify_and_hold resolves the authorization's on-chain state
+    (``_settlement_proof_onchain``) before declaring failure, and
+    returns success with the same stable payment_ref when — and
+    only when — the chain proves the exact authorized transfer
+    landed, so the escrow still opens exactly once.
     """
 
     def __init__(self, base_url: str) -> None:
@@ -445,6 +697,18 @@ class _HttpFacilitator:
         with opener.open(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
+    def _recovered_settlement(self, normalized_auth, requirement) -> bool:
+        """W-155 recovery gate: chain proof that this authorization
+        already settled. Consulted only after the facilitator's
+        settle answer was lost or reported the authorization as
+        consumed; never weakens the facilitator path — /verify has
+        already validated signature, amount, recipient, and window
+        for THIS call before this check can run."""
+        asset = str(getattr(requirement, "asset", "") or "")
+        if not asset:
+            return False
+        return _settlement_proof_onchain(asset, normalized_auth)
+
     def verify_and_hold(self, *, payment_payload, requirement):
         import sincor_x402
         from sincor_x402.facilitator import (
@@ -490,15 +754,41 @@ class _HttpFacilitator:
         try:
             settle = self._post(self._settle_url, body)
         except Exception as exc:
+            # W-155: the settle may have executed on-chain before its
+            # response was lost. Resolve the authorization's chain
+            # state before declaring failure — if the exact transfer
+            # landed, this payment HAS settled and the buyer is owed
+            # the resource, with the same stable payment_ref.
+            if self._recovered_settlement(normalized_auth, requirement):
+                return sincor_x402.FacilitatorResult(
+                    True,
+                    payer=str(verify.get("payer")
+                              or normalized_auth["from"]),
+                    payment_ref=payment_ref)
             return sincor_x402.FacilitatorResult(
                 False, error=f"facilitator_settle_unreachable: {exc}")
         if not bool(settle.get("success", settle.get("ok"))):
+            reason = str(settle.get("errorReason")
+                         or settle.get("error") or "settlement_failed")
+            # W-155: an already-settled / nonce-consumed rejection on
+            # a retry means an earlier settle (whose response never
+            # reached us, or whose caller never saw ours) already
+            # moved the funds. Recover it from chain state instead
+            # of demanding a second payment.
+            if _settle_rejection_suggests_consumed(reason) \
+                    and self._recovered_settlement(
+                        normalized_auth, requirement):
+                return sincor_x402.FacilitatorResult(
+                    True,
+                    payer=str(settle.get("payer")
+                              or verify.get("payer")
+                              or normalized_auth["from"]),
+                    payment_ref=payment_ref)
             return sincor_x402.FacilitatorResult(
                 False,
                 payer=str(settle.get("payer")
                           or verify.get("payer") or ""),
-                error=str(settle.get("errorReason")
-                          or settle.get("error") or "settlement_failed"))
+                error=reason)
         payer = str(settle.get("payer") or verify.get("payer")
                     or normalized_auth["from"])
         return sincor_x402.FacilitatorResult(

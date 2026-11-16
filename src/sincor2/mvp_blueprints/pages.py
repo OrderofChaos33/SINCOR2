@@ -492,6 +492,20 @@ def x402_live_page():
     return render_template("x402_live.html", **lane3.proof_wall_data())
 
 
+@bp.route("/x402-live/events.json")
+def x402_live_events_feed():
+    """Polling feed for the proof wall's Live activity section (~30s).
+
+    Same data the page renders server-side: verified settlement events
+    (newest first) plus totals split by origin. Degrades to an empty
+    feed when the event store is empty or unreadable — never a 500."""
+    from flask import jsonify
+
+    from sincor2 import lane3
+
+    return jsonify(lane3.proof_wall_live_feed())
+
+
 @bp.route("/register")
 def register_page():
     return render_template("register.html")

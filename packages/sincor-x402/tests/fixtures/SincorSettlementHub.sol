@@ -16,8 +16,17 @@
 // the tests document the behaviour; the Python Hub engine compensates
 // off-chain, see sincor_x402/hub_engine.py):
 //   * expectedSchemaHash is signed but never enforced on-chain.
-//   * The Hub records whatever sigilCommitment the submitter passes.
 //   * Funds move via ERC-20 transferFrom; buyers must pre-approve the Hub.
+//
+// RE-VENDORED 2026-11-13 for the W-150 fix (branch xioix/hub-w150-fix):
+// this copy now mirrors the FIXED contracts/modules/SincorSettlementHub.sol
+// — sigilCommitment is a field of the signed SealAuthorization struct
+// (SEAL_TYPEHASH changed), verifyAndSettleSeal no longer takes a separate
+// submitter-supplied sigilCommitment, and zero-amount seals revert
+// (SealAmountZero). The draft defect "the Hub records whatever
+// sigilCommitment the submitter passes" is FIXED in the source contract
+// and therefore fixed here; the Python engine's off-chain verification
+// remains as a pre-submission layer, no longer as the only binding.
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
@@ -33,10 +42,10 @@ contract SincorSettlementHub {
     bytes32 public constant DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    // SEAL Envelope Struct Typehash
+    // SEAL Envelope Struct Typehash (W-150: sigilCommitment is signed)
     bytes32 public constant SEAL_TYPEHASH =
         keccak256(
-            "SealAuthorization(bytes32 taskId,address buyer,address provider,uint256 amount,bytes32 expectedSchemaHash,uint256 deadline,uint256 nonce)"
+            "SealAuthorization(bytes32 taskId,address buyer,address provider,uint256 amount,bytes32 expectedSchemaHash,bytes32 sigilCommitment,uint256 deadline,uint256 nonce)"
         );
 
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -51,6 +60,7 @@ contract SincorSettlementHub {
         address provider;
         uint256 amount;
         bytes32 expectedSchemaHash;
+        bytes32 sigilCommitment;
         uint256 deadline;
         uint256 nonce;
     }
@@ -59,6 +69,7 @@ contract SincorSettlementHub {
     error InvalidNonce();
     error InvalidSealSignature();
     error SigilCommitmentZero();
+    error SealAmountZero();
     error UsdcTransferFailed();
 
     event SealSettled(
@@ -95,13 +106,13 @@ contract SincorSettlementHub {
      */
     function verifyAndSettleSeal(
         SealAuthorization calldata seal,
-        bytes32 sigilCommitment,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external returns (bool) {
         if (block.timestamp > seal.deadline) revert SealExpired();
-        if (sigilCommitment == bytes32(0)) revert SigilCommitmentZero();
+        if (seal.sigilCommitment == bytes32(0)) revert SigilCommitmentZero();
+        if (seal.amount == 0) revert SealAmountZero();
         if (seal.nonce != nonces[seal.buyer]++) revert InvalidNonce();
 
         bytes32 structHash = keccak256(
@@ -112,6 +123,7 @@ contract SincorSettlementHub {
                 seal.provider,
                 seal.amount,
                 seal.expectedSchemaHash,
+                seal.sigilCommitment,
                 seal.deadline,
                 seal.nonce
             )
@@ -122,7 +134,7 @@ contract SincorSettlementHub {
         if (recovered == address(0) || recovered != seal.buyer) revert InvalidSealSignature();
 
         // Record SIGIL state commitment on-chain before moving funds (CEI pattern)
-        verifiedTaskSigils[seal.taskId] = sigilCommitment;
+        verifiedTaskSigils[seal.taskId] = seal.sigilCommitment;
 
         uint256 fee = (seal.amount * protocolFeeBps) / 10000;
         uint256 payout = seal.amount - fee;
@@ -132,7 +144,7 @@ contract SincorSettlementHub {
         }
         if (!usdc.transferFrom(seal.buyer, seal.provider, payout)) revert UsdcTransferFailed();
 
-        emit SealSettled(seal.taskId, seal.buyer, seal.provider, payout, fee, sigilCommitment);
+        emit SealSettled(seal.taskId, seal.buyer, seal.provider, payout, fee, seal.sigilCommitment);
         return true;
     }
 }
