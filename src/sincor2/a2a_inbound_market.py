@@ -3022,6 +3022,48 @@ def attach_market_routes(bp: Blueprint) -> None:
         data["ledger_verification"] = pool.verify_ledger()
         return jsonify(data), 200
 
+    @bp.get("/v1/a2a/pool/verify")
+    def v1_pool_verify():
+        """Public pool verification: status aggregates plus the ledger
+        reconciliation verdict as one machine-readable answer.
+
+        Always 200 when the pool answers — an inconclusive ledger
+        (verify_ledger ok False) is reported as verified: false with the
+        reason visible in ledger_verification, never hidden behind a
+        5xx and never reported as a pass. Only an exception from the
+        pool itself is a 503.
+        """
+        from sincor2.a2a_bounty_pool import bounty_pool
+        try:
+            pool = bounty_pool()
+            status = pool.status()
+            verification = pool.verify_ledger()
+        except Exception as err:
+            return _http_error(str(err), 503)
+        spent_axm = sum(
+            int(a.get("amount_wei") or 0) / 10**18
+            for a in status.get("allocations") or []
+            if a.get("state") == "spent"
+        )
+        funded = float(status.get("funded_axm") or 0.0)
+        allocated = float(status.get("allocated_axm") or 0.0)
+        available = float(status.get("available_axm") or 0.0)
+        conservation_ok = abs(funded - (allocated + available + spent_axm)) <= 1e-6
+        data = {
+            "funded_axm": status.get("funded_axm"),
+            "allocated_axm": status.get("allocated_axm"),
+            "available_axm": status.get("available_axm"),
+            "spent_axm": spent_axm,
+            "reserve_axm": status.get("reserve_axm"),
+            "allocation_count": status.get("allocation_count"),
+            "ledger": status.get("ledger") or "offchain-axm",
+            "ledger_verification": verification,
+            "conservation_ok": conservation_ok,
+            "verified": bool(verification.get("ok") is True
+                             and conservation_ok),
+        }
+        return jsonify(data), 200
+
     @bp.post("/v1/a2a/pool/fund")
     def v1_pool_fund():
         """Move reserve into the spendable pool. Body: {amount_axm?}.
