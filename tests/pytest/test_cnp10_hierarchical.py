@@ -35,6 +35,7 @@ from marketplace.contract_net.keccak import keccak256  # noqa: E402
 from marketplace.contract_net.types import (  # noqa: E402
     BASE_SEPOLIA_CHAIN_ID,
     AgentProfile,
+    Award,
     ContractNetConfig,
     TaskSpec,
 )
@@ -49,9 +50,11 @@ from sincor2.hierarchical_cnp import (  # noqa: E402
     HierarchicalConfig,
     HierarchicalTaskGraph,
     NestedSeal,
+    NonceReuseError,
     OrphanedSubcontract,
     SealChainError,
     SealError,
+    SealNonceRegistry,
     mint_nested_seal,
     nested_seal_digest,
     nested_seal_typed_data,
@@ -776,3 +779,162 @@ def test_high_level_flows_use_secp256k1_when_configured():
     # Recovered signer matches the declared agent address.
     chain = g.verify_node_chain(n1, now=NOW)
     assert chain[-1].agent_address.lower() == n0.award.winner_wallet.lower()
+
+
+# ---------------------------------------------------------------------------
+# W-160: per-signer nonce single-use (red-team hunt 50, PoC §B2)
+# ---------------------------------------------------------------------------
+
+
+def _nonce_pair(net_cfg, nonce=7):
+    """The PoC §B2 setup: one signer, one nonce, two different tasks."""
+    address, key = secp256k1_identity()
+
+    def mint(task_id):
+        return mint_nested_seal(
+            net_cfg,
+            agent_did="did:sincor:prover",
+            agent_address=address,
+            task_id=task_id,
+            capabilities=(),
+            expiry=NOW + 3600,
+            nonce=nonce,
+            depth=0,
+            parent_seal_hash=EMPTY_SEAL_HASH,
+            private_key=key,
+            max_depth=MAX_DEPTH_HARD_CAP,
+            now=NOW,
+        )
+
+    return mint("t-nonce-1"), mint("t-nonce-2"), address
+
+
+def test_nonce_reuse_rejected_on_verify_with_registry():
+    cfg = net_config()
+    s1, s2, _address = _nonce_pair(cfg)
+    assert s1.seal_id != s2.seal_id  # distinct seals, same signer + nonce
+    registry = SealNonceRegistry()
+    verify_nested_seal(s1, cfg, now=NOW, nonce_registry=registry)
+    with pytest.raises(NonceReuseError):
+        verify_nested_seal(s2, cfg, now=NOW, nonce_registry=registry)
+    # Re-verifying the *same* seal is idempotent, not reuse.
+    verify_nested_seal(s1, cfg, now=NOW, nonce_registry=registry)
+    # A different signer may legitimately use the same nonce value.
+    other, _a, _k = mint_secp256k1(cfg, task_id="t-other", nonce=7)
+    verify_nested_seal(other, cfg, now=NOW, nonce_registry=registry)
+
+
+def test_failed_verification_does_not_consume_nonce():
+    cfg = net_config()
+    s1, s2, _address = _nonce_pair(cfg)
+    registry = SealNonceRegistry()
+    # s2 presented *expired* fails on expiry and must not poison the
+    # ledger: the legitimately first verified seal still claims nonce 7.
+    with pytest.raises(SealError):
+        verify_nested_seal(s2, cfg, now=NOW + 3601, nonce_registry=registry)
+    assert len(registry) == 0
+    verify_nested_seal(s1, cfg, now=NOW, nonce_registry=registry)
+    with pytest.raises(NonceReuseError):
+        verify_nested_seal(s2, cfg, now=NOW, nonce_registry=registry)
+
+
+def test_nonce_reuse_rejected_in_chain_verification():
+    cfg = net_config()
+    s1, s2, _address = _nonce_pair(cfg)
+    registry = SealNonceRegistry()
+    chain = verify_seal_chain(
+        s1, {s1.seal_id.lower(): s1}, cfg, now=NOW,
+        max_depth=MAX_DEPTH_HARD_CAP, nonce_registry=registry,
+    )
+    assert [s.seal_id for s in chain] == [s1.seal_id]
+    with pytest.raises(SealChainError):
+        verify_seal_chain(
+            s2, {s2.seal_id.lower(): s2}, cfg, now=NOW,
+            max_depth=MAX_DEPTH_HARD_CAP, nonce_registry=registry,
+        )
+
+
+def test_nonce_reuse_within_one_chain_rejected():
+    cfg = net_config()
+    # Parent and child signed by the SAME key with the SAME nonce: the
+    # presented chain itself carries the reuse, no external ledger needed.
+    address, key = secp256k1_identity()
+    root = mint_nested_seal(
+        cfg, agent_did="did:sincor:prover", agent_address=address,
+        task_id="t-chain-root", capabilities=(), expiry=NOW + 3600,
+        nonce=3, depth=0, parent_seal_hash=EMPTY_SEAL_HASH,
+        private_key=key, max_depth=MAX_DEPTH_HARD_CAP, now=NOW,
+    )
+    leaf = mint_nested_seal(
+        cfg, agent_did="did:sincor:prover", agent_address=address,
+        task_id="t-chain-leaf", capabilities=(), expiry=NOW + 3600,
+        nonce=3, depth=1, parent_seal_hash=root.seal_id,
+        private_key=key, max_depth=MAX_DEPTH_HARD_CAP, now=NOW,
+    )
+    registry = {root.seal_id.lower(): root, leaf.seal_id.lower(): leaf}
+    with pytest.raises(SealChainError):
+        verify_seal_chain(
+            leaf, registry, cfg, now=NOW, max_depth=MAX_DEPTH_HARD_CAP
+        )
+
+
+def _award(task_id, winner_wallet):
+    return Award(
+        auction_id="0x" + "ab" * 32, task_id=task_id, winner_id="prover",
+        winner_wallet=winner_wallet, winner_bid_price=100,
+        clearing_price=100, savings_vs_first_price=0, mechanism="vickrey",
+        junior_reserved=False, junior_winner=False, invites=[], bids=[],
+        llm_calls_avoided=0, tokens_saved=0, valid_bid_count=1,
+        rejected_bid_count=0, phase="cleared",
+    )
+
+
+def test_nonce_reuse_rejected_at_graph_registration():
+    cfg = net_config()
+    s1, s2, address = _nonce_pair(cfg)
+    g = HierarchicalTaskGraph(
+        ContractNetEngine(cfg), HierarchicalConfig(max_depth=3)
+    )
+    # Union adaptation (W-158, landed on main via stack H): register_root
+    # only accepts awards the graph's engine actually produced, sealed by
+    # the award's winner. Run real auctions won by the nonce-pair signer
+    # so both presented awards are in the engine's history — the ONLY
+    # thing standing in the second registration's way is then the nonce
+    # binding itself, exactly as this test intends.
+    prover = _agent("prover", ("research",), 1.0)
+    prover.wallet = address  # the auction winner must be the seal signer
+    award1 = g.engine.run(
+        task("t-nonce-1", ("research",)), [prover], seed=7, now=NOW)
+    award2 = g.engine.run(
+        task("t-nonce-2", ("research",)), [prover], seed=7, now=NOW)
+    node = g.register_root(
+        task("t-nonce-1", ("research",)), award1,
+        s1, now=NOW,
+    )
+    assert node.seal.seal_id == s1.seal_id
+    # The second seal is well-formed and validly signed — only the nonce
+    # binding stands in its way.
+    with pytest.raises(NonceReuseError):
+        g.register_root(
+            task("t-nonce-2", ("research",)), award2,
+            s2, now=NOW,
+        )
+    assert len(g) == 1
+    assert g.verify_graph(now=NOW) == 1
+    # The graph's own nonce counter skips the externally bound nonce 7.
+    handed_out = [g.next_seal_nonce(address) for _ in range(7)]
+    assert handed_out == [1, 2, 3, 4, 5, 6, 8]
+
+
+def test_nonce_registry_persistence_round_trip(tmp_path):
+    cfg = net_config()
+    s1, s2, _address = _nonce_pair(cfg)
+    path = str(tmp_path / "nonces.json")
+    first = SealNonceRegistry(path)
+    verify_nested_seal(s1, cfg, now=NOW, nonce_registry=first)
+    # A fresh instance over the same file still knows nonce 7 is taken.
+    second = SealNonceRegistry(path)
+    assert second.lookup(s1.agent_address, 7) == s1.seal_id.lower()
+    with pytest.raises(NonceReuseError):
+        verify_nested_seal(s2, cfg, now=NOW, nonce_registry=second)
+    verify_nested_seal(s1, cfg, now=NOW, nonce_registry=second)
