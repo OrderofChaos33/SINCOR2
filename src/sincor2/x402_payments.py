@@ -374,6 +374,21 @@ def facilitator_route(
 #     either is missing or invalid, never silently dropping them.
 # Payload shape + local validation only: no listing attempt, no live
 # facilitator call (the CDP facilitator route decision is founder-gated).
+#
+# 2026-11-13 audit against the current spec (x402-foundation
+# specs/extensions/bazaar.md + CDP "Get discovered"): the generated
+# schema now matches the spec's POST example (``type`` as const,
+# body-method enum, bodyType/body required); the content tables were
+# reconciled with the 2026-10-26 prepared declarations — the missing
+# healthcare-credential-check input schema was added, web-search-read /
+# market-data-read gained their handler enums, and per-resource example
+# bodies/outputs (BAZAAR_EXAMPLE_BODIES / BAZAAR_OUTPUT_EXAMPLES)
+# replaced the generated placeholders where those were invalid or thin.
+# The October declarations file itself used the discovery-CATALOG shape
+# (input/output as siblings of info, an accepts echo, GET methods) —
+# that shape is stale; the served extension shape above is canonical,
+# and docs/distribution/mcp-directories/bazaar-extensions.json now
+# records the declarations in the served shape.
 # ---------------------------------------------------------------------------
 
 #: JSON Schema primitive/composite types accepted in an input schema.
@@ -413,6 +428,7 @@ BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "mode": {
                 "type": "string",
+                "enum": ["search", "read"],
                 "description": "'search' (requires query) or 'read' "
                 "(requires url)",
             },
@@ -420,6 +436,21 @@ BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "url": {"type": "string"},
         },
         "required": ["mode"],
+    },
+    "healthcare-credential-check": {
+        "type": "object",
+        "properties": {
+            "provider_npi": {
+                "type": "string",
+                "description": "10-digit National Provider Identifier",
+            },
+            "provider_name": {"type": "string"},
+            "payer_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        },
+        "required": ["provider_npi"],
     },
     "local-business-site-check": {
         "type": "object",
@@ -434,10 +465,13 @@ BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
         "properties": {
             "pair": {
                 "type": "string",
+                "enum": ["ETH/USD", "USDC/USD"],
                 "description": "Chainlink pair, e.g. ETH/USD",
             },
             "mode": {
                 "type": "string",
+                "enum": ["price"],
+                "default": "price",
                 "description": "Read mode; default 'price'",
             },
         },
@@ -459,6 +493,83 @@ BAZAAR_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
             "decision_id": {"type": "string"},
         },
         "required": ["options"],
+    },
+}
+
+
+#: Per-resource example request bodies for the discovery declaration.
+#: Overrides for resources where the schema-generated placeholder would
+#: be a combination the handler rejects (e.g. web-search-read with an
+#: empty mode) or too thin for a buyer agent to imitate. Audited
+#: against the 2026-10-26 prepared declarations and the serve handlers
+#: (2026-11-13 Bazaar wiring pass); keep in step with
+#: BAZAAR_INPUT_SCHEMAS — an example must validate against its schema.
+BAZAAR_EXAMPLE_BODIES: dict[str, dict[str, Any]] = {
+    "web-search-read": {"mode": "search", "query": "x402 protocol news"},
+    "market-data-read": {"pair": "ETH/USD", "mode": "price"},
+    "local-business-site-check": {
+        "url": "https://example.com",
+        "business_name": "Example Co",
+    },
+    "toa-micro-decision": {
+        "options": [{"label": "Option A"}, {"label": "Option B"}],
+    },
+    "healthcare-credential-check": {"provider_npi": "1234567890"},
+}
+
+#: Per-resource example outputs for the discovery declaration
+#: (``info.output.example``). Keys mirror the serve handlers' real 200
+#: bodies (billing._paid_skill_dispatch targets); resources without an
+#: entry keep the generic {"ok": True, "resource": <id>} example.
+BAZAAR_OUTPUT_EXAMPLES: dict[str, dict[str, Any]] = {
+    "wallet-sanctions-screen": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "verdict": "clean",
+        "status": "screened",
+        "screened": True,
+        "stale": False,
+        "match": None,
+        "detail": "address not on OFAC SDN list",
+    },
+    "kya-trust-score": {
+        "agent_id": "",
+        "wallet": "0x0000000000000000000000000000000000000000",
+        "score": 0,
+        "components": {},
+    },
+    "web-search-read": {
+        "ok": True,
+        "resource": "web-search-read",
+        "mode": "search",
+        "query": "x402 protocol news",
+        "results": [],
+        "count": 0,
+        "retrieved_at": "2026-01-01T00:00:00Z",
+    },
+    "local-business-site-check": {
+        "url": "https://example.com",
+        "verdict": "unknown",
+        "deficiencies": [],
+    },
+    "market-data-read": {
+        "pair": "ETH/USD",
+        "mode": "price",
+        "source": "chainlink",
+        "price": "2500.00",
+        "round_id": "0",
+        "stale": False,
+    },
+    "polymarket-whale-signal": {
+        "status": "no_fresh_signals",
+        "signals": [],
+    },
+    "toa-micro-decision": {
+        "ranked_options": [],
+        "confidence": 0.0,
+    },
+    "healthcare-credential-check": {
+        "npi_valid": True,
+        "licence_status": "active",
     },
 }
 
@@ -504,11 +615,17 @@ def build_bazaar_discovery_extension(
     builds the extension by hand.
     """
     body_schema = bazaar_input_schema(resource_id)
-    example_body = {
-        name: _bazaar_example_value(name, prop)
-        for name, prop in (body_schema.get("properties") or {}).items()
-        if isinstance(prop, dict)
-    }
+    if resource_id in BAZAAR_EXAMPLE_BODIES:
+        example_body = copy.deepcopy(BAZAAR_EXAMPLE_BODIES[resource_id])
+    else:
+        example_body = {
+            name: _bazaar_example_value(name, prop)
+            for name, prop in (body_schema.get("properties") or {}).items()
+            if isinstance(prop, dict)
+        }
+    output_example = copy.deepcopy(
+        BAZAAR_OUTPUT_EXAMPLES.get(
+            resource_id, {"ok": True, "resource": resource_id}))
     return {
         "bazaar": {
             "info": {
@@ -520,7 +637,7 @@ def build_bazaar_discovery_extension(
                 },
                 "output": {
                     "type": "json",
-                    "example": {"ok": True, "resource": resource_id},
+                    "example": output_example,
                 },
             },
             "schema": {
@@ -532,11 +649,11 @@ def build_bazaar_discovery_extension(
                         "properties": {
                             "type": {
                                 "type": "string",
-                                "enum": ["http"],
+                                "const": "http",
                             },
                             "method": {
                                 "type": "string",
-                                "enum": ["GET", "POST"],
+                                "enum": ["POST", "PUT", "PATCH"],
                             },
                             "bodyType": {
                                 "type": "string",
@@ -549,7 +666,7 @@ def build_bazaar_discovery_extension(
                                 "additionalProperties": {"type": "string"},
                             },
                         },
-                        "required": ["type", "method"],
+                        "required": ["type", "method", "bodyType", "body"],
                         "additionalProperties": False,
                     },
                     "output": {
@@ -605,6 +722,22 @@ def validate_bazaar_extension(extension: Any) -> list[str]:
             "DELETE",
         ):
             errors.append("bazaar.info.input.method missing or unsupported")
+        elif info_input.get("method") in ("POST", "PUT", "PATCH"):
+            # Body methods: the spec's schema requires bodyType + body,
+            # and the Bazaar prober sends the declared body example —
+            # an absent one makes the declaration unusable.
+            if info_input.get("bodyType") not in (
+                "json",
+                "form-data",
+                "text",
+            ):
+                errors.append(
+                    "bazaar.info.input.bodyType missing or unsupported "
+                    "for a body method")
+            if not isinstance(info_input.get("body"), dict):
+                errors.append(
+                    "bazaar.info.input.body missing or not an object "
+                    "example")
     schema = bazaar.get("schema")
     if not isinstance(schema, dict):
         errors.append("bazaar.schema missing or not an object")

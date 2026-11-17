@@ -13,6 +13,7 @@ from .errors import (AcceptsMismatch, AllowanceInsufficient, AmbiguousPayment,
                      MalformedChallenge, MissingPaymentRef, PaymentCapExceeded,
                      SettlementReverted, SincorX402Error, UnsupportedPayment,
                      VelocityCapExceeded, VerificationFailed)
+from .discovery import build_bazaar_extension, validate_bazaar_extension
 from .facilitator import FacilitatorClient, FacilitatorResult, LocalFacilitator
 from .hub_engine import (SEAL_SCHEME, HubSettlementEngine,
                          HubSettlementReceipt, SealEnvelope,
@@ -33,6 +34,7 @@ __all__ = [
     "PaymentRequirement", "EscrowTerms", "USDC_BASE_ADDRESS", "sha256_hex",
     "PlatformClient", "LocalReferencePlatform", "EscrowRecord",
     "FacilitatorClient", "LocalFacilitator", "FacilitatorResult",
+    "build_bazaar_extension", "validate_bazaar_extension",
     "Verifier", "ReferenceVerifier", "VerificationResult",
     "HubSettlementEngine", "HubSettlementReceipt", "SealEnvelope",
     "SEAL_SCHEME", "compute_sigil_commitment", "to_bytes32",
