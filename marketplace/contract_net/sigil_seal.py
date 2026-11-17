@@ -18,12 +18,14 @@ data: delegator -> sessionKey, scoped permissions, expiry, nonce). A
 delegation chain verifies only when:
 
 1. the cert signature recovers to the delegator (master) address,
-2. the cert has not expired,
-3. the session key has not been revoked,
-4. the requested permission is covered by the cert's scoped permissions,
-5. the action signature recovers to the session-key address, and
-6. the cert's permissions are a subset of the delegator's own grants
-   (down-scoping enforced at registration).
+2. the referenced delegator seal exists, is bound to that delegator, and
+   remains valid (not revoked or expired),
+3. the cert has not expired,
+4. the session key has not been revoked,
+5. the requested permission is covered by the cert's scoped permissions,
+6. the action signature recovers to the session-key address, and
+7. the cert's permissions are a subset of the referenced seal's signed
+   capabilities (down-scoping enforced at registration).
 
 Security posture (mirrors ``eip712.py``):
 
@@ -329,12 +331,20 @@ def revocation_typed_data_payload(
 # ---------------------------------------------------------------------------
 
 def _recover_secp256k1(typed_data: Dict[str, Any], signature: str) -> Optional[str]:
+    """Recover the signer via eth_account's public typed-data API.
+
+    Fail-closed: a high-s (malleated-twin) signature is refused before
+    recovery so the (r, n-s, v^1) twin can never pass as a distinct
+    valid seal signature (parity with eip712.py's Bid path; W-174).
+    """
     try:
         from eth_account import Account
         from eth_account.messages import encode_typed_data
+        from sincor2.sig_canonical import require_low_s
     except Exception:
         return None
     try:
+        require_low_s(signature)  # reject (r, n-s) malleation twins
         message = encode_typed_data(full_message=typed_data)
         return Account.recover_message(message, signature=signature)
     except Exception:
@@ -444,6 +454,7 @@ class DelegationRecord:
     nonce: int
     signature: str
     sig_type: str
+    seal_id: str
     revoked: bool = False
     revoked_at: Optional[int] = None
 
@@ -491,8 +502,10 @@ class SealRegistry:
         seal_id = to_hex(seal_typed_data_digest(self.config, **fields))
         if seal_id in self.seals:
             raise ValueError("seal already registered (replay)")
+        stored_fields = dict(fields)
+        stored_fields["capabilities"] = list(fields["capabilities"])
         self.seals[seal_id] = SealRecord(
-            fields=dict(fields), signature=signature,
+            fields=stored_fields, signature=signature,
             sig_type=sig_type, seal_id=seal_id,
         )
         return seal_id
@@ -529,27 +542,61 @@ class SealRegistry:
         return int(rec.fields["expiry"]) > ts
 
     # -- delegation ----------------------------------------------------------
+    def _delegator_seal_failure(
+        self,
+        seal_id: str,
+        delegator: str,
+        permissions: List[str],
+        *,
+        ts: int,
+    ) -> Optional[str]:
+        """Return why a seal cannot currently authorize a delegation.
+
+        This is the single binding check used at registration and again
+        whenever a delegation is exercised, so revoking or expiring the
+        delegator seal immediately invalidates every dependent delegation.
+        """
+        seal = self.seals.get(seal_id)
+        if seal is None:
+            return "unknown delegator seal_id"
+        if seal.fields["agent_address"].lower() != delegator.lower():
+            return "delegation delegator does not match delegator seal"
+        if seal.revoked:
+            return "delegator seal revoked"
+        if int(seal.fields["expiry"]) <= ts:
+            return "delegator seal expired"
+        if not grants_cover_all(seal.fields["capabilities"], permissions):
+            return (
+                "delegation permissions exceed delegator seal capabilities "
+                "(down-scoping violated)"
+            )
+        return None
+
     def register_delegation(
         self,
         cert: Dict[str, Any],
         signature: str,
         *,
         sig_type: str,
-        delegator_grants: List[str],
-        seal_id: Optional[str] = None,
+        seal_id: str,
         now: Optional[float] = None,
     ) -> str:
         """Register a delegation cert after full chain checks.
 
-        Enforces: cert signed by delegator; cert permissions ⊆ delegator
-        grants (down-scoping); cert expiry ≤ delegator seal expiry when a
-        ``seal_id`` is given; session key not already delegated.
+        Enforces: a referenced delegator seal exists and is currently
+        valid; the cert delegator is that seal's agent; the cert is signed
+        by the delegator; cert permissions are a subset of the seal's
+        signed capabilities (down-scoping); cert expiry does not exceed
+        the seal expiry; and the session key is not already delegated.
+        Caller-supplied grants are never an authority source.
         """
         if sig_type != SigType.SECP256K1.value:
             raise ValueError(
                 "delegation certs require secp256k1: HMAC is never "
                 "accepted for delegation (money-adjacent trust path)"
             )
+        if not seal_id:
+            raise ValueError("delegator seal_id required")
         payload = delegation_typed_data_payload(self.config, **cert)
         recovered = _recover_secp256k1(payload, signature)
         if recovered is None or recovered.lower() != cert["delegator"].lower():
@@ -557,19 +604,19 @@ class SealRegistry:
         ts = int(now if now is not None else time.time())
         if int(cert["expiry"]) <= ts:
             raise ValueError("refusing to register expired delegation cert")
-        if not grants_cover_all(delegator_grants, cert["permissions"]):
+        seal_failure = self._delegator_seal_failure(
+            seal_id,
+            cert["delegator"],
+            list(cert["permissions"]),
+            ts=ts,
+        )
+        if seal_failure is not None:
+            raise ValueError(seal_failure)
+        seal = self.seals[seal_id]
+        if int(cert["expiry"]) > int(seal.fields["expiry"]):
             raise ValueError(
-                "delegation permissions exceed delegator grants "
-                "(down-scoping violated)"
+                "delegation expiry exceeds delegator seal expiry"
             )
-        if seal_id is not None:
-            seal = self.seals.get(seal_id)
-            if seal is None:
-                raise ValueError("unknown delegator seal_id")
-            if int(cert["expiry"]) > int(seal.fields["expiry"]):
-                raise ValueError(
-                    "delegation expiry exceeds delegator seal expiry"
-                )
         key = cert["session_key"].lower()
         if key in self.delegations:
             raise ValueError("session key already delegated (reuse rejected)")
@@ -581,6 +628,7 @@ class SealRegistry:
             nonce=int(cert["nonce"]),
             signature=signature,
             sig_type=sig_type,
+            seal_id=seal_id,
         )
         return key
 
@@ -630,6 +678,14 @@ class SealRegistry:
         ts = int(now if now is not None else time.time())
         if rec.expiry <= ts:
             return False, "delegation cert expired"
+        seal_failure = self._delegator_seal_failure(
+            rec.seal_id,
+            rec.delegator,
+            rec.permissions,
+            ts=ts,
+        )
+        if seal_failure is not None:
+            return False, seal_failure
         if not permission_covered(rec.permissions, required_permission):
             return False, (
                 f"required permission {required_permission!r} not in "
@@ -645,7 +701,14 @@ class SealRegistry:
         if rec is None or rec.revoked:
             return False
         ts = int(now if now is not None else time.time())
-        return rec.expiry > ts
+        if rec.expiry <= ts:
+            return False
+        return self._delegator_seal_failure(
+            rec.seal_id,
+            rec.delegator,
+            rec.permissions,
+            ts=ts,
+        ) is None
 
 
 __all__ = [
