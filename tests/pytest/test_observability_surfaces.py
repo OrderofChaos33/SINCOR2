@@ -76,6 +76,29 @@ def test_pool_verify_after_fund_and_allocate(client, tmp_path):
     assert body["verified"] is True
 
 
+def test_pool_verify_after_spend_still_verifies(client, tmp_path):
+    """Regression: spent allocations left the pool, so conservation is
+    funded == allocated + available + spent. After a spend, a clean
+    ledger must still verify (the original allocated+available formula
+    could never pass again once any bounty settled)."""
+    pool = reset_bounty_pool(path=str(tmp_path / "pool-spent.json"),
+                             reserve_axm=100)
+    pool.fund()
+    alloc = pool.allocate("task-obs-2", 25.0, reason="observability test")
+    pool.spend(alloc["allocation_id"])
+
+    resp = client.get("/v1/a2a/pool/verify")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["funded_axm"] == 100.0
+    assert body["allocated_axm"] == 0.0
+    assert body["available_axm"] == 75.0
+    assert body["spent_axm"] == 25.0
+    assert body["ledger_verification"]["ok"] is True
+    assert body["conservation_ok"] is True
+    assert body["verified"] is True
+
+
 def test_pool_verify_inconclusive_is_not_a_pass(client, monkeypatch):
     def fake_verify_ledger(self):
         return {

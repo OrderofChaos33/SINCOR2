@@ -3048,7 +3048,7 @@ def attach_market_routes(bp: Blueprint) -> None:
         funded = float(status.get("funded_axm") or 0.0)
         allocated = float(status.get("allocated_axm") or 0.0)
         available = float(status.get("available_axm") or 0.0)
-        conservation_ok = abs(funded - (allocated + available)) <= 1e-6
+        conservation_ok = abs(funded - (allocated + available + spent_axm)) <= 1e-6
         data = {
             "funded_axm": status.get("funded_axm"),
             "allocated_axm": status.get("allocated_axm"),
