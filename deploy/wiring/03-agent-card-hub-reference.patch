@@ -1,0 +1,34 @@
+--- a/src/sincor2/a2a_integration.py
++++ b/src/sincor2/a2a_integration.py
+@@ -296,6 +296,7 @@
+     payment_methods:       List[Dict[str, Any]] = field(default_factory=list)
+     agentkit:              Dict[str, Any] = field(default_factory=dict)
+     base_commerce:         Dict[str, Any] = field(default_factory=dict)
++    settlement_hub:        Dict[str, Any] = field(default_factory=dict)
+ 
+     def to_dict(self) -> Dict[str, Any]:
+         url = (self.supported_interfaces[0].url
+@@ -342,6 +343,8 @@
+             d["agentKit"] = self.agentkit
+         if self.base_commerce:
+             d["baseCommerce"] = self.base_commerce
++        if self.settlement_hub:
++            d["settlementHub"] = self.settlement_hub
+         return d
+ 
+     # Legacy helper — returns a flat dict matching the old agent.json shape so
+@@ -2217,6 +2220,14 @@
+         payment_methods=commerce["payment_methods"],
+         agentkit=commerce["agentkit"],
+         base_commerce=commerce["base_commerce"],
++        settlement_hub={
++            "network": "Base",
++            "chain_id": 8453,
++            "address": "<MAINNET_HUB_ADDRESS>",
++            "contract": "SincorSettlementHub",
++            "protocol_fee_bps": 500,
++            "scheme": "sincor-seal-v1",
++        },
+     )
+ 
+ 
