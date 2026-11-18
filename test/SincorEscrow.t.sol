@@ -215,12 +215,11 @@ contract SincorTaskEscrowTest is Test {
         assertEq(token.balanceOf(address(escrow)), 0);
     }
 
-    function test_CancelRevertsForNonCreator() public {
+    function test_CancelRevertsForNonCreatorBeforeExpiry() public {
         vm.prank(creator);
         uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
-        vm.warp(block.timestamp + 2 days);
 
-        // A third party cannot cancel — and therefore cannot take the reward.
+        // Before expiry, a third party cannot cancel a live task.
         vm.prank(agent);
         vm.expectRevert("Unauthorized cancellation");
         escrow.cancelTask(taskId);
@@ -234,6 +233,38 @@ contract SincorTaskEscrowTest is Test {
         vm.prank(creator);
         escrow.cancelTask(taskId);
         assertEq(token.balanceOf(address(escrow)), 0);
+    }
+
+    function test_ThirdPartyCanTriggerRefundAfterExpiry() public {
+        vm.prank(creator);
+        uint256 taskId = escrow.createTask(REWARD, BOND, 1 days);
+
+        address stranger = address(0x99);
+
+        // The same call reverts while the task is still inside its window.
+        vm.prank(stranger);
+        vm.expectRevert("Unauthorized cancellation");
+        escrow.cancelTask(taskId);
+
+        // At the expiry timestamp the claim window has closed
+        // (claimTask requires block.timestamp < expiryTimestamp).
+        vm.warp(block.timestamp + 1 days);
+
+        uint256 creatorBefore = token.balanceOf(creator);
+        uint256 strangerBefore = token.balanceOf(stranger);
+
+        vm.expectEmit(true, true, false, true);
+        emit SincorTaskEscrow.TaskCancelled(taskId, creator, REWARD);
+        vm.prank(stranger);
+        escrow.cancelTask(taskId);
+
+        // The refund lands with the creator in full; the caller gets nothing.
+        assertEq(token.balanceOf(creator), creatorBefore + REWARD);
+        assertEq(token.balanceOf(stranger), strangerBefore);
+        assertEq(token.balanceOf(address(escrow)), 0);
+        (,, uint256 reward,,, SincorTaskEscrow.TaskStatus status) = escrow.tasks(taskId);
+        assertEq(reward, 0);
+        assertEq(uint256(status), uint256(SincorTaskEscrow.TaskStatus.Cancelled));
     }
 
     function test_CancelRevertsAfterClaim() public {

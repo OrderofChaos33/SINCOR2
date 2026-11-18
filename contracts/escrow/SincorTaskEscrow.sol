@@ -55,15 +55,22 @@ contract SincorTaskEscrow is ReentrancyGuard {
     }
 
     /// @notice Cancel an unclaimed task and refund its full reward to the creator.
-    /// @dev Only the task's creator may cancel, and only while the task is
-    ///      Unassigned (no agent has staked a bond yet, so the creator is the
-    ///      only party with funds at stake). This is the recovery path for
-    ///      tasks that expire unclaimed — without it their rewards would be
-    ///      locked in this contract permanently (W-189).
+    /// @dev While the task is Unassigned (no agent has staked a bond yet, so
+    ///      the creator is the only party with funds at stake), the creator
+    ///      may cancel at any time. Once the task's expiry has passed — the
+    ///      claim window closes at expiryTimestamp, since claimTask requires
+    ///      block.timestamp < expiryTimestamp — ANY caller may trigger the
+    ///      cancellation; the refund always goes to the task's creator,
+    ///      never to the caller. This is the recovery path for tasks that
+    ///      expire unclaimed — without it their rewards would be locked in
+    ///      this contract permanently (W-189).
     function cancelTask(uint256 taskId) external nonReentrant {
         Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Unassigned, "Task not cancellable");
-        require(msg.sender == task.creator, "Unauthorized cancellation");
+        require(
+            msg.sender == task.creator || block.timestamp >= task.expiryTimestamp,
+            "Unauthorized cancellation"
+        );
 
         task.status = TaskStatus.Cancelled;
         uint256 refundAmount = task.rewardAmount;
