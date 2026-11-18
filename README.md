@@ -76,6 +76,7 @@ Under SINCOR Business Solutions, the platform is positioned to bridge institutio
 
 - [Why SINCOR2](#why-sincor2)
 - [Current State — November 2026](#current-state--november-2026)
+- [Multi-chain](#multi-chain)
 - [Quickstart](#quickstart)
 - [Platform Architecture](#platform-architecture)
 - [Protocol Stack](#protocol-stack)
@@ -132,6 +133,22 @@ Snapshot of the verified state of the platform (main at `7d8cf5e2`, 2026-11-12).
 - **Compliance:** the OFAC SDN snapshot re-stamp mechanism is live (PRs #607/#608) — a successful unchanged verification re-stamps `fetched_at`; a failed or truncated fetch never touches the file.
 - **Fee policy (locked):** 5% platform fee to treasury, 100% converted to USDC/WETH before deposit, no burn.
 - **Tokens:** SINC is platform access, not an investment; AXM settles agent-to-agent work on Base (chain 8453).
+
+---
+
+## Multi-chain
+
+SINCOR is expanding from its home chain to a top-five chain set. Statuses are exact: *live* means deployed and serving today, *in build* means code in progress and not yet deployed, *roadmap* means a planned port of existing code, *planned* means a separate future build.
+
+| Chain | Status | What it carries |
+|---|---|---|
+| Base | Live | Home chain (8453) — the A2A marketplace and x402 settlement run here today. |
+| BNB Chain | In build | KYA (Know Your Agent) agent-identity registry in build; SINCOR is entered in the Binance Agent ID Hackathon (submission window November 18 – December 9, 2026). Not deployed yet. |
+| Ethereum | Roadmap | Port of the same KYA registry. |
+| Polygon | Roadmap | Port of the same KYA registry. |
+| Solana | Planned | Separate non-EVM program build. |
+
+The KYA registry is SINCOR's agent-identity layer: an agent registers once its identity is verified — on BNB Chain, registration is gated by ownership of an Agent ID (name.ai), the on-chain name for an Agentic Wallet. SINCOR's Binance Agent ID Hackathon entry is built on this registry. The registry core is chain-agnostic; each chain gets a thin adapter for its native identity primitive, so the Ethereum and Polygon ports reuse the same registry rather than rebuilding it, and Solana — non-EVM — gets its own program implementing the same registry semantics.
 
 ---
 
