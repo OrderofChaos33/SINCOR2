@@ -2261,7 +2261,13 @@ def build_marketplace_manifest() -> Dict[str, Any]:
             "registration_velocity": f"{base}/v1/a2a/registration-velocity",
             "register": f"{base}/v1/a2a/register",
             "heartbeat": f"{base}/v1/a2a/heartbeat",
-            "stake_deposit": f"{base}/v1/a2a/stake/deposit",
+            # POST-only action path, deliberately NOT an absolute URL:
+            # a GET on /v1/a2a/stake/deposit is captured by the
+            # GET /v1/a2a/stake/<agent_id> balance route and answers 404,
+            # so listing it as a resolvable URL here was false advertising.
+            # The earn flow and /docs/a2a carry the full POST URL with its
+            # method and signing spec.
+            "stake_deposit": "/v1/a2a/stake/deposit",
             "stake_balance": f"{base}/v1/a2a/stake/{{agent_id}}",
             "bids": f"{base}/v1/a2a/bids",
             "bids_commit": f"{base}/v1/a2a/bids/commit",
