@@ -443,7 +443,7 @@ class TestRefreshOfacSdn:
         from sincor2.defi.ofac_sdn import snapshot_path
         monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
         assert refresh_mod.active_snapshot_path() == str(
-            tmp_path / "p20_ofac_sdn.json")
+            tmp_path / "p20_ofac_sdn.manifest.json")
         monkeypatch.delenv("SINCOR_DATA_DIR")
         assert refresh_mod.active_snapshot_path() == snapshot_path()
 
@@ -454,8 +454,10 @@ class TestRefreshOfacSdn:
         monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
         result = refresh_mod.refresh()
         assert result["status"] == "updated"
-        written = json.loads(
-            (tmp_path / "p20_ofac_sdn.json").read_text())
+        # The refresh writes the text-chunk form under the data dir;
+        # read it back through the production loader seam.
+        written = load_snapshot(
+            str(tmp_path / "p20_ofac_sdn.manifest.json"))
         assert written["publication_date"] == snap["publication_date"]
         assert written["entry_count"] == snap["entry_count"]
         assert written["fetched_at"] == result["fetched_at"]
@@ -470,7 +472,9 @@ class TestRefreshOfacSdn:
             self, tmp_path, monkeypatch):
         snap = _fresh_real_snapshot()
         snap["source"] = "REFRESHED-COPY-MARKER"
-        (tmp_path / "p20_ofac_sdn.json").write_text(json.dumps(snap))
+        from sincor2.defi.ofac_sdn import (
+            SNAPSHOT_FILENAME, write_snapshot_atomic)
+        write_snapshot_atomic(snap, str(tmp_path / SNAPSHOT_FILENAME))
         monkeypatch.setenv("SINCOR_DATA_DIR", str(tmp_path))
         loaded = ss.load_screen_snapshot()
         assert loaded["source"] == "REFRESHED-COPY-MARKER"

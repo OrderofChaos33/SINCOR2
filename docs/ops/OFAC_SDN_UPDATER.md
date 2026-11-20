@@ -1,7 +1,14 @@
 # OFAC SDN Snapshot Updater — runbook
 
 The P20 compliance oracle screens against a vendored lean snapshot of the
-OFAC SDN list (`src/sincor2/defi/data/p20_ofac_sdn.json`). This snapshot
+OFAC SDN list, stored as UTF-8 text under `src/sincor2/defi/data/`: a JSON
+manifest (`p20_ofac_sdn.manifest.json`) plus chunk files
+(`p20_ofac_sdn.b64.<digest>.<nnn>.txt`), each holding a slice of the
+base64-encoded gzipped snapshot JSON. The loader reassembles the chunks,
+verifies the SHA-256 digests recorded in the manifest, gunzips, and parses.
+Text form is deliberate: the GitHub connector's push route validates UTF-8
+text and rejects binary content outright, so a `.gz` snapshot could never
+be pushed through it — these chunk files can. This snapshot
 must be refreshed regularly: the oracle's freshness guards **alert at 24h**
 and **fail closed beyond 48h** (`LIST_FRESHNESS_*_SECONDS` in
 `compliance_automation.py`), so the updater runs **daily**.
@@ -31,7 +38,9 @@ daily); the exact hour is flexible.
    last list change (W-35). A failed fetch or parse never re-stamps.
 4. On a new publication: writes the new snapshot atomically
    (temp file + fsync + `os.replace`) — a crash can never leave a
-   half-written list.
+   half-written list. In text-chunk form the chunk files land first
+   under digest-derived names and the manifest is replaced last, so
+   the manifest stays the single commit point.
 
 Output is a one-line JSON status: `{"status": "updated"|"unchanged"|"failed", ...}`.
 
