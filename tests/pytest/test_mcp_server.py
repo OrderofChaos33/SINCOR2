@@ -139,20 +139,28 @@ def test_marketplace_manifest(env):
 
 # ── Read tools return real platform data ───────────────────────────────────
 
-def test_list_tasks_returns_anchored_auction(env):
-    task_id = _anchored_sealed_task()
+def test_list_tasks_reads_the_task_board(env):
+    # Regression (outsider sweep K2): list_tasks used to read
+    # /v1/a2a/auctions — only onchain-anchored sealed tasks — and so
+    # reported an empty marketplace. It now reads the real board,
+    # GET /v1/a2a/tasks: anchored AND unanchored tasks appear.
+    anchored_id = _anchored_sealed_task()
+    plain = create_task("lead-enrichment", tags=["lead-enrichment"],
+                        bounty_axm=1.5, sealed=True, poster_id="mcp-poster")
     payload, is_error = _call("list_tasks", {"skill": "lead-enrichment"})
     assert not is_error, payload
-    assert payload["source"] == "GET /v1/a2a/auctions"
-    ids = [a["task_id"] for a in payload["auctions"]]
-    assert task_id in ids
-    entry = next(a for a in payload["auctions"] if a["task_id"] == task_id)
+    assert payload["source"] == "GET /v1/a2a/tasks"
+    ids = [a["task_id"] for a in payload["tasks"]]
+    assert anchored_id in ids
+    assert plain["task_id"] in ids
+    entry = next(a for a in payload["tasks"] if a["task_id"] == anchored_id)
     assert entry["bounty_axm"] == 2.0
-    assert entry["bidder_kit"] == f"/v1/a2a/tasks/{task_id}/bidder-kit"
+    assert entry["bidder_kit"] == f"/v1/a2a/tasks/{anchored_id}/bidder-kit"
+    assert entry["auction_id"] == "0x" + "cc" * 32
 
-    # Skill filter excludes non-matching auctions.
+    # Skill filter excludes non-matching tasks.
     payload, _ = _call("list_tasks", {"skill": "dental-billing-scrub"})
-    assert task_id not in [a["task_id"] for a in payload["auctions"]]
+    assert anchored_id not in [a["task_id"] for a in payload["tasks"]]
 
 
 def test_get_task_returns_bidder_kit(env):
@@ -163,6 +171,23 @@ def test_get_task_returns_bidder_kit(env):
     assert payload["auction_id"] == "0x" + "cc" * 32
     assert "commitment_scheme" in payload
     assert payload["chain_id"] == 8453
+
+
+def test_get_task_returns_board_kit_for_unanchored_task(env):
+    # The kit no longer 404s for unanchored tasks: get_task returns the
+    # board kit (offchain scheme + worked example) for them.
+    task = create_task("lead-enrichment", tags=["lead-enrichment"],
+                       bounty_axm=1.5, sealed=True, poster_id="mcp-poster")
+    payload, is_error = _call("get_task", {"task_id": task["task_id"]})
+    assert not is_error, payload
+    assert payload["mode"] == "board-sealed"
+    board = payload["board"]
+    assert board["commit_endpoint"]["path"] == "/v1/a2a/bids/commit"
+    example = board["example"]
+    salt = bytes.fromhex(example["salt"][2:])
+    expected = "0x" + sealed_commitment(
+        int(example["price_wei"]), salt, example["agent_id"]).hex()
+    assert example["commitment"] == expected
 
 
 def test_get_task_unknown_is_error_payload(env):
