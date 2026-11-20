@@ -5,7 +5,7 @@ Downloads nothing on import. :func:`parse_sdn_xml` turns the official
 snapshot the sanctions screener needs: names, aliases, programs, and IDs
 (including digital-currency addresses). The raw ~30MB XML is never vendored.
 
-Snapshot schema (``src/sincor2/defi/data/p20_ofac_sdn.json``)::
+Snapshot schema (the parsed form, however it is stored)::
 
     {
       "source": "OFAC SDN List",
@@ -24,8 +24,23 @@ Snapshot schema (``src/sincor2/defi/data/p20_ofac_sdn.json``)::
 Name screening uses exact match on :func:`normalize_name` output. This is
 deliberately conservative: production name screening wants fuzzy matching,
 which is documented follow-up work, not silently implemented here.
+
+On-disk storage (vendored copy): the snapshot is stored as UTF-8 *text*
+under ``src/sincor2/defi/data/`` — a small JSON manifest
+(``p20_ofac_sdn.manifest.json``) plus chunk files, each holding a slice
+of the base64-encoded gzipped snapshot JSON. Text form is deliberate:
+the GitHub connector's push route validates UTF-8 text and rejects
+binary content outright, so a ``.gz`` file could never be pushed
+through it, while these chunk files can. :func:`load_snapshot`
+reassembles the chunks, verifies both SHA-256 digests recorded in the
+manifest, gunzips, and parses — and it still reads plain-JSON and
+gzip snapshot files at explicit paths (``SINCOR_DATA_DIR`` copies,
+test fixtures) for backward compatibility.
 """
 
+import base64
+import gzip
+import hashlib
 import json
 import os
 import re
@@ -36,7 +51,19 @@ SDN_SOURCE_URL = "https://www.treasury.gov/ofac/downloads/sdn.xml"
 SDN_XMLNS = ("https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview"
              "/exports/XML")
 
-SNAPSHOT_FILENAME = "p20_ofac_sdn.json"
+#: The vendored snapshot's manifest file. ``snapshot_path()`` points
+#: here; the payload lives in the chunk files the manifest names.
+SNAPSHOT_FILENAME = "p20_ofac_sdn.manifest.json"
+
+#: Manifest ``format`` marker for the base64-text-chunk storage form.
+TEXT_FORMAT = "sincor-ofac-sdn-text/1"
+
+#: Base64 characters per chunk file (before line wrapping). With the
+#: 100-column wrap each chunk file stays comfortably under 700 KB.
+_CHUNK_CHARS = 600_000
+_WRAP_COLUMNS = 100
+
+_GZIP_MAGIC = b"\x1f\x8b"
 
 
 def snapshot_path() -> str:
@@ -172,10 +199,13 @@ def build_screening_sets(snapshot: Dict[str, Any]) -> Tuple[Set[str], Set[str]]:
     return addresses, names
 
 
-def load_snapshot(path: str = None) -> Dict[str, Any]:
-    """Load and validate a vendored snapshot. Raises on any defect."""
-    with open(path or snapshot_path(), encoding="utf-8") as f:
-        data = json.load(f)
+def _serialize_snapshot(snapshot: Dict[str, Any]) -> bytes:
+    """Canonical payload bytes for a snapshot dict (compact JSON)."""
+    return json.dumps(
+        snapshot, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _validate_snapshot(data: Dict[str, Any]) -> Dict[str, Any]:
     for key in ("source", "source_url", "publication_date",
                 "fetched_at", "entries"):
         if key not in data:
@@ -185,15 +215,156 @@ def load_snapshot(path: str = None) -> Dict[str, Any]:
     return data
 
 
-def write_snapshot_atomic(snapshot: Dict[str, Any], path: str) -> None:
-    """Write a snapshot atomically: temp file + fsync + os.replace, so a
-    crash or failed verification can never leave a half-written list."""
+def _load_text_chunks(manifest_path: str,
+                      manifest: Dict[str, Any]) -> Dict[str, Any]:
+    """Reassemble a text-chunk snapshot: read the chunk files named by
+    the manifest (siblings of the manifest file), base64-decode,
+    verify both SHA-256 digests, gunzip, parse. Raises on any defect —
+    a torn or tampered chunk set must never screen as a valid list."""
+    names = manifest.get("chunks")
+    if not isinstance(names, list) or not names:
+        raise ValueError("SDN text snapshot manifest names no chunks")
+    if manifest.get("chunk_count") != len(names):
+        raise ValueError("SDN text snapshot chunk_count mismatch")
+    base_dir = os.path.dirname(os.path.abspath(manifest_path))
+    parts: List[str] = []
+    for name in names:
+        if os.path.basename(name) != name:
+            raise ValueError(f"SDN chunk name is not a plain file: {name}")
+        with open(os.path.join(base_dir, name), encoding="utf-8") as f:
+            parts.append("".join(f.read().split()))
+    try:
+        gz = base64.b64decode("".join(parts), validate=True)
+    except ValueError as e:
+        raise ValueError(f"SDN text snapshot is not valid base64: {e}") from e
+    if hashlib.sha256(gz).hexdigest() != manifest.get("sha256_gzip"):
+        raise ValueError("SDN text snapshot gzip digest mismatch")
+    payload = gzip.decompress(gz)
+    if hashlib.sha256(payload).hexdigest() != manifest.get("sha256_json"):
+        raise ValueError("SDN text snapshot JSON digest mismatch")
+    return json.loads(payload.decode("utf-8"))
+
+
+def load_snapshot(path: str = None) -> Dict[str, Any]:
+    """Load and validate a vendored snapshot. Raises on any defect.
+
+    Transparently handles every on-disk form:
+
+    - the text-chunk form (``path`` names a manifest JSON whose
+      ``format`` is :data:`TEXT_FORMAT`) — chunks are reassembled and
+      digest-verified, see :func:`_load_text_chunks`;
+    - gzip bytes (magic-byte detection, never filename) — decompressed
+      in memory;
+    - plain JSON (e.g. a refreshed copy under ``SINCOR_DATA_DIR`` or a
+      test fixture at an explicit path) — parsed as-is.
+    """
+    target = path or snapshot_path()
+    with open(target, "rb") as f:
+        raw = f.read()
+    if raw[:2] == _GZIP_MAGIC:
+        data = json.loads(gzip.decompress(raw).decode("utf-8"))
+    else:
+        data = json.loads(raw.decode("utf-8"))
+        if isinstance(data, dict) and data.get("format") == TEXT_FORMAT:
+            data = _load_text_chunks(target, data)
+    return _validate_snapshot(data)
+
+
+def _atomic_write_bytes(payload: bytes, path: str) -> None:
+    """Temp file + fsync + os.replace: a crash can never leave a
+    half-written file at ``path``."""
     tmp = f"{path}.tmp.{os.getpid()}"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, ensure_ascii=False, separators=(",", ":"))
+    with open(tmp, "wb") as f:
+        f.write(payload)
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+
+
+def _write_text_chunks(snapshot: Dict[str, Any], payload: bytes,
+                       manifest_path: str) -> None:
+    """Write a snapshot in text-chunk form next to ``manifest_path``.
+
+    Chunk file names embed the gzip digest, so a new generation never
+    overwrites the live one in place: chunks land first, the manifest
+    (written last, atomically) is the commit point, and the previous
+    generation's chunk files are removed afterwards.
+    """
+    base_dir = os.path.dirname(os.path.abspath(manifest_path))
+    stem = os.path.basename(manifest_path)
+    for suffix in (".manifest.json", ".json"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    gz = gzip.compress(payload, mtime=0)
+    sha_gzip = hashlib.sha256(gz).hexdigest()
+    sha_json = hashlib.sha256(payload).hexdigest()
+    encoded = base64.b64encode(gz).decode("ascii")
+    slices = [encoded[i:i + _CHUNK_CHARS]
+              for i in range(0, len(encoded), _CHUNK_CHARS)] or [""]
+    names: List[str] = []
+    sizes: List[int] = []
+    for idx, text in enumerate(slices):
+        name = f"{stem}.b64.{sha_gzip[:8]}.{idx:03d}.txt"
+        wrapped = "\n".join(
+            text[i:i + _WRAP_COLUMNS]
+            for i in range(0, len(text), _WRAP_COLUMNS)) + "\n"
+        blob = wrapped.encode("utf-8")
+        _atomic_write_bytes(blob, os.path.join(base_dir, name))
+        names.append(name)
+        sizes.append(len(blob))
+    manifest = {
+        "format": TEXT_FORMAT,
+        "source": snapshot["source"],
+        "source_url": snapshot["source_url"],
+        "publication_date": snapshot["publication_date"],
+        "record_count": snapshot["record_count"],
+        "entry_count": snapshot["entry_count"],
+        "fetched_at": snapshot["fetched_at"],
+        "encoding": "base64(gzip(utf-8 json))",
+        "chunk_count": len(names),
+        "chunks": names,
+        "chunk_bytes": sizes,
+        "payload_bytes_gzip": len(gz),
+        "payload_bytes_json": len(payload),
+        "sha256_gzip": sha_gzip,
+        "sha256_json": sha_json,
+    }
+    _atomic_write_bytes(
+        (json.dumps(manifest, indent=2) + "\n").encode("utf-8"),
+        manifest_path)
+    # Retire the previous generation's chunk files (any same-stem chunk
+    # not in the live set). A failure here only leaves inert orphans —
+    # the loader follows the manifest, never the directory listing.
+    keep = set(names)
+    for fname in os.listdir(base_dir):
+        if (fname.startswith(f"{stem}.b64.") and fname.endswith(".txt")
+                and fname not in keep):
+            try:
+                os.remove(os.path.join(base_dir, fname))
+            except OSError:
+                pass
+
+
+def write_snapshot_atomic(snapshot: Dict[str, Any], path: str) -> None:
+    """Write a snapshot atomically, so a crash or failed verification
+    can never leave a half-written list.
+
+    The form follows the target: the manifest filename (the vendored
+    snapshot and ``SINCOR_DATA_DIR`` refresh targets) is written in
+    text-chunk form (see :func:`_write_text_chunks`); a ``.gz`` path is
+    written gzip-compressed (``mtime=0``: bytes depend only on the
+    content); any other path keeps the historical plain-JSON form.
+    :func:`load_snapshot` reads all three.
+    """
+    payload = _serialize_snapshot(snapshot)
+    if os.path.basename(path) == SNAPSHOT_FILENAME or \
+            path.endswith(".manifest.json"):
+        _write_text_chunks(snapshot, payload, path)
+    elif path.endswith(".gz"):
+        _atomic_write_bytes(gzip.compress(payload, mtime=0), path)
+    else:
+        _atomic_write_bytes(payload, path)
 
 
 # -- OFAC-wired oracle ------------------------------------------------------
