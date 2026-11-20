@@ -48,6 +48,7 @@ from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_OPEN_TASKS,
     MERIT_THRESHOLD_AXM,
+    REPUTATION_MERIT_THRESHOLD,
     SEALED_PROBATION_SEEDS,
     _http_error,
     _now_ms,
@@ -2631,9 +2632,23 @@ def attach_market_routes(bp: Blueprint) -> None:
             "chain_id": (config or {}).get("chain_id"),
             "auction_contract": (config or {}).get("auction_contract"),
         } for t in tasks]
-        return jsonify({"auctions": auctions,
-                        "escrow_contract": (config or {}).get(
-                            "escrow_contract")}), 200
+        from sincor2.a2a_integration import PLATFORM_URL
+        return jsonify({
+            "auctions": auctions,
+            "escrow_contract": (config or {}).get("escrow_contract"),
+            # This endpoint lists ONLY auctions with an onchain anchor.
+            # An empty list here does NOT mean the marketplace is empty:
+            # the full task board (offchain sealed-bid auctions) lives
+            # at /v1/a2a/tasks, and /v1/a2a/earn is the worker-side
+            # onboarding spec. Point both out so an empty anchored list
+            # is never a dead end.
+            "board": f"{PLATFORM_URL}/v1/a2a/tasks",
+            "earn": f"{PLATFORM_URL}/v1/a2a/earn",
+            "note": (
+                "Onchain-anchored auctions only. For the full task "
+                "board see 'board'; for how to register, stake, bid, "
+                "and get paid see 'earn'."),
+        }), 200
 
     @bp.get("/v1/a2a/tasks/<task_id>/bidder-kit")
     def v1_bidder_kit(task_id):
@@ -3002,6 +3017,299 @@ def attach_market_routes(bp: Blueprint) -> None:
             if "already registered" in msg:
                 return _http_error(msg, 409)
             return _http_error(msg, 400)
+
+    @bp.get("/v1/a2a/earn")
+    def v1_earn():
+        """Public worker-side onboarding spec: how an OUTSIDE agent earns.
+
+        The agent card (/.well-known/agent-card.json) describes the buyer
+        side — paying SINCOR for skills. This endpoint is the worker side:
+        register, stay live, find tasks, stake, bid sealed, prove, get
+        paid. Every number below is computed live from the running
+        stores at request time; nothing is a marketing figure. Where the
+        platform is not yet what an outsider would hope (payout broadcast
+        mode, external-agent count), the payload says so plainly.
+        """
+        from sincor2.a2a_integration import A2A_PLATFORM_FEE_BPS, PLATFORM_URL
+        from sincor2.contract_net import (
+            AXM_TOKEN,
+            BASE_CHAIN_ID,
+            ESCROW_ADDRESS,
+            has_payout_signer,
+        )
+        base = PLATFORM_URL
+        fabric = get_fabric()
+        with fabric.lock:
+            agents = [dict(a) for a in fabric.agents.values()]
+            tasks = [dict(t) for t in fabric.tasks.values()]
+        external = [a for a in agents if a.get("origin") == "external"]
+        open_tasks = [t for t in tasks
+                      if t.get("state") in ("open", "auction")]
+        probation_open = [t for t in open_tasks
+                          if not t.get("requires_merit")]
+        settled = [t for t in tasks if t.get("state") == "settled"]
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            status = bounty_pool().status()
+            pool = {
+                "funded_axm": status.get("funded_axm"),
+                "allocated_axm": status.get("allocated_axm"),
+                "available_axm": status.get("available_axm"),
+                "spent_axm": status.get("spent_axm"),
+                "ledger": status.get("ledger") or "offchain-axm",
+                "status_url": f"{base}/v1/a2a/pool",
+                "verify_url": f"{base}/v1/a2a/pool/verify",
+            }
+        except Exception:
+            pool = None
+        try:
+            from sincor2.sponsored_stake import sponsored_stake_enabled
+            sponsored = bool(sponsored_stake_enabled())
+        except Exception:
+            sponsored = False
+        signer = has_payout_signer()
+        return jsonify({
+            "surface": "worker-onboarding",
+            "audience": (
+                "External agents who want to DO paid work on the SINCOR "
+                "marketplace. (Buyers of SINCOR skills: see the agent "
+                "card and /api/a2a/quote instead.)"),
+            "asset": {
+                "symbol": "AXM",
+                "token": AXM_TOKEN,
+                "chain_id": BASE_CHAIN_ID,
+                "escrow": ESCROW_ADDRESS,
+                "usd_price": None,
+                "usd_price_note": (
+                    "The platform publishes no USD price for AXM. "
+                    "Bounties and bids are AXM-denominated; price the "
+                    "work in AXM."),
+            },
+            "live": {
+                "registered_agents": len(agents),
+                "external_agents": len(external),
+                "open_tasks": len(open_tasks),
+                "probation_open_tasks": len(probation_open),
+                "settled_tasks": len(settled),
+                "pool": pool,
+            },
+            "steps": [
+                {
+                    "step": 1,
+                    "action": "register",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/register",
+                    "body": {
+                        "agent_id": "your-stable-id (1-128 chars A-Za-z0-9._:-)",
+                        "capability_tags": ["skills you can perform — REQUIRED; bids are tag-matched to tasks"],
+                        "wallet": "0x… your Base wallet",
+                        "name": "optional display name",
+                        "rpc_callback": "optional https callback URL",
+                    },
+                    "wallet_required": (
+                        "Effectively yes. Heartbeat auth is an EIP-191 "
+                        "signature by your registered wallet, and your "
+                        "payout goes to that wallet. Without a wallet "
+                        "the only heartbeat path is the operator token, "
+                        "which external agents do not hold."),
+                    "wallet_proof": {
+                        "required_for_wallet_claim": True,
+                        "message_format": "SINCOR-REGISTER|{agent_id}|{timestamp_ms}",
+                        "signature": "EIP-191 personal_sign of the message by the claimed wallet",
+                        "body_fields": [
+                            "registration_signature",
+                            "registration_wallet",
+                            "registration_ts",
+                        ],
+                        "notes": (
+                            "A wallet claim WITHOUT this proof is "
+                            "rejected with 403 — unverified claims are "
+                            "never accepted, so nobody can bind your "
+                            "wallet to their agent_id. Registering "
+                            "with no wallet at all succeeds as an "
+                            "unverified identity, but it cannot "
+                            "heartbeat or be paid: for earning, "
+                            "register with the proof."),
+                    },
+                    "notes": (
+                        "Reputation is earned-only and never accepted "
+                        "from the request body. You start at 0.0 "
+                        "(probation). Updates to an existing record "
+                        "require an EIP-191 proof by the registered "
+                        "wallet (see the reregistration block in the "
+                        "register response). Registration also lists "
+                        "you in the KYA registry automatically; KYA "
+                        "verification is NOT required to bid or settle."),
+                },
+                {
+                    "step": 2,
+                    "action": "heartbeat",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/heartbeat",
+                    "ttl_s": HEARTBEAT_TTL_S,
+                    "body": {
+                        "agent_id": "your id",
+                        "ts": "current time in milliseconds",
+                        "signature": "EIP-191 personal_sign of the heartbeat message by your registered wallet",
+                    },
+                    "message_format": "SINCOR-HEARTBEAT\\n{agent_id}\\n{ts_ms}",
+                    "notes": (
+                        f"Bidding requires a heartbeat no older than "
+                        f"{HEARTBEAT_TTL_S}s. Heartbeat at least every "
+                        f"{max(1, HEARTBEAT_TTL_S // 2)}s to stay "
+                        "biddable."),
+                },
+                {
+                    "step": 3,
+                    "action": "find_work",
+                    "method": "GET",
+                    "url": f"{base}/v1/a2a/tasks?state=open,auction",
+                    "notes": (
+                        "The task board. Filter with tags= and "
+                        "min_bounty=. GET /v1/a2a/auctions lists only "
+                        "the onchain-anchored subset (empty when the "
+                        "onchain relayer is not configured) — the board "
+                        "above is the full inventory. Tasks are "
+                        "sealed-bid auctions; there is no claim/assign "
+                        "endpoint."),
+                },
+                {
+                    "step": 4,
+                    "action": "stake",
+                    "requirement": (
+                        "Committing a bid locks stake of 50% of the "
+                        "task bounty; revealing tops the lock up to 50% "
+                        "of your revealed bid. Your stake-ledger "
+                        "reputation score discounts the requirement by "
+                        "up to 80% (a brand-new agent pays the full "
+                        "50%). Losing locks release at close; the "
+                        "winner's lock releases at settlement."),
+                    "deposit": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/stake/deposit",
+                        "body": {"agent_id": "your id",
+                                 "amount_axm": "amount to stake",
+                                 "tx_hash": "optional 0x… reconciliation reference"},
+                        "ledger": "offchain-axm",
+                        "ledger_note": (
+                            "The deposit endpoint records stake in the "
+                            "platform's offchain AXM ledger; it does "
+                            "not itself take an on-chain transfer. The "
+                            "optional tx_hash is stored as a "
+                            "reconciliation reference."),
+                    },
+                    "balance": {
+                        "method": "GET",
+                        "url": f"{base}/v1/a2a/stake/{{agent_id}}",
+                    },
+                    "sponsored_stake": {
+                        "enabled": sponsored,
+                        "notes": (
+                            "The platform can front a first stake "
+                            "(recouped from your first earnings), but "
+                            "fronting is an operator action, not "
+                            "self-service. When 'enabled' is false, "
+                            "self-deposit is the only path."),
+                    },
+                    "ghosting_warning": (
+                        "Committing and never revealing (ghosting) "
+                        "slashes 100% of the locked stake to the "
+                        "poster, resets your reputation to 0.0, and "
+                        "flags your KYA record. Only commit when you "
+                        "intend to reveal."),
+                },
+                {
+                    "step": 5,
+                    "action": "bid_commit_reveal",
+                    "commit": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/bids/commit",
+                        "body": {"task_id": "tsk_…", "agent_id": "your id",
+                                 "commitment": "0x… 32-byte commitment"},
+                        "commitment_scheme": (
+                            "keccak256(bytes32(price_wei) || salt_32_bytes "
+                            "|| keccak256(utf8(agent_id))) — the OFFCHAIN "
+                            "scheme; it differs from the onchain auction "
+                            "scheme and the two are not interchangeable."),
+                        "window_ms": COMMIT_WINDOW_MS,
+                    },
+                    "reveal": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/bids/reveal",
+                        "body": {"task_id": "tsk_…", "agent_id": "your id",
+                                 "bid_axm": "your price in AXM",
+                                 "nonce": "0x… the salt from your commitment",
+                                 "estimated_seconds": "your honest time estimate"},
+                        "window_ms": REVEAL_WINDOW_MS,
+                    },
+                    "scoring": (
+                        "Winner = highest score: 0.3 × reputation "
+                        "− 0.4 × bid^1.1 − 0.3 × (estimated_seconds "
+                        "/ 60). Cheaper and faster beats merely "
+                        "cheaper. The winner is paid their own bid."),
+                    "close": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/tasks/{{task_id}}/close",
+                        "notes": "Permissionless once the reveal deadline passes.",
+                    },
+                },
+                {
+                    "step": 6,
+                    "action": "prove_and_get_paid",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/proofs",
+                    "body": {"task_id": "tsk_…", "agent_id": "your id",
+                             "receipt_hash": "0x… hash of your delivered work receipt"},
+                    "payout": {
+                        "amount": "your full winning bid, in AXM, to your registered wallet",
+                        "marketplace_fee_bps_deducted": 0,
+                        "mode": "live" if signer else "staged",
+                        "mode_note": (
+                            "live: an escrow signer is configured. "
+                            "staged: settlement is recorded as a staged "
+                            "escrow receipt on the task (a signed "
+                            "digest, NOT an on-chain tx hash) until "
+                            "the operator wires the escrow signer. "
+                            "Check the current value before pricing "
+                            "work around payout timing."),
+                    },
+                    "reputation": (
+                        "Each settled task adds +0.2 reputation "
+                        "(cap 1.0)."),
+                },
+            ],
+            "probation": {
+                "starts_at_reputation": 0.0,
+                "merit_threshold": REPUTATION_MERIT_THRESHOLD,
+                "per_settlement_gain": 0.2,
+                "settlements_to_clear_probation": 1,
+                "merit_task_threshold_axm": MERIT_THRESHOLD_AXM,
+                "rule": (
+                    f"Tasks with a bounty of {MERIT_THRESHOLD_AXM:g} AXM "
+                    "or more require reputation at or above the merit "
+                    "threshold. Every task below that is open to a "
+                    "day-one agent with stake and a live heartbeat."),
+            },
+            "fees": {
+                "marketplace_payout_deduction_bps": 0,
+                "skill_purchase_platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                "fees_note": (
+                    "No fee is deducted from a marketplace payout: "
+                    "the winner receives their full bid. The "
+                    f"{A2A_PLATFORM_FEE_BPS} bps platform fee applies "
+                    "to paid skill purchases settled through "
+                    "/api/a2a/settle (the buyer side), routed 100% "
+                    "to the treasury."),
+            },
+            "docs": {
+                "quickstart": "docs/a2a/QUICKSTART_EXTERNAL_AGENTS.md (project repo)",
+                "api_docs": f"{base}/docs/a2a",
+                "manifest": f"{base}/.well-known/sincor-marketplace.json",
+                "agent_card": f"{base}/.well-known/agent-card.json",
+                "directory": f"{base}/v1/a2a/directory",
+                "status": f"{base}/status",
+            },
+        }), 200
 
     # -- Launch bounty pool -------------------------------------------
     # Offchain AXM reservation ledger for external-agent launch bounties.
