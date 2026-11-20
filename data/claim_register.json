@@ -481,6 +481,52 @@
       "downgrade_suggestion": "",
       "notes": "",
       "owner": "founder"
+    },
+    {
+      "claim_id": "CR-057",
+      "pattern": "audited",
+      "kind": "disclaimer",
+      "category": "certification",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/venom.html:499",
+        "templates/venom.html:585"
+      ],
+      "claim_text": "Active confidential disclosures in progress with audited protocols.",
+      "evidence": {
+        "code_refs": [
+          "templates/venom.html:499",
+          "templates/venom.html:585"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "If the founder prefers no entry, reword to 'Active confidential disclosures in progress.' (drops the blocklisted word) and retire this entry.",
+      "notes": "Confidentiality-limited status disclosure, same treatment as CR-004/CR-022: 'audited protocols' = protocols reviewed by VENOM itself (the security arm's own engagements); NOT a claim that SINCOR is audited or certified by any third party. An active confidential disclosure is in progress as of 2026-11-16; the counterparty is confidential and deliberately not named here. Founder-approved page copy (VENOM page deploy, 2026-11-16).",
+      "owner": "founder"
+    },
+    {
+      "claim_id": "CR-058",
+      "pattern": "guaranteed",
+      "kind": "disclaimer",
+      "category": "financial",
+      "verdict": "substantiated",
+      "locations": [
+        "templates/venom.html:714"
+      ],
+      "claim_text": "A review is an adversarial security assessment with reproducible proofs — scoped, dated, and explicit about what it does not cover. It is not a guarantee.",
+      "evidence": {
+        "code_refs": [
+          "templates/venom.html:714"
+        ],
+        "test_refs": null,
+        "deployment_proof": null,
+        "customer_evidence": null
+      },
+      "downgrade_suggestion": "",
+      "notes": "Anti-claim: the page explicitly disclaims any guarantee for a review.",
+      "owner": "founder"
     }
   ]
 }
