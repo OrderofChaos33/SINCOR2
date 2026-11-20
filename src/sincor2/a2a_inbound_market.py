@@ -11,6 +11,9 @@ request bodies and the expected value is never logged. An unset
 Routes gated by ``_require_pool_admin`` (this module):
 * ``DELETE /v1/a2a/tasks/<task_id>`` — task-board admin delete (also
   releases pool allocations; release failures surface, G2.12)
+* ``POST /v1/a2a/tasks/<task_id>/relist`` — operator relist of an
+  expired task (fresh pool allocation via the create path; see
+  ``relist_task``)
 * ``POST /v1/a2a/pool/fund`` / ``/v1/a2a/pool/allocate`` /
   ``/v1/a2a/pool/release`` — bounty-pool writes
 * ``GET /v1/a2a/pool`` — public status, intentionally unauthenticated
@@ -170,6 +173,22 @@ def listing_ttl_ms() -> int:
     return max(60_000, int(seconds * 1000))
 
 
+def _reanchor_listing(task: Dict[str, Any], ts: int, ttl: int) -> None:
+    """Re-anchor a sealed task's commit/reveal windows at ``ts`` and mark
+    it open. Standing (``auto_refresh``) listings also get their outer
+    TTL extended; other callers set ``listing_expires_at`` themselves.
+
+    Shared by ``refresh_stale_listings`` (standing-listing revival) and
+    ``relist_task`` (operator relist of an expired task) so the sealed
+    window discipline lives in exactly one place.
+    """
+    task["commit_deadline"] = ts + COMMIT_WINDOW_MS
+    task["reveal_deadline"] = ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS
+    task["state"] = "open"
+    if task.get("auto_refresh"):
+        task["listing_expires_at"] = ts + ttl
+
+
 def refresh_stale_listings() -> List[Dict[str, Any]]:
     """Keep standing listings biddable; expire genuinely dead ones.
 
@@ -191,11 +210,7 @@ def refresh_stale_listings() -> List[Dict[str, Any]]:
     changed: List[Dict[str, Any]] = []
 
     def _reanchor(task: Dict[str, Any]) -> None:
-        task["commit_deadline"] = ts + COMMIT_WINDOW_MS
-        task["reveal_deadline"] = ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS
-        task["state"] = "open"
-        if task.get("auto_refresh"):
-            task["listing_expires_at"] = ts + ttl
+        _reanchor_listing(task, ts, ttl)
 
     with fabric.lock:
         for task in fabric.tasks.values():
@@ -544,6 +559,205 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
                     "pool_backing_skipped_reason"]
     _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
+    return snap
+
+
+class RelistError(ValueError):
+    """A relist precondition failed. ``status`` is the HTTP status the
+    route maps it to. Subclasses ValueError so function-level callers
+    can treat it like create_task's validation errors."""
+
+    def __init__(self, message: str, status: int = 409):
+        super().__init__(message)
+        self.status = status
+
+
+# Lifecycle fields a relist resets to their creation-time defaults, and
+# fields stamped after creation that a relist drops outright. None of a
+# previous round's winner, assignment, proof, payout, hold, or ghost
+# state may leak into the fresh listing.
+_RELIST_RESET_FIELDS: Dict[str, Any] = {
+    "assigned_to": None,
+    "winner_score": None,
+    "winning_bid_axm": None,
+    "time_est_ms": None,
+    "proof_id": None,
+    "payout_axm": None,
+    "auction_closes_at": None,
+}
+_RELIST_DROP_FIELDS = (
+    "assigned_at", "expired_reason", "expired_at", "ghosted_commits",
+    "ghost_penalty", "settled_at", "payout_tx", "payout_staged_digest",
+    "deliverable_evidence", "sybil_hold", "sybil_hold_decision",
+    "close_blocked_reason", "close_blocked_at", "telemetry_throttle",
+    "pool_backing_skipped_reason",
+)
+
+
+def relist_task(task_id: str) -> Dict[str, Any]:
+    """Return an expired task to the open board (operator relist).
+
+    The safe inverse of expiry, with create-path money discipline. The
+    naive alternative — flipping ``state`` back to open in place — is a
+    money-path corruption: every expiry path releases the task's pool
+    allocation inline, so a flipped task would claim pool backing that
+    no longer exists and its settlement would fail or pay unbacked.
+
+    Preconditions (all verified, all fail-closed):
+
+    * ``state == "expired"`` — anything else is a conflict, which also
+      makes a second relist a clean refusal.
+    * NO live pool allocation for the task, verified against the pool
+      ledger itself (``allocations_for_task``), never the task's own
+      ``pool_backed`` claim. A live allocation on an expired task means
+      the expiry release failed or never ran; relisting would
+      double-book the bounty against the pool.
+    * A named poster — anonymous-poster tasks are refused: the
+      anti-gaming guards reject every bid on them fail-closed, so a
+      relist could only strand a fresh allocation on a listing that can
+      never be performed.
+    * Not a P24 test listing (``p24`` in skill or seed_key).
+    * No onchain auction anchor — the shim cannot re-open a closed
+      onchain auction; those need a fresh create.
+    * Board headroom under ``MAX_OPEN_TASKS``, enforced exactly as at
+      creation (relist waves stop at the cap).
+
+    On success, under the fabric lock: lifecycle state is reset to
+    creation shape, prior-round bids/commits are purged (a stale
+    revealed bid must never win the fresh round; stale unrevealed
+    commits must never ghost-penalize twice), sealed windows are
+    re-anchored via ``_reanchor_listing``, the 24h listing TTL restarts,
+    and ``relist_count``/``relisted_at`` stamp the audit trail. Pool
+    backing is then re-run through the create path — poster-standing
+    gate (``poster_pool_eligible``), then a FRESH allocation, never the
+    released one. As at creation, a gate/funding failure leaves the
+    task open but unbacked: backing is an upgrade, not a gate.
+
+    Raises KeyError for an unknown task, RelistError for refusals.
+    Publishes ``task.refreshed`` with ``relisted: True``.
+    """
+    task_id = str(task_id or "").strip()
+    fabric = get_fabric()
+    ts = _now_ms()
+    ttl = listing_ttl_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if task is None:
+            raise KeyError("unknown task")
+        if task.get("state") != "expired":
+            raise RelistError(
+                f"task is not expired (state={task.get('state')!r}); "
+                "only expired tasks can be relisted")
+        poster_id = task.get("poster_id")
+        if not poster_id:
+            raise RelistError(
+                "anonymous-poster tasks cannot be relisted: bids on "
+                "them are rejected fail-closed, so the listing could "
+                "never be performed")
+        identity_blob = " ".join(
+            str(task.get(k) or "") for k in ("skill", "seed_key")).lower()
+        if "p24" in identity_blob:
+            raise RelistError("P24 test listings are not relisted")
+        if task.get("auction_id"):
+            raise RelistError(
+                "task carries an onchain auction anchor; a closed "
+                "onchain auction cannot be re-opened — post a fresh task")
+        # Money precondition, verified against the pool ledger itself:
+        # no allocation for this task may still be live.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            live_allocations = bounty_pool().allocations_for_task(task_id)
+        except Exception as err:
+            raise RelistError(
+                f"pool ledger unreadable ({err}); refusing to relist "
+                "without verifying the task holds no live allocation",
+                status=503)
+        if live_allocations:
+            raise RelistError(
+                "task still holds live pool allocation(s) "
+                + ", ".join(str(a.get("allocation_id") or "?")
+                            for a in live_allocations)
+                + "; release them before relisting or the bounty would "
+                "be double-booked against the pool")
+        open_n = sum(1 for t in fabric.tasks.values()
+                     if t.get("state") in ("open", "auction"))
+        if open_n >= MAX_OPEN_TASKS:
+            raise RelistError(
+                f"too many open auctions ({open_n}/{MAX_OPEN_TASKS}); "
+                "relist in a later wave")
+        # --- reset to creation shape ----------------------------------
+        for field, default in _RELIST_RESET_FIELDS.items():
+            task[field] = default
+        for field in _RELIST_DROP_FIELDS:
+            task.pop(field, None)
+        bounty = float(task.get("bounty_axm") or 0)
+        task["requires_merit"] = bounty >= MERIT_THRESHOLD_AXM
+        if task.get("sealed"):
+            _reanchor_listing(task, ts, ttl)
+        else:
+            task["commit_deadline"] = None
+            task["reveal_deadline"] = None
+            task["state"] = "open"
+        task["listing_expires_at"] = ts + ttl
+        task["relisted_at"] = ts
+        task["relist_count"] = int(task.get("relist_count") or 0) + 1
+        # Prior-round bids/commits belong to the dead auction.
+        prefix = f"{task_id}\x00"
+        stale_commits = [k for k in fabric.commits
+                         if k.startswith(prefix)]
+        for key in stale_commits:
+            fabric.commits.pop(key, None)
+        stale_bids = [bid_id for bid_id, b in fabric.bids.items()
+                      if b.get("task_id") == task_id]
+        for bid_id in stale_bids:
+            fabric.bids.pop(bid_id, None)
+        # Backing fields are rewritten by the create-path allocation
+        # below; clear the dead round's values first so a gate failure
+        # never leaves a released allocation id on an open task.
+        task["pool_backed"] = False
+        task["pool_allocation_id"] = None
+        snap = dict(task)
+    _save_tasks(fabric)
+    # --- fresh pool backing (create path, fail-open like create_task) --
+    from sincor2.sybil_defense import poster_pool_eligible
+    pool_ok, pool_gate_reason = poster_pool_eligible(snap.get("poster_id"))
+    if not pool_ok:
+        logger.warning("pool backing skipped for relisted task %s: %s",
+                       task_id, pool_gate_reason)
+        snap["pool_backed"] = False
+        snap["pool_backing_skipped_reason"] = pool_gate_reason
+    else:
+        try:
+            from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
+            alloc = bounty_pool().allocate(
+                task_id, float(snap.get("bounty_axm") or 0),
+                reason="task relist backing")
+            snap["pool_backed"] = True
+            snap["pool_allocation_id"] = alloc.get("allocation_id")
+        except PoolNotConfigured:
+            snap["pool_backed"] = False
+        except Exception as err:  # insufficient funds, ledger failure, ...
+            logger.warning("pool backing failed for relisted task %s: %s",
+                           task_id, err)
+            snap["pool_backed"] = False
+    # W-92 discipline: write the backing result back to the persisted
+    # record (mutate under lock, save outside it), as create_task does.
+    with fabric.lock:
+        stored_task = fabric.tasks.get(task_id)
+        if stored_task is not None:
+            stored_task["pool_backed"] = snap.get("pool_backed", False)
+            stored_task["pool_allocation_id"] = snap.get("pool_allocation_id")
+            if "pool_backing_skipped_reason" in snap:
+                stored_task["pool_backing_skipped_reason"] = snap[
+                    "pool_backing_skipped_reason"]
+            snap = dict(stored_task)
+    _save_tasks(fabric)
+    fabric.publish("task.refreshed", list(snap.get("tags") or []),
+                   {"task_id": task_id, "state": snap.get("state"),
+                    "relisted": True,
+                    "relist_count": snap.get("relist_count")})
+    snap["relist_cleared"] = {"bids": len(stale_bids),
+                              "commits": len(stale_commits)}
     return snap
 
 
@@ -2240,6 +2454,29 @@ def attach_market_routes(bp: Blueprint) -> None:
                 released_allocations=released,
                 release_failures=release_failures)
         return jsonify({"deleted": task_id, "released_allocations": released}), 200
+
+    @bp.post("/v1/a2a/tasks/<task_id>/relist")
+    def v1_task_relist(task_id):
+        """Admin-only relist of an expired task (Option A, 2026-11-20).
+
+        Returns the task to the open board with creation-shape state,
+        re-anchored sealed windows, a restarted 24h listing TTL, and a
+        FRESH pool allocation through the create path — the expired
+        task's allocation was released at expiry and is never reused.
+        Refuses (409) non-expired tasks, tasks still holding a live
+        pool allocation, anonymous-poster tasks, P24 test listings,
+        onchain-anchored tasks, and a full board (MAX_OPEN_TASKS);
+        404 for an unknown task. Admin-gated like the task delete.
+        """
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        try:
+            return jsonify(relist_task(str(task_id or ""))), 200
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except RelistError as err:
+            return _http_error(str(err), err.status)
 
     @bp.get("/v1/a2a/tasks/<task_id>")
     def v1_task_detail(task_id):
