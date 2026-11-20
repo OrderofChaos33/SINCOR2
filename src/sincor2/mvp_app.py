@@ -1396,7 +1396,12 @@ register_mvp_blueprints(app)
 
 @app.errorhandler(404)
 def not_found(error):
-    if request.path.startswith('/api/'):
+    # API namespaces get the JSON error envelope the API already uses
+    # ({"error", "status"} — the a2a_errors shape). /v1/* was missing
+    # here, so every unknown A2A route fell through to the HTML page
+    # and JSON clients crashed parsing the error (outsider sweep
+    # 2026-11-20, N12). Public pages keep the HTML 404.
+    if request.path.startswith('/api/') or request.path.startswith('/v1/'):
         return jsonify({'error': 'Not found', 'status': 404}), 404
     return render_template('error.html', code=404, title='Page Not Found',
                            message="The page you're looking for doesn't exist or has been moved."), 404

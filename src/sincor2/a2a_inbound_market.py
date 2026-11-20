@@ -170,6 +170,32 @@ def listing_ttl_ms() -> int:
     return max(60_000, int(seconds * 1000))
 
 
+def _commit_window_open(task: Dict[str, Any], ts: int) -> Optional[bool]:
+    """Derived display marker (outsider sweep 2026-11-20, N4): can a
+    sealed-bid commit still land on this task right now?
+
+    ``True`` only for a sealed task in a biddable state whose commit
+    deadline has not passed — exactly the condition ``commit_bid``
+    enforces. ``False`` for a sealed task whose window has closed (or
+    that has left the biddable states): the board used to present such
+    tasks as plain ``state: "open"`` and the commit then failed with
+    403 "commit window closed". ``None`` when the task has no commit
+    window at all (unsealed tasks take plaintext bids).
+
+    Display-only: this never mutates the task, re-anchors a window, or
+    changes any state — the stored record and the timing rules are
+    untouched.
+    """
+    if not task.get("sealed"):
+        return None
+    deadline = task.get("commit_deadline")
+    if deadline is None:
+        return None
+    if task.get("state") not in ("open", "auction"):
+        return False
+    return ts <= int(deadline)
+
+
 def refresh_stale_listings() -> List[Dict[str, Any]]:
     """Keep standing listings biddable; expire genuinely dead ones.
 
@@ -2255,6 +2281,10 @@ def attach_market_routes(bp: Blueprint) -> None:
             "state", "sealed", "commit_deadline", "reveal_deadline",
             "created_at", "assigned_to", "winning_bid_axm", "proof_id",
             "payout_axm", "expired_reason", "ghosted_commits")}
+        # N4: same commit-window marker the list carries, so a client
+        # that found the task elsewhere can still tell whether a commit
+        # can land before it tries.
+        view["commit_window_open"] = _commit_window_open(task, _now_ms())
         return jsonify(view), 200
 
     @bp.get("/v1/a2a/tasks")
@@ -2265,7 +2295,11 @@ def attach_market_routes(bp: Blueprint) -> None:
         (comma-separated, any-match), ``min_bounty`` (float AXM),
         ``page`` (1-based), ``per_page`` (max 100). Newest first.
         The board is refreshed first so listings are never silently
-        unbiddable (see refresh_stale_listings).
+        unbiddable (see refresh_stale_listings). Each row also carries
+        ``commit_window_open`` (see ``_commit_window_open``): a sealed
+        task between its commit and reveal deadlines is NOT re-anchored
+        by the refresh, so the marker is how a client tells it apart
+        from a task a commit can still land on.
         """
         refresh_stale_listings()
         expire_stale_assignments()
@@ -2296,8 +2330,17 @@ def attach_market_routes(bp: Blueprint) -> None:
         total = len(tasks)
         pages = max(1, (total + per_page - 1) // per_page)
         start = (page - 1) * per_page
+        page_tasks = tasks[start:start + per_page]
+        # N4 (outsider sweep 2026-11-20): mark each row with whether a
+        # sealed-bid commit can still land. A task whose commit window
+        # has closed stays listed under its real state — filtering it
+        # out would rewrite board history — but it no longer presents
+        # as biddable. Derived at read time; stored records untouched.
+        ts = _now_ms()
+        for task in page_tasks:
+            task["commit_window_open"] = _commit_window_open(task, ts)
         return jsonify({
-            "tasks": tasks[start:start + per_page],
+            "tasks": page_tasks,
             "page": page,
             "per_page": per_page,
             "total": total,
@@ -3015,10 +3058,21 @@ def attach_market_routes(bp: Blueprint) -> None:
         """Public pool status: reserve / funded / allocated / available,
         plus aggregate ledger verification (W-101 wiring: verify_ledger()
         previously had no production caller, so ledger drift sat
-        undetected at runtime)."""
+        undetected at runtime).
+
+        N11 (outsider sweep 2026-11-20): the response is the SUMMARY
+        only. ``BountyPool.status()`` embeds every allocation record
+        with its full state history (~1.75 MB on the live ledger);
+        that list stays available in-process (the reconciliation pass
+        iterates it) but no longer rides this public payload. Every
+        summary field is preserved verbatim — funded / allocated /
+        available / spent + conservation, allocation_count, the
+        rehydrate flags, and the ledger note.
+        """
         from sincor2.a2a_bounty_pool import bounty_pool
         pool = bounty_pool()
         data = pool.status()
+        data.pop("allocations", None)
         data["ledger_verification"] = pool.verify_ledger()
         return jsonify(data), 200
 
