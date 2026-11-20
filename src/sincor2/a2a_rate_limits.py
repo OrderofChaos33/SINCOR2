@@ -199,6 +199,7 @@ ENDPOINT_POLICY: Dict[str, str] = {
     # task lifecycle (attach_market_routes)
     "POST /v1/a2a/tasks": "task_write",
     "DELETE /v1/a2a/tasks/<task_id>": "task_write",
+    "POST /v1/a2a/tasks/<task_id>/relist": "task_write",
     "POST /v1/a2a/tasks/<task_id>/close": "task_write",
     "POST /v1/a2a/proofs": "task_write",
     "POST /api/v1/proofs": "task_write",
