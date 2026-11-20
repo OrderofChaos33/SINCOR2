@@ -185,6 +185,7 @@ ENDPOINT_POLICY: Dict[str, str] = {
     # launch bounty pool (attach_market_routes): public status read, and
     # admin-gated writes in the same cheap-write abuse class as bids.
     "GET /v1/a2a/pool": "read",
+    "GET /v1/a2a/pool/verify": "read",
     "POST /v1/a2a/pool/fund": "bid",
     "POST /v1/a2a/pool/allocate": "bid",
     "POST /v1/a2a/pool/release": "bid",
@@ -198,6 +199,7 @@ ENDPOINT_POLICY: Dict[str, str] = {
     # task lifecycle (attach_market_routes)
     "POST /v1/a2a/tasks": "task_write",
     "DELETE /v1/a2a/tasks/<task_id>": "task_write",
+    "POST /v1/a2a/tasks/<task_id>/relist": "task_write",
     "POST /v1/a2a/tasks/<task_id>/close": "task_write",
     "POST /v1/a2a/proofs": "task_write",
     "POST /api/v1/proofs": "task_write",

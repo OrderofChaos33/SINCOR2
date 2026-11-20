@@ -292,6 +292,7 @@ class AgentCard:
     # clients can discover quoting and the full card registry without scraping.
     quote_endpoint:        Optional[str] = None
     agent_cards_url:       Optional[str] = None
+    earn_url:              Optional[str] = None
     wallet:                Optional[str] = None
     chain_id:              Optional[int] = None
     payment_methods:       List[Dict[str, Any]] = field(default_factory=list)
@@ -331,6 +332,8 @@ class AgentCard:
             d["quoteEndpoint"] = self.quote_endpoint
         if self.agent_cards_url:
             d["agentCardsUrl"] = self.agent_cards_url
+        if self.earn_url:
+            d["earnUrl"] = self.earn_url
         if self.icon_url:
             d["iconUrl"] = self.icon_url
         if self.wallet:
@@ -2213,6 +2216,9 @@ def build_agent_card() -> AgentCard:
         # endpoint and the full agent-card registry.
         quote_endpoint=f"{PLATFORM_URL}/api/a2a/quote",
         agent_cards_url=f"{PLATFORM_URL}/v1/a2a/cards",
+        # Worker side: this card sells skills to buyers; agents who want
+        # to earn by doing marketplace work start at the earn endpoint.
+        earn_url=f"{PLATFORM_URL}/v1/a2a/earn",
         wallet=commerce["wallet"],
         chain_id=commerce["chain_id"],
         payment_methods=commerce["payment_methods"],
@@ -2240,9 +2246,12 @@ def build_marketplace_manifest() -> Dict[str, Any]:
             "auctions (sealed-bid commit/reveal), the agent directory, AXM "
             "price quotes, and the MCP server entry point. Reputation is "
             "earned-only and never declared; KYA-gated discovery excludes "
-            "revoked agents."
+            "revoked agents. Agents who want to WORK (not buy skills) "
+            "start at the 'earn' endpoint: registration, heartbeat, "
+            "stake, and payout terms, with live counts."
         ),
         "endpoints": {
+            "earn": f"{base}/v1/a2a/earn",
             "tasks": f"{base}/v1/a2a/tasks",
             "auctions": f"{base}/v1/a2a/auctions",
             "bidder_kit": f"{base}/v1/a2a/tasks/{{task_id}}/bidder-kit",
@@ -2251,9 +2260,15 @@ def build_marketplace_manifest() -> Dict[str, Any]:
             "quote": f"{base}/api/a2a/quote",
             "registration_velocity": f"{base}/v1/a2a/registration-velocity",
             "register": f"{base}/v1/a2a/register",
+            "heartbeat": f"{base}/v1/a2a/heartbeat",
+            "stake_deposit": f"{base}/v1/a2a/stake/deposit",
+            "stake_balance": f"{base}/v1/a2a/stake/{{agent_id}}",
             "bids": f"{base}/v1/a2a/bids",
             "bids_commit": f"{base}/v1/a2a/bids/commit",
             "bids_reveal": f"{base}/v1/a2a/bids/reveal",
+            "proofs": f"{base}/v1/a2a/proofs",
+            "pool": f"{base}/v1/a2a/pool",
+            "pool_verify": f"{base}/v1/a2a/pool/verify",
         },
         "mcp": {
             "transport": "stdio",
@@ -2272,9 +2287,14 @@ def build_marketplace_manifest() -> Dict[str, Any]:
         },
         "upgrade_path": {
             "task_list": (
-                "list_tasks reads GET /v1/a2a/tasks — the full task "
-                "board. GET /v1/a2a/auctions remains available for the "
-                "subset of sealed tasks carrying an onchain anchor."
+                "GET /v1/a2a/tasks is the full task board (offchain "
+                "sealed-bid auctions included). GET /v1/a2a/auctions "
+                "lists only the onchain-anchored subset and is empty "
+                "when the onchain relayer is not configured — an empty "
+                "auctions list does not mean an empty marketplace. "
+                "Worker-side onboarding (register, heartbeat, stake, "
+                "commit/reveal, proof, payout terms) is specified at "
+                "GET /v1/a2a/earn."
             ),
         },
         "rate_limit_tiers": {
@@ -3731,6 +3751,24 @@ class A2ARouter:
                     "agents": f"{PLATFORM_URL}/api/a2a/agents",
                     "agentCards": f"{PLATFORM_URL}/v1/a2a/cards",
                     "directory": f"{PLATFORM_URL}/v1/a2a/directory",
+                    "earn": f"{PLATFORM_URL}/v1/a2a/earn",
+                    "manifest": f"{PLATFORM_URL}/.well-known/sincor-marketplace.json",
+                },
+                "marketplace": {
+                    "earn": f"{PLATFORM_URL}/v1/a2a/earn",
+                    "register": f"{PLATFORM_URL}/v1/a2a/register",
+                    "heartbeat": f"{PLATFORM_URL}/v1/a2a/heartbeat",
+                    "tasks": f"{PLATFORM_URL}/v1/a2a/tasks",
+                    "stakeDeposit": f"{PLATFORM_URL}/v1/a2a/stake/deposit",
+                    "bidsCommit": f"{PLATFORM_URL}/v1/a2a/bids/commit",
+                    "bidsReveal": f"{PLATFORM_URL}/v1/a2a/bids/reveal",
+                    "proofs": f"{PLATFORM_URL}/v1/a2a/proofs",
+                    "note": (
+                        "The worker-side flow (register → heartbeat → "
+                        "stake → commit/reveal → proof → payout) is "
+                        "specified end-to-end at the earn endpoint, "
+                        "including the stake requirement, the 60s "
+                        "heartbeat TTL, and the current payout mode."),
                 },
                 "methods": [
                     "message/send", "message/stream", "tasks/get", "tasks/cancel",

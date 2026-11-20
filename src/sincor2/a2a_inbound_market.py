@@ -11,6 +11,9 @@ request bodies and the expected value is never logged. An unset
 Routes gated by ``_require_pool_admin`` (this module):
 * ``DELETE /v1/a2a/tasks/<task_id>`` — task-board admin delete (also
   releases pool allocations; release failures surface, G2.12)
+* ``POST /v1/a2a/tasks/<task_id>/relist`` — operator relist of an
+  expired task (fresh pool allocation via the create path; see
+  ``relist_task``)
 * ``POST /v1/a2a/pool/fund`` / ``/v1/a2a/pool/allocate`` /
   ``/v1/a2a/pool/release`` — bounty-pool writes
 * ``GET /v1/a2a/pool`` — public status, intentionally unauthenticated
@@ -48,6 +51,7 @@ from sincor2.a2a_inbound import (
     HEARTBEAT_TTL_S,
     MAX_OPEN_TASKS,
     MERIT_THRESHOLD_AXM,
+    REPUTATION_MERIT_THRESHOLD,
     SEALED_PROBATION_SEEDS,
     _http_error,
     _now_ms,
@@ -170,6 +174,22 @@ def listing_ttl_ms() -> int:
     return max(60_000, int(seconds * 1000))
 
 
+def _reanchor_listing(task: Dict[str, Any], ts: int, ttl: int) -> None:
+    """Re-anchor a sealed task's commit/reveal windows at ``ts`` and mark
+    it open. Standing (``auto_refresh``) listings also get their outer
+    TTL extended; other callers set ``listing_expires_at`` themselves.
+
+    Shared by ``refresh_stale_listings`` (standing-listing revival) and
+    ``relist_task`` (operator relist of an expired task) so the sealed
+    window discipline lives in exactly one place.
+    """
+    task["commit_deadline"] = ts + COMMIT_WINDOW_MS
+    task["reveal_deadline"] = ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS
+    task["state"] = "open"
+    if task.get("auto_refresh"):
+        task["listing_expires_at"] = ts + ttl
+
+
 def refresh_stale_listings() -> List[Dict[str, Any]]:
     """Keep standing listings biddable; expire genuinely dead ones.
 
@@ -191,11 +211,7 @@ def refresh_stale_listings() -> List[Dict[str, Any]]:
     changed: List[Dict[str, Any]] = []
 
     def _reanchor(task: Dict[str, Any]) -> None:
-        task["commit_deadline"] = ts + COMMIT_WINDOW_MS
-        task["reveal_deadline"] = ts + COMMIT_WINDOW_MS + REVEAL_WINDOW_MS
-        task["state"] = "open"
-        if task.get("auto_refresh"):
-            task["listing_expires_at"] = ts + ttl
+        _reanchor_listing(task, ts, ttl)
 
     with fabric.lock:
         for task in fabric.tasks.values():
@@ -635,6 +651,205 @@ def create_task(skill: str, tags: Optional[List[str]] = None, bounty_axm: float 
                     "pool_backing_skipped_reason"]
     _save_tasks(fabric)
     fabric.publish("task.created", tag_list, {"task_id": task_id, "skill": skill, "bounty_axm": bounty, "sealed": bool(sealed), "auction_id": snap.get("auction_id")})
+    return snap
+
+
+class RelistError(ValueError):
+    """A relist precondition failed. ``status`` is the HTTP status the
+    route maps it to. Subclasses ValueError so function-level callers
+    can treat it like create_task's validation errors."""
+
+    def __init__(self, message: str, status: int = 409):
+        super().__init__(message)
+        self.status = status
+
+
+# Lifecycle fields a relist resets to their creation-time defaults, and
+# fields stamped after creation that a relist drops outright. None of a
+# previous round's winner, assignment, proof, payout, hold, or ghost
+# state may leak into the fresh listing.
+_RELIST_RESET_FIELDS: Dict[str, Any] = {
+    "assigned_to": None,
+    "winner_score": None,
+    "winning_bid_axm": None,
+    "time_est_ms": None,
+    "proof_id": None,
+    "payout_axm": None,
+    "auction_closes_at": None,
+}
+_RELIST_DROP_FIELDS = (
+    "assigned_at", "expired_reason", "expired_at", "ghosted_commits",
+    "ghost_penalty", "settled_at", "payout_tx", "payout_staged_digest",
+    "deliverable_evidence", "sybil_hold", "sybil_hold_decision",
+    "close_blocked_reason", "close_blocked_at", "telemetry_throttle",
+    "pool_backing_skipped_reason",
+)
+
+
+def relist_task(task_id: str) -> Dict[str, Any]:
+    """Return an expired task to the open board (operator relist).
+
+    The safe inverse of expiry, with create-path money discipline. The
+    naive alternative — flipping ``state`` back to open in place — is a
+    money-path corruption: every expiry path releases the task's pool
+    allocation inline, so a flipped task would claim pool backing that
+    no longer exists and its settlement would fail or pay unbacked.
+
+    Preconditions (all verified, all fail-closed):
+
+    * ``state == "expired"`` — anything else is a conflict, which also
+      makes a second relist a clean refusal.
+    * NO live pool allocation for the task, verified against the pool
+      ledger itself (``allocations_for_task``), never the task's own
+      ``pool_backed`` claim. A live allocation on an expired task means
+      the expiry release failed or never ran; relisting would
+      double-book the bounty against the pool.
+    * A named poster — anonymous-poster tasks are refused: the
+      anti-gaming guards reject every bid on them fail-closed, so a
+      relist could only strand a fresh allocation on a listing that can
+      never be performed.
+    * Not a P24 test listing (``p24`` in skill or seed_key).
+    * No onchain auction anchor — the shim cannot re-open a closed
+      onchain auction; those need a fresh create.
+    * Board headroom under ``MAX_OPEN_TASKS``, enforced exactly as at
+      creation (relist waves stop at the cap).
+
+    On success, under the fabric lock: lifecycle state is reset to
+    creation shape, prior-round bids/commits are purged (a stale
+    revealed bid must never win the fresh round; stale unrevealed
+    commits must never ghost-penalize twice), sealed windows are
+    re-anchored via ``_reanchor_listing``, the 24h listing TTL restarts,
+    and ``relist_count``/``relisted_at`` stamp the audit trail. Pool
+    backing is then re-run through the create path — poster-standing
+    gate (``poster_pool_eligible``), then a FRESH allocation, never the
+    released one. As at creation, a gate/funding failure leaves the
+    task open but unbacked: backing is an upgrade, not a gate.
+
+    Raises KeyError for an unknown task, RelistError for refusals.
+    Publishes ``task.refreshed`` with ``relisted: True``.
+    """
+    task_id = str(task_id or "").strip()
+    fabric = get_fabric()
+    ts = _now_ms()
+    ttl = listing_ttl_ms()
+    with fabric.lock:
+        task = fabric.tasks.get(task_id)
+        if task is None:
+            raise KeyError("unknown task")
+        if task.get("state") != "expired":
+            raise RelistError(
+                f"task is not expired (state={task.get('state')!r}); "
+                "only expired tasks can be relisted")
+        poster_id = task.get("poster_id")
+        if not poster_id:
+            raise RelistError(
+                "anonymous-poster tasks cannot be relisted: bids on "
+                "them are rejected fail-closed, so the listing could "
+                "never be performed")
+        identity_blob = " ".join(
+            str(task.get(k) or "") for k in ("skill", "seed_key")).lower()
+        if "p24" in identity_blob:
+            raise RelistError("P24 test listings are not relisted")
+        if task.get("auction_id"):
+            raise RelistError(
+                "task carries an onchain auction anchor; a closed "
+                "onchain auction cannot be re-opened — post a fresh task")
+        # Money precondition, verified against the pool ledger itself:
+        # no allocation for this task may still be live.
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            live_allocations = bounty_pool().allocations_for_task(task_id)
+        except Exception as err:
+            raise RelistError(
+                f"pool ledger unreadable ({err}); refusing to relist "
+                "without verifying the task holds no live allocation",
+                status=503)
+        if live_allocations:
+            raise RelistError(
+                "task still holds live pool allocation(s) "
+                + ", ".join(str(a.get("allocation_id") or "?")
+                            for a in live_allocations)
+                + "; release them before relisting or the bounty would "
+                "be double-booked against the pool")
+        open_n = sum(1 for t in fabric.tasks.values()
+                     if t.get("state") in ("open", "auction"))
+        if open_n >= MAX_OPEN_TASKS:
+            raise RelistError(
+                f"too many open auctions ({open_n}/{MAX_OPEN_TASKS}); "
+                "relist in a later wave")
+        # --- reset to creation shape ----------------------------------
+        for field, default in _RELIST_RESET_FIELDS.items():
+            task[field] = default
+        for field in _RELIST_DROP_FIELDS:
+            task.pop(field, None)
+        bounty = float(task.get("bounty_axm") or 0)
+        task["requires_merit"] = bounty >= MERIT_THRESHOLD_AXM
+        if task.get("sealed"):
+            _reanchor_listing(task, ts, ttl)
+        else:
+            task["commit_deadline"] = None
+            task["reveal_deadline"] = None
+            task["state"] = "open"
+        task["listing_expires_at"] = ts + ttl
+        task["relisted_at"] = ts
+        task["relist_count"] = int(task.get("relist_count") or 0) + 1
+        # Prior-round bids/commits belong to the dead auction.
+        prefix = f"{task_id}\x00"
+        stale_commits = [k for k in fabric.commits
+                         if k.startswith(prefix)]
+        for key in stale_commits:
+            fabric.commits.pop(key, None)
+        stale_bids = [bid_id for bid_id, b in fabric.bids.items()
+                      if b.get("task_id") == task_id]
+        for bid_id in stale_bids:
+            fabric.bids.pop(bid_id, None)
+        # Backing fields are rewritten by the create-path allocation
+        # below; clear the dead round's values first so a gate failure
+        # never leaves a released allocation id on an open task.
+        task["pool_backed"] = False
+        task["pool_allocation_id"] = None
+        snap = dict(task)
+    _save_tasks(fabric)
+    # --- fresh pool backing (create path, fail-open like create_task) --
+    from sincor2.sybil_defense import poster_pool_eligible
+    pool_ok, pool_gate_reason = poster_pool_eligible(snap.get("poster_id"))
+    if not pool_ok:
+        logger.warning("pool backing skipped for relisted task %s: %s",
+                       task_id, pool_gate_reason)
+        snap["pool_backed"] = False
+        snap["pool_backing_skipped_reason"] = pool_gate_reason
+    else:
+        try:
+            from sincor2.a2a_bounty_pool import PoolNotConfigured, bounty_pool
+            alloc = bounty_pool().allocate(
+                task_id, float(snap.get("bounty_axm") or 0),
+                reason="task relist backing")
+            snap["pool_backed"] = True
+            snap["pool_allocation_id"] = alloc.get("allocation_id")
+        except PoolNotConfigured:
+            snap["pool_backed"] = False
+        except Exception as err:  # insufficient funds, ledger failure, ...
+            logger.warning("pool backing failed for relisted task %s: %s",
+                           task_id, err)
+            snap["pool_backed"] = False
+    # W-92 discipline: write the backing result back to the persisted
+    # record (mutate under lock, save outside it), as create_task does.
+    with fabric.lock:
+        stored_task = fabric.tasks.get(task_id)
+        if stored_task is not None:
+            stored_task["pool_backed"] = snap.get("pool_backed", False)
+            stored_task["pool_allocation_id"] = snap.get("pool_allocation_id")
+            if "pool_backing_skipped_reason" in snap:
+                stored_task["pool_backing_skipped_reason"] = snap[
+                    "pool_backing_skipped_reason"]
+            snap = dict(stored_task)
+    _save_tasks(fabric)
+    fabric.publish("task.refreshed", list(snap.get("tags") or []),
+                   {"task_id": task_id, "state": snap.get("state"),
+                    "relisted": True,
+                    "relist_count": snap.get("relist_count")})
+    snap["relist_cleared"] = {"bids": len(stale_bids),
+                              "commits": len(stale_commits)}
     return snap
 
 
@@ -2332,6 +2547,29 @@ def attach_market_routes(bp: Blueprint) -> None:
                 release_failures=release_failures)
         return jsonify({"deleted": task_id, "released_allocations": released}), 200
 
+    @bp.post("/v1/a2a/tasks/<task_id>/relist")
+    def v1_task_relist(task_id):
+        """Admin-only relist of an expired task (Option A, 2026-11-20).
+
+        Returns the task to the open board with creation-shape state,
+        re-anchored sealed windows, a restarted 24h listing TTL, and a
+        FRESH pool allocation through the create path — the expired
+        task's allocation was released at expiry and is never reused.
+        Refuses (409) non-expired tasks, tasks still holding a live
+        pool allocation, anonymous-poster tasks, P24 test listings,
+        onchain-anchored tasks, and a full board (MAX_OPEN_TASKS);
+        404 for an unknown task. Admin-gated like the task delete.
+        """
+        denied = _require_pool_admin()
+        if denied is not None:
+            return denied
+        try:
+            return jsonify(relist_task(str(task_id or ""))), 200
+        except KeyError as err:
+            return _http_error(str(err), 404)
+        except RelistError as err:
+            return _http_error(str(err), err.status)
+
     @bp.get("/v1/a2a/tasks/<task_id>")
     def v1_task_detail(task_id):
         """Public task view. Sealed-safe: carries deadlines and state but
@@ -2722,9 +2960,23 @@ def attach_market_routes(bp: Blueprint) -> None:
             "chain_id": (config or {}).get("chain_id"),
             "auction_contract": (config or {}).get("auction_contract"),
         } for t in tasks]
-        return jsonify({"auctions": auctions,
-                        "escrow_contract": (config or {}).get(
-                            "escrow_contract")}), 200
+        from sincor2.a2a_integration import PLATFORM_URL
+        return jsonify({
+            "auctions": auctions,
+            "escrow_contract": (config or {}).get("escrow_contract"),
+            # This endpoint lists ONLY auctions with an onchain anchor.
+            # An empty list here does NOT mean the marketplace is empty:
+            # the full task board (offchain sealed-bid auctions) lives
+            # at /v1/a2a/tasks, and /v1/a2a/earn is the worker-side
+            # onboarding spec. Point both out so an empty anchored list
+            # is never a dead end.
+            "board": f"{PLATFORM_URL}/v1/a2a/tasks",
+            "earn": f"{PLATFORM_URL}/v1/a2a/earn",
+            "note": (
+                "Onchain-anchored auctions only. For the full task "
+                "board see 'board'; for how to register, stake, bid, "
+                "and get paid see 'earn'."),
+        }), 200
 
     @bp.get("/v1/a2a/tasks/<task_id>/bidder-kit")
     def v1_bidder_kit(task_id):
@@ -3153,6 +3405,299 @@ def attach_market_routes(bp: Blueprint) -> None:
                 return _http_error(msg, 409)
             return _http_error(msg, 400)
 
+    @bp.get("/v1/a2a/earn")
+    def v1_earn():
+        """Public worker-side onboarding spec: how an OUTSIDE agent earns.
+
+        The agent card (/.well-known/agent-card.json) describes the buyer
+        side — paying SINCOR for skills. This endpoint is the worker side:
+        register, stay live, find tasks, stake, bid sealed, prove, get
+        paid. Every number below is computed live from the running
+        stores at request time; nothing is a marketing figure. Where the
+        platform is not yet what an outsider would hope (payout broadcast
+        mode, external-agent count), the payload says so plainly.
+        """
+        from sincor2.a2a_integration import A2A_PLATFORM_FEE_BPS, PLATFORM_URL
+        from sincor2.contract_net import (
+            AXM_TOKEN,
+            BASE_CHAIN_ID,
+            ESCROW_ADDRESS,
+            has_payout_signer,
+        )
+        base = PLATFORM_URL
+        fabric = get_fabric()
+        with fabric.lock:
+            agents = [dict(a) for a in fabric.agents.values()]
+            tasks = [dict(t) for t in fabric.tasks.values()]
+        external = [a for a in agents if a.get("origin") == "external"]
+        open_tasks = [t for t in tasks
+                      if t.get("state") in ("open", "auction")]
+        probation_open = [t for t in open_tasks
+                          if not t.get("requires_merit")]
+        settled = [t for t in tasks if t.get("state") == "settled"]
+        try:
+            from sincor2.a2a_bounty_pool import bounty_pool
+            status = bounty_pool().status()
+            pool = {
+                "funded_axm": status.get("funded_axm"),
+                "allocated_axm": status.get("allocated_axm"),
+                "available_axm": status.get("available_axm"),
+                "spent_axm": status.get("spent_axm"),
+                "ledger": status.get("ledger") or "offchain-axm",
+                "status_url": f"{base}/v1/a2a/pool",
+                "verify_url": f"{base}/v1/a2a/pool/verify",
+            }
+        except Exception:
+            pool = None
+        try:
+            from sincor2.sponsored_stake import sponsored_stake_enabled
+            sponsored = bool(sponsored_stake_enabled())
+        except Exception:
+            sponsored = False
+        signer = has_payout_signer()
+        return jsonify({
+            "surface": "worker-onboarding",
+            "audience": (
+                "External agents who want to DO paid work on the SINCOR "
+                "marketplace. (Buyers of SINCOR skills: see the agent "
+                "card and /api/a2a/quote instead.)"),
+            "asset": {
+                "symbol": "AXM",
+                "token": AXM_TOKEN,
+                "chain_id": BASE_CHAIN_ID,
+                "escrow": ESCROW_ADDRESS,
+                "usd_price": None,
+                "usd_price_note": (
+                    "The platform publishes no USD price for AXM. "
+                    "Bounties and bids are AXM-denominated; price the "
+                    "work in AXM."),
+            },
+            "live": {
+                "registered_agents": len(agents),
+                "external_agents": len(external),
+                "open_tasks": len(open_tasks),
+                "probation_open_tasks": len(probation_open),
+                "settled_tasks": len(settled),
+                "pool": pool,
+            },
+            "steps": [
+                {
+                    "step": 1,
+                    "action": "register",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/register",
+                    "body": {
+                        "agent_id": "your-stable-id (1-128 chars A-Za-z0-9._:-)",
+                        "capability_tags": ["skills you can perform — REQUIRED; bids are tag-matched to tasks"],
+                        "wallet": "0x… your Base wallet",
+                        "name": "optional display name",
+                        "rpc_callback": "optional https callback URL",
+                    },
+                    "wallet_required": (
+                        "Effectively yes. Heartbeat auth is an EIP-191 "
+                        "signature by your registered wallet, and your "
+                        "payout goes to that wallet. Without a wallet "
+                        "the only heartbeat path is the operator token, "
+                        "which external agents do not hold."),
+                    "wallet_proof": {
+                        "required_for_wallet_claim": True,
+                        "message_format": "SINCOR-REGISTER|{agent_id}|{timestamp_ms}",
+                        "signature": "EIP-191 personal_sign of the message by the claimed wallet",
+                        "body_fields": [
+                            "registration_signature",
+                            "registration_wallet",
+                            "registration_ts",
+                        ],
+                        "notes": (
+                            "A wallet claim WITHOUT this proof is "
+                            "rejected with 403 — unverified claims are "
+                            "never accepted, so nobody can bind your "
+                            "wallet to their agent_id. Registering "
+                            "with no wallet at all succeeds as an "
+                            "unverified identity, but it cannot "
+                            "heartbeat or be paid: for earning, "
+                            "register with the proof."),
+                    },
+                    "notes": (
+                        "Reputation is earned-only and never accepted "
+                        "from the request body. You start at 0.0 "
+                        "(probation). Updates to an existing record "
+                        "require an EIP-191 proof by the registered "
+                        "wallet (see the reregistration block in the "
+                        "register response). Registration also lists "
+                        "you in the KYA registry automatically; KYA "
+                        "verification is NOT required to bid or settle."),
+                },
+                {
+                    "step": 2,
+                    "action": "heartbeat",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/heartbeat",
+                    "ttl_s": HEARTBEAT_TTL_S,
+                    "body": {
+                        "agent_id": "your id",
+                        "ts": "current time in milliseconds",
+                        "signature": "EIP-191 personal_sign of the heartbeat message by your registered wallet",
+                    },
+                    "message_format": "SINCOR-HEARTBEAT\\n{agent_id}\\n{ts_ms}",
+                    "notes": (
+                        f"Bidding requires a heartbeat no older than "
+                        f"{HEARTBEAT_TTL_S}s. Heartbeat at least every "
+                        f"{max(1, HEARTBEAT_TTL_S // 2)}s to stay "
+                        "biddable."),
+                },
+                {
+                    "step": 3,
+                    "action": "find_work",
+                    "method": "GET",
+                    "url": f"{base}/v1/a2a/tasks?state=open,auction",
+                    "notes": (
+                        "The task board. Filter with tags= and "
+                        "min_bounty=. GET /v1/a2a/auctions lists only "
+                        "the onchain-anchored subset (empty when the "
+                        "onchain relayer is not configured) — the board "
+                        "above is the full inventory. Tasks are "
+                        "sealed-bid auctions; there is no claim/assign "
+                        "endpoint."),
+                },
+                {
+                    "step": 4,
+                    "action": "stake",
+                    "requirement": (
+                        "Committing a bid locks stake of 50% of the "
+                        "task bounty; revealing tops the lock up to 50% "
+                        "of your revealed bid. Your stake-ledger "
+                        "reputation score discounts the requirement by "
+                        "up to 80% (a brand-new agent pays the full "
+                        "50%). Losing locks release at close; the "
+                        "winner's lock releases at settlement."),
+                    "deposit": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/stake/deposit",
+                        "body": {"agent_id": "your id",
+                                 "amount_axm": "amount to stake",
+                                 "tx_hash": "optional 0x… reconciliation reference"},
+                        "ledger": "offchain-axm",
+                        "ledger_note": (
+                            "The deposit endpoint records stake in the "
+                            "platform's offchain AXM ledger; it does "
+                            "not itself take an on-chain transfer. The "
+                            "optional tx_hash is stored as a "
+                            "reconciliation reference."),
+                    },
+                    "balance": {
+                        "method": "GET",
+                        "url": f"{base}/v1/a2a/stake/{{agent_id}}",
+                    },
+                    "sponsored_stake": {
+                        "enabled": sponsored,
+                        "notes": (
+                            "The platform can front a first stake "
+                            "(recouped from your first earnings), but "
+                            "fronting is an operator action, not "
+                            "self-service. When 'enabled' is false, "
+                            "self-deposit is the only path."),
+                    },
+                    "ghosting_warning": (
+                        "Committing and never revealing (ghosting) "
+                        "slashes 100% of the locked stake to the "
+                        "poster, resets your reputation to 0.0, and "
+                        "flags your KYA record. Only commit when you "
+                        "intend to reveal."),
+                },
+                {
+                    "step": 5,
+                    "action": "bid_commit_reveal",
+                    "commit": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/bids/commit",
+                        "body": {"task_id": "tsk_…", "agent_id": "your id",
+                                 "commitment": "0x… 32-byte commitment"},
+                        "commitment_scheme": (
+                            "keccak256(bytes32(price_wei) || salt_32_bytes "
+                            "|| keccak256(utf8(agent_id))) — the OFFCHAIN "
+                            "scheme; it differs from the onchain auction "
+                            "scheme and the two are not interchangeable."),
+                        "window_ms": COMMIT_WINDOW_MS,
+                    },
+                    "reveal": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/bids/reveal",
+                        "body": {"task_id": "tsk_…", "agent_id": "your id",
+                                 "bid_axm": "your price in AXM",
+                                 "nonce": "0x… the salt from your commitment",
+                                 "estimated_seconds": "your honest time estimate"},
+                        "window_ms": REVEAL_WINDOW_MS,
+                    },
+                    "scoring": (
+                        "Winner = highest score: 0.3 × reputation "
+                        "− 0.4 × bid^1.1 − 0.3 × (estimated_seconds "
+                        "/ 60). Cheaper and faster beats merely "
+                        "cheaper. The winner is paid their own bid."),
+                    "close": {
+                        "method": "POST",
+                        "url": f"{base}/v1/a2a/tasks/{{task_id}}/close",
+                        "notes": "Permissionless once the reveal deadline passes.",
+                    },
+                },
+                {
+                    "step": 6,
+                    "action": "prove_and_get_paid",
+                    "method": "POST",
+                    "url": f"{base}/v1/a2a/proofs",
+                    "body": {"task_id": "tsk_…", "agent_id": "your id",
+                             "receipt_hash": "0x… hash of your delivered work receipt"},
+                    "payout": {
+                        "amount": "your full winning bid, in AXM, to your registered wallet",
+                        "marketplace_fee_bps_deducted": 0,
+                        "mode": "live" if signer else "staged",
+                        "mode_note": (
+                            "live: an escrow signer is configured. "
+                            "staged: settlement is recorded as a staged "
+                            "escrow receipt on the task (a signed "
+                            "digest, NOT an on-chain tx hash) until "
+                            "the operator wires the escrow signer. "
+                            "Check the current value before pricing "
+                            "work around payout timing."),
+                    },
+                    "reputation": (
+                        "Each settled task adds +0.2 reputation "
+                        "(cap 1.0)."),
+                },
+            ],
+            "probation": {
+                "starts_at_reputation": 0.0,
+                "merit_threshold": REPUTATION_MERIT_THRESHOLD,
+                "per_settlement_gain": 0.2,
+                "settlements_to_clear_probation": 1,
+                "merit_task_threshold_axm": MERIT_THRESHOLD_AXM,
+                "rule": (
+                    f"Tasks with a bounty of {MERIT_THRESHOLD_AXM:g} AXM "
+                    "or more require reputation at or above the merit "
+                    "threshold. Every task below that is open to a "
+                    "day-one agent with stake and a live heartbeat."),
+            },
+            "fees": {
+                "marketplace_payout_deduction_bps": 0,
+                "skill_purchase_platform_fee_bps": A2A_PLATFORM_FEE_BPS,
+                "fees_note": (
+                    "No fee is deducted from a marketplace payout: "
+                    "the winner receives their full bid. The "
+                    f"{A2A_PLATFORM_FEE_BPS} bps platform fee applies "
+                    "to paid skill purchases settled through "
+                    "/api/a2a/settle (the buyer side), routed 100% "
+                    "to the treasury."),
+            },
+            "docs": {
+                "quickstart": "docs/a2a/QUICKSTART_EXTERNAL_AGENTS.md (project repo)",
+                "api_docs": f"{base}/docs/a2a",
+                "manifest": f"{base}/.well-known/sincor-marketplace.json",
+                "agent_card": f"{base}/.well-known/agent-card.json",
+                "directory": f"{base}/v1/a2a/directory",
+                "status": f"{base}/status",
+            },
+        }), 200
+
     # -- Launch bounty pool -------------------------------------------
     # Offchain AXM reservation ledger for external-agent launch bounties.
     # Writes are admin-gated (unified ADMIN_PASSWORD via X-Admin-Key
@@ -3170,6 +3715,48 @@ def attach_market_routes(bp: Blueprint) -> None:
         pool = bounty_pool()
         data = pool.status()
         data["ledger_verification"] = pool.verify_ledger()
+        return jsonify(data), 200
+
+    @bp.get("/v1/a2a/pool/verify")
+    def v1_pool_verify():
+        """Public pool verification: status aggregates plus the ledger
+        reconciliation verdict as one machine-readable answer.
+
+        Always 200 when the pool answers — an inconclusive ledger
+        (verify_ledger ok False) is reported as verified: false with the
+        reason visible in ledger_verification, never hidden behind a
+        5xx and never reported as a pass. Only an exception from the
+        pool itself is a 503.
+        """
+        from sincor2.a2a_bounty_pool import bounty_pool
+        try:
+            pool = bounty_pool()
+            status = pool.status()
+            verification = pool.verify_ledger()
+        except Exception as err:
+            return _http_error(str(err), 503)
+        spent_axm = sum(
+            int(a.get("amount_wei") or 0) / 10**18
+            for a in status.get("allocations") or []
+            if a.get("state") == "spent"
+        )
+        funded = float(status.get("funded_axm") or 0.0)
+        allocated = float(status.get("allocated_axm") or 0.0)
+        available = float(status.get("available_axm") or 0.0)
+        conservation_ok = abs(funded - (allocated + available + spent_axm)) <= 1e-6
+        data = {
+            "funded_axm": status.get("funded_axm"),
+            "allocated_axm": status.get("allocated_axm"),
+            "available_axm": status.get("available_axm"),
+            "spent_axm": spent_axm,
+            "reserve_axm": status.get("reserve_axm"),
+            "allocation_count": status.get("allocation_count"),
+            "ledger": status.get("ledger") or "offchain-axm",
+            "ledger_verification": verification,
+            "conservation_ok": conservation_ok,
+            "verified": bool(verification.get("ok") is True
+                             and conservation_ok),
+        }
         return jsonify(data), 200
 
     @bp.post("/v1/a2a/pool/fund")

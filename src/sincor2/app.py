@@ -448,6 +448,13 @@ app.register_blueprint(_defi_catalog_bp)
 if limiter:
     limiter.exempt(_defi_catalog_bp)
 
+# Public observability surfaces: /status + /skills (read-only aggregates).
+from sincor2.blueprints.observability import observability_bp as _observability_bp
+
+app.register_blueprint(_observability_bp)
+if limiter:
+    limiter.exempt(_observability_bp)
+
 # Human payment rail: GET /rail/pay/<sku> + GET /rail/onramp (read-only page;
 # the money movement happens client-side via the x402 challenge endpoints).
 from sincor2.blueprints.rail_pay import rail_pay_bp as _rail_pay_bp

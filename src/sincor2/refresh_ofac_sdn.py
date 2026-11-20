@@ -13,10 +13,14 @@ It reuses the verified machinery in
 sanity -> atomic replace); nothing is written unless the download
 verifies. The snapshot lands at:
 
-- ``$SINCOR_DATA_DIR/p20_ofac_sdn.json`` when ``SINCOR_DATA_DIR`` is
+- ``$SINCOR_DATA_DIR/p20_ofac_sdn.manifest.json`` when ``SINCOR_DATA_DIR`` is
   set (the sanctions screen prefers that copy when present), else
 - the vendored bundled file (:func:`ofac_sdn.snapshot_path`), which
   is also the read fallback on first boot, before any refresh.
+
+The snapshot is stored in text-chunk form (a JSON manifest plus
+base64 chunk files — see :mod:`sincor2.defi.ofac_sdn`); the refresh
+writes that form wherever the active path names the manifest.
 
 ``fetched_at`` is stamped with the true time of the verified
 re-download — never back- or forward-dated. When OFAC has not

@@ -1,6 +1,7 @@
 """P20 OFAC real-data tests: vendored SDN snapshot + updater + oracle wiring.
 
-The vendored snapshot (src/sincor2/defi/data/p20_ofac_sdn.json) is
+The vendored snapshot (src/sincor2/defi/data/p20_ofac_sdn.manifest.json
++ base64 text chunks, reassembled by the loader) is
 deterministic — spot checks pin entries verified present in it. The
 synthetic reference fixture is untouched; these tests do not depend on
 network access (fetch is monkeypatched).
@@ -43,8 +44,10 @@ NS = ("https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview"
 
 def _vendored_publication_date() -> str:
     """The vendored snapshot's own declared publication date, read from
-    the raw file on disk. Provenance assertions compare against this —
-    never a hardcoded date — so the next snapshot refresh stays green."""
+    the manifest file on disk (the manifest is plain JSON text and
+    carries the snapshot's provenance). Provenance assertions compare
+    against this — never a hardcoded date — so the next snapshot
+    refresh stays green."""
     with open(snapshot_path(), encoding="utf-8") as f:
         return json.load(f)["publication_date"]
 
