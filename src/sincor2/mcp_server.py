@@ -8,7 +8,7 @@ shapes (``initialize``, ``tools/list``, ``tools/call``). Dependency-light:
 The server is a thin, honest client of the platform's real A2A HTTP surface::
 
     manifest   GET /.well-known/sincor-marketplace.json   (advertises this server)
-    list_tasks GET /v1/a2a/auctions                        (sealed auctions, onchain anchors)
+    list_tasks GET /v1/a2a/tasks                           (the real task board)
     get_task   GET /v1/a2a/tasks/<task_id>/bidder-kit
     get_agent_card GET /v1/a2a/cards
     get_quote  GET /api/a2a/quote?skill_id=...&caller_id=...
@@ -340,11 +340,12 @@ TOOLS: List[Dict[str, Any]] = [
         "name": "list_tasks",
         "annotations": {"title": "List tasks", "read_only_hint": True},
         "description": (
-            "List open marketplace auctions (read-only). Backed by "
-            "GET /v1/a2a/auctions — sealed auctions with an onchain anchor. "
-            "UPGRADE PATH: once the sibling task-list endpoint "
-            "GET /v1/a2a/tasks merges, this tool switches to it for the full "
-            "task inventory (open, sealed, and assigned tasks)."
+            "List marketplace tasks from the real task board (read-only). "
+            "Backed by GET /v1/a2a/tasks — every task the board serves "
+            "(open, sealed, assigned, …), not just the onchain-anchored "
+            "subset the legacy /v1/a2a/auctions endpoint returns. "
+            "Defaults to biddable states (open, auction); pass 'state' "
+            "to widen or narrow."
         ),
         "inputSchema": {
             "type": "object",
@@ -352,7 +353,7 @@ TOOLS: List[Dict[str, Any]] = [
                 "skill": {"type": "string",
                           "description": "Filter by skill tag, e.g. 'lead-enrichment'."},
                 "state": {"type": "string",
-                          "description": "Filter by auction state ('open', 'auction', …)."},
+                          "description": "Filter by task state ('open', 'auction', …). Defaults to 'open,auction'."},
                 "limit": {"type": "integer", "default": 50,
                           "description": "Max entries to return."},
             },
@@ -362,10 +363,12 @@ TOOLS: List[Dict[str, Any]] = [
         "name": "get_task",
         "annotations": {"title": "Get task", "read_only_hint": True},
         "description": (
-            "Full detail for one auctioned task (read-only): deadlines, "
-            "commitment scheme, price bounds, and contract addresses. "
-            "Backed by GET /v1/a2a/tasks/<task_id>/bidder-kit — 404 for tasks "
-            "without an onchain auction anchor."
+            "Full bidding kit for one task (read-only): deadlines, the "
+            "board commitment scheme with a worked example, price "
+            "bounds, endpoints, and — for onchain-anchored tasks — the "
+            "contract addresses and onchain scheme. Backed by "
+            "GET /v1/a2a/tasks/<task_id>/bidder-kit, which serves every "
+            "board task."
         ),
         "inputSchema": {
             "type": "object",
@@ -508,31 +511,67 @@ _TOOL_NAMES = {t["name"] for t in TOOLS}
 # Tool implementations
 # ---------------------------------------------------------------------------
 
+def _project_board_task(t: Dict[str, Any]) -> Dict[str, Any]:
+    """Project one raw board task record onto the tool's entry shape.
+
+    Keeps the fields the auctions-backed tool returned (task_id, skill,
+    bounty_axm, state, *_deadline_ms, bidder_kit) and adds the board
+    fields a bidder needs to triage (sealed, requires_merit, tags);
+    internal record fields (seed keys, pool allocation ids, poster
+    internals) are not forwarded.
+    """
+    entry = {
+        "task_id": t.get("task_id"),
+        "skill": t.get("skill"),
+        "tags": t.get("tags"),
+        "bounty_axm": t.get("bounty_axm"),
+        "state": t.get("state"),
+        "sealed": bool(t.get("sealed")),
+        "requires_merit": bool(t.get("requires_merit")),
+        "commit_deadline_ms": t.get("commit_deadline"),
+        "reveal_deadline_ms": t.get("reveal_deadline"),
+        "created_at": t.get("created_at"),
+        "bidder_kit": f"/v1/a2a/tasks/{t.get('task_id')}/bidder-kit",
+    }
+    if t.get("auction_id"):
+        entry["auction_id"] = t.get("auction_id")
+    return entry
+
+
 def _tool_list_tasks(args: Dict[str, Any]) -> Dict[str, Any]:
-    resp = _get("/v1/a2a/auctions")
-    if not resp["ok"]:
-        return {"error": "auctions endpoint failed", "upstream": resp}
-    auctions = (resp["data"] or {}).get("auctions", [])
+    # Read the REAL task board — the same source the HTTP board serves.
+    # The legacy /v1/a2a/auctions endpoint only lists sealed tasks with
+    # an onchain anchor, which in production is an empty set: this tool
+    # used to report an empty marketplace while the board held
+    # thousands of tasks (outsider sweep K2, 2026-11-20).
     skill = (args.get("skill") or "").strip().lower()
     state = (args.get("state") or "").strip().lower()
-    limit = int(args.get("limit") or 50)
-    out = []
-    for a in auctions:
-        if skill and skill != str(a.get("skill") or "").lower():
-            continue
-        if state and str(a.get("state", "")).lower() != state:
-            continue
-        a = dict(a)
-        a["bidder_kit"] = f"/v1/a2a/tasks/{a.get('task_id')}/bidder-kit"
-        out.append(a)
-        if len(out) >= max(limit, 1):
+    limit = max(int(args.get("limit") or 50), 1)
+    states = state or "open,auction"
+    out: List[Dict[str, Any]] = []
+    page = 1
+    while len(out) < limit and page <= 20:  # bounded: <= 2000 board rows
+        resp = _get("/v1/a2a/tasks",
+                    {"state": states, "page": page, "per_page": 100})
+        if not resp["ok"]:
+            return {"error": "tasks endpoint failed", "upstream": resp}
+        data = resp["data"] or {}
+        tasks = data.get("tasks", [])
+        for t in tasks:
+            if skill and skill != str(t.get("skill") or "").lower():
+                continue
+            out.append(_project_board_task(t))
+            if len(out) >= limit:
+                break
+        if not tasks or page >= int(data.get("pages") or 1):
             break
+        page += 1
     return {
-        "auctions": out, "count": len(out),
-        "source": "GET /v1/a2a/auctions",
-        "note": ("Sealed auctions with onchain anchors only. When the sibling "
-                 "GET /v1/a2a/tasks endpoint merges, this tool will read the "
-                 "full task inventory from it."),
+        "tasks": out, "count": len(out),
+        "source": "GET /v1/a2a/tasks",
+        "note": ("The full task board (same source as the HTTP board). "
+                 "Each entry links its bidder-kit with the exact "
+                 "commitment scheme for that task."),
     }
 
 
@@ -632,9 +671,15 @@ def _plan_bid(args: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any], str, Dict
     extra: Dict[str, Any] = {}
 
     if mode == "auto":
-        # A sealed auction task exposes a bidder-kit; open tasks 404 there.
+        # The bidder-kit serves every board task and states whether the
+        # task is sealed: sealed tasks use commit/reveal, open tasks use
+        # the legacy plaintext bid. (Kit detection used to key off the
+        # kit returning 404 for unanchored tasks — the kit no longer
+        # 404s, so read the explicit 'sealed' flag instead.)
         kit = _get(f"/v1/a2a/tasks/{urllib.parse.quote(task_id, safe='')}/bidder-kit")
-        mode = "commit" if kit["ok"] else "legacy"
+        kit_data = kit["data"] if kit["ok"] and isinstance(
+            kit.get("data"), dict) else {}
+        mode = "commit" if kit_data.get("sealed") else "legacy"
         extra["detected_mode"] = mode
 
     if mode == "legacy":

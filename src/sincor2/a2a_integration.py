@@ -2243,6 +2243,7 @@ def build_marketplace_manifest() -> Dict[str, Any]:
             "revoked agents."
         ),
         "endpoints": {
+            "tasks": f"{base}/v1/a2a/tasks",
             "auctions": f"{base}/v1/a2a/auctions",
             "bidder_kit": f"{base}/v1/a2a/tasks/{{task_id}}/bidder-kit",
             "agent_cards": f"{base}/v1/a2a/cards",
@@ -2271,10 +2272,9 @@ def build_marketplace_manifest() -> Dict[str, Any]:
         },
         "upgrade_path": {
             "task_list": (
-                "list_tasks currently reads GET /v1/a2a/auctions (sealed "
-                "auctions with onchain anchors). When the sibling "
-                "GET /v1/a2a/tasks endpoint merges, the MCP list_tasks tool "
-                "switches to it for the full task inventory."
+                "list_tasks reads GET /v1/a2a/tasks — the full task "
+                "board. GET /v1/a2a/auctions remains available for the "
+                "subset of sealed tasks carrying an onchain anchor."
             ),
         },
         "rate_limit_tiers": {

@@ -345,6 +345,97 @@ def sealed_commitment(price_wei: int, salt: bytes, agent_id: str) -> bytes:
     return _keccak256(int(price_wei).to_bytes(32, "big") + bytes(salt) + agent_id_hash)
 
 
+def _board_bidder_kit(task: Dict[str, Any],
+                      agent_id: Optional[str]) -> Dict[str, Any]:
+    """The board (offchain API) bidding instructions for one task.
+
+    This is the kit an outsider can actually use on every task the board
+    lists: sealed tasks bid through ``POST /v1/a2a/bids/commit`` +
+    ``/bids/reveal`` with the OFFCHAIN shim commitment (see
+    :func:`sealed_commitment`), priced in AXM wei; open tasks take a
+    plaintext bid at ``POST /v1/a2a/bids``. The worked ``example`` is
+    computed with the board's own :func:`sealed_commitment`, so the hash
+    an outsider reproduces from the published scheme verifies against
+    the board by construction.
+    """
+    kit: Dict[str, Any] = {"currency": "AXM", "task_id": task["task_id"]}
+    if task.get("sealed"):
+        example_agent = str(agent_id or "example-agent")
+        example_salt = (1).to_bytes(32, "big")
+        example_price_wei = 10 ** 18
+        kit.update({
+            "mode": "sealed",
+            "commit_deadline_ms": task.get("commit_deadline"),
+            "reveal_deadline_ms": task.get("reveal_deadline"),
+            "commitment_scheme": (
+                "keccak256(abi.encodePacked(bytes32(price_wei), "
+                "bytes32(salt), keccak256(utf8(agent_id))))"),
+            "price_unit": (
+                "AXM wei: price_wei = round(bid_axm * 1e18). The commit "
+                "carries only the hash; the reveal sends bid_axm and the "
+                "server recomputes price_wei from it."),
+            "price_bounds_wei": {"min": "1", "max": str(UINT96_MAX)},
+            "commit_endpoint": {
+                "method": "POST",
+                "path": "/v1/a2a/bids/commit",
+                "body": {"task_id": task["task_id"],
+                         "agent_id": "<your-agent-id>",
+                         "commitment": "0x<commitment, 64 hex chars>"},
+            },
+            "reveal_endpoint": {
+                "method": "POST",
+                "path": "/v1/a2a/bids/reveal",
+                "body": {"task_id": task["task_id"],
+                         "agent_id": "<your-agent-id>",
+                         "bid_axm": "<your bid, in AXM>",
+                         "nonce": "0x<your 32-byte salt, hex>",
+                         "estimated_seconds": "<your time estimate>"},
+            },
+            "auth": (
+                "Commit and reveal must be authenticated (W-77): an "
+                "EIP-191 signature by your agent's registered wallet, "
+                "sent as authSignature + authTimestamp + authNonce "
+                "fields, or the operator heartbeat token."),
+            "stake_note": (
+                "Committing locks stake equal to 50% of the task bounty "
+                "(minStakeBps=5000). A commit that is never revealed is "
+                "ghost-slashed 100% of the lock at close."),
+            "warning": (
+                "This OFFCHAIN commitment is NOT an onchain commitment: "
+                "the CommitRevealAuction preimage additionally binds "
+                "the auction id and the chain id (W-4). Never submit a "
+                "board commitment to the contract, and never commit a "
+                "contract-style hash to the board — it cannot reveal "
+                "here and the locked stake is slashed."),
+            "example": {
+                "agent_id": example_agent,
+                "bid_axm": 1.0,
+                "price_wei": str(example_price_wei),
+                "salt": "0x" + example_salt.hex(),
+                "agent_id_hash": "0x" + _keccak256(
+                    example_agent.encode("utf-8")).hex(),
+                "commitment": "0x" + sealed_commitment(
+                    example_price_wei, example_salt, example_agent).hex(),
+            },
+        })
+    else:
+        kit.update({
+            "mode": "open",
+            "bid_endpoint": {
+                "method": "POST",
+                "path": "/v1/a2a/bids",
+                "body": {"task_id": task["task_id"],
+                         "agent_id": "<your-agent-id>",
+                         "bid_axm": "<your bid, in AXM>",
+                         "estimated_seconds": "<your time estimate>"},
+            },
+            "note": (
+                "Open task: no commit/reveal phase. Place a plaintext "
+                "bid before the listing expires."),
+        })
+    return kit
+
+
 def _parse_bytes32_hex(value: Any, field: str) -> bytes:
     raw = str(value or "").strip().lower()
     if raw.startswith("0x"):
@@ -2637,55 +2728,114 @@ def attach_market_routes(bp: Blueprint) -> None:
 
     @bp.get("/v1/a2a/tasks/<task_id>/bidder-kit")
     def v1_bidder_kit(task_id):
-        """Everything a wallet-based bidder needs for one onchain auction:
-        chain, contract addresses, auction id, deadlines, the exact
-        commitment scheme, and price bounds. Pass ?agent_id= to get your
-        precomputed agent_id_hash too.
+        """Everything a bidder needs for one task.
 
-        Currency note: the onchain auction settles in native ETH (wei
-        prices here), not AXM. The contract's onchain deadlines are
-        authoritative; the millisecond mirrors below track the anchor.
+        The board is the live marketplace, so the kit ALWAYS describes
+        the board (offchain API) scheme under ``board`` — that is the
+        only scheme that can commit and reveal on a board task:
+
+            commitment = keccak256(abi.encodePacked(bytes32(price_wei),
+                bytes32(salt), keccak256(utf8(agent_id))))
+
+        with prices in AXM wei (price_wei = round(bid_axm * 1e18)),
+        committed via POST /v1/a2a/bids/commit and revealed via
+        POST /v1/a2a/bids/reveal. For a sealed task without an onchain
+        anchor the board fields are also mirrored at the top level.
+
+        When the task additionally carries an onchain auction anchor
+        AND the onchain relayer is configured, the onchain wallet kit
+        (chain, contracts, auction id, onchain scheme — native ETH wei)
+        is included under ``onchain`` and, for back-compat, at the top
+        level. The two schemes are NOT interchangeable: the onchain
+        preimage additionally binds the auction id and the chain id
+        (W-4), so a commitment built for one path can never reveal on
+        the other. Before this fix the endpoint 404'd for every
+        unanchored task — i.e. every real board task — and taught only
+        the onchain scheme, so a faithful outsider produced commits
+        that could never reveal and ate the 100% ghost slash.
         """
         from sincor2.onchain.auction_relayer import onchain_config
-        from sincor2.onchain.bidder_client import UINT96_MAX, agent_id_hash
         task = get_fabric().tasks.get(str(task_id or ""))
         if task is None:
             return _http_error("unknown task", 404)
-        if not task.get("sealed") or not task.get("auction_id"):
-            return _http_error("task has no onchain auction anchor", 404)
-        config = onchain_config()
-        if config is None:
-            return _http_error("onchain auctions not configured", 503)
+        agent_id = request.args.get("agent_id")
+        board = _board_bidder_kit(task, agent_id)
         kit = {
             "task_id": task["task_id"],
             "skill": task.get("skill"),
             "bounty_axm": task.get("bounty_axm"),
             "state": task.get("state"),
-            "chain_id": config.get("chain_id"),
-            "rpc_hint": config.get("rpc_hint"),
-            "auction_contract": config.get("auction_contract"),
-            "escrow_contract": config.get("escrow_contract"),
-            "auction_id": task.get("auction_id"),
-            "commit_deadline_ms": task.get("commit_deadline"),
-            "reveal_deadline_ms": task.get("reveal_deadline"),
-            "commitment_scheme": (
-                "keccak256(abi.encodePacked(bytes32(auctionId), "
-                "uint256(block.chainid), bytes32(price_wei), "
-                "bytes32(salt), keccak256(utf8(agent_id))))"),
-            "price_bounds_wei": {"min": 0, "max": str(UINT96_MAX)},
-            "functions": [
-                "commit(bytes32 auctionId, bytes32 commitHash)",
-                "reveal(bytes32 auctionId, uint256 price, bytes32 salt, "
-                "bytes32 agentIdHash)",
-                "vickreyResult(bytes32 auctionId) -> (address winner, "
-                "uint256 price)",
-            ],
+            "sealed": bool(task.get("sealed")),
+            "requires_merit": bool(task.get("requires_merit")),
+            "board": board,
             "docs": "/docs/a2a",
         }
-        agent_id = request.args.get("agent_id")
         if agent_id:
             kit["agent_id"] = agent_id
-            kit["agent_id_hash"] = "0x" + agent_id_hash(agent_id).hex()
+            kit["agent_id_hash"] = "0x" + _keccak256(
+                str(agent_id).encode("utf-8")).hex()
+        config = onchain_config() if task.get("auction_id") else None
+        if task.get("sealed") and task.get("auction_id") \
+                and config is not None:
+            from sincor2.onchain.bidder_client import (
+                UINT96_MAX as ONCHAIN_UINT96_MAX,
+            )
+            onchain = {
+                "chain_id": config.get("chain_id"),
+                "rpc_hint": config.get("rpc_hint"),
+                "auction_contract": config.get("auction_contract"),
+                "escrow_contract": config.get("escrow_contract"),
+                "auction_id": task.get("auction_id"),
+                "commit_deadline_ms": task.get("commit_deadline"),
+                "reveal_deadline_ms": task.get("reveal_deadline"),
+                "commitment_scheme": (
+                    "keccak256(abi.encodePacked(bytes32(auctionId), "
+                    "uint256(block.chainid), bytes32(price_wei), "
+                    "bytes32(salt), keccak256(utf8(agent_id))))"),
+                "price_bounds_wei": {
+                    "min": 0, "max": str(ONCHAIN_UINT96_MAX)},
+                "functions": [
+                    "commit(bytes32 auctionId, bytes32 commitHash)",
+                    "reveal(bytes32 auctionId, uint256 price, bytes32 salt, "
+                    "bytes32 agentIdHash)",
+                    "vickreyResult(bytes32 auctionId) -> (address winner, "
+                    "uint256 price)",
+                ],
+                "currency": "ETH",
+                "warning": (
+                    "Onchain commitments bind the auction id and chain "
+                    "id and settle in native ETH; board commitments "
+                    "(under 'board') bind only price/salt/agent and "
+                    "settle in AXM. The two are NOT interchangeable."),
+            }
+            kit["onchain"] = onchain
+            kit["mode"] = "onchain+board"
+            # Back-compat: the pre-fix kit carried the onchain fields at
+            # the top level for anchored tasks; keep them there.
+            for key in ("chain_id", "rpc_hint", "auction_contract",
+                        "escrow_contract", "auction_id",
+                        "commit_deadline_ms", "reveal_deadline_ms",
+                        "commitment_scheme", "price_bounds_wei",
+                        "functions"):
+                kit[key] = onchain[key]
+        elif task.get("sealed"):
+            kit["mode"] = "board-sealed"
+            kit["currency"] = "AXM"
+            kit["commitment_scheme"] = board["commitment_scheme"]
+            kit["price_bounds_wei"] = board["price_bounds_wei"]
+            kit["commit_deadline_ms"] = board["commit_deadline_ms"]
+            kit["reveal_deadline_ms"] = board["reveal_deadline_ms"]
+            if task.get("auction_id"):
+                kit["onchain"] = {
+                    "configured": False,
+                    "note": (
+                        "This task carries an onchain auction anchor "
+                        "but onchain auctions are not configured on "
+                        "this deployment; bid via the board API."),
+                }
+        else:
+            kit["mode"] = "board-open"
+            kit["currency"] = "AXM"
         return jsonify(kit), 200
 
     @bp.get("/v1/a2a/registration-velocity")
