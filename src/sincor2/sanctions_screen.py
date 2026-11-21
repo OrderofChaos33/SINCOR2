@@ -2,8 +2,9 @@
 
 One EVM wallet address in, one sanctions verdict out, screened against
 the vendored OFAC SDN snapshot that P20 already uses
-(``src/sincor2/defi/data/p20_ofac_sdn.json`` — 19,471 entries,
-publication 10/21/2026). Priced as the ``wallet-sanctions-screen``
+(``src/sincor2/defi/data/p20_ofac_sdn.manifest.json`` + its base64
+text-chunk files — 19,471 entries, publication 10/21/2026). Priced as
+the ``wallet-sanctions-screen``
 resource in ``config/x402_pricing.yaml`` ($0.005 USDC on Base).
 
 Honesty contract (standing observability rule — feeds report unknown,

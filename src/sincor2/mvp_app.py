@@ -1269,6 +1269,12 @@ from sincor2.blueprints.defi_catalog import defi_catalog_bp as _defi_catalog_bp
 
 app.register_blueprint(_defi_catalog_bp)
 
+# Public observability surfaces: /status + /skills (read-only aggregates;
+# the third surface, GET /v1/a2a/pool/verify, rides the a2a blueprint).
+from sincor2.blueprints.observability import observability_bp as _observability_bp
+
+app.register_blueprint(_observability_bp)
+
 # OBS-01 Agent Vitals (BETA): /obs/vitals + GET /api/obs/vitals. Read-only,
 # customer-session gated, deliberately unlinked from all public nav/pricing/
 # sitemaps (direct URL only) until the beta walkthrough passes. No money
