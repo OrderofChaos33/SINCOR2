@@ -2,24 +2,24 @@
   "format": "sincor-ofac-sdn-text/1",
   "source": "OFAC SDN List",
   "source_url": "https://www.treasury.gov/ofac/downloads/sdn.xml",
-  "publication_date": "11/19/2026",
-  "record_count": 19595,
-  "entry_count": 19595,
-  "fetched_at": "2026-11-20T16:53:31.218431+00:00",
+  "publication_date": "11/20/2026",
+  "record_count": 19599,
+  "entry_count": 19599,
+  "fetched_at": "2026-11-21T10:23:16.453964+00:00",
   "encoding": "base64(gzip(utf-8 json))",
   "chunk_count": 3,
   "chunks": [
-    "p20_ofac_sdn.b64.65a09f0e.000.txt",
-    "p20_ofac_sdn.b64.65a09f0e.001.txt",
-    "p20_ofac_sdn.b64.65a09f0e.002.txt"
+    "p20_ofac_sdn.b64.17208cf7.000.txt",
+    "p20_ofac_sdn.b64.17208cf7.001.txt",
+    "p20_ofac_sdn.b64.17208cf7.002.txt"
   ],
   "chunk_bytes": [
     606000,
     606000,
-    80283
+    80615
   ],
-  "payload_bytes_gzip": 959616,
-  "payload_bytes_json": 7369473,
-  "sha256_gzip": "65a09f0e489e6ca0b3c53479b337f7617441b5e79edc0a51438535dde16216a6",
-  "sha256_json": "9c106fed25f7b470803c74ce9128f730b1c6fb2c5b4917896b67e1c5c3b9f470"
+  "payload_bytes_gzip": 959862,
+  "payload_bytes_json": 7371324,
+  "sha256_gzip": "17208cf7ea7efad4fa47edd95ec662d09fb36fe3c1ada2f417a8cef658001576",
+  "sha256_json": "f77f477ab7c481bb5da88e76513d1a86490fef57494473fba3186a29c4e8ba39"
 }
