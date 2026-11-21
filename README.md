@@ -303,7 +303,7 @@ SINCOR2 sits on top of five open protocols. Each covers a distinct layer. None o
 | ERC-8004 | On-chain identity and reputation | Identity, reputation, and validation registries for agents | Validation and reputation oracle implemented and unit-tested on a development branch; not on main, not deployed. Design record: [docs/ERC8004_REGISTER.md](docs/ERC8004_REGISTER.md) |
 | ERC-7579 | Modular smart accounts | Policy modules and hooks on Kernel-class accounts | SIGIL policy module implemented and unit-tested on a development branch; not on main, not deployed |
 
-The division of work is strict. A2A moves task descriptions. x402 and AP2 move payment intent. ERC-8004 and ERC-7579 define where identity, reputation, and account policy live on-chain. SINCOR's own components — the bounty pool, the sealed-bid auction, SIGIL verification, and SEAL settlement — sit between payment intent and payment release, so funds move after verified delivery instead of before it.
+The division of work is strict. A2A moves task descriptions. x402 and AP2 move payment intent. ERC-8004 and ERC-7579 define where identity, reputation, and account policy live on-chain. SINCOR's own components — the bounty pool, the sealed-bid auction, SIGIL verification, and SEAL (Settlement Envelope Authorization Layer) settlement — sit between payment intent and payment release, so funds move after verified delivery instead of before it.
 
 > [!NOTE]
 > Status words in this document are exact. *Live* means serving traffic or published today. *In development* means implemented and tested on a branch; it is not on main and not deployed. Status & Limitations collects every case in one place.
@@ -922,3 +922,7 @@ pytest --cov=src/sincor2
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Trademarks
+
+SINCOR™, VENOM™, ANTIVENOM™, SEAL™ and AXM™ are trademarks of SINCOR Business Solutions LLC. The MIT license covers the code in this repository; it does not grant rights to the trademarks.
