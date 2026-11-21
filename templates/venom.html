@@ -205,6 +205,20 @@
       .antivenom-strip p strong{color:var(--ink);}
       .price-note{margin-top:18px;font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--faint);line-height:1.7;}
 
+      /* ---------- antivenom roving ---------- */
+      .roving{background:var(--bg-2);border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);}
+      .roving-lede{color:var(--muted);font-size:17.5px;max-width:62ch;margin-bottom:28px;}
+      .roving-lede strong{color:var(--ink);font-weight:600;}
+      .sub-scroll{border:1px solid var(--line-soft);border-radius:var(--radius);overflow-x:auto;background:var(--panel);}
+      .sub-table{border-collapse:collapse;width:100%;min-width:660px;font-size:15.5px;}
+      .sub-table th,.sub-table td{padding:15px 18px;text-align:left;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+      .sub-table tbody tr:last-child th,.sub-table tbody tr:last-child td{border-bottom:none;}
+      .sub-table thead th{font-family:"Oswald",sans-serif;text-transform:uppercase;font-size:19px;color:var(--ink);letter-spacing:.02em;line-height:1.15;}
+      .sub-table thead th .per{display:block;margin-top:3px;font-family:"IBM Plex Mono",monospace;font-size:13px;letter-spacing:.05em;color:var(--gold-bright);text-transform:none;}
+      .sub-table tbody th{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-bright);font-weight:600;white-space:nowrap;padding-top:18px;}
+      .sub-table td{color:var(--muted);}
+      .sub-table td strong{color:var(--ink);font-weight:600;}
+
       /* ---------- scope / honesty ---------- */
       .scope{border:1px solid var(--line-soft);border-radius:var(--radius);padding:28px 24px;background:var(--bg-2);}
       .scope .sec-tag{margin-bottom:10px;}
@@ -716,6 +730,80 @@
         </div>
 
         <p class="price-note">No checkout, no payment links, no retainer traps. Every engagement starts with one email and a scoping conversation — you approve the scope and the price before any work begins.</p>
+      </div>
+    </section>
+
+    <!-- ================= ANTIVENOM ROVING ================= -->
+    <section class="roving" id="roving">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <p class="sec-tag">Antivenom Roving — the subscription</p>
+          <h2>After the BITE: stay bitten-proof. <em>ANTIVENOM Roving.</em></h2>
+          <p>A review is a snapshot. Your protocol isn't. Upgrades land, oracles change, dependencies drift — and the state you get hacked in is never the state you were audited in.</p>
+        </div>
+
+        <p class="roving-lede reveal">
+          ANTIVENOM Roving puts your contracts and their critical dependencies into the same rover fleet that has run
+          <strong>61 red-team hunts and logged 206 findings</strong> — the fleet with <strong>11 confirmed findings currently
+          in confidential disclosure</strong> with external protocols. The fleet patrols your scope on a schedule, re-hunts when
+          your code changes, and every pattern it learns anywhere makes your coverage smarter. Findings come to you privately,
+          with a working proof-of-concept, a remediation path, and an independent re-test of the fix.
+        </p>
+
+        <div class="sub-scroll reveal">
+          <table class="sub-table" aria-label="ANTIVENOM Roving subscription tiers">
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">Sentinel<span class="per">$497/mo</span></th>
+                <th scope="col">Warden<span class="per">$1,497/mo</span></th>
+                <th scope="col">Apex<span class="per">$2,997/mo</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Scope</th>
+                <td>1 protocol, ≤5 contracts</td>
+                <td>1 protocol, ≤15 contracts</td>
+                <td>Full protocol + dependency graph</td>
+              </tr>
+              <tr>
+                <th scope="row">Patrol</th>
+                <td>Monthly deep hunt</td>
+                <td>Every 2 weeks</td>
+                <td>Weekly + priority queue</td>
+              </tr>
+              <tr>
+                <th scope="row">Alerts</th>
+                <td>Confirmed, ≤24h</td>
+                <td>Confirmed + plausible, ≤12h</td>
+                <td>Confirmed + plausible, ≤4h</td>
+              </tr>
+              <tr>
+                <th scope="row">Remediation included</th>
+                <td>Quoted per engagement</td>
+                <td><strong>4 hrs/mo</strong></td>
+                <td><strong>12 hrs/mo</strong></td>
+              </tr>
+              <tr>
+                <th scope="row">Re-tests</th>
+                <td>1/quarter</td>
+                <td>All of our findings</td>
+                <td>All of our findings, first in queue</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="price-note reveal">Every subscription starts from a BITE baseline — pilot $3,500, fully credited toward the $9,500 Flagship BITE within 30 days. Detection and response by a fleet that has the receipts; not a promise that nothing can ever break.</p>
+
+        <div class="antivenom-strip reveal">
+          <div>
+            <h3>Founding cohort: 5 subscribers</h3>
+            <p>ANTIVENOM Roving opens with a <strong>founding cohort of five subscribers</strong>. When the five seats are taken, enrollment closes until the fleet expands — patrol quality stays personal, never diluted.</p>
+          </div>
+          <a class="btn btn-gold btn-sm" href="mailto:court@getsincor.com?subject=VENOM%20%E2%80%94%20ANTIVENOM%20Roving%20Subscription">Start the conversation</a>
+        </div>
       </div>
     </section>
 
