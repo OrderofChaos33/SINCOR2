@@ -77,8 +77,14 @@ import os
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-193)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.a2a.pool")
 
@@ -237,7 +243,13 @@ class BountyPool:
             except (TypeError, ValueError):
                 reserve_axm = 0.0
         self.reserve_wei = max(0, _axm_to_wei(reserve_axm))
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        # W-193 locked-transaction state (StakeLedger W-208 pattern):
+        # depth > 0 means this instance already holds the flock; nested
+        # _save() calls join the outer transaction instead of saving an
+        # independent (possibly stale) snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._funded_wei = 0
         self._spent_wei = 0
         self._allocations: Dict[str, Dict[str, Any]] = {}
@@ -333,7 +345,24 @@ class BountyPool:
         return Path(marketplace_checkpoint_path(self.path))
 
     def _apply_payload(self, raw: Dict[str, Any]) -> None:
-        """Apply a persisted ledger payload (the _save() shape) in memory."""
+        """Apply a persisted ledger payload (the _save() shape) in memory.
+
+        W-193: this REPLACES the in-memory state (allocations, journal
+        and anchor are reset first), so a reload-under-lock discards a
+        stale snapshot wholesale instead of merging into it — a record
+        another instance released or spent must not linger here.
+        """
+        self._allocations = {}
+        self._history = []
+        self._history_writes = 0
+        self._history_maybe_trimmed = False
+        self._anchor_writes = 0
+        self._anchor_funded_wei = 0
+        self._anchor_allocated_wei = 0
+        self._anchor_spent_wei = 0
+        self._anchor_digest = _JOURNAL_GENESIS_DIGEST
+        self._anchor_bootstrapped = False
+        self._journal_head_digest = _JOURNAL_GENESIS_DIGEST
         self._funded_wei = int(raw.get("funded_wei") or 0)
         self._spent_wei = int(raw.get("spent_wei") or 0)
         allocs = raw.get("allocations") or {}
@@ -625,7 +654,92 @@ class BountyPool:
         self._anchor_writes += excess
         del self._history[:excess]
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn``.
+
+        Lets a mutator see allocations/funds recorded by another
+        instance since this instance last loaded, so a stale snapshot
+        is never the basis of a save (W-193). A missing file keeps the
+        in-memory state (first save, or the checkpoint-restored boot
+        state in ``_restore_from_checkpoint``); a corrupt/stateless
+        file also keeps it rather than wiping accounting — ``_load()``
+        already handled those cases loudly at boot.
+        """
+        if not self.path.is_file():
+            return
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, ValueError):
+            return
+        if not isinstance(raw, dict) or not (_SAVE_STATE_KEYS & raw.keys()):
+            return
+        self._apply_payload(raw)
+        self._load_failed = False
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked mutate transaction (W-193), mirroring StakeLedger's
+        W-208 ``_locked_txn``: instance RLock + exclusive flock (on the
+        LockedJsonStore-style sidecar lock file, so a missing ledger
+        file is never created by locking) + reload-under-lock, then
+        run the body; on exit, persist exactly once if any nested
+        ``_save()`` marked the transaction dirty — so a mutator that
+        raises before saving writes nothing, while a body that marked
+        dirty and then raised still persists its journaled state.
+        Nested entry joins the outer transaction: no re-flock, no
+        reload, no independent save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fh = open(Path(str(self.path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so EVERY persisting path — the public mutators and the boot
+        saves in ``__init__`` / ``_restore_from_checkpoint`` — writes
+        the fresh merged state, and ``_mirror_to_checkpoint`` mirrors
+        exactly that fresh payload, never a stale snapshot.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._fold_journal_anchor()
         tmp = self.path.with_name(self.path.name + ".tmp")
@@ -947,7 +1061,7 @@ class BountyPool:
         instead of raising. Raises ``PoolNotConfigured`` when the operator
         has not set a reserve (``SINCOR_LAUNCH_BOUNTY_AXM`` defaults to 0).
         """
-        with self._lock:
+        with self._locked_txn():
             self._raise_if_degraded()
             if self._rehydrate_blocked:
                 raise PoolError(
@@ -987,7 +1101,7 @@ class BountyPool:
         amount_wei = _axm_to_wei(amount_axm)
         if amount_wei <= 0:
             raise PoolError("amount_axm must be positive")
-        with self._lock:
+        with self._locked_txn():
             self._raise_if_degraded()
             available = self._available_wei()
             if amount_wei > available:
@@ -1015,7 +1129,7 @@ class BountyPool:
     def release(self, allocation_id: str) -> Dict[str, Any]:
         """Return an allocation to the pool unspent."""
         allocation_id = str(allocation_id or "").strip()
-        with self._lock:
+        with self._locked_txn():
             self._raise_if_degraded()
             alloc = self._allocations.get(allocation_id)
             if alloc is None:
@@ -1042,7 +1156,7 @@ class BountyPool:
         ``PoolError`` unless the allocation is currently allocated.
         """
         allocation_id = str(allocation_id or "").strip()
-        with self._lock:
+        with self._locked_txn():
             self._raise_if_degraded()
             alloc = self._allocations.get(allocation_id)
             if alloc is None:
