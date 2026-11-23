@@ -51,6 +51,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 from sincor2.onchain import toa_penalty
@@ -199,6 +200,11 @@ class StakeLedger:
         # cross-process guard is the fcntl exclusive lock taken in
         # deposit().
         self._lock = threading.RLock()
+        # W-208 locked-transaction state: depth > 0 means this instance
+        # already holds the flock; nested mutators join the outer
+        # transaction instead of re-locking or saving independently.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
         # tx_hash (normalized lowercase) -> {agent_id, amount_wei, at}.
         # Durable: persisted in the ledger file, survives restarts.
@@ -237,7 +243,69 @@ class StakeLedger:
             except (json.JSONDecodeError, OSError):
                 pass
 
+    @contextmanager
+    def _locked_txn(self):
+        """Locked mutate transaction (W-208), modeled on deposit().
+
+        Outermost entry: instance RLock + exclusive flock on the ledger
+        file + reload-under-lock (existing shallow-update semantics),
+        then run the body; on exit, persist exactly once if any nested
+        ``_save()`` marked the transaction dirty — so conditional-save
+        semantics (e.g. release() on a missing lock writes nothing) are
+        preserved.  If the body raises after marking dirty (e.g.
+        _deposit_locked journals a tx-hash conflict before raising),
+        the journaled state is still persisted.  Nested entry (a
+        mutator calling another persisting helper) joins the outer
+        transaction: no re-flock, no reload, no independent save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            parent = os.path.dirname(self.path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            lock_fh = open(self.path, "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    self._data.setdefault("toa_nonces", {})
+                    self._data.setdefault("credits", {})
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit."""
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
         tmp = self.path + ".tmp"
         d = os.path.dirname(self.path)
         if d:
@@ -365,6 +433,12 @@ class StakeLedger:
     def record_completion(self, agent_id: str, task_id: str,
                           poster_id: Optional[str] = None,
                           at: Optional[int] = None) -> float:
+        with self._locked_txn():
+            return self._record_completion_impl(agent_id, task_id, poster_id, at)
+
+    def _record_completion_impl(self, agent_id: str, task_id: str,
+                          poster_id: Optional[str] = None,
+                          at: Optional[int] = None) -> float:
         """Record a dispute-free execution (settlement, or a dispute the
         adjudicator did NOT uphold).  Idempotent on (agent, task): a
         retried settlement cannot double-count.  Returns the new R_i."""
@@ -385,6 +459,10 @@ class StakeLedger:
         return self.reputation_score(agent_id, now=now)
 
     def _record_upheld_dispute(self, agent_id: str) -> None:
+        with self._locked_txn():
+            return self._record_upheld_dispute_impl(agent_id)
+
+    def _record_upheld_dispute_impl(self, agent_id: str) -> None:
         rep = self._rep(agent_id)
         now = _now_ts()
         self._prune_rep(rep, now)
@@ -393,6 +471,10 @@ class StakeLedger:
         self._save()
 
     def _reset_reputation_score(self, agent_id: str) -> None:
+        with self._locked_txn():
+            return self._reset_reputation_score_impl(agent_id)
+
+    def _reset_reputation_score_impl(self, agent_id: str) -> None:
         """Ghosting: clear the execution record.  R_i -> 0 immediately —
         the collateral regime change is the real punishment."""
         rec = self._agent(agent_id)
@@ -442,30 +524,13 @@ class StakeLedger:
         amount_wei = int(amount_wei)
         agent_id = str(agent_id)
         tx_hash = _normalize_tx_hash(reference) if reference else None
-        with self._lock:
-            lock_fh = None
-            try:
-                parent = os.path.dirname(self.path)
-                if parent:
-                    os.makedirs(parent, exist_ok=True)
-                # Cross-process mutual exclusion for the read-modify-write
-                # below.  Both writers flock the same path before either
-                # replaces it, so the second writer's reload sees the
-                # first writer's tx hash.
-                lock_fh = open(self.path, "a+b")
-                if fcntl is not None:
-                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
-                self._reload_under_lock()
-                return self._deposit_locked(agent_id, amount_wei,
-                                            reference, tx_hash,
-                                            signature_hash)
-            finally:
-                if lock_fh is not None:
-                    try:
-                        if fcntl is not None:
-                            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
-                    finally:
-                        lock_fh.close()
+        # Same discipline as before (instance lock + flock + reload, so
+        # the second writer's reload sees the first writer's tx hash),
+        # now via the shared _locked_txn path used by every mutator.
+        with self._locked_txn():
+            return self._deposit_locked(agent_id, amount_wei,
+                                        reference, tx_hash,
+                                        signature_hash)
 
     def _deposit_locked(self, agent_id: str, amount_wei: int,
                         reference: Optional[str],
@@ -566,6 +631,11 @@ class StakeLedger:
     # -- commit / reveal locks ------------------------------------------------
     def lock_for_commit(self, agent_id: str, task_id: str,
                         bounty_wei: int) -> int:
+        with self._locked_txn():
+            return self._lock_for_commit_impl(agent_id, task_id, bounty_wei)
+
+    def _lock_for_commit_impl(self, agent_id: str, task_id: str,
+                        bounty_wei: int) -> int:
         """Lock stake at commit.  The requirement is reputation-weighted:
         B_stake,i = bounty*50 % x (1 - 0.8 x R_i).  Raises InsufficientStake
         => the commit itself must be rejected."""
@@ -586,6 +656,11 @@ class StakeLedger:
         return need
 
     def top_up_for_reveal(self, agent_id: str, task_id: str,
+                          bid_wei: int) -> int:
+        with self._locked_txn():
+            return self._top_up_for_reveal_impl(agent_id, task_id, bid_wei)
+
+    def _top_up_for_reveal_impl(self, agent_id: str, task_id: str,
                           bid_wei: int) -> int:
         """After reveal the true bid value is known; top the lock up to the
         reputation-weighted bid*50 %.  Raises InsufficientStake => the
@@ -610,6 +685,10 @@ class StakeLedger:
         return extra
 
     def release(self, agent_id: str, task_id: str) -> int:
+        with self._locked_txn():
+            return self._release_impl(agent_id, task_id)
+
+    def _release_impl(self, agent_id: str, task_id: str) -> int:
         """Unlock a task lock (losers at close, winner at settlement)."""
         rec = self._agent(agent_id)
         amount = int(rec["locks"].pop(task_id, "0"))
@@ -691,6 +770,14 @@ class StakeLedger:
               adjudicator: Optional[str] = None,
               poster_id: Optional[str] = None,
               penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        with self._locked_txn():
+            return self._slash_impl(agent_id, task_id, slash_bps, reason,
+                                    adjudicator, poster_id, penalty)
+
+    def _slash_impl(self, agent_id: str, task_id: str, slash_bps: int, reason: str,
+              adjudicator: Optional[str] = None,
+              poster_id: Optional[str] = None,
+              penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Slash ``slash_bps`` of the agent's locked stake for ``task_id``.
 
         Proceeds split by the subsidy-extraction invariant: the platform's
@@ -750,6 +837,12 @@ class StakeLedger:
         return out
 
     def slash_ghost(self, agent_id: str, task_id: str,
+                    poster_id: Optional[str] = None,
+                    penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        with self._locked_txn():
+            return self._slash_ghost_impl(agent_id, task_id, poster_id, penalty)
+
+    def _slash_ghost_impl(self, agent_id: str, task_id: str,
                     poster_id: Optional[str] = None,
                     penalty: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Ghosting: committed but never revealed => 100 % slash.
@@ -815,6 +908,17 @@ class StakeLedger:
 
     # -- dynamic slashing curve (CNP-3, explicitly gated) -----------------------
     def slash_dynamic(self, agent_id: str, task_id: str, anchor_bps: int,
+                      severity: int, reason: str,
+                      adjudicator: Optional[str] = None,
+                      poster_id: Optional[str] = None,
+                      toa_decision: Optional[Dict[str, Any]] = None
+                      ) -> Dict[str, Any]:
+        with self._locked_txn():
+            return self._slash_dynamic_impl(agent_id, task_id, anchor_bps,
+                                            severity, reason, adjudicator,
+                                            poster_id, toa_decision)
+
+    def _slash_dynamic_impl(self, agent_id: str, task_id: str, anchor_bps: int,
                       severity: int, reason: str,
                       adjudicator: Optional[str] = None,
                       poster_id: Optional[str] = None,
@@ -919,6 +1023,10 @@ class StakeLedger:
 
     # -- challenger bonds -------------------------------------------------------
     def post_challenger_bond(self, agent_id: str, task_id: str) -> int:
+        with self._locked_txn():
+            return self._post_challenger_bond_impl(agent_id, task_id)
+
+    def _post_challenger_bond_impl(self, agent_id: str, task_id: str) -> int:
         """Lock the 0.02 ETH challenger bond for a quality dispute."""
         bal = self.balance_of(agent_id)
         if int(bal["available_wei"]) < CHALLENGER_BOND_WEI:
@@ -934,6 +1042,10 @@ class StakeLedger:
         return CHALLENGER_BOND_WEI
 
     def release_bond(self, agent_id: str, task_id: str) -> int:
+        with self._locked_txn():
+            return self._release_bond_impl(agent_id, task_id)
+
+    def _release_bond_impl(self, agent_id: str, task_id: str) -> int:
         rec = self._agent(agent_id)
         amount = int(rec["bonds"].pop(task_id, "0"))
         if amount:
@@ -945,18 +1057,31 @@ class StakeLedger:
     # -- poster re-auction credits ------------------------------------------------
     def credit_reauction(self, poster_id: str, amount_wei: int,
                          reason: str) -> None:
+        with self._locked_txn():
+            return self._credit_reauction_impl(poster_id, amount_wei, reason)
+
+    def _credit_reauction_impl(self, poster_id: str, amount_wei: int,
+                         reason: str) -> None:
         if amount_wei <= 0:
             return
         credits = self._data["credits"]
         credits[poster_id] = str(int(credits.get(poster_id, "0")) + amount_wei)
         self._event("reauction_credit", poster_id=poster_id,
                     amount_wei=str(amount_wei), reason=reason)
+        self._save()
 
     def reauction_credit(self, poster_id: str) -> int:
         return int(self._data["credits"].get(poster_id, "0"))
 
     # -- adjudication entry point -------------------------------------------------
     def adjudicate(self, agent_id: str, task_id: str, upheld: bool,
+                   adjudicator: Optional[str] = None,
+                   poster_id: Optional[str] = None) -> Dict[str, Any]:
+        with self._locked_txn():
+            return self._adjudicate_impl(agent_id, task_id, upheld,
+                                         adjudicator, poster_id)
+
+    def _adjudicate_impl(self, agent_id: str, task_id: str, upheld: bool,
                    adjudicator: Optional[str] = None,
                    poster_id: Optional[str] = None) -> Dict[str, Any]:
         """Adjudicator ruling on a quality dispute (challenger bond required
@@ -1128,6 +1253,10 @@ class StakeLedger:
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
+        with self._locked_txn():
+            return self._note_onchain_tx_impl(kind, tx_hash, **detail)
+
+    def _note_onchain_tx_impl(self, kind: str, tx_hash: str, **detail: Any) -> None:
         """Append an on-chain broadcast reference to the ledger event log."""
         self._event("onchain_tx", kind=kind, tx_hash=str(tx_hash), **detail)
         self._save()
@@ -1267,6 +1396,10 @@ class StakeLedger:
         return bridge.build_slash_tx(SlashRuling(**ruling), signature, sender)
 
     def note_onchain_tx(self, kind: str, tx_hash: str, **detail: Any) -> None:
+        with self._locked_txn():
+            return self._note_onchain_tx_impl(kind, tx_hash, **detail)
+
+    def _note_onchain_tx_impl(self, kind: str, tx_hash: str, **detail: Any) -> None:
         """Append an on-chain broadcast reference to the ledger event log."""
         self._event("onchain_tx", kind=kind, tx_hash=str(tx_hash), **detail)
         self._save()
