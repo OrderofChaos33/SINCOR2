@@ -94,10 +94,16 @@ import json
 import os
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from eth_hash.auto import keccak
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-206)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 try:  # pynacl is a hard dependency of this SKU; import eagerly for a clear error.
     from nacl.exceptions import BadSignatureError
@@ -307,9 +313,13 @@ class AuditTrail:
     ) -> None:
         self.log_path = Path(log_path) if log_path else default_log_path()
         self.enabled = audit_enabled(enabled)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._head: bytes = _GENESIS_PREV
         self._seq: int = 0
+        # W-206 locked-transaction state (mirrors ProofEventStore W-212 /
+        # PersistentErrorTracker W-213): depth > 0 means this instance
+        # already holds the flock; nested entry joins the outer txn.
+        self._txn_depth = 0
         self._recover_head()
 
     # -- internals ---------------------------------------------------------
@@ -319,19 +329,81 @@ class AuditTrail:
 
         Corrupt lines are skipped here (verification is verify_chain's job,
         which reports them); recovery must never crash on a damaged file.
+
+        W-206: only the LAST valid entry determines (seq, head), so this
+        scans backwards from the file tail in chunks — O(tail) in the
+        common case instead of a full-file scan on every record().
         """
+        self._head = _GENESIS_PREV
+        self._seq = 0
         if not self.log_path.exists():
             return
+        try:
+            size = self.log_path.stat().st_size
+        except OSError:
+            return
+        if size == 0:
+            return
+        chunk = 65536
+        offset = size
+        buf = b""
         with self.log_path.open("rb") as fh:
-            for raw in fh:
-                if not raw.strip():
-                    continue
+            while offset > 0:
+                read_size = min(chunk, offset)
+                offset -= read_size
+                fh.seek(offset)
+                buf = fh.read(read_size) + buf
+                lines = buf.split(b"\n")
+                # When offset > 0 the first fragment may be a partial
+                # line; only consider complete lines after it.
+                complete = lines[1:] if offset > 0 else lines
+                for raw in reversed(complete):
+                    if not raw.strip():
+                        continue
+                    try:
+                        entry = json.loads(raw.decode("utf-8"))
+                        self._head = bytes.fromhex(entry["entry_hash"])
+                        self._seq = int(entry["seq"]) + 1
+                        return
+                    except (UnicodeDecodeError, ValueError, KeyError):
+                        continue
+                # No valid entry in this window; keep scanning backwards
+                # (buf retains the partial head fragment for the next pass).
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-206), mirroring ProofEventStore's W-212
+        ``_locked_txn``: instance RLock + exclusive flock on the sidecar
+        ``.lock`` file (graceful fallback when fcntl is unavailable) +
+        re-recover head/seq from the file tail under the lock, so the
+        cached values are never trusted stale across instances. Nested
+        entry joins the outer transaction: no re-flock, no re-recovery.
+        """
+        with self._lock:
+            if getattr(self, "_txn_depth", 0) > 0:
+                self._txn_depth += 1
                 try:
-                    entry = json.loads(raw.decode("utf-8"))
-                    self._head = bytes.fromhex(entry["entry_hash"])
-                    self._seq = int(entry["seq"]) + 1
-                except (UnicodeDecodeError, ValueError, KeyError):
-                    continue
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fh = open(Path(str(self.log_path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                try:
+                    self._recover_head()
+                    yield
+                finally:
+                    self._txn_depth = 0
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
 
     def _append_line(self, line: str) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -356,17 +428,21 @@ class AuditTrail:
             return None
         if not agent_id or not action:
             raise ValueError("agent_id and action are required")
-        entry = build_entry(
-            seq=self._seq,
-            agent_id=agent_id,
-            action=action,
-            timestamp_ms=timestamp_ms if timestamp_ms is not None else _now_ms(),
-            causal_parent=causal_parent,
-            detail=detail or {},
-            prev_hash=self._head,
-            signing_key=load_signing_key(),
-        )
-        with self._lock:
+        # W-206: build the entry INSIDE the locked transaction. The
+        # transaction re-recovers (seq, head) from the file tail under
+        # the flock first, so a second instance's appends are chained
+        # onto — never forked from a stale cached head.
+        with self._locked_txn():
+            entry = build_entry(
+                seq=self._seq,
+                agent_id=agent_id,
+                action=action,
+                timestamp_ms=timestamp_ms if timestamp_ms is not None else _now_ms(),
+                causal_parent=causal_parent,
+                detail=detail or {},
+                prev_hash=self._head,
+                signing_key=load_signing_key(),
+            )
             self._append_line(_canonical(entry).decode("utf-8"))
             self._head = bytes.fromhex(entry["entry_hash"])
             self._seq += 1

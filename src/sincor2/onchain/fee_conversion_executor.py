@@ -40,9 +40,16 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-202)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 from eth_abi import encode as abi_encode
 from eth_hash.auto import keccak
@@ -293,11 +300,27 @@ STATUS_FAILED = "failed"
 
 
 class ConversionLedger:
-    """JSON-persisted obligation ledger with atomic writes."""
+    """JSON-persisted obligation ledger with atomic writes.
+
+    W-202: cross-instance safe, mirroring the W-213 locked-transaction
+    pattern. Every mutate and read runs inside a locked transaction:
+    instance RLock + exclusive flock on the sidecar ``.lock`` file +
+    reload-under-lock, so a stale instance never saves (or serves) a
+    snapshot that erases another instance's obligations. Saves are
+    pid-unique tmp + fsync + ``os.replace`` + directory fsync. Lock
+    acquisition fails closed: a fee-conversion obligation must never
+    be written (or read as absent) on an unlocked guess.
+    """
 
     def __init__(self, path: str):
         self.path = path
         self._obligations: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()
+        # Depth > 0: this instance already holds the flock; nested
+        # _save() calls join the outer transaction instead of saving an
+        # independent (possibly stale) snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     # -- persistence ------------------------------------------------------
@@ -310,59 +333,179 @@ class ConversionLedger:
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("ledger load failed (%s); starting empty", exc)
 
+    def _apply_loaded(self, obligations: Dict[str, Dict[str, Any]]) -> None:
+        """Replace in-memory state from a persisted payload, updating
+        surviving obligation dicts in place so references already
+        handed out stay the stored objects."""
+        for key in list(self._obligations):
+            if key not in obligations:
+                del self._obligations[key]
+        for key, value in obligations.items():
+            existing = self._obligations.get(key)
+            if isinstance(existing, dict) and isinstance(value, dict):
+                existing.clear()
+                existing.update(value)
+            else:
+                self._obligations[key] = value
+
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn``.
+
+        A missing file keeps the in-memory state (first save); a
+        corrupt file also keeps it rather than wiping obligations —
+        ``_load()`` already handled those cases loudly at boot.
+        """
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        obligations = data.get("obligations", {})
+        if isinstance(obligations, dict):
+            self._apply_loaded(obligations)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-202), mirroring W-213: instance RLock
+        + exclusive flock on the sidecar ``.lock`` file +
+        reload-under-lock, then run the body; on exit, persist exactly
+        once if any nested ``_save()`` marked the transaction dirty.
+        Nested entry joins the outer transaction. Fail-closed: if the
+        lock cannot be taken, raise instead of proceeding unlocked.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            if fcntl is None:
+                raise ExecutorError(
+                    f"fcntl unavailable: cannot lock ledger {self.path} "
+                    "(fail-closed)")
+            directory = os.path.dirname(self.path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            try:
+                lock_fh = open(self.path + ".lock", "a+b")
+            except OSError as exc:
+                raise ExecutorError(
+                    f"cannot open ledger lock file for {self.path}: {exc}"
+                ) from exc
+            try:
+                try:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                except OSError as exc:
+                    raise ExecutorError(
+                        f"cannot flock ledger {self.path}: {exc}"
+                    ) from exc
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
-        tmp = self.path + ".tmp"
+        """Persist, or — inside a locked transaction — defer to its exit."""
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
+        tmp = f"{self.path}.tmp.{os.getpid()}.{threading.get_ident()}"
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump({"obligations": self._obligations}, fh, indent=2)
-        os.replace(tmp, self.path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"obligations": self._obligations}, fh, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self.path)
+            dir_fd = os.open(os.path.dirname(os.path.abspath(self.path)),
+                             os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass  # already replaced (or never created)
 
     # -- API --------------------------------------------------------------
     def record(self, obligation_id: str, token_in: str, amount_wei: int,
                source: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Record a pending conversion obligation (idempotent)."""
-        if obligation_id in self._obligations:
-            return self._obligations[obligation_id]
-        ob = {
-            "id": obligation_id,
-            "token_in": token_in.upper(),
-            "amount_wei": str(amount_wei),
-            "target": None,
-            "status": STATUS_PENDING,
-            "source": source or {},
-            "history": [{"status": STATUS_PENDING, "at": _now()}],
-            "txs": [],
-        }
-        self._obligations[obligation_id] = ob
-        self._save()
-        return ob
+        with self._locked_txn():
+            if obligation_id in self._obligations:
+                return self._obligations[obligation_id]
+            ob = {
+                "id": obligation_id,
+                "token_in": token_in.upper(),
+                "amount_wei": str(amount_wei),
+                "target": None,
+                "status": STATUS_PENDING,
+                "source": source or {},
+                "history": [{"status": STATUS_PENDING, "at": _now()}],
+                "txs": [],
+            }
+            self._obligations[obligation_id] = ob
+            self._save()
+            return ob
 
     def transition(self, obligation_id: str, status: str,
                    detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        ob = self._obligations[obligation_id]
-        ob["status"] = status
-        entry: Dict[str, Any] = {"status": status, "at": _now()}
-        if detail:
-            entry.update(detail)
-        ob["history"].append(entry)
-        self._save()
-        return ob
+        with self._locked_txn():
+            ob = self._obligations[obligation_id]
+            ob["status"] = status
+            entry: Dict[str, Any] = {"status": status, "at": _now()}
+            if detail:
+                entry.update(detail)
+            ob["history"].append(entry)
+            self._save()
+            return ob
 
     def add_tx(self, obligation_id: str, kind: str, tx_hash: str,
                extra: Optional[Dict[str, Any]] = None) -> None:
-        ob = self._obligations[obligation_id]
-        rec: Dict[str, Any] = {"kind": kind, "tx_hash": tx_hash, "at": _now()}
-        if extra:
-            rec.update(extra)
-        ob["txs"].append(rec)
-        self._save()
+        with self._locked_txn():
+            ob = self._obligations[obligation_id]
+            rec: Dict[str, Any] = {"kind": kind, "tx_hash": tx_hash, "at": _now()}
+            if extra:
+                rec.update(extra)
+            ob["txs"].append(rec)
+            self._save()
 
     def get(self, obligation_id: str) -> Optional[Dict[str, Any]]:
-        return self._obligations.get(obligation_id)
+        with self._locked_txn():
+            return self._obligations.get(obligation_id)
 
     def pending(self) -> List[Dict[str, Any]]:
-        return [ob for ob in self._obligations.values()
-                if ob["status"] in (STATUS_PENDING, STATUS_QUOTED, STATUS_APPROVED)]
+        with self._locked_txn():
+            return [ob for ob in self._obligations.values()
+                    if ob["status"] in (STATUS_PENDING, STATUS_QUOTED, STATUS_APPROVED)]
 
 
 def _now() -> str:

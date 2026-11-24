@@ -1,7 +1,14 @@
 """Swarm Command board state store (stdlib only).
 
-JSON-file persistence behind a ``threading.Lock`` around every
-read-modify-write cycle. Holds the orchestration state for the Swarm
+JSON-file persistence behind a lock around every read-modify-write
+cycle: an instance ``threading.RLock`` plus — W-200 — an exclusive
+``flock`` on a sidecar ``.lock`` file around ``_modify``, with the
+state reloaded fresh from disk inside the flock. The MCP server builds
+a new ``BoardStore`` per request, so the per-instance lock alone
+coordinated nothing across instances/processes; the flock does.
+Writes go through a pid-unique tmp file + ``os.replace`` (the old
+fixed ``path + ".tmp"`` name was shared across processes — a
+crash/corruption vector). Holds the orchestration state for the Swarm
 Command dashboard / MCP layer: lanes + cards, daily stacks, dispatches /
 assignments, and discussion threads.
 
@@ -15,7 +22,13 @@ import os
 import secrets
 import threading
 import time
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-200)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 DEFAULT_PATH = "data/swarm_board.json"
 
@@ -44,12 +57,56 @@ class BoardStore:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or os.environ.get("SWARM_BOARD_PATH", DEFAULT_PATH)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        # W-200 flock state: depth > 0 means this instance already holds
+        # the sidecar flock (nested entry joins the outer transaction
+        # instead of re-flocking, which would deadlock on a second fd).
+        self._flock_depth = 0
+        self._flock_fh = None
         with self._lock:
-            state = self._load_locked()
-            if state is None:
-                state = self._fresh_state()
-                self._write_locked(state)
+            with self._file_lock():
+                state = self._load_locked()
+                if state is None:
+                    state = self._fresh_state()
+                    self._write_locked(state)
+
+    @contextmanager
+    def _file_lock(self):
+        """Exclusive flock on the sidecar ``path + ".lock"`` file (W-200).
+
+        Mirrors the established family pattern (BountyPool W-193 /
+        TokenBudget W-215 / PersistentErrorTracker W-213): graceful
+        fallback to the instance RLock alone when fcntl is unavailable.
+        Caller must hold ``self._lock``; nested entry joins the outer
+        lock instead of re-acquiring.
+        """
+        if self._flock_depth > 0:
+            self._flock_depth += 1
+            try:
+                yield
+            finally:
+                self._flock_depth -= 1
+            return
+        parent = os.path.dirname(self.path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        lock_fh = open(self.path + ".lock", "a+b")
+        try:
+            if fcntl is not None:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            self._flock_depth = 1
+            self._flock_fh = lock_fh
+            try:
+                yield
+            finally:
+                self._flock_depth = 0
+                self._flock_fh = None
+        finally:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            finally:
+                lock_fh.close()
 
     # -- persistence helpers (caller must hold self._lock) -----------------
     def _fresh_state(self) -> Dict[str, Any]:
@@ -78,19 +135,26 @@ class BoardStore:
         parent = os.path.dirname(self.path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        tmp = self.path + ".tmp"
+        # W-200: pid-unique tmp name — the fixed path + ".tmp" was shared
+        # across processes, so concurrent writers truncated/replaced each
+        # other's tmp file (FileNotFoundError / torn writes).
+        tmp = "%s.%d.%s.tmp" % (self.path, os.getpid(), secrets.token_hex(4))
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, sort_keys=True)
         os.replace(tmp, self.path)
 
     def _modify(self, fn):
+        # W-200: reload-mutate-write inside the cross-process flock, so
+        # the fresh reload can no longer be overtaken by another
+        # instance/process writing between our load and our write.
         with self._lock:
-            state = self._load_locked()
-            if state is None:
-                state = self._fresh_state()
-            result = fn(state)
-            self._write_locked(state)
-            return result
+            with self._file_lock():
+                state = self._load_locked()
+                if state is None:
+                    state = self._fresh_state()
+                result = fn(state)
+                self._write_locked(state)
+                return result
 
     def _read(self, fn):
         with self._lock:

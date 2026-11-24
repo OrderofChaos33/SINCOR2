@@ -96,6 +96,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -597,38 +598,105 @@ class SealNonceRegistry:
 
     def __init__(self, path: Optional[str] = None) -> None:
         self._path = path
+        self._lock_path = path + ".lock" if path else None
+        self._lock = threading.RLock()
+        self._txn_depth = 0
         self._bindings: Dict[str, Dict[int, str]] = {}
         if path is not None and os.path.exists(path):
+            self._bindings = self._load_bindings()
+
+    def _load_bindings(self) -> Dict[str, Dict[int, str]]:
+        try:
+            with open(self._path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+            bindings = raw["bindings"]
+            return {
+                str(signer).lower(): {
+                    int(nonce): str(seal_id).lower()
+                    for nonce, seal_id in nonces.items()
+                }
+                for signer, nonces in bindings.items()
+            }
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise HierarchicalCNPError(
+                f"cannot load seal nonce registry from {self._path!r}: {exc}"
+            ) from exc
+
+    @contextmanager
+    def _locked(self, exclusive: bool):
+        # W-192/W-198: flock + reload-under-lock, mirroring FileSealRegistry
+        # in this file and the W-212/W-213 sibling fixes. Re-entrant via
+        # _txn_depth so check_and_record can hold EX across check+persist.
+        if self._path is None:
+            yield
+            return
+        with self._lock:
+            if self._txn_depth > 0:
+                yield
+                return
             try:
-                with open(path, "r", encoding="utf-8") as fh:
-                    raw = json.load(fh)
-                bindings = raw["bindings"]
-                for signer, nonces in bindings.items():
-                    self._bindings[str(signer).lower()] = {
-                        int(nonce): str(seal_id).lower()
-                        for nonce, seal_id in nonces.items()
-                    }
-            except (OSError, ValueError, KeyError, TypeError) as exc:
+                import fcntl
+            except ImportError as exc:
                 raise HierarchicalCNPError(
-                    f"cannot load seal nonce registry from {path!r}: {exc}"
+                    "fcntl unavailable: cannot lock seal nonce registry"
                 ) from exc
+            try:
+                fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+            except OSError as exc:
+                raise HierarchicalCNPError(
+                    f"cannot open seal nonce lock {self._lock_path!r}: {exc}"
+                ) from exc
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+                self._txn_depth = 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth = 0
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+
+    def _reload_under_lock(self) -> None:
+        if self._path is not None:
+            self._bindings = self._load_bindings()
 
     def __len__(self) -> int:
+        if self._path is not None:
+            with self._locked(exclusive=False):
+                self._reload_under_lock()
+                return sum(len(n) for n in self._bindings.values())
         return sum(len(nonces) for nonces in self._bindings.values())
 
     def lookup(self, agent_address: str, nonce: int) -> Optional[str]:
         """The seal id bound to ``(agent_address, nonce)``, or None."""
+        if self._path is not None:
+            with self._locked(exclusive=False):
+                self._reload_under_lock()
+                return self._bindings.get(agent_address.lower(), {}).get(nonce)
         return self._bindings.get(agent_address.lower(), {}).get(nonce)
 
-    def assert_available(self, seal: NestedSeal) -> None:
-        """Raise :class:`NonceReuseError` if the seal's (signer, nonce)
-        is already bound to a *different* seal. Records nothing."""
-        bound = self.lookup(seal.agent_address, seal.nonce)
+    def _assert_available_locked(self, seal: NestedSeal) -> None:
+        bound = self._bindings.get(seal.agent_address.lower(), {}).get(seal.nonce)
         if bound is not None and bound != seal.seal_id.lower():
             raise NonceReuseError(
                 f"nonce {seal.nonce} for signer {seal.agent_address} is "
                 f"already bound to seal {bound}: nonce reuse rejected"
             )
+
+    def assert_available(self, seal: NestedSeal) -> None:
+        """Raise :class:`NonceReuseError` if the seal's (signer, nonce)
+        is already bound to a *different* seal. Records nothing."""
+        if self._path is not None:
+            with self._locked(exclusive=False):
+                self._reload_under_lock()
+                self._assert_available_locked(seal)
+                return
+        self._assert_available_locked(seal)
 
     def check_and_record(self, seal: NestedSeal) -> None:
         """Enforce single-use and bind ``(signer, nonce)`` to this seal.
@@ -637,16 +705,23 @@ class SealNonceRegistry:
         recording an unverified seal would let an attacker poison the
         ledger and deny a legitimate signer their nonce.
         """
-        self.assert_available(seal)
-        signer = seal.agent_address.lower()
-        nonces = self._bindings.setdefault(signer, {})
-        if seal.nonce not in nonces:
-            nonces[seal.nonce] = seal.seal_id.lower()
-            self._persist()
-
-    def _persist(self) -> None:
         if self._path is None:
+            self._assert_available_locked(seal)
+            signer = seal.agent_address.lower()
+            nonces = self._bindings.setdefault(signer, {})
+            if seal.nonce not in nonces:
+                nonces[seal.nonce] = seal.seal_id.lower()
             return
+        with self._locked(exclusive=True):
+            self._reload_under_lock()
+            self._assert_available_locked(seal)
+            signer = seal.agent_address.lower()
+            nonces = self._bindings.setdefault(signer, {})
+            if seal.nonce not in nonces:
+                nonces[seal.nonce] = seal.seal_id.lower()
+                self._persist_locked()
+
+    def _persist_locked(self) -> None:
         payload = {
             "version": 1,
             "bindings": {
@@ -654,10 +729,26 @@ class SealNonceRegistry:
                 for signer, nonces in self._bindings.items()
             },
         }
-        tmp_path = f"{self._path}.tmp"
+        tmp_path = f"{self._path}.tmp-{os.getpid()}"
         with open(tmp_path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=1, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp_path, self._path)
+        try:
+            dir_fd = os.open(os.path.dirname(os.path.abspath(self._path)), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        except OSError:
+            pass
+
+    def _persist(self) -> None:
+        if self._path is None:
+            return
+        with self._locked(exclusive=True):
+            self._persist_locked()
 
 
 def verify_nested_seal(

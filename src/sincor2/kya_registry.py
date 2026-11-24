@@ -2,16 +2,28 @@
 
 Persist: PersistentStore.kv (same SQLite DB /health already uses).
 Redis only if a URL exists. File is last-resort and dies on Railway.
+
+W-205: save() reloads the persisted registry under a cross-process
+flock and merges per record instead of blindly overwriting the whole
+blob from a possibly stale in-memory snapshot (the lost-update defect
+that erased peer registrations and resurrected revocations).
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platform
+    fcntl = None  # type: ignore[assignment]
 
 from sincor2.card_sanitize import (
     NAME_MAX_LEN,
@@ -43,12 +55,32 @@ MAX_IDENTITIES_PER_WALLET = 3
 # does not work; honest quitting does.
 UNSTAKE_TIMELOCK_MS = 7 * 24 * 60 * 60 * 1000
 
-_LOCK = threading.Lock()
+class KyaPersistenceError(RuntimeError):
+    """Persisted KYA registry state is corrupt or cannot be trusted.
+
+    Raised by save() (fail closed) instead of overwriting a blob this
+    process could not parse — a corrupt registry is never silently
+    wiped by a stale or blind save.
+    """
+
+
+# RLock (W-205): callers may hold the lock while calling back into
+# lock-taking helpers (the family pattern — cf. proof_events W-212).
+_LOCK = threading.RLock()
 _STORE: Dict[str, Dict[str, Any]] = {}
 _BY_AGENT: Dict[str, str] = {}
 _BY_CARD: Dict[str, set] = {}
 _TOMBSTONES: Dict[str, Dict[str, Any]] = {}
 _LAST_HEARTBEAT_SAVE_MS = 0
+# W-205 flock reentrancy depth: >0 means this process already holds the
+# sidecar flock; nested save() calls join the outer transaction.
+_FLOCK_DEPTH = 0
+# W-205: True once this instance has loaded/ingested the persisted
+# registry (or successfully saved), i.e. its in-memory state is based
+# on the shared persisted registry and save() must merge against it.
+# reset() clears it: a freshly reset registry is a new authoritative
+# registry whose first save replaces, exactly as before W-205.
+_SYNCED_WITH_PERSISTENCE = False
 
 
 def _now_ms() -> int:
@@ -61,8 +93,9 @@ def reset() -> None:
         _BY_AGENT.clear()
         _BY_CARD.clear()
         _TOMBSTONES.clear()
-    global _LAST_HEARTBEAT_SAVE_MS
+    global _LAST_HEARTBEAT_SAVE_MS, _SYNCED_WITH_PERSISTENCE
     _LAST_HEARTBEAT_SAVE_MS = 0
+    _SYNCED_WITH_PERSISTENCE = False
 
 
 def _redis_url() -> str:
@@ -97,6 +130,8 @@ def _sqlite():
 def _ingest(records) -> None:
     if not isinstance(records, list):
         return
+    global _SYNCED_WITH_PERSISTENCE
+    _SYNCED_WITH_PERSISTENCE = True
     with _LOCK:
         for rec in records:
             if isinstance(rec, dict) and rec.get("kya_id") and rec.get("agent_id"):
@@ -110,6 +145,8 @@ def _ingest(records) -> None:
 def _ingest_tombstones(tombstones) -> None:
     if not isinstance(tombstones, list):
         return
+    global _SYNCED_WITH_PERSISTENCE
+    _SYNCED_WITH_PERSISTENCE = True
     with _LOCK:
         for t in tombstones:
             if isinstance(t, dict) and t.get("wallet"):
@@ -167,35 +204,260 @@ def load() -> None:
         pass
 
 
-def save() -> None:
+@contextmanager
+def _flock():
+    """Cross-process exclusive flock on the persist path's sidecar
+    ``.lock`` file (W-205, mirroring LockedJsonStore / proof_events
+    W-212). Reentrant: nested entry by the flock holder joins the outer
+    transaction. Caller must hold ``_LOCK``. When fcntl is unavailable
+    the instance RLock alone guards the save (graceful fallback)."""
+    global _FLOCK_DEPTH
+    if _FLOCK_DEPTH > 0:
+        _FLOCK_DEPTH += 1
+        try:
+            yield
+        finally:
+            _FLOCK_DEPTH -= 1
+        return
+    path = _persist_path()
+    if fcntl is None or path is None:
+        yield
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fh = open(Path(str(path) + ".lock"), "a+b")
+    try:
+        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        _FLOCK_DEPTH = 1
+        try:
+            yield
+        finally:
+            _FLOCK_DEPTH = 0
+    finally:
+        try:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fh.close()
+
+
+def _read_persisted_raw():
+    """Raw persisted blob from the first backend that has one, in
+    load()'s priority order (PersistentStore kv -> Redis -> file).
+    Backend operational errors fall through, mirroring load(); a
+    backend that answers is authoritative for what is persisted."""
+    store = _sqlite()
+    if store is not None:
+        try:
+            raw = store.kv_get(STORE_KEY)
+            if raw:
+                return raw
+        except Exception:
+            pass
+    client = _redis()
+    if client is not None:
+        try:
+            raw = client.get(REDIS_KEY)
+            if raw:
+                return raw
+        except Exception:
+            pass
+    path = _persist_path()
+    if path is not None and path.is_file():
+        try:
+            raw = path.read_text(encoding="utf-8")
+            if raw:
+                return raw
+        except OSError:
+            pass
+    return None
+
+
+def _parse_blob_strict(raw):
+    """Parse a persisted blob for save()'s merge. Fail closed: any
+    malformed content raises KyaPersistenceError so save() refuses
+    instead of silently wiping state it could not read."""
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError) as exc:
+        raise KyaPersistenceError(
+            f"persisted KYA registry is corrupt (invalid JSON): {exc}"
+        ) from exc
+    if isinstance(parsed, dict):
+        records = parsed.get("records")
+        tombstones = parsed.get("tombstones")
+    elif isinstance(parsed, list):
+        records, tombstones = parsed, None
+    else:
+        raise KyaPersistenceError(
+            "persisted KYA registry is corrupt (not an object/array)"
+        )
+    if records is not None and not isinstance(records, list):
+        raise KyaPersistenceError(
+            "persisted KYA registry is corrupt (records not a list)")
+    if tombstones is not None and not isinstance(tombstones, list):
+        raise KyaPersistenceError(
+            "persisted KYA registry is corrupt (tombstones not a list)")
+    return records or [], tombstones or []
+
+
+def _record_wins(candidate, incumbent):
+    """Per-record merge verdict (W-205): revocation is sticky — a
+    revoked version always beats a live one, so a stale save can never
+    resurrect a revoked agent. Otherwise the newest updated_at wins;
+    ties go to the candidate (the version being merged in last)."""
+    cand_revoked = bool(candidate.get("revoked"))
+    inc_revoked = bool(incumbent.get("revoked"))
+    if cand_revoked != inc_revoked:
+        return cand_revoked
+
+    def _ts(rec) -> int:
+        try:
+            return int(rec.get("updated_at") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    return _ts(candidate) >= _ts(incumbent)
+
+
+def _merge_registry(persisted_records, persisted_tombstones,
+                    memory_records, memory_tombstones):
+    """Merge the persisted registry with the in-memory one, per record.
+
+    Records are keyed by kya_id, collapsing any agent_id duplicates to
+    the winning version; tombstones merge as a union keyed by wallet
+    (sticky — a tombstone is never dropped by a peer that never saw
+    it). Returns (records, tombstones) lists in the on-disk blob shape.
+    """
+    merged: Dict[str, Dict[str, Any]] = {}
+    by_agent: Dict[str, str] = {}
+
+    def _offer(rec) -> None:
+        if not isinstance(rec, dict) or not rec.get("kya_id") or not rec.get("agent_id"):
+            return
+        kya_id = rec["kya_id"]
+        agent_id = rec["agent_id"]
+        rival_id = by_agent.get(agent_id)
+        if rival_id is not None and rival_id != kya_id:
+            # Same agent under a different kya_id: one logical record.
+            if _record_wins(rec, merged[rival_id]):
+                del merged[rival_id]
+            else:
+                return
+        incumbent = merged.get(kya_id)
+        if incumbent is None or _record_wins(rec, incumbent):
+            merged[kya_id] = rec
+            by_agent[agent_id] = kya_id
+
+    for rec in persisted_records:
+        _offer(rec)
+    for rec in memory_records:
+        _offer(rec)
+
+    tombs: Dict[str, Dict[str, Any]] = {}
+    for t in list(persisted_tombstones) + list(memory_tombstones):
+        if isinstance(t, dict) and t.get("wallet"):
+            key = str(t["wallet"]).lower()
+            incumbent = tombs.get(key)
+            if incumbent is None or int(t.get("tombstoned_at") or 0) >= int(
+                    incumbent.get("tombstoned_at") or 0):
+                tombs[key] = t
+    return list(merged.values()), list(tombs.values())
+
+
+def _resync_memory(records, tombstones) -> None:
+    """Rebuild the in-memory indexes from a merged registry. Caller
+    holds ``_LOCK`` and the flock. Winning memory-side records keep
+    their object identity; persisted-only records are adopted as-is."""
     with _LOCK:
-        payload = json.dumps({
-            "records": list(_STORE.values()),
-            "tombstones": list(_TOMBSTONES.values()),
-            "saved_at": _now_ms(),
-        })
+        _STORE.clear()
+        _BY_AGENT.clear()
+        _BY_CARD.clear()
+        _TOMBSTONES.clear()
+        for rec in records:
+            _STORE[rec["kya_id"]] = rec
+            _BY_AGENT[rec["agent_id"]] = rec["kya_id"]
+            ch = rec.get("card_hash")
+            if ch:
+                _BY_CARD.setdefault(ch, set()).add(rec["agent_id"])
+        for t in tombstones:
+            _TOMBSTONES[str(t["wallet"]).lower()] = t
+
+
+def _write_payload(payload: str) -> bool:
+    """Write via the legacy backend chain (first success wins).
+    Returns True when some backend durably accepted the payload."""
     store = _sqlite()
     if store is not None:
         try:
             store.kv_set(STORE_KEY, payload)
-            return
+            return True
         except Exception:
             pass
     client = _redis()
     if client is not None:
         try:
             client.set(REDIS_KEY, payload)
-            return
+            return True
         except Exception:
             pass
     path = _persist_path()
     if path is None:
-        return
+        return False
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(payload, encoding="utf-8")
+        tmp_path = f"{path}.tmp.{os.getpid()}.{threading.get_ident()}"
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp_path, path)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass  # already replaced (or never created)
+        return True
     except Exception:
-        pass
+        return False
+
+
+def save() -> None:
+    """Persist the registry without losing peer writes (W-205).
+
+    Under the instance RLock and the cross-process flock, reload the
+    latest persisted blob and merge it per record with the in-memory
+    state (revocations and tombstones sticky; per-record newest
+    updated_at wins), then write the merged blob and re-sync memory to
+    it. A corrupt persisted blob raises KyaPersistenceError — save()
+    refuses rather than silently wiping the registry. An instance that
+    has never loaded the persisted registry (fresh after reset()) is a
+    new authoritative registry: its save replaces, as before W-205.
+    """
+    global _SYNCED_WITH_PERSISTENCE
+    with _LOCK:
+        with _flock():
+            raw = _read_persisted_raw()
+            persisted_records: List[Dict[str, Any]] = []
+            persisted_tombstones: List[Dict[str, Any]] = []
+            if raw:
+                persisted_records, persisted_tombstones = _parse_blob_strict(raw)
+            memory_records = list(_STORE.values())
+            memory_tombstones = list(_TOMBSTONES.values())
+            if _SYNCED_WITH_PERSISTENCE and raw:
+                records, tombstones = _merge_registry(
+                    persisted_records, persisted_tombstones,
+                    memory_records, memory_tombstones,
+                )
+            else:
+                records, tombstones = memory_records, memory_tombstones
+            payload = json.dumps({
+                "records": records,
+                "tombstones": tombstones,
+                "saved_at": _now_ms(),
+            })
+            if _write_payload(payload):
+                _resync_memory(records, tombstones)
+                _SYNCED_WITH_PERSISTENCE = True
 
 
 def _write_tombstone(wallet: str, agent_id: str, card_hash: str, reason: str) -> Dict[str, Any]:
@@ -276,7 +538,6 @@ def is_wallet_tombstoned(wallet: str) -> bool:
         return False
     with _LOCK:
         return wallet.lower() in _TOMBSTONES
-    return json.dumps(obj, separators=(",", ":"), sort_keys=True, ensure_ascii=True)
 
 
 def _canonical(obj: Any) -> str:

@@ -11,8 +11,14 @@ import re
 import threading
 import time
 from collections import deque
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-201)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 from flask import Flask, jsonify
 
@@ -158,6 +164,16 @@ class Fabric:
         self.commits: Dict[str, Dict[str, Any]] = {}
         self.events: deque = deque(maxlen=500)
         self.event_seq = 0
+        # W-201: keys this instance knows are persisted on disk (set at
+        # load time and after every successful save). _save_agents /
+        # _save_tasks diff them against the live dicts to tell "deleted
+        # by this instance" (honor the deletion) apart from "never seen
+        # by this stale instance" (a peer's record — preserve it when
+        # merging the fresh on-disk state under the file lock).
+        self._persisted_agent_ids: set = set()
+        self._persisted_board_ids: Dict[str, set] = {
+            "tasks": set(), "bids": set(), "commits": set(), "proofs": set(),
+        }
 
     def publish(self, event_type: str, tags: List[str], payload: Dict[str, Any]) -> Dict[str, Any]:
         event = {"topic": "tasks:broadcast", "type": event_type, "ts": _now_ms(), "tags": list(tags), "payload": payload, "seq": 0}
@@ -315,6 +331,63 @@ def _registry_persistence_check(restored_count: int) -> Dict[str, Any]:
         }
 
 
+@contextmanager
+def _store_lock(path: Path):
+    """Exclusive cross-process flock on the sidecar ``<path>.lock``
+    file (W-201), mirroring FileSealRegistry in hierarchical_cnp and
+    the W-212/W-213 stores: graceful degradation to in-process-only
+    exclusion when fcntl is unavailable. The lock file is never
+    replaced, so the flock stays bound to one inode."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fh = open(Path(str(path) + ".lock"), "a+b")
+    try:
+        if fcntl is not None:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            if fcntl is not None:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+        finally:
+            lock_fh.close()
+
+
+def _atomic_write_text(path: Path, payload: str) -> None:
+    """Durably replace ``path`` with ``payload`` (W-201): pid-unique
+    tmp file + fsync + ``os.replace`` + directory fsync — the
+    FileSealRegistry idiom. A concurrent reader sees the old file or
+    the new one, never a torn write."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(payload)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+    dir_fd = os.open(str(path.parent), os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _note_persisted_agent_ids(fabric: Fabric) -> None:
+    try:
+        fabric._persisted_agent_ids = set(fabric.agents)
+    except Exception:
+        pass
+
+
+def _note_persisted_board_ids(fabric: Fabric) -> None:
+    try:
+        fabric._persisted_board_ids = {
+            "tasks": set(fabric.tasks), "bids": set(fabric.bids),
+            "commits": set(fabric.commits), "proofs": set(fabric.proofs),
+        }
+    except Exception:
+        pass
+
+
 def _load_agents(fabric: Fabric) -> "tuple":
     """Restore agent records; returns ``(restored, expected)``.
 
@@ -325,6 +398,7 @@ def _load_agents(fabric: Fabric) -> "tuple":
     """
     path = _persist_path()
     if path is None or not path.is_file():
+        _note_persisted_agent_ids(fabric)
         return 0, None
     restored = 0
     expected = None
@@ -342,29 +416,56 @@ def _load_agents(fabric: Fabric) -> "tuple":
                     restored += 1
     except Exception as err:
         logger.warning("[A2A] restore failed: %s", err)
+    _note_persisted_agent_ids(fabric)
     return restored, expected
 
 
 def _save_agents(fabric: Fabric) -> None:
+    """Persist the agent registry (W-201 locked reload-merge-save).
+
+    The pre-W-201 save rewrote the whole file from this instance's
+    in-memory snapshot with a plain ``path.write_text`` — no lock, no
+    reload, non-atomic — so a stale instance silently dropped peer
+    registrations and a concurrent reader could observe a torn file.
+
+    Now: flock the sidecar lock, reload the fresh on-disk registry,
+    merge (peer's records survive; this instance's records win on key
+    conflict; records this instance deleted since its last load/save
+    stay deleted), then write atomically (pid-unique tmp + fsync +
+    os.replace + dir fsync). Peer records are also folded back into
+    the live working set so the singleton converges instead of
+    re-saving a stale view. Never raises: a failed write is logged,
+    never fatal (the historical contract).
+    """
     path = _persist_path()
     if path is None:
         return
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # W-95: persist the expected agent count alongside the registry so a
-        # partial wipe (file still parses, records silently dropped) trips the
-        # boot-time integrity check in get_fabric().
-        written = [a for a in fabric.agents.values() if isinstance(a, dict) and a.get("agent_id")]
-        path.write_text(
-            json.dumps(
-                {
-                    "agents": list(fabric.agents.values()),
-                    "saved_at": _now_ms(),
-                    "expected_agent_count": len(written),
-                }
-            ),
-            encoding="utf-8",
-        )
+        with _store_lock(path):
+            fresh = Fabric()
+            _load_agents(fresh)
+            known = getattr(fabric, "_persisted_agent_ids", None) or set()
+            deleted = set(known) - set(fabric.agents)
+            merged = {aid: rec for aid, rec in fresh.agents.items()
+                      if aid not in deleted}
+            merged.update(fabric.agents)
+            for aid, rec in merged.items():
+                fabric.agents.setdefault(aid, rec)
+            # W-95: persist the expected agent count alongside the registry so a
+            # partial wipe (file still parses, records silently dropped) trips the
+            # boot-time integrity check in get_fabric().
+            written = [a for a in merged.values() if isinstance(a, dict) and a.get("agent_id")]
+            _atomic_write_text(
+                path,
+                json.dumps(
+                    {
+                        "agents": list(merged.values()),
+                        "saved_at": _now_ms(),
+                        "expected_agent_count": len(written),
+                    }
+                ),
+            )
+            fabric._persisted_agent_ids = set(merged)
     except Exception as err:
         logger.warning("[A2A] persist failed: %s", err)
 
@@ -520,6 +621,7 @@ def _load_tasks(fabric: Fabric) -> None:
     if checkpoint is not None:
         if raw is None:
             _restore_board_state(fabric, checkpoint.state)
+            _note_persisted_board_ids(fabric)
             return
         json_version = (raw.get("checkpoint_version")
                         if isinstance(raw, dict) else None)
@@ -527,6 +629,7 @@ def _load_tasks(fabric: Fabric) -> None:
                 and not isinstance(json_version, bool)
                 and checkpoint.version == json_version):
             _restore_board_state(fabric, checkpoint.state)
+            _note_persisted_board_ids(fabric)
             return
     if raw is not None:
         tasks = raw.get("tasks") if isinstance(raw, dict) else raw
@@ -535,6 +638,7 @@ def _load_tasks(fabric: Fabric) -> None:
             for task in items:
                 if isinstance(task, dict) and task.get("task_id"):
                     fabric.tasks[task["task_id"]] = task
+    _note_persisted_board_ids(fabric)
 
 
 def _save_tasks(fabric: Fabric) -> None:
@@ -558,24 +662,66 @@ def _save_tasks(fabric: Fabric) -> None:
     path = _tasks_persist_path()
     if path is None:
         return
-    saved_at = _now_ms()
-    state = {
-        "tasks": list(fabric.tasks.values()),
-        "bids": list(fabric.bids.values()),
-        "commits": dict(fabric.commits),
-        "proofs": list(fabric.proofs.values()),
-        "saved_at": saved_at,
-    }
-    checkpoint_version = _mirror_board_to_checkpoint(state)
+    # W-201: locked reload-merge-save. The pre-W-201 save rewrote the
+    # whole board from this instance's (possibly stale) snapshot with
+    # no file lock and no reload, so a second instance's tasks, bids,
+    # commits, and proofs were silently dropped. Now the save runs
+    # under the sidecar flock: reload the fresh board (via _load_tasks
+    # on a scratch fabric, so the checkpoint/JSON pairing rules decide
+    # freshness exactly as at boot), merge — peer records survive,
+    # this instance's records win on key conflict, records this
+    # instance deleted since its last load/save stay deleted — fold
+    # peer records back into the live working set, and only then run
+    # the historical write sequence against the merged state: mirror
+    # to the hash-bound checkpoint FIRST, then write the JSON
+    # (atomically: pid-unique tmp + fsync + os.replace + dir fsync)
+    # recording the resulting monotonic checkpoint_version. A reload
+    # that fails closed (corrupt store) aborts the save instead of
+    # overwriting checkpointed state with a stale snapshot; the save
+    # still never raises.
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(
-            json.dumps({"tasks": state["tasks"], "saved_at": saved_at,
-                        "checkpoint_version": checkpoint_version}),
-            encoding="utf-8",
-        )
-        os.replace(tmp, path)
+        with _store_lock(path):
+            fresh = Fabric()
+            try:
+                _load_tasks(fresh)
+            except Exception as err:
+                logger.warning(
+                    "[A2A] board reload before save failed, aborting "
+                    "save: %s", err)
+                return
+            known = getattr(fabric, "_persisted_board_ids", None) or {}
+            merged: Dict[str, Dict[str, Any]] = {}
+            for coll in ("tasks", "bids", "commits", "proofs"):
+                mine = getattr(fabric, coll)
+                deleted = set(known.get(coll) or set()) - set(mine)
+                combined = {k: v for k, v in getattr(fresh, coll).items()
+                            if k not in deleted}
+                combined.update(mine)
+                merged[coll] = combined
+                for key, record in combined.items():
+                    mine.setdefault(key, record)
+            saved_at = _now_ms()
+            state = {
+                "tasks": list(merged["tasks"].values()),
+                "bids": list(merged["bids"].values()),
+                "commits": dict(merged["commits"]),
+                "proofs": list(merged["proofs"].values()),
+                "saved_at": saved_at,
+            }
+            checkpoint_version = _mirror_board_to_checkpoint(state)
+            try:
+                _atomic_write_text(
+                    path,
+                    json.dumps({"tasks": state["tasks"],
+                                "saved_at": saved_at,
+                                "checkpoint_version": checkpoint_version}),
+                )
+            except Exception as err:
+                logger.warning("[A2A] task persist failed: %s", err)
+                return
+            fabric._persisted_board_ids = {
+                coll: set(records) for coll, records in merged.items()
+            }
     except Exception as err:
         logger.warning("[A2A] task persist failed: %s", err)
 

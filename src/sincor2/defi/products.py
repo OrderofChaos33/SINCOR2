@@ -18,8 +18,15 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-210)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 from . import division
 from .catalog import PROTOCOL_BY_ID, PROTOCOLS, assert_catalog_complete
@@ -132,6 +139,57 @@ def _save_state(state: Dict[str, Dict[str, str]], path: Optional[str] = None) ->
     os.replace(tmp, path)
 
 
+# -- W-210 locked transactions -------------------------------------------
+# Mirrors PersistentErrorTracker's W-213 fix in resilience/auto_heal.py:
+# every whole-file mutator does reload-mutate-save under an exclusive
+# flock on a sidecar ``.lock`` file, so a caller holding a stale
+# snapshot can never erase another instance's/process's write with its
+# whole-file save. The fixed ``.tmp`` name in _save_state is safe here
+# because saves only happen inside this transaction (flock + the
+# process-wide RLock serialize them).
+_state_txn_lock = threading.RLock()
+_state_txn_local = threading.local()
+
+
+@contextmanager
+def _locked_state_txn(path: str) -> Iterator[None]:
+    """Hold the state file's flock + process RLock for one transaction.
+
+    Nested entry on the same thread/path joins the outer transaction:
+    no re-flock and no reload (the outer body already reloaded fresh).
+    """
+    depths: Dict[str, int] = getattr(_state_txn_local, "depths", None)
+    if depths is None:
+        depths = {}
+        _state_txn_local.depths = depths
+    if depths.get(path, 0) > 0:
+        depths[path] += 1
+        try:
+            yield
+        finally:
+            depths[path] -= 1
+        return
+    with _state_txn_lock:
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        lock_fh = open(Path(path + ".lock"), "a+b")
+        try:
+            if fcntl is not None:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+            depths[path] = 1
+            try:
+                yield
+            finally:
+                depths[path] = 0
+        finally:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            finally:
+                lock_fh.close()
+
+
 def build_registry(state_path: Optional[str] = None) -> List[Dict[str, Any]]:
     """All 26 products, merged with persisted stage/status overrides."""
     assert_catalog_complete()
@@ -184,14 +242,22 @@ def promote(sku: str, to_stage: str, ledger=None,
     if not result.ok:
         return {"ok": False, "sku": sku, "to_stage": to_stage,
                 "reasons": [r.__dict__ for r in result.reasons]}
-    state = _load_state(state_path)
-    saved = state.get(sku, {})
-    saved["stage"] = to_stage
-    saved["version"] = _bump_patch(product["version"])
-    state[sku] = saved
-    _save_state(state, state_path)
+    # W-210: reload-mutate-save under the flock — the state reloaded
+    # here is fresh, so a concurrent promotion of a different SKU by
+    # another instance/process is preserved instead of being erased
+    # by this whole-file save; the version bump likewise starts from
+    # the fresh saved version, not the pre-gate snapshot.
+    resolved_path = state_path or default_state_path()
+    with _locked_state_txn(resolved_path):
+        state = _load_state(resolved_path)
+        saved = state.get(sku, {})
+        saved["stage"] = to_stage
+        saved["version"] = _bump_patch(saved.get("version", product["version"]))
+        state[sku] = saved
+        _save_state(state, resolved_path)
+        new_version = saved["version"]
     return {"ok": True, "sku": sku, "to_stage": to_stage,
-            "version": saved["version"], "reasons": []}
+            "version": new_version, "reasons": []}
 
 
 def approve_marketing(sku: str, state_path: Optional[str] = None) -> Dict[str, Any]:
@@ -204,11 +270,15 @@ def approve_marketing(sku: str, state_path: Optional[str] = None) -> Dict[str, A
         return {"ok": False,
                 "reason": f"marketing approves at product stage; {sku} is at "
                           f"'{product['stage']}'"}
-    state = _load_state(state_path)
-    saved = state.get(sku, {})
-    saved["marketing_status"] = "approved"
-    state[sku] = saved
-    _save_state(state, state_path)
+    # W-210: reload-mutate-save under the flock, same as promote() —
+    # a stale whole-file save must not erase a concurrent write.
+    resolved_path = state_path or default_state_path()
+    with _locked_state_txn(resolved_path):
+        state = _load_state(resolved_path)
+        saved = state.get(sku, {})
+        saved["marketing_status"] = "approved"
+        state[sku] = saved
+        _save_state(state, resolved_path)
     return {"ok": True, "reason": "marketing approved"}
 
 

@@ -39,9 +39,15 @@ import json
 import logging
 import os
 import threading
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-215)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.token_budget")
 
@@ -192,21 +198,114 @@ class TokenBudgetController:
         self._lock = threading.RLock()
         self._path = ledger_path or _ledger_path()
         self._agents: Dict[str, AgentBudgetState] = {}
+        # W-215 locked-transaction state (StakeLedger W-208 / BountyPool
+        # W-193 pattern): depth > 0 means this instance already holds the
+        # flock; nested _persist() calls join the outer transaction
+        # instead of saving an independent (possibly stale) snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 
-    def _load(self) -> None:
-        raw = _load_ledger(self._path)
+    def _apply_raw(self, raw: Dict[str, Any]) -> None:
+        """Replace in-memory state wholesale from a persisted payload.
+
+        W-215: a reload-under-lock must discard a stale snapshot
+        entirely — an agent another instance killed, or usage it
+        recorded, must not linger or vanish through a merge.
+        """
+        agents: Dict[str, AgentBudgetState] = {}
         for agent_id, d in raw.items():
             try:
-                self._agents[agent_id] = AgentBudgetState.from_dict(d)
+                agents[agent_id] = AgentBudgetState.from_dict(d)
             except (KeyError, TypeError) as exc:
                 logger.warning("[TOKEN_BUDGET] skipping corrupt ledger entry %s: %s", agent_id, exc)
+        self._agents = agents
+
+    def _load(self) -> None:
+        self._apply_raw(_load_ledger(self._path))
+
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn``.
+
+        Lets a mutator see usage/kills/ceilings recorded by another
+        instance since this instance last loaded, so a stale snapshot
+        is never the basis of a save (W-215). A missing file keeps the
+        in-memory state (first save); a corrupt file also keeps it
+        rather than wiping accounting.
+        """
+        if not self._path.is_file():
+            return
+        try:
+            with self._path.open("r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except (json.JSONDecodeError, OSError):
+            return
+        if not isinstance(raw, dict):
+            return
+        self._apply_raw(raw)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked mutate transaction (W-215), mirroring BountyPool's
+        W-193 ``_locked_txn``: instance RLock + exclusive flock (on the
+        LockedJsonStore-style sidecar lock file, so a missing ledger
+        file is never created by locking) + reload-under-lock, then
+        run the body; on exit, persist exactly once if any nested
+        ``_persist()`` marked the transaction dirty. Nested entry joins
+        the outer transaction: no re-flock, no reload, no save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fh = open(Path(str(self._path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._persist_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._persist_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
 
     def _persist(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _persist_locked(self) -> None:
         data = {aid: state.to_dict() for aid, state in self._agents.items()}
         _save_ledger(self._path, data)
 
@@ -246,7 +345,7 @@ class TokenBudgetController:
 
         Persists the ledger after every call so usage survives a crash.
         """
-        with self._lock:
+        with self._locked_txn():
             state = self._get_or_create(agent_id, ceiling)
             state.record_usage(tokens_used)
             self._persist()
@@ -256,7 +355,7 @@ class TokenBudgetController:
         Hard-kill *agent_id* immediately.  Subsequent ``is_allowed()`` calls
         return False until ``reinstate_agent()`` is called.
         """
-        with self._lock:
+        with self._locked_txn():
             state = self._get_or_create(agent_id)
             state.killed = True
             state.kill_reason = reason
@@ -268,7 +367,7 @@ class TokenBudgetController:
 
     def reinstate_agent(self, agent_id: str) -> None:
         """Remove the manual kill flag for *agent_id*."""
-        with self._lock:
+        with self._locked_txn():
             state = self._get_or_create(agent_id)
             state.killed = False
             state.kill_reason = ""
@@ -301,7 +400,7 @@ class TokenBudgetController:
 
     def register_agent(self, agent_id: str, daily_ceiling: int) -> None:
         """Pre-register an agent with a specific daily ceiling (idempotent)."""
-        with self._lock:
+        with self._locked_txn():
             self._get_or_create(agent_id, daily_ceiling)
             self._persist()
         logger.debug(
@@ -310,7 +409,7 @@ class TokenBudgetController:
 
     def reset_agent_daily_count(self, agent_id: str) -> None:
         """Reset an agent's daily counter to zero (admin use only)."""
-        with self._lock:
+        with self._locked_txn():
             state = self._get_or_create(agent_id)
             state.tokens_used_today = 0
             state.ledger_date = date.today().isoformat()

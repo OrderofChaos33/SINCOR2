@@ -46,6 +46,8 @@ import json
 import math
 import os
 import tempfile
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +60,11 @@ from sincor2.quality_scoring_engine import (
     SelfImprovingQualityEngine,
 )
 from sincor2.persona_engine import PersonaEngine, PersonaVector
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-211)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 # ---------------------------------------------------------------------------
 # Tunable, documented bounds
@@ -124,6 +131,13 @@ class QualityTrendTracker:
         self.engine = SelfImprovingQualityEngine()
         self.store_path = Path(store_path) if store_path else data_dir() / "obs_skus" / _STORE_FILENAME
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        # W-211 locked-transaction state (PersistentErrorTracker W-213
+        # pattern): depth > 0 means this instance already holds the
+        # flock; nested _save() calls join the outer transaction instead
+        # of saving an independent (possibly stale) snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._state = self._load()
 
     # -- durable store ------------------------------------------------------
@@ -139,7 +153,81 @@ class QualityTrendTracker:
                 pass  # corrupt store -> start fresh rather than crash the watcher
         return {"agents": {}, "updated": _utcnow()}
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the store file. Call inside ``_locked_txn``.
+
+        Lets a mutator/read see history written by another instance
+        since this instance last loaded, so a stale snapshot is never
+        the basis of a save or a read (W-211). A missing or corrupt
+        file keeps the in-memory state rather than wiping history —
+        ``_load()`` already handled those cases at construction.
+        """
+        try:
+            with open(self.store_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return
+        if isinstance(data, dict) and "agents" in data:
+            self._state = data
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-211), mirroring PersistentErrorTracker's
+        W-213 ``_locked_txn`` in resilience/auto_heal.py: instance RLock
+        + exclusive flock on the sidecar ``.lock`` file (graceful
+        fallback when fcntl is unavailable) + reload-under-lock, then
+        run the body; on exit, persist exactly once if any nested
+        ``_save()`` marked the transaction dirty. Nested entry joins
+        the outer transaction: no re-flock, no reload, no save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            self.store_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fh = open(Path(str(self.store_path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
         self._state["updated"] = _utcnow()
         tmp = self.store_path.with_suffix(".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
@@ -171,12 +259,16 @@ class QualityTrendTracker:
                 raise ValueError(f"score for {dim} out of range [0,1]: {value}")
             normalized[_dim_key(dim)] = value
         ts = timestamp or _utcnow()
-        state = self._agent_state(agent_id)
-        for dim_key, value in normalized.items():
-            series = state["dimensions"].setdefault(dim_key, [])
-            series.append({"ts": ts, "deliverable_id": deliverable_id, "score": value})
-        state["overall"].append({"ts": ts, "deliverable_id": deliverable_id, "score": _clamp01(overall_score)})
-        self._save()
+        # W-211: reload-mutate-save under the flock, so a stale instance
+        # appends to the fresh on-disk history instead of erasing records
+        # written by another instance with its stale snapshot.
+        with self._locked_txn():
+            state = self._agent_state(agent_id)
+            for dim_key, value in normalized.items():
+                series = state["dimensions"].setdefault(dim_key, [])
+                series.append({"ts": ts, "deliverable_id": deliverable_id, "score": value})
+            state["overall"].append({"ts": ts, "deliverable_id": deliverable_id, "score": _clamp01(overall_score)})
+            self._save()
         return {"agent_id": agent_id, "deliverable_id": deliverable_id, "recorded_at": ts}
 
     def ingest_quality_score(self, agent_id: str, score: QualityScore) -> Dict[str, Any]:
@@ -226,31 +318,36 @@ class QualityTrendTracker:
         }
 
     def dimension_trend(self, agent_id: str, dimension: Any) -> Dict[str, Any]:
-        state = self._state["agents"].get(agent_id)
-        if not state:
-            return {"agent_id": agent_id, "dimension": _dim_key(dimension), "n": 0,
-                    "trendable": False, "note": "no history recorded"}
-        series = state["dimensions"].get(_dim_key(dimension), [])
-        return {"agent_id": agent_id, "dimension": _dim_key(dimension),
-                **self._series_stats(series)}
+        # W-211: reload fresh under the flock so another instance's
+        # writes are never hidden by a stale snapshot.
+        with self._locked_txn():
+            state = self._state["agents"].get(agent_id)
+            if not state:
+                return {"agent_id": agent_id, "dimension": _dim_key(dimension), "n": 0,
+                        "trendable": False, "note": "no history recorded"}
+            series = state["dimensions"].get(_dim_key(dimension), [])
+            return {"agent_id": agent_id, "dimension": _dim_key(dimension),
+                    **self._series_stats(series)}
 
     def agent_overview(self, agent_id: str) -> Dict[str, Any]:
         """Per-dimension trends + overall trend for one agent."""
-        state = self._state["agents"].get(agent_id)
-        if not state:
-            return {"agent_id": agent_id, "dimensions": {}, "overall": None,
-                    "alerts": [], "note": "no history recorded"}
-        dims = {key: self._series_stats(series) for key, series in state["dimensions"].items()}
-        overall = self._series_stats(state["overall"]) if state["overall"] else None
-        alerts: List[str] = []
-        for key, stats in dims.items():
-            if stats.get("degrading"):
-                alerts.append(f"degrading:{key} slope={stats['slope_per_sample']}/sample")
-            if stats.get("below_floor"):
-                alerts.append(f"low_absolute:{key} rolling_mean={stats['rolling_mean']}")
-        if overall and overall.get("degrading"):
-            alerts.append(f"degrading:overall slope={overall['slope_per_sample']}/sample")
-        return {"agent_id": agent_id, "dimensions": dims, "overall": overall, "alerts": alerts}
+        # W-211: reload fresh under the flock (see dimension_trend).
+        with self._locked_txn():
+            state = self._state["agents"].get(agent_id)
+            if not state:
+                return {"agent_id": agent_id, "dimensions": {}, "overall": None,
+                        "alerts": [], "note": "no history recorded"}
+            dims = {key: self._series_stats(series) for key, series in state["dimensions"].items()}
+            overall = self._series_stats(state["overall"]) if state["overall"] else None
+            alerts: List[str] = []
+            for key, stats in dims.items():
+                if stats.get("degrading"):
+                    alerts.append(f"degrading:{key} slope={stats['slope_per_sample']}/sample")
+                if stats.get("below_floor"):
+                    alerts.append(f"low_absolute:{key} rolling_mean={stats['rolling_mean']}")
+            if overall and overall.get("degrading"):
+                alerts.append(f"degrading:overall slope={overall['slope_per_sample']}/sample")
+            return {"agent_id": agent_id, "dimensions": dims, "overall": overall, "alerts": alerts}
 
 
 # ---------------------------------------------------------------------------

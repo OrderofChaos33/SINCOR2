@@ -51,9 +51,16 @@ import json
 import logging
 import os
 import random
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
+
+try:  # POSIX advisory locks for the cross-process cycle lock (W-199)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor2.activity_engine")
 
@@ -224,12 +231,95 @@ def load_state() -> Dict[str, Any]:
 def save_state(state: Dict[str, Any]) -> None:
     path = state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True),
-                   encoding="utf-8")
-    # Validate before swapping in (JSON state-file edit rule).
-    json.loads(tmp.read_text(encoding="utf-8"))
-    os.replace(tmp, path)
+    # W-199: pid-unique tmp (the family's shared fixed ".tmp" name was a
+    # cross-process crash hazard) + fsync before the atomic replace,
+    # mirroring LockedJsonStore / FileSealRegistry.
+    tmp = path.with_name(
+        f"{path.name}.tmp.{os.getpid()}.{threading.get_ident()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(state, indent=2, sort_keys=True))
+            fh.flush()
+            os.fsync(fh.fileno())
+        # Validate before swapping in (JSON state-file edit rule).
+        json.loads(tmp.read_text(encoding="utf-8"))
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass  # already replaced (or never created)
+
+
+# ---------------------------------------------------------------------------
+# Cycle lock (W-199)
+# ---------------------------------------------------------------------------
+
+class ActivityCycleInProgressError(RuntimeError):
+    """A concurrent activity-engine cycle already holds the cycle lock.
+
+    Fail-closed signal: the second cycle must NOT load-mutate-save its
+    own snapshot over the in-flight cycle's work.
+    """
+
+
+_CYCLE_THREAD_LOCK = threading.RLock()
+
+
+@contextmanager
+def cycle_lock() -> Iterator[None]:
+    """Hold the engine's single-cycle lock from state load to save.
+
+    W-199: ``run_cycle`` holds its state snapshot for the ENTIRE cycle
+    (the widest race window in the lost-update family), so a merge /
+    reload-under-lock cannot save it — a second cycle working from the
+    same snapshot would double-post and double-settle against fabric
+    truth, not just overwrite a counter. The cure is a CYCLE LOCK
+    (persistence research 2026-11-23): an exclusive ``flock`` on the
+    sidecar ``state.json.lock`` file, acquired non-blockingly, held
+    load->save. A second concurrent cycle — another thread or another
+    process on the same volume — fails closed with
+    :class:`ActivityCycleInProgressError` and retries next tick.
+
+    The lock is NOT reentrant across the flock: a nested acquisition
+    (even from the holding thread) fails closed, matching the rule
+    that cycles never nest. Where ``fcntl`` is unavailable the lock
+    degrades loudly to the in-process thread lock only, mirroring
+    ``EscalationStore`` on non-POSIX platforms.
+    """
+    if not _CYCLE_THREAD_LOCK.acquire(blocking=False):
+        raise ActivityCycleInProgressError(
+            "activity engine cycle already in progress (this process)")
+    fd: Optional[int] = None
+    try:
+        if fcntl is None:  # pragma: no cover - non-POSIX platforms
+            logger.warning(
+                "[ACTIVITY] fcntl unavailable: cycle lock is process-local "
+                "only (no cross-process exclusion)")
+            yield
+            return
+        lock_path = str(state_path()) + ".lock"
+        state_path().parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        except OSError as err:
+            raise ActivityCycleInProgressError(
+                f"cannot open cycle lock file {lock_path!r}: {err}") from err
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as err:
+            raise ActivityCycleInProgressError(
+                "activity engine cycle already in progress "
+                "(another process holds the cycle lock)") from err
+        yield
+    finally:
+        if fd is not None:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            except Exception:
+                pass
+            os.close(fd)
+        _CYCLE_THREAD_LOCK.release()
 
 
 # ---------------------------------------------------------------------------
@@ -774,7 +864,18 @@ def run_cycle(*, post: bool = True) -> Dict[str, Any]:
     """Run one engine cycle: heartbeat, advance in-flight, post new.
 
     Safe to call on a short interval; every step is idempotent.
+
+    W-199: the whole cycle runs under :func:`cycle_lock`, held from
+    ``load_state()`` to ``save_state()``. A concurrent cycle fails
+    closed with :class:`ActivityCycleInProgressError` instead of
+    racing this cycle's snapshot (lost cursor advance / settled
+    counts / fee totals / in-flight records).
     """
+    with cycle_lock():
+        return _run_cycle_locked(post=post)
+
+
+def _run_cycle_locked(*, post: bool = True) -> Dict[str, Any]:
     summary: Dict[str, Any] = {
         "posted": [], "advanced": {}, "settled": [],
         "expired": [], "errors": [],
