@@ -10,9 +10,16 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import uuid
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-204)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 # Evidence kinds the stage gates understand.
 KIND_TEST_RUN = "test_run"
@@ -59,6 +66,9 @@ class ProofLedger:
     def __init__(self, path: Optional[str] = None):
         self.path = path or default_ledger_path()
         self._entries: List[Dict[str, Any]] = []
+        self._lock = threading.RLock()
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     # -- persistence ------------------------------------------------------
@@ -73,14 +83,118 @@ class ProofLedger:
             except (json.JSONDecodeError, OSError):
                 self._entries = []
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn`` (W-204).
+
+        A missing or corrupt file keeps the in-memory state rather
+        than wiping entries — ``_load()`` already handled those cases
+        at construction.
+        """
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        entries = data.get("entries", [])
+        if isinstance(entries, list):
+            self._entries = entries
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-204), mirroring PersistentErrorTracker's
+        W-213 / FileSealRegistry pattern: instance RLock + exclusive
+        flock on the sidecar ``.lock`` file (graceful fallback when
+        fcntl is unavailable) + reload-under-lock, then run the body;
+        on exit, persist exactly once if any nested ``_save()`` marked
+        the transaction dirty. Nested entry joins the outer transaction.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            parent = os.path.dirname(self.path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            lock_fh = open(self.path + ".lock", "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
-        tmp = self.path + ".tmp"
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction, persist the current in-memory state
+        under the flock WITHOUT reloading: subclasses such as
+        ObsProofLedger mutate ``_entries`` then call ``_save()``
+        directly, and a reload here would discard their pending entry.
+        Cross-instance safety for ProofLedger's own API comes from
+        ``append``/``read`` reloading under ``_locked_txn``.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._lock:
+            parent = os.path.dirname(self.path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            lock_fh = open(self.path + ".lock", "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                try:
+                    self._save_locked()
+                finally:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            finally:
+                lock_fh.close()
+
+    def _save_locked(self) -> None:
+        tmp = f"{self.path}.tmp-{os.getpid()}-{threading.get_ident()}"
         parent = os.path.dirname(self.path)
         if parent:
             os.makedirs(parent, exist_ok=True)
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump({"entries": self._entries}, fh, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, self.path)
+        if parent:
+            try:
+                dir_fd = os.open(parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except OSError:
+                pass
 
     # -- API --------------------------------------------------------------
     def append(self, sku: str, kind: str, details: Dict[str, Any],
@@ -98,18 +212,24 @@ class ProofLedger:
             "recorded_by": recorded_by,
             "details": dict(details or {}),
         }
-        self._entries.append(entry)
-        self._save()
+        # W-204: reload-mutate-save under the flock, so a stale
+        # instance never erases another instance's entries.
+        with self._locked_txn():
+            self._entries.append(entry)
+            self._save()
         return dict(entry)
 
     def read(self, sku: Optional[str] = None,
             kind: Optional[str] = None) -> List[Dict[str, Any]]:
-        out = self._entries
-        if sku is not None:
-            out = [e for e in out if e.get("sku") == sku]
-        if kind is not None:
-            out = [e for e in out if e.get("kind") == kind]
-        return [dict(e) for e in out]
+        # W-204: reload fresh under the lock so reads never serve a
+        # stale snapshot missing another instance's appends.
+        with self._locked_txn():
+            out = self._entries
+            if sku is not None:
+                out = [e for e in out if e.get("sku") == sku]
+            if kind is not None:
+                out = [e for e in out if e.get("kind") == kind]
+            return [dict(e) for e in out]
 
     def count(self, sku: Optional[str] = None) -> int:
         return len(self.read(sku=sku))
