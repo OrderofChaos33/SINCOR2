@@ -73,7 +73,14 @@ import logging
 import os
 import threading
 import time
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-197)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.market.antigaming")
 
@@ -162,7 +169,17 @@ class AntigamingStore:
     def __init__(self, path: Optional[str] = None):
         self.path = path or _default_store_path()
         self._lock = threading.RLock()
-        self._data: Dict[str, Any] = {
+        self._data: Dict[str, Any] = self._fresh_data()
+        # W-197 locked-transaction state (mirrors PersistentErrorTracker
+        # W-213 / ProofEventStore W-212): depth > 0 means this instance
+        # already holds the flock; nested entry joins the outer txn.
+        self._txn_depth = 0
+        self._txn_dirty = False
+        self._load()
+
+    @staticmethod
+    def _fresh_data() -> Dict[str, Any]:
+        return {
             "bid_events": {},   # agent_id -> [ts_ms, ...] (entered auctions)
             "win_events": {},   # agent_id -> [ts_ms, ...] (won auctions)
             "win_streak": {},   # agent_id -> consecutive wins (global order)
@@ -170,23 +187,113 @@ class AntigamingStore:
             "pair_win_events": {},  # "poster\\x00winner" -> [ts_ms, ...]
             "rejections": [],   # bounded audit log of rejected bids
         }
-        self._load()
 
     # -- persistence ------------------------------------------------------
+    def _apply_raw(self, raw: Dict[str, Any]) -> None:
+        """Replace in-memory state wholesale from a persisted payload.
+
+        W-197: a reload-under-lock must discard a stale snapshot
+        entirely — a record another instance pruned must not linger,
+        and one it recorded must not vanish through a merge.
+        """
+        data = self._fresh_data()
+        for key in data:
+            if isinstance(raw.get(key), (dict, list)):
+                data[key] = raw[key]
+        self._data = data
+
     def _load(self) -> None:
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
                 if isinstance(raw, dict):
-                    for key in self._data:
-                        if isinstance(raw.get(key), (dict, list)):
-                            self._data[key] = raw[key]
+                    self._apply_raw(raw)
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("antigaming store load failed (%s); "
                                "starting empty", exc)
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the store file. Call inside ``_locked_txn``.
+
+        Lets a mutator/read see records written by another instance
+        since this instance last loaded, so a stale snapshot is never
+        the basis of a save or a read (W-197). A missing file keeps the
+        in-memory state (first save); a corrupt file also keeps it
+        rather than wiping accounting — ``_load()`` already handled
+        those cases loudly at boot.
+        """
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            return
+        if not isinstance(raw, dict):
+            return
+        self._apply_raw(raw)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-197), mirroring PersistentErrorTracker's
+        W-213 / ProofEventStore's W-212 ``_locked_txn``: instance RLock +
+        exclusive flock on the sidecar ``.lock`` file (graceful fallback
+        when fcntl is unavailable) + reload-under-lock, then run the
+        body against the fresh state; on exit, persist exactly once if
+        any nested ``_save()`` marked the transaction dirty. Nested
+        entry joins the outer transaction: no re-flock, no reload.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            d = os.path.dirname(self.path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+            lock_fh = open(Path(str(self.path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
         tmp = self.path + ".tmp"
         d = os.path.dirname(self.path)
         if d:
@@ -237,22 +344,24 @@ class AntigamingStore:
     # -- read API (pure-ish; used by guards and tests) ----------------------
     def bids_in_window(self, agent_id: str, now_ms: Optional[int] = None) -> int:
         now_ms = _now_ms() if now_ms is None else int(now_ms)
-        with self._lock:
+        # W-197: reload fresh under the flock so another instance's
+        # records are never hidden by a stale snapshot.
+        with self._locked_txn():
             self._prune(agent_id, now_ms)
             return len(self._data["bid_events"].get(agent_id, []))
 
     def wins_in_window(self, agent_id: str, now_ms: Optional[int] = None) -> int:
         now_ms = _now_ms() if now_ms is None else int(now_ms)
-        with self._lock:
+        with self._locked_txn():
             self._prune(agent_id, now_ms)
             return len(self._data["win_events"].get(agent_id, []))
 
     def win_streak_of(self, agent_id: str) -> int:
-        with self._lock:
+        with self._locked_txn():
             return int(self._data["win_streak"].get(agent_id, 0))
 
     def pair_streak_of(self, poster_id: str, winner_id: str) -> int:
-        with self._lock:
+        with self._locked_txn():
             return int(self._data["pair_streak"].get(
                 self._pair_key(poster_id, winner_id), 0))
 
@@ -262,13 +371,13 @@ class AntigamingStore:
         alternation-breaker. Unlike pair_streak_of, rotation by a third
         party does NOT reset this count; only time prunes it."""
         now_ms = _now_ms() if now_ms is None else int(now_ms)
-        with self._lock:
+        with self._locked_txn():
             self._prune_pairs(now_ms)
             return len(self._data["pair_win_events"].get(
                 self._pair_key(str(poster_id), str(winner_id)), []))
 
     def rejection_log(self, limit: int = 50) -> List[Dict[str, Any]]:
-        with self._lock:
+        with self._locked_txn():
             return [dict(e) for e in self._data["rejections"][-limit:]]
 
 
@@ -347,7 +456,7 @@ def _audit_rejection(agent_id: str, task_id: str, reason: str,
     accounting must not brick the guard path."""
     try:
         store = antigaming_store()
-        with store._lock:
+        with store._locked_txn():  # W-197: flock + reload-under-lock
             store._reject(str(agent_id), str(task_id or ""), reason, detail)
             store._save()
     except Exception as exc:  # pragma: no cover - accounting only
@@ -420,7 +529,7 @@ def check_bid_eligibility(task: Dict[str, Any], agent_id: str,
     try:
         store = antigaming_store()
         check_self_bid(task, agent_id)
-        with store._lock:
+        with store._locked_txn():  # W-197: flock + reload-under-lock
             store._prune(agent_id, now_ms)
             bids = len(store._data["bid_events"].get(agent_id, []))
             if bids >= max_bids_per_window():
@@ -495,7 +604,7 @@ def record_bid_entry(agent_id: str, task_id: str = "",
     now_ms = _now_ms() if now_ms is None else int(now_ms)
     try:
         store = antigaming_store()
-        with store._lock:
+        with store._locked_txn():  # W-197: flock + reload-under-lock
             store._prune(str(agent_id), now_ms)
             store._data["bid_events"].setdefault(str(agent_id),
                                                  []).append(now_ms)
@@ -524,7 +633,7 @@ def record_auction_close(poster_id: Optional[str],
     now_ms = _now_ms() if now_ms is None else int(now_ms)
     try:
         store = antigaming_store()
-        with store._lock:
+        with store._locked_txn():  # W-197: flock + reload-under-lock
             if winner_id:
                 winner_id = str(winner_id)
                 for agent in list(store._data["win_streak"]):
