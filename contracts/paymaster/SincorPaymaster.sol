@@ -54,6 +54,19 @@ pragma solidity ^0.8.24;
 ///      Single canonical encode path (E2): context = abi.encode(sender,
 ///      maxCost); postOp decodes it with abi.decode. The old raw-20-byte
 ///      context path is removed.
+///
+/// @dev P20 sponsorship markup (2026-11-23): every settled sponsored op
+///      accrues a markup owed by the sender — actualGasCost * markupBps /
+///      10000, default 800 bps (8%, the researched P20 list price,
+///      UNRATIFIED: a built default in an undeployed contract, confirmed
+///      or changed by the founder at the deploy gate). Accrual rides
+///      alongside the settlement accounting and never touches the
+///      sponsorship caps or spend ceiling. The sender pays the accrual
+///      down with payMarkup(); the ETH is forwarded to markupRecipient —
+///      the owner-bound destination (defaults to the owner), the same
+///      bind pattern as withdrawTo's recipient. Accrual and collection
+///      conserve exactly: sum(markupAccrued) + totalMarkupCollected ==
+///      totalMarkupAccrued at all times.
 
 interface IEntryPoint {
     function balanceOf(address account) external view returns (uint256);
@@ -104,12 +117,30 @@ contract SincorPaymaster {
     ///         address(0) = no separate withdrawer; only the owner can withdraw.
     address public withdrawer;
 
+    // ── P20 sponsorship markup ──────────────────────────────────────
+    uint256 public constant MAX_MARKUP_BPS = 10_000;
+    /// @notice Markup rate in bps of actualGasCost. Default 800 (8%),
+    ///         the researched P20 list price (unratified built default).
+    uint256 public markupBps = 800;
+    /// @notice The only destination payMarkup() forwards to. Defaults to
+    ///         the owner; the owner may rebind it once, on the record,
+    ///         via setMarkupRecipient.
+    address public markupRecipient;
+    /// @notice Outstanding markup owed per sender.
+    mapping(address => uint256) public markupAccrued;
+    uint256 public totalMarkupAccrued;
+    uint256 public totalMarkupCollected;
+
     event Sponsored(address indexed sender, uint256 ops);
     event ProbationSet(address indexed wallet, bool on);
     event MaxSponsoredOpsSet(uint256 ops);
     event MaxSponsoredWeiSet(uint256 weiLimit);
     event WithdrawerSet(address indexed withdrawer);
     event Withdrawn(address indexed to, uint256 amount);
+    event MarkupBpsSet(uint256 bps);
+    event MarkupRecipientSet(address indexed recipient);
+    event MarkupAccrued(address indexed sender, uint256 markup, uint256 accruedTotal);
+    event MarkupPaid(address indexed sender, uint256 amount, uint256 remaining);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "not owner");
@@ -119,6 +150,33 @@ contract SincorPaymaster {
     constructor(IEntryPoint _entryPoint) {
         entryPoint = _entryPoint;
         owner = msg.sender;
+        markupRecipient = msg.sender;
+    }
+
+    function setMarkupBps(uint256 bps) external onlyOwner {
+        require(bps <= MAX_MARKUP_BPS, "markup too high");
+        markupBps = bps;
+        emit MarkupBpsSet(bps);
+    }
+
+    function setMarkupRecipient(address recipient) external onlyOwner {
+        require(recipient != address(0), "zero recipient");
+        markupRecipient = recipient;
+        emit MarkupRecipientSet(recipient);
+    }
+
+    /// @notice Pay down your own accrued sponsorship markup. The ETH is
+    ///         forwarded in full to markupRecipient; partial payments are
+    ///         fine, overpayment reverts (no change, no float held here).
+    function payMarkup() external payable {
+        uint256 owed = markupAccrued[msg.sender];
+        require(owed > 0, "no markup owed");
+        require(msg.value > 0 && msg.value <= owed, "payment outside accrued markup");
+        markupAccrued[msg.sender] = owed - msg.value;
+        totalMarkupCollected += msg.value;
+        (bool ok,) = payable(markupRecipient).call{value: msg.value}("");
+        require(ok, "markup forward failed");
+        emit MarkupPaid(msg.sender, msg.value, markupAccrued[msg.sender]);
     }
 
     function setProbation(address wallet, bool on) external onlyOwner {
@@ -189,6 +247,18 @@ contract SincorPaymaster {
         sponsoredWei += actualGasCost;
         sponsoredCount[sender] += 1;
         emit Sponsored(sender, sponsoredCount[sender]);
+
+        // P20: accrue the sponsorship markup owed by this sender. Runs on
+        // every settlement (gas was consumed in every postOp mode); if a
+        // postOp call itself reverted earlier, the EntryPoint's retry
+        // re-runs this body from rolled-back state, so an op can never be
+        // charged twice.
+        uint256 markup = (actualGasCost * markupBps) / MAX_MARKUP_BPS;
+        if (markup > 0) {
+            markupAccrued[sender] += markup;
+            totalMarkupAccrued += markup;
+            emit MarkupAccrued(sender, markup, markupAccrued[sender]);
+        }
     }
 
     function deposit() external payable {
