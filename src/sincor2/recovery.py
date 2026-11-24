@@ -47,7 +47,14 @@ import logging
 import os
 import threading
 import time
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Dict, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-196)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.market.recovery")
 
@@ -174,33 +181,152 @@ class RecoveryLedger:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or _default_ledger_path()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._data: Dict[str, Any] = {"wallets": {}, "events": []}
+        # W-196 locked-transaction state (W-213/W-195 pattern): depth > 0
+        # means this instance already holds the flock; nested _save()
+        # calls join the outer transaction instead of saving a stale
+        # snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     # -- persistence ------------------------------------------------------
+    def _apply_raw(self, raw: Dict[str, Any]) -> None:
+        """Replace in-memory state wholesale from a persisted payload.
+
+        W-196: a reload must discard a stale snapshot entirely, so a
+        sponsorship another instance recorded must not vanish and one
+        it superseded must not linger through a merge.
+        """
+        data: Dict[str, Any] = {"wallets": {}, "events": []}
+        if isinstance(raw.get("wallets"), dict):
+            data["wallets"] = raw["wallets"]
+        if isinstance(raw.get("events"), list):
+            data["events"] = raw["events"]
+        self._data = data
+
     def _load(self) -> None:
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
                 if isinstance(raw, dict):
-                    if isinstance(raw.get("wallets"), dict):
-                        self._data["wallets"] = raw["wallets"]
-                    if isinstance(raw.get("events"), list):
-                        self._data["events"] = raw["events"]
+                    self._apply_raw(raw)
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning("recovery ledger load failed (%s); "
                                "starting empty", exc)
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn``.
+
+        A missing file keeps the in-memory state (first save); a corrupt
+        file also keeps it rather than wiping accounting — ``_load()``
+        already handled those cases loudly at boot.
+        """
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            return
+        if not isinstance(raw, dict):
+            return
+        self._apply_raw(raw)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-196), mirroring PersistentErrorTracker's
+        W-213 / SponsoredStakeLedger's W-195 ``_locked_txn``: instance
+        RLock + exclusive flock on the sidecar ``.lock`` file +
+        reload-under-lock, then run the body; on exit, persist exactly
+        once if any nested ``_save()`` marked the transaction dirty.
+        Nested entry joins the outer transaction: no re-flock, no
+        reload, no save. Fail-closed on lock failure: if flock is
+        unavailable or cannot be acquired, raise rather than proceed
+        without cross-instance mutual exclusion.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            directory = os.path.dirname(self.path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            if fcntl is None:  # fail closed
+                raise RuntimeError(
+                    "recovery ledger: fcntl unavailable; refusing to "
+                    "operate without cross-instance locking (W-196)")
+            lock_fh = open(Path(str(self.path) + ".lock"), "a+b")
+            try:
+                # Fail closed: any flock error propagates.
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                except OSError:
+                    pass
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
-        tmp = self.path + ".tmp"
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
+        tmp = f"{self.path}.tmp.{os.getpid()}.{threading.get_ident()}"
         d = os.path.dirname(self.path)
         if d:
             os.makedirs(d, exist_ok=True)
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(self._data, fh, indent=2)
-        os.replace(tmp, self.path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(self._data, fh, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmp, self.path)
+            # Dir fsync so the rename itself is durable.
+            if d:
+                try:
+                    dir_fd = os.open(d, os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+                except OSError:
+                    pass
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass  # already replaced (or never created)
 
     def _event(self, kind: str, **detail: Any) -> None:
         self._data["events"].append(
@@ -210,25 +336,32 @@ class RecoveryLedger:
 
     # -- reads ------------------------------------------------------------
     def wallet_state(self, wallet: str) -> Dict[str, Any]:
-        w = self._data["wallets"].get((wallet or "").lower())
-        if not w:
-            return {"strikes": 0, "sponsorships": [],
-                    "last_sponsored_at_ms": None}
-        return {"strikes": int(w.get("strikes", 0)),
-                "sponsorships": list(w.get("sponsorships", [])),
-                "last_sponsored_at_ms": w.get("last_sponsored_at_ms")}
+        # W-196: reload fresh under the flock so another instance's
+        # writes are never hidden by a stale snapshot.
+        with self._locked_txn():
+            w = self._data["wallets"].get((wallet or "").lower())
+            if not w:
+                return {"strikes": 0, "sponsorships": [],
+                        "last_sponsored_at_ms": None}
+            return {"strikes": int(w.get("strikes", 0)),
+                    "sponsorships": list(w.get("sponsorships", [])),
+                    "last_sponsored_at_ms": w.get("last_sponsored_at_ms")}
 
     def find_by_event(self, bankruptcy_event_id: str) -> Optional[Dict[str, Any]]:
-        for w in self._data["wallets"].values():
-            for s in w.get("sponsorships", []):
-                if s.get("bankruptcy_event_id") == bankruptcy_event_id:
-                    return dict(s)
-        return None
+        with self._locked_txn():
+            for w in self._data["wallets"].values():
+                for s in w.get("sponsorships", []):
+                    if s.get("bankruptcy_event_id") == bankruptcy_event_id:
+                        return dict(s)
+            return None
 
     # -- writes -----------------------------------------------------------
     def record_sponsorship(self, wallet: str, sponsorship: Dict[str, Any]
                            ) -> Dict[str, Any]:
-        with self._lock:
+        # W-196: reload-mutate-save under the flock, so a stale instance
+        # increments the fresh on-disk strike count instead of erasing
+        # another instance's sponsorships with its stale snapshot.
+        with self._locked_txn():
             key = (wallet or "").lower()
             w = self._data["wallets"].setdefault(
                 key, {"strikes": 0, "sponsorships": [],
