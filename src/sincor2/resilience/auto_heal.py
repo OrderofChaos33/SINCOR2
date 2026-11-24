@@ -23,9 +23,16 @@ import os
 import random
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-213)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.resilience.auto_heal")
 
@@ -148,6 +155,12 @@ class PersistentErrorTracker:
         self._clock = clock
         self._lock = threading.RLock()
         self._records: Dict[str, ErrorRecord] = {}
+        # W-213 locked-transaction state (BountyPool W-193 / TokenBudget
+        # W-215 pattern): depth > 0 means this instance already holds the
+        # flock; nested _save() calls join the outer transaction instead
+        # of saving an independent (possibly stale) snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     @staticmethod
@@ -163,7 +176,10 @@ class PersistentErrorTracker:
     ) -> ErrorRecord:
         """Increment the record for this error signature and persist."""
         now = self._clock()
-        with self._lock:
+        # W-213: reload-mutate-save under the flock, so a stale instance
+        # increments the fresh on-disk record instead of erasing records
+        # written by another instance with its stale snapshot.
+        with self._locked_txn():
             key = self._key(error_type, endpoint)
             rec = self._records.get(key)
             if rec is None:
@@ -180,19 +196,22 @@ class PersistentErrorTracker:
             if message:
                 rec.last_message = message[:500]
             self._save()
-            return rec
+            result = rec
+        return result
 
     def get(self, error_type: str, endpoint: str) -> Optional[ErrorRecord]:
-        with self._lock:
+        # W-213: reload fresh under the flock so another instance's
+        # writes (and prunes) are never hidden by a stale snapshot.
+        with self._locked_txn():
             return self._records.get(self._key(error_type, endpoint))
 
     def all_records(self) -> List[ErrorRecord]:
-        with self._lock:
+        with self._locked_txn():
             return list(self._records.values())
 
     def stats(self) -> Dict[str, Any]:
         """Aggregate totals, split by classification."""
-        with self._lock:
+        with self._locked_txn():
             total = sum(r.count for r in self._records.values())
             by_class: Dict[str, int] = {}
             for rec in self._records.values():
@@ -208,15 +227,114 @@ class PersistentErrorTracker:
     def prune(self, older_than_seconds: float) -> int:
         """Drop records whose last sighting is older than the cutoff."""
         cutoff = self._clock() - older_than_seconds
-        with self._lock:
+        # W-213: prune against the fresh on-disk state under the flock —
+        # a stale instance must neither resurrect pruned-away records nor
+        # erase newer records it never saw.
+        with self._locked_txn():
             stale = [k for k, r in self._records.items() if r.last_seen < cutoff]
             for k in stale:
                 del self._records[k]
             if stale:
                 self._save()
-            return len(stale)
+            pruned = len(stale)
+        return pruned
+
+    def _apply_raw(self, raw: Dict[str, Any]) -> None:
+        """Replace in-memory state wholesale from a persisted payload.
+
+        W-213: a reload-under-lock must discard a stale snapshot
+        entirely — a record another instance pruned must not linger,
+        and one it recorded must not vanish through a merge.
+        """
+        records: Dict[str, ErrorRecord] = {}
+        for key, d in raw.items():
+            try:
+                records[key] = ErrorRecord.from_dict(d)
+            except (KeyError, ValueError, TypeError) as exc:
+                logger.warning("error tracker: skipping bad record %s: %s", key, exc)
+        self._records = records
+
+    def _reload_under_lock(self) -> None:
+        """Re-read the store file. Call inside ``_locked_txn``.
+
+        Lets a mutator/read see records written by another instance
+        since this instance last loaded, so a stale snapshot is never
+        the basis of a save or a read (W-213). A missing file keeps the
+        in-memory state (first save); a corrupt file also keeps it
+        rather than wiping accounting — ``_load()`` already handled
+        those cases loudly at boot.
+        """
+        try:
+            with open(self._path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            return
+        if not isinstance(raw, dict):
+            return
+        self._apply_raw(raw)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-213), mirroring BountyPool's W-193 /
+        TokenBudget's W-215 ``_locked_txn``: instance RLock + exclusive
+        flock on the sidecar ``.lock`` file (graceful fallback when
+        fcntl is unavailable) + reload-under-lock, then run the body;
+        on exit, persist exactly once if any nested ``_save()`` marked
+        the transaction dirty. Nested entry joins the outer
+        transaction: no re-flock, no reload, no save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            directory = os.path.dirname(self._path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            lock_fh = open(Path(str(self._path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
 
     def _save(self) -> None:
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
         tmp = self._path + ".tmp"
         try:
             directory = os.path.dirname(self._path)
@@ -246,12 +364,10 @@ class PersistentErrorTracker:
                 exc,
             )
             return
+        if not isinstance(raw, dict):
+            return
         with self._lock:
-            for key, d in raw.items():
-                try:
-                    self._records[key] = ErrorRecord.from_dict(d)
-                except (KeyError, ValueError, TypeError) as exc:
-                    logger.warning("error tracker: skipping bad record %s: %s", key, exc)
+            self._apply_raw(raw)
 
 
 # ---------------------------------------------------------------------------
