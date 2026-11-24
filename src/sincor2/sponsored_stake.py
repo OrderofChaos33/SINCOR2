@@ -44,8 +44,16 @@ import hmac
 import json
 import logging
 import os
+import threading
 import time
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Dict, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-195)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger("sincor.market.sponsored_stake")
 
@@ -104,29 +112,134 @@ class SponsoredStakeLedger:
         self.path = (
             path or os.environ.get(LEDGER_ENV) or _default_ledger_path())
         self._data: Dict[str, Any] = {"agents": {}, "events": []}
+        self._lock = threading.RLock()
+        # W-195 locked-transaction state (W-213 pattern): depth > 0 means
+        # this instance already holds the flock; nested _save() calls join
+        # the outer transaction instead of saving a stale snapshot.
+        self._txn_depth = 0
+        self._txn_dirty = False
         self._load()
 
     # -- persistence ------------------------------------------------------
+    def _apply_raw(self, raw: Dict[str, Any]) -> None:
+        """Replace in-memory state wholesale from a persisted payload.
+
+        W-195: a reload must discard a stale snapshot entirely — the old
+        shallow ``self._data.update(raw)`` load merged stale keys back
+        in, so a record another instance settled (or removed) could
+        linger and be re-saved. Build a fresh dict instead.
+        """
+        data: Dict[str, Any] = {"agents": {}, "events": []}
+        data.update(raw)
+        if not isinstance(data.get("agents"), dict):
+            data["agents"] = {}
+        if not isinstance(data.get("events"), list):
+            data["events"] = []
+        self._data = data
+
     def _load(self) -> None:
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
                 if isinstance(raw, dict):
-                    self._data.update(raw)
+                    self._apply_raw(raw)
             except (json.JSONDecodeError, OSError) as exc:
                 logger.warning(
                     "sponsored-stake ledger load failed (%s); starting empty",
                     exc)
 
+    def _reload_under_lock(self) -> None:
+        """Re-read the ledger file. Call inside ``_locked_txn``.
+
+        A missing file keeps the in-memory state (first save); a corrupt
+        file also keeps it rather than wiping accounting — ``_load()``
+        already handled those cases loudly at boot.
+        """
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                raw = json.load(fh)
+        except FileNotFoundError:
+            return
+        except (OSError, ValueError):
+            return
+        if not isinstance(raw, dict):
+            return
+        self._apply_raw(raw)
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-195), mirroring PersistentErrorTracker's
+        W-213 ``_locked_txn``: instance RLock + exclusive flock on the
+        sidecar ``.lock`` file (graceful fallback when fcntl is
+        unavailable) + reload-under-lock, then run the body; on exit,
+        persist exactly once if any nested ``_save()`` marked the
+        transaction dirty. Nested entry joins the outer transaction:
+        no re-flock, no reload, no save.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            directory = os.path.dirname(self.path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            lock_fh = open(Path(str(self.path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                self._txn_dirty = False
+                try:
+                    self._reload_under_lock()
+                    try:
+                        yield
+                    except BaseException:
+                        if self._txn_dirty:
+                            self._save_locked()
+                        raise
+                    if self._txn_dirty:
+                        self._save_locked()
+                finally:
+                    self._txn_depth = 0
+                    self._txn_dirty = False
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
+
     def _save(self) -> None:
-        tmp = self.path + ".tmp"
+        """Persist, or — inside a locked transaction — defer to its exit.
+
+        Outside a transaction this enters one (flock + reload first),
+        so every persisting path writes the fresh merged state.
+        """
+        if self._txn_depth > 0:
+            self._txn_dirty = True
+            return
+        with self._locked_txn():
+            self._txn_dirty = True
+
+    def _save_locked(self) -> None:
+        tmp = f"{self.path}.tmp.{os.getpid()}.{threading.get_ident()}"
         d = os.path.dirname(self.path)
         if d:
             os.makedirs(d, exist_ok=True)
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(self._data, fh, indent=2)
-        os.replace(tmp, self.path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(self._data, fh, indent=2)
+            os.replace(tmp, self.path)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass  # already replaced (or never created)
 
     def _event(self, kind: str, **detail: Any) -> None:
         self._data["events"].append(
@@ -136,16 +249,20 @@ class SponsoredStakeLedger:
 
     # -- API --------------------------------------------------------------
     def status_of(self, agent_id: str) -> Optional[Dict[str, Any]]:
-        rec = self._data["agents"].get(agent_id)
-        return dict(rec) if rec else None
+        # W-195: reload fresh under the flock so another instance's
+        # writes are never hidden by a stale snapshot.
+        with self._locked_txn():
+            rec = self._data["agents"].get(agent_id)
+            return dict(rec) if rec else None
 
     def outstanding_wei(self, agent_id: str) -> int:
-        rec = self._data["agents"].get(agent_id)
-        if not rec or rec.get("status") == STATUS_SETTLED:
-            return 0
-        return (int(rec.get("fronted_wei", "0"))
-                - int(rec.get("recouped_wei", "0"))
-                - int(rec.get("clawed_back_wei", "0")))
+        with self._locked_txn():
+            rec = self._data["agents"].get(agent_id)
+            if not rec or rec.get("status") == STATUS_SETTLED:
+                return 0
+            return (int(rec.get("fronted_wei", "0"))
+                    - int(rec.get("recouped_wei", "0"))
+                    - int(rec.get("clawed_back_wei", "0")))
 
     def front(self, agent_id: str, amount_wei: int,
               approved_by: str) -> Dict[str, Any]:
@@ -155,42 +272,46 @@ class SponsoredStakeLedger:
         on bad input, RuntimeError when the agent already has an active
         sponsorship.
         """
-        if not sponsored_stake_enabled():
-            raise SponsoredStakeDisabled(
-                f"sponsored stake is disabled; set {ENABLE_ENV}=1 to enable")
-        agent_id = str(agent_id or "").strip()
-        if not agent_id:
-            raise ValueError("agent_id is required")
-        amount_wei = int(amount_wei)
-        if amount_wei <= 0:
-            raise ValueError("amount_wei must be positive")
-        existing = self._data["agents"].get(agent_id)
-        if existing and existing.get("status") in _ACTIVE:
-            raise RuntimeError(
-                f"agent {agent_id} already has an active sponsorship "
-                f"({existing['status']}, outstanding "
-                f"{self.outstanding_wei(agent_id)} wei)")
-        from sincor2.onchain.stake_ledger import stake_ledger
+        # W-195: check-mutate-save under the flock with a fresh reload,
+        # so a stale instance cannot double-front or erase another
+        # instance's record with its stale snapshot.
+        with self._locked_txn():
+            if not sponsored_stake_enabled():
+                raise SponsoredStakeDisabled(
+                    f"sponsored stake is disabled; set {ENABLE_ENV}=1 to enable")
+            agent_id = str(agent_id or "").strip()
+            if not agent_id:
+                raise ValueError("agent_id is required")
+            amount_wei = int(amount_wei)
+            if amount_wei <= 0:
+                raise ValueError("amount_wei must be positive")
+            existing = self._data["agents"].get(agent_id)
+            if existing and existing.get("status") in _ACTIVE:
+                raise RuntimeError(
+                    f"agent {agent_id} already has an active sponsorship "
+                    f"({existing['status']}, outstanding "
+                    f"{self.outstanding_wei(agent_id)} wei)")
+            from sincor2.onchain.stake_ledger import stake_ledger
 
-        stake_ledger().deposit(
-            agent_id, amount_wei,
-            reference=f"sponsored-stake:{agent_id}")
-        rec = {
-            "agent_id": agent_id,
-            "fronted_wei": str(amount_wei),
-            "recouped_wei": "0",
-            "clawed_back_wei": "0",
-            "status": STATUS_FRONTED,
-            "approved_by": str(approved_by or "admin"),
-            "fronted_at": _now(),
-            "settled_at": None,
-        }
-        self._data["agents"][agent_id] = rec
-        self._event("front", agent_id=agent_id,
-                    amount_wei=str(amount_wei),
-                    approved_by=str(approved_by or "admin"))
-        self._save()
-        return dict(rec)
+            stake_ledger().deposit(
+                agent_id, amount_wei,
+                reference=f"sponsored-stake:{agent_id}")
+            rec = {
+                "agent_id": agent_id,
+                "fronted_wei": str(amount_wei),
+                "recouped_wei": "0",
+                "clawed_back_wei": "0",
+                "status": STATUS_FRONTED,
+                "approved_by": str(approved_by or "admin"),
+                "fronted_at": _now(),
+                "settled_at": None,
+            }
+            self._data["agents"][agent_id] = rec
+            self._event("front", agent_id=agent_id,
+                        amount_wei=str(amount_wei),
+                        approved_by=str(approved_by or "admin"))
+            self._save()
+            return dict(rec)
 
     def recoup(self, agent_id: str, earnings_wei: int,
                task_id: Optional[str] = None) -> Dict[str, Any]:
@@ -200,30 +321,32 @@ class SponsoredStakeLedger:
         Runs regardless of the enablement flag: disabling stops new
         fronts, it never forgives outstanding ones.
         """
-        earnings_wei = int(earnings_wei)
-        outstanding = self.outstanding_wei(agent_id)
-        if outstanding <= 0 or earnings_wei <= 0:
-            return {"agent_id": agent_id, "recouped_wei": "0",
-                    "outstanding_wei": str(outstanding),
-                    "status": (self._data["agents"].get(agent_id) or {}).get(
-                        "status")}
-        take = min(outstanding, earnings_wei)
-        rec = self._data["agents"][agent_id]
-        rec["recouped_wei"] = str(int(rec["recouped_wei"]) + take)
-        new_outstanding = outstanding - take
-        rec["status"] = (STATUS_SETTLED if new_outstanding == 0
-                         else STATUS_RECOUPING)
-        if new_outstanding == 0:
-            rec["settled_at"] = _now()
-        self._event("recoup", agent_id=agent_id,
-                    recouped_wei=str(take),
-                    outstanding_wei=str(new_outstanding),
-                    task_id=str(task_id or ""),
-                    earnings_wei=str(earnings_wei))
-        self._save()
-        return {"agent_id": agent_id, "recouped_wei": str(take),
-                "outstanding_wei": str(new_outstanding),
-                "status": rec["status"]}
+        # W-195: reload-mutate-save under the flock (see front()).
+        with self._locked_txn():
+            earnings_wei = int(earnings_wei)
+            outstanding = self.outstanding_wei(agent_id)
+            if outstanding <= 0 or earnings_wei <= 0:
+                return {"agent_id": agent_id, "recouped_wei": "0",
+                        "outstanding_wei": str(outstanding),
+                        "status": (self._data["agents"].get(agent_id) or {}).get(
+                            "status")}
+            take = min(outstanding, earnings_wei)
+            rec = self._data["agents"][agent_id]
+            rec["recouped_wei"] = str(int(rec["recouped_wei"]) + take)
+            new_outstanding = outstanding - take
+            rec["status"] = (STATUS_SETTLED if new_outstanding == 0
+                             else STATUS_RECOUPING)
+            if new_outstanding == 0:
+                rec["settled_at"] = _now()
+            self._event("recoup", agent_id=agent_id,
+                        recouped_wei=str(take),
+                        outstanding_wei=str(new_outstanding),
+                        task_id=str(task_id or ""),
+                        earnings_wei=str(earnings_wei))
+            self._save()
+            return {"agent_id": agent_id, "recouped_wei": str(take),
+                    "outstanding_wei": str(new_outstanding),
+                    "status": rec["status"]}
 
     def apply_clawback(self, agent_id: str, amount_wei: int,
                        task_id: Optional[str] = None) -> int:
@@ -245,32 +368,34 @@ class SponsoredStakeLedger:
         recoup: disabling stops new fronts, it never forgives — or
         revives — claims.
         """
-        amount_wei = int(amount_wei)
-        rec = self._data["agents"].get(agent_id)
-        if rec is None or amount_wei <= 0:
-            return 0
-        done = rec.setdefault("clawback_tasks", [])
-        if task_id and str(task_id) in done:
-            return 0
-        outstanding = self.outstanding_wei(agent_id)
-        if outstanding <= 0:
-            return 0
-        applied = min(amount_wei, outstanding)
-        rec["clawed_back_wei"] = str(
-            int(rec.get("clawed_back_wei", "0")) + applied)
-        if task_id:
-            done.append(str(task_id))
-        new_outstanding = outstanding - applied
-        rec["status"] = (STATUS_SETTLED if new_outstanding == 0
-                         else STATUS_RECOUPING)
-        if new_outstanding == 0:
-            rec["settled_at"] = _now()
-        self._event("clawback", agent_id=agent_id,
-                    clawed_back_wei=str(applied),
-                    outstanding_wei=str(new_outstanding),
-                    task_id=str(task_id or ""))
-        self._save()
-        return applied
+        # W-195: reload-mutate-save under the flock (see front()).
+        with self._locked_txn():
+            amount_wei = int(amount_wei)
+            rec = self._data["agents"].get(agent_id)
+            if rec is None or amount_wei <= 0:
+                return 0
+            done = rec.setdefault("clawback_tasks", [])
+            if task_id and str(task_id) in done:
+                return 0
+            outstanding = self.outstanding_wei(agent_id)
+            if outstanding <= 0:
+                return 0
+            applied = min(amount_wei, outstanding)
+            rec["clawed_back_wei"] = str(
+                int(rec.get("clawed_back_wei", "0")) + applied)
+            if task_id:
+                done.append(str(task_id))
+            new_outstanding = outstanding - applied
+            rec["status"] = (STATUS_SETTLED if new_outstanding == 0
+                             else STATUS_RECOUPING)
+            if new_outstanding == 0:
+                rec["settled_at"] = _now()
+            self._event("clawback", agent_id=agent_id,
+                        clawed_back_wei=str(applied),
+                        outstanding_wei=str(new_outstanding),
+                        task_id=str(task_id or ""))
+            self._save()
+            return applied
 
 
 # --- process-wide singleton (overridable in tests) -----------------------------
