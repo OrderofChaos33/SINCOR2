@@ -21,6 +21,18 @@ spec's empty-state sentence over the snapshot-only page. A partially
 written final line (crash mid-append) is the one tolerated defect:
 complete lines before it still load, and the torn tail is ignored.
 
+Load-time integrity repair (SH-1): per-record *structural* problems
+— a record that parses as JSON but fails :func:`validate_event`, or
+a duplicate ``event_id`` — no longer brick the wall. Each such record
+is quarantined to the sidecar ``<store>.quarantine.jsonl`` (appended,
+with its reason) and in-memory state is rebuilt from the valid
+remainder; the store file itself is never rewritten on load, so a
+clean store loads byte-identically. BOUNDARY: corrupt JSON — a
+complete line that does not parse as JSON at all, or a file that is
+not decodable text — still fails closed with
+:class:`ProofStoreError`; quarantine-and-rebuild applies to
+per-record structural problems only, never to unparseable bytes.
+
 Event shape (one shape for every source — spec §3.1):
 
     event_id    dedupe key everywhere ("moebiusx:trade-107", "task:tsk_…")
@@ -134,30 +146,90 @@ class ProofEventStore:
 
     # ── loading ──────────────────────────────────────────────────────
 
+    @property
+    def quarantine_path(self) -> Path:
+        """Sidecar receiving quarantined records (SH-1)."""
+        return Path(str(self._path) + ".quarantine.jsonl")
+
+    def _quarantine(self, pending: List[Dict[str, Any]]) -> None:
+        """Append quarantined records to the sidecar (SH-1).
+
+        Each entry is one JSON line: {line, reason, raw, record}.
+        Append-only and idempotent per (line, raw, reason): reloads
+        re-validate the same on-disk records, and an entry already in
+        the sidecar is not written again, so repeated loads cannot
+        grow the quarantine file with copies of the same defect.
+        """
+        if not pending:
+            return
+        qpath = self.quarantine_path
+        seen = set()
+        if qpath.exists():
+            try:
+                for qline in qpath.read_text(encoding="utf-8").splitlines():
+                    if not qline.strip():
+                        continue
+                    try:
+                        entry = json.loads(qline)
+                    except ValueError:
+                        continue
+                    seen.add((entry.get("line"), entry.get("raw"),
+                              entry.get("reason")))
+            except OSError:
+                seen = set()
+        fresh = [e for e in pending
+                 if (e["line"], e["raw"], e["reason"]) not in seen]
+        if not fresh:
+            return
+        try:
+            qpath.parent.mkdir(parents=True, exist_ok=True)
+            with open(qpath, "a", encoding="utf-8") as fh:
+                for entry in fresh:
+                    fh.write(json.dumps(entry, separators=(",", ":"),
+                                        sort_keys=True) + "\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+        except OSError as exc:
+            raise ProofStoreError(
+                f"proof event quarantine write failed: {exc}") from exc
+        for entry in fresh:
+            logger.warning(
+                "proof_events: quarantined line %s from %s: %s",
+                entry["line"], self._path, entry["reason"])
+
     def _read_disk(self):
         """Parse the on-disk file fresh. Returns (events, ids).
 
-        Missing file = empty store. A malformed complete line raises
-        ProofStoreError (fail closed); a torn final line (crash during
+        Missing file = empty store. A torn final line (crash during
         append, no trailing newline, unparseable) is ignored so the
         events that were durably written still count.
+
+        SH-1 boundary (see module docstring): a complete line that
+        does not parse as JSON at all is corrupt-JSON and raises
+        ProofStoreError (fail closed). A line that parses but is
+        structurally invalid, or whose event_id duplicates an earlier
+        record, is quarantined to the sidecar and skipped — the valid
+        remainder loads. The store file is never rewritten here.
         """
         events: List[Dict[str, Any]] = []
         ids: set = set()
         if self._path.exists():
             try:
                 raw = self._path.read_text(encoding="utf-8")
-            except OSError as exc:
+            except (OSError, UnicodeDecodeError) as exc:
                 raise ProofStoreError(
                     f"proof event store unreadable: {exc}") from exc
             lines = raw.split("\n")
+            pending_quarantine: List[Dict[str, Any]] = []
             for idx, line in enumerate(lines):
                 text = line.strip()
                 if not text:
                     continue
+                # Step 1 — JSON syntax. Unparseable = corrupt-JSON:
+                # fail closed (torn final line excepted, as before).
                 try:
-                    record = validate_event(json.loads(text))
-                except (ValueError, TypeError) as exc:
+                    parsed = json.loads(text)
+                except ValueError as exc:
                     is_torn_tail = idx == len(lines) - 1 and not raw.endswith("\n")
                     if is_torn_tail:
                         logger.warning(
@@ -167,14 +239,33 @@ class ProofEventStore:
                     raise ProofStoreError(
                         f"proof event store corrupt at line {idx + 1}: {exc}"
                     ) from exc
+                # Step 2 — structure. A parseable but invalid record is
+                # a per-record problem: quarantine it, keep loading.
+                try:
+                    record = validate_event(parsed)
+                except (ValueError, TypeError) as exc:
+                    pending_quarantine.append({
+                        "line": idx + 1,
+                        "reason": f"invalid record: {exc}",
+                        "raw": text,
+                        "record": parsed if isinstance(parsed, dict) else None,
+                    })
+                    continue
                 if record["event_id"] in ids:
                     # The file is append-only and record_event dedupes,
                     # so a duplicate on disk means tampering/corruption.
-                    raise ProofStoreError(
-                        f"proof event store has duplicate event_id "
-                        f"{record['event_id']!r}")
+                    # SH-1: keep the first occurrence, quarantine the
+                    # duplicate instead of bricking the whole wall.
+                    pending_quarantine.append({
+                        "line": idx + 1,
+                        "reason": f"duplicate event_id: {record['event_id']!r}",
+                        "raw": text,
+                        "record": parsed if isinstance(parsed, dict) else None,
+                    })
+                    continue
                 ids.add(record["event_id"])
                 events.append(record)
+            self._quarantine(pending_quarantine)
         return events, ids
 
     def _load(self) -> None:
