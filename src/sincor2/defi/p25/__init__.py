@@ -24,7 +24,7 @@ PARAMS = {
     "fee_denominations": ("AXM", "SINC"),
 }
 
-from . import allocator, api, fees, guards, ingestor, rebalancer, risk
+from . import allocator, api, fees, guards, ingestor, rebalancer, risk, statements
 
 
 __all__ = [
@@ -35,6 +35,7 @@ __all__ = [
     "ingestor",
     "rebalancer",
     "risk",
+    "statements",
     "PARAMS",
 ]
 
