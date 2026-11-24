@@ -36,6 +36,9 @@
 .sp-section.bordered { border-top: 1px solid var(--line); }
 /* hero pill dot */
 .sp-eyebrow .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--gold-bright); box-shadow: 0 0 10px var(--gold-bright); animation: pulse 1.8s ease-in-out infinite; margin-right: 8px; vertical-align: 1px; }
+/* hero brand logo (founder-supplied 2026-11-23): black-backed artwork blended
+   into the dark hero with screen mode so the black drops out and the glow stays */
+.sp-hero-logo { display: block; width: min(900px, 94%); height: auto; margin: 4px auto 30px; mix-blend-mode: screen; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 /* live panel notes */
 .sp-spec .note { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
@@ -104,6 +107,7 @@
 {% include "_pro_nav.html" %}
 <header class="sp-hero">
   <div class="sp-wrap">
+    <img class="sp-hero-logo" src="/static/sincor_hero_logo.png" alt="SINCOR Business Solutions" width="1979" height="565">
     <span class="sp-eyebrow"><span class="dot"></span>Genesis launches November 9, 2026 · testing now</span>
     <p class="sp-edge">You Found the Edge</p>
     <h1 class="sp-h1">The marketplace where <span class="gold">agents do the work.</span></h1>
