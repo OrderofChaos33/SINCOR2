@@ -141,6 +141,62 @@ class AirdropQuest:
             }
         )
 
+    def _sync_from(self, state: Dict[str, Any]) -> None:
+        """Adopt persisted state as this instance's in-memory snapshot.
+
+        Caller must hold self.lock (or be in __init__).
+        """
+        self.claims = state.get("claims") or {}
+        self.root = str(state.get("root") or "")
+        try:
+            self.count = int(state.get("count") or 0)
+        except (TypeError, ValueError):
+            self.count = 0
+        self.source = str(state.get("source") or "unloaded")
+
+    def _run_update(self, mutator) -> Any:
+        """Apply ``mutator`` to the FRESH on-disk state under the store flock.
+
+        W-214 fix: the mutator receives the claims/root/count/source
+        reloaded from disk inside JsonStore.update (LockedJsonStore.mutate),
+        never this instance's possibly-stale snapshot, and this instance is
+        re-synced from the persisted result. The mutator takes a parts dict
+        {"claims", "root", "count", "source"} (mutated in place) and returns
+        the caller's result. Exceptions abort the write entirely.
+
+        Locking: self.lock is held across store.update to serialize this
+        instance's own threads and the re-sync; the mutator must not call
+        any method that re-acquires self.lock. LockedJsonStore's own lock
+        is a separate per-store object, so this cannot deadlock against it.
+        """
+        captured: Dict[str, Any] = {}
+
+        def _apply(raw: Any) -> Dict[str, Any]:
+            state = raw if isinstance(raw, dict) else {}
+            parts = {
+                "claims": state.get("claims") or {},
+                "root": str(state.get("root") or ""),
+                "count": state.get("count") or 0,
+                "source": str(state.get("source") or "unloaded"),
+            }
+            try:
+                parts["count"] = int(parts["count"])
+            except (TypeError, ValueError):
+                parts["count"] = 0
+            captured["result"] = mutator(parts)
+            return {
+                "claims": parts["claims"],
+                "root": parts["root"],
+                "count": parts["count"],
+                "source": parts["source"],
+                "saved_at": _now(),
+            }
+
+        with self.lock:
+            new_state = self.store.update(_apply)
+            self._sync_from(new_state)
+        return captured.get("result")
+
     def _load_manifest(self) -> None:
         path = _manifest_path()
         if not path.is_file():
@@ -178,12 +234,20 @@ class AirdropQuest:
         bound = _committed_root()
         if bound and tree.hex_root().lower() != bound:
             raise PermissionError("ROOT_MISMATCH")
+        new_root = tree.hex_root()
+        new_count = tree.manifest()["count"]
+
+        def _merge(parts):
+            # Merge root/count/source into the FRESH state; claims written
+            # by another instance since this instance loaded must survive.
+            parts["root"] = new_root
+            parts["count"] = new_count
+            parts["source"] = source
+            return new_count
+
+        self._run_update(_merge)
         with self.lock:
             self.tree = tree
-            self.root = tree.hex_root()
-            self.count = tree.manifest()["count"]
-            self.source = source
-            self._persist()
         if persist_manifest:
             path = _manifest_path()
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -252,10 +316,18 @@ class AirdropQuest:
         if not elig.get("eligible"):
             raise PermissionError("wallet not in merkle list")
 
-        with self.lock:
-            key = f"{wallet}:{self.root}"
-            if key in self.claims:
-                return dict(self.claims[key])
+        key = f"{wallet}:{self.root}"
+        claim_root = elig.get("root") or self.root
+        claim_proof = elig.get("proof") or list(proof or [])
+
+        def _claim(parts):
+            # W-214 double-claim fix: the already-claimed check is re-done
+            # against the FRESH claims reloaded under the flock. A claim
+            # written by another instance since this instance loaded is
+            # returned as-is — no second row, no second credit.
+            fresh_claims = parts["claims"]
+            if key in fresh_claims:
+                return dict(fresh_claims[key])
             row = {
                 "wallet": wallet,
                 "agent_id": agent_id,
@@ -263,15 +335,16 @@ class AirdropQuest:
                 "reward_axm": PRICE_BOOK["quest_reward_axm"],
                 "status": "credited_ledger",
                 "note": "treasury must settle; this is not an auto-transfer",
-                "root": elig.get("root") or self.root,
-                "proof": elig.get("proof") or list(proof or []),
+                "root": claim_root,
+                "proof": claim_proof,
                 "ts": _now(),
                 "chain_id": CHAIN_ID,
                 "token": AXM,
             }
-            self.claims[key] = row
-            self._persist()
+            fresh_claims[key] = row
             return dict(row)
+
+        return self._run_update(_claim)
 
     def stats(self) -> Dict[str, Any]:
         with self.lock:
