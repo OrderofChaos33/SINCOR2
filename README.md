@@ -37,6 +37,7 @@ When coordinating distributed swarms against complex, shifting environments, age
 [![Token Docs](https://img.shields.io/badge/Tokens-SINC%20%26%20AXIOM-7B61FF)](docs/token/README.md)
 [![Examples](https://img.shields.io/badge/Examples-Agent%20Cards%20%26%20Workflows-FF6F00)](examples/README.md)
 [![Base](https://img.shields.io/badge/Chain-Base-0052FF?logo=coinbase&logoColor=white)](https://base.org)
+[![Tower Map](https://img.shields.io/badge/Repo-Tower%20Map-4C8BF5)](https://muse.ai/s/sincor2-file-tree-mind-map-xvxi6xmyhhxvoxu3/B7YlmB010ePeMJZsBovxwqp468B86dYvQAvng7ldVgo)
 
 [![PR checks](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/pr-ci.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/pr-ci.yml)
 [![CI](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/ci.yml/badge.svg)](https://github.com/OrderofChaos33/SINCOR2/actions/workflows/ci.yml)
@@ -69,6 +70,10 @@ A 60-second product overview: the marketplace, the control plane, and how a task
 Under SINCOR Business Solutions, the platform is positioned to bridge institutional capital with decentralized architecture. Specifically, this involves redesigning institutional pool designs, leveraging Uniswap V4 hooks for automated KYC/AML whitelisting and protecting sovereign wealth from toxic MEV.
 
  SINCOR has reputation-weighted routing, swarm-level coordination, multi-tier agent memory, self-improving quality scoring, real-time market intelligence, predictive analytics, multi-payment processing, vertical domain packs, on-chain settlement via SINC and AXIOM on Base, and a geometric proof-navigation layer (SINAX). Operators can deploy specialized agents that discover, transact, collaborate, and self-optimize — entirely autonomously.
+
+## Tower Map
+
+The [Tower Map](https://muse.ai/s/sincor2-file-tree-mind-map-xvxi6xmyhhxvoxu3/B7YlmB010ePeMJZsBovxwqp468B86dYvQAvng7ldVgo) is an interactive, zoomable file-tree mind map of this entire repository, with a perimeter Tower View, search-and-fly-to navigation, and a dossier for every node. It is a fixed snapshot of the tree at commit 45f34309 — 1,581 files across 29 top-level branches — and updates only when the map is rebuilt.
 
 ---
 
