@@ -35,7 +35,7 @@ PARAMS = {
     "live_blocked": True,
 }
 
-from . import accrual, curve, factory, fees, live_block, onboarding, policy, primitives, screener, split
+from . import accrual, curve, factory, fees, live_block, onboarding, platform_book, policy, primitives, screener, split
 
 from .live_block import LiveBlocked
 from .screener import ContentScreener, DeferredScreener, DenyListScreener, ScreenerDenied
@@ -52,6 +52,7 @@ __all__ = [
     "fees",
     "live_block",
     "onboarding",
+    "platform_book",
     "policy",
     "primitives",
     "screener",
