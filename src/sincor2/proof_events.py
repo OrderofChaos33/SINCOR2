@@ -44,8 +44,14 @@ import logging
 import os
 import re
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+try:  # POSIX advisory locks for cross-instance mutual exclusion (W-212)
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -114,9 +120,13 @@ class ProofEventStore:
 
     def __init__(self, path: Optional[Path] = None) -> None:
         self._path = Path(path) if path is not None else store_path()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._events: Optional[List[Dict[str, Any]]] = None
         self._ids: set = set()
+        # W-212 locked-transaction state (mirrors BountyPool W-193 /
+        # TokenBudget W-215 _locked_txn): depth > 0 means this instance
+        # already holds the flock; nested entry joins the outer txn.
+        self._txn_depth = 0
 
     @property
     def path(self) -> Path:
@@ -124,16 +134,14 @@ class ProofEventStore:
 
     # ── loading ──────────────────────────────────────────────────────
 
-    def _load(self) -> None:
-        """Populate the in-memory index from disk (once, under lock).
+    def _read_disk(self):
+        """Parse the on-disk file fresh. Returns (events, ids).
 
         Missing file = empty store. A malformed complete line raises
         ProofStoreError (fail closed); a torn final line (crash during
         append, no trailing newline, unparseable) is ignored so the
         events that were durably written still count.
         """
-        if self._events is not None:
-            return
         events: List[Dict[str, Any]] = []
         ids: set = set()
         if self._path.exists():
@@ -167,8 +175,55 @@ class ProofEventStore:
                         f"{record['event_id']!r}")
                 ids.add(record["event_id"])
                 events.append(record)
-        self._events = events
-        self._ids = ids
+        return events, ids
+
+    def _load(self) -> None:
+        """Populate the in-memory index from disk (once, under lock)."""
+        if self._events is not None:
+            return
+        self._events, self._ids = self._read_disk()
+
+    def _reload(self) -> None:
+        """Re-read the file fresh, discarding any stale snapshot.
+
+        Call inside ``_locked_txn`` (W-212).
+        """
+        self._events, self._ids = self._read_disk()
+
+    @contextmanager
+    def _locked_txn(self):
+        """Locked transaction (W-212), mirroring BountyPool's W-193
+        ``_locked_txn``: instance RLock + exclusive flock on the
+        sidecar ``.lock`` file (graceful fallback when fcntl is
+        unavailable) + reload-under-lock, then run the body against
+        the fresh state. Nested entry joins the outer transaction:
+        no re-flock, no reload.
+        """
+        with self._lock:
+            if self._txn_depth > 0:
+                self._txn_depth += 1
+                try:
+                    yield
+                finally:
+                    self._txn_depth -= 1
+                return
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            lock_fh = open(Path(str(self._path) + ".lock"), "a+b")
+            try:
+                if fcntl is not None:
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
+                self._txn_depth = 1
+                try:
+                    self._reload()
+                    yield
+                finally:
+                    self._txn_depth = 0
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+                finally:
+                    lock_fh.close()
 
     # ── writes ───────────────────────────────────────────────────────
 
@@ -182,8 +237,10 @@ class ProofEventStore:
         was recorded when it was not.
         """
         record = validate_event(event)
-        with self._lock:
-            self._load()
+        # W-212: dedupe + append inside the flock with a fresh reload,
+        # so a second instance's already-appended id is seen and the
+        # duplicate is refused instead of bricking the file.
+        with self._locked_txn():
             assert self._events is not None
             if record["event_id"] in self._ids:
                 return False
@@ -206,8 +263,9 @@ class ProofEventStore:
     def list_events(self, limit: int = 25) -> List[Dict[str, Any]]:
         """Newest-first events (at most ``limit``), each carrying its
         ``origin_label`` so no render path can drop the origin."""
-        with self._lock:
-            self._load()
+        # W-212: reload fresh under the flock so appends by another
+        # instance are never hidden by a stale cached snapshot.
+        with self._locked_txn():
             assert self._events is not None
             events = list(self._events)
         events.reverse()
@@ -219,8 +277,7 @@ class ProofEventStore:
         """Event counts: grand total plus the by-origin split. Counts
         only — amounts are never summed across assets/origins into a
         single money figure."""
-        with self._lock:
-            self._load()
+        with self._locked_txn():
             assert self._events is not None
             events = list(self._events)
         by_origin = {origin: 0 for origin in sorted(ORIGINS)}
