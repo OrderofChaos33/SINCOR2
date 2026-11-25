@@ -5,21 +5,21 @@
   "publication_date": "11/23/2026",
   "record_count": 19629,
   "entry_count": 19629,
-  "fetched_at": "2026-11-24T17:14:33.927484+00:00",
+  "fetched_at": "2026-11-25T17:31:51.063475+00:00",
   "encoding": "base64(gzip(utf-8 json))",
   "chunk_count": 3,
   "chunks": [
-    "p20_ofac_sdn.b64.2591ba3e.000.txt",
-    "p20_ofac_sdn.b64.2591ba3e.001.txt",
-    "p20_ofac_sdn.b64.2591ba3e.002.txt"
+    "p20_ofac_sdn.b64.a0a24b27.000.txt",
+    "p20_ofac_sdn.b64.a0a24b27.001.txt",
+    "p20_ofac_sdn.b64.a0a24b27.002.txt"
   ],
   "chunk_bytes": [
     606000,
     606000,
     82118
   ],
-  "payload_bytes_gzip": 960977,
+  "payload_bytes_gzip": 960976,
   "payload_bytes_json": 7383858,
-  "sha256_gzip": "2591ba3edabfff889001d913d6c5427f7ee2ab9dcf545f9141701252368a10a8",
-  "sha256_json": "60db9206e55fb5478fa519d79d55444ec2633070800fc2389ed7aac3860f4c33"
+  "sha256_gzip": "a0a24b27c20d8f63d618bbacd54a909a4796373636cff034e6fd0d6d255f0d5f",
+  "sha256_json": "c2ba0e64a057ef3fbb472c859408c24b2fe34114efaca155f7802d29e37c5b97"
 }
