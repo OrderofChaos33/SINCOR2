@@ -160,6 +160,63 @@ MAX_AGENT_OPEN_ESCROW_AXM = 50.0
 _OPEN_ESCROW_STATES = frozenset({"assigned", "proof_submitted", "failed"})
 
 
+# ---------------------------------------------------------------------------
+# Task-board list snapshot cache (perf fix, 2026-11-24)
+#
+# GET /v1/a2a/tasks used to copy + sort the entire task board on EVERY
+# request, after running the full maintenance sweeps. Pollers (the
+# liveness runner pages the whole board every few seconds) therefore
+# paid full-board cost per page; with a single gunicorn worker every
+# other route queued behind them (Railway logs 2026-11-24: 3-9 s per
+# list call in production, /health and /pricing queueing 12-47 s).
+#
+# The sorted board snapshot (dict copies, newest first) is now cached
+# on the Fabric instance itself for a short TTL; filters and pagination
+# are applied per request against the snapshot. Keeping the cache on
+# the fabric scopes it to the state it describes: reset_fabric() and
+# process restarts build a fresh fabric with no snapshot. Freshness:
+#   * any non-GET request routed through the market blueprint drops
+#     the snapshot immediately (see attach_market_routes);
+#   * the maintenance sweeps drop it whenever they change a task;
+#   * direct in-process mutations that bypass both (e.g. the activity
+#     engine calling lifecycle functions) are bounded by the TTL:
+#     SINCOR_A2A_TASKS_CACHE_TTL_S, default 5 s; 0 disables the cache.
+_TASKS_SNAPSHOT_ATTR = "_tasks_list_snapshot"
+
+
+def _tasks_snapshot_ttl_s() -> float:
+    try:
+        return max(0.0, float(
+            os.environ.get("SINCOR_A2A_TASKS_CACHE_TTL_S", "5")))
+    except (TypeError, ValueError):
+        return 5.0
+
+
+def _invalidate_tasks_snapshot(fabric: Any = None) -> None:
+    """Drop the cached board snapshot (next list read rebuilds it)."""
+    fabric = fabric if fabric is not None else get_fabric()
+    if getattr(fabric, _TASKS_SNAPSHOT_ATTR, None) is not None:
+        setattr(fabric, _TASKS_SNAPSHOT_ATTR, None)
+
+
+def _board_snapshot(fabric: Any) -> List[Dict[str, Any]]:
+    """Newest-first list of task dict copies for the list endpoint.
+
+    Served from the per-fabric TTL cache when fresh; rebuilt under the
+    fabric lock (copy) + outside it (sort) when stale or absent.
+    """
+    ttl = _tasks_snapshot_ttl_s()
+    snap = getattr(fabric, _TASKS_SNAPSHOT_ATTR, None)
+    if snap is not None and ttl > 0 and (time.monotonic() - snap[0]) < ttl:
+        return snap[1]
+    with fabric.lock:
+        tasks = [dict(t) for t in fabric.tasks.values()]
+    tasks.sort(key=lambda t: (-int(t.get("created_at") or 0),
+                              str(t.get("task_id") or "")))
+    setattr(fabric, _TASKS_SNAPSHOT_ATTR, (time.monotonic(), tasks))
+    return tasks
+
+
 def listing_ttl_ms() -> int:
     """Outer listing lifetime for a task (default 24 h).
 
@@ -214,10 +271,16 @@ def refresh_stale_listings() -> List[Dict[str, Any]]:
         _reanchor_listing(task, ts, ttl)
 
     with fabric.lock:
+        # Perf (2026-11-24): the set of task_ids holding at least one
+        # commit is computed ONCE per sweep. The previous per-task
+        # `any(k.startswith(prefix) for k in fabric.commits)` scan made
+        # every sweep O(tasks x commits) — at production scale (~7.4k
+        # tasks, ~17.5k commit keys) ~10^8 string scans per call, and
+        # this sweep runs on every GET /v1/a2a/tasks (plus bid paths).
+        committed_task_ids = {k.split("\x00", 1)[0] for k in fabric.commits}
         for task in fabric.tasks.values():
             task_id = task.get("task_id")
-            prefix = f"{task_id}\x00"
-            has_commits = any(k.startswith(prefix) for k in fabric.commits)
+            has_commits = task_id in committed_task_ids
             state = task.get("state")
             if state in ("open", "auction"):
                 listing_exp = task.get("listing_expires_at")
@@ -246,6 +309,7 @@ def refresh_stale_listings() -> List[Dict[str, Any]]:
                 changed.append(dict(task))
     if changed:
         _save_tasks(fabric)
+        _invalidate_tasks_snapshot(fabric)
         for snap in changed:
             fabric.publish("task.refreshed", list(snap.get("tags") or []),
                            {"task_id": snap.get("task_id"),
@@ -1427,6 +1491,7 @@ def expire_stale_assignments() -> List[Dict[str, Any]]:
         )
     if expired:
         _save_tasks(fabric)
+        _invalidate_tasks_snapshot(fabric)
     # Pool allocation reconciliation: the inline release/spend calls
     # in this lifecycle (here, close_auction, submit_proof, the sybil
     # hold paths, admin delete) are fail-safe — a swallowed failure or
@@ -2452,6 +2517,16 @@ def reset_socialfi_onboarding():
 
 
 def attach_market_routes(bp: Blueprint) -> None:
+    @bp.before_request
+    def _drop_tasks_snapshot_on_write():
+        # Any write routed through this blueprint may change the board
+        # (create/delete/relist/close/bid/proof/...); drop the cached
+        # list snapshot so the next GET /v1/a2a/tasks rebuilds it
+        # instead of serving a pre-write board until the TTL lapses.
+        if request.method != "GET":
+            _invalidate_tasks_snapshot()
+        return None
+
     @bp.post("/v1/a2a/tasks")
     @idempotent("tasks.create", error=_http_error)
     def v1_tasks():
@@ -2592,9 +2667,19 @@ def attach_market_routes(bp: Blueprint) -> None:
 
         Query params: ``state`` (comma-separated), ``tags``
         (comma-separated, any-match), ``min_bounty`` (float AXM),
-        ``page`` (1-based), ``per_page`` (max 100). Newest first.
+        ``page`` (1-based), ``per_page`` (max 100). ``limit`` /
+        ``offset`` are accepted as an alternative slice selector:
+        when either is present it wins over ``page``/``per_page``
+        (``limit`` is clamped to the same max 100) and the response
+        reports the equivalent ``page``/``per_page``. Newest first.
         The board is refreshed first so listings are never silently
         unbiddable (see refresh_stale_listings).
+
+        Perf (2026-11-24): the board comes from the short-TTL sorted
+        snapshot cached on the fabric (see _board_snapshot) instead of
+        a full copy + sort per request; the sweeps above invalidate
+        the snapshot whenever they change a task, as does any write
+        routed through this blueprint.
         """
         refresh_stale_listings()
         expire_stale_assignments()
@@ -2607,11 +2692,14 @@ def attach_market_routes(bp: Blueprint) -> None:
         try:
             page = max(1, int(request.args.get("page") or 1))
             per_page = min(100, max(1, int(request.args.get("per_page") or 20)))
+            raw_offset = request.args.get("offset")
+            raw_limit = request.args.get("limit")
+            offset = int(raw_offset) if raw_offset is not None else None
+            limit = int(raw_limit) if raw_limit is not None else None
         except (TypeError, ValueError):
             return _http_error("page and per_page must be integers", 400)
         fabric = get_fabric()
-        with fabric.lock:
-            tasks = [dict(t) for t in fabric.tasks.values()]
+        tasks = _board_snapshot(fabric)
         if states:
             tasks = [t for t in tasks if str(t.get("state") or "").lower() in states]
         if tags:
@@ -2620,11 +2708,15 @@ def attach_market_routes(bp: Blueprint) -> None:
         if min_bounty > 0:
             tasks = [t for t in tasks
                      if float(t.get("bounty_axm") or 0) >= min_bounty]
-        tasks.sort(key=lambda t: (-int(t.get("created_at") or 0),
-                                  str(t.get("task_id") or "")))
         total = len(tasks)
+        if offset is not None or limit is not None:
+            if limit is not None:
+                per_page = min(100, max(1, limit))
+            start = max(0, offset) if offset is not None else 0
+            page = start // per_page + 1
+        else:
+            start = (page - 1) * per_page
         pages = max(1, (total + per_page - 1) // per_page)
-        start = (page - 1) * per_page
         return jsonify({
             "tasks": tasks[start:start + per_page],
             "page": page,
